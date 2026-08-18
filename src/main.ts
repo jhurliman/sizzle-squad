@@ -686,6 +686,13 @@ const btnDash = document.getElementById('btnDash')!;
 btnGrab.addEventListener('pointerdown', (e) => {
   input.pressGrab();
   input.setUse(true);
+  // ONE PULSE, AND IT HAS TO STILL BE HERE. The two handlers this replaced
+  // buzzed 8ms for grab and 5ms for use, and the note on the second one said
+  // why: "a control that answers silently while its neighbours answer feels
+  // broken, not quiet." Folding them into one button dropped both, which would
+  // have left the primary control the only silent disc in the cluster while
+  // dash still buzzed. 8ms, the grab value, because a press is a press.
+  haptic(8);
   e.preventDefault();
 });
 for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) {

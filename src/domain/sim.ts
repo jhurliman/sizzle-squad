@@ -854,10 +854,24 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
   if (!held) {
     if (st.kind === 'crate' && st.dispenses) return 'dispense';
     if (st.kind === 'plates') return 'dispense';
-    // See 'prep' above. Same two conditions the `useHeld` gate in step() tests,
-    // written once here so the sign the player reads and the work the button
-    // does can never disagree.
-    if (st.kind === 'board' && st.holding?.type === 'ingredient' && st.holding.ingredient.state === 'raw') return 'prep';
+    // See 'prep' above. Same conditions the `useHeld` gate in step() tests, and
+    // the SAME chopSeconds test updateStations makes before it advances any
+    // work — all three have to agree or the button lies.
+    //
+    // The chopSeconds check is not defensive tidying, it is a soft-lock fix. A
+    // bun and a rasher of bacon are both chopSeconds 0 and both are ingredients
+    // the player carries constantly. Put either on a board without this and:
+    // planGrab says 'prep', so the press is consumed as a no-op; the hold runs
+    // but updateStations refuses to advance an ingredient that cannot be
+    // chopped; and there is no other plan that lifts it. The item and the board
+    // are gone for the rest of the run, for the player and for the bots.
+    if (
+      st.kind === 'board' &&
+      st.holding?.type === 'ingredient' &&
+      st.holding.ingredient.state === 'raw' &&
+      INGREDIENT_DEFS[st.holding.ingredient.kind].chopSeconds > 0
+    )
+      return 'prep';
     if (st.kind === 'sink' && st.holding?.type === 'plate' && st.holding.plate.dirty) return 'prep';
     return st.holding ? 'take' : 'none';
   }
@@ -1462,8 +1476,15 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
       }
     }
     if (input.useHeld && st) {
+      // Same three-way agreement as planGrab above: without the chopSeconds
+      // test this lights the station and puts the chef into 'working' over a
+      // bun that updateStations will never advance — a chef miming a chop
+      // forever at a board that cannot be used.
       const usable =
-        (st.kind === 'board' && st.holding?.type === 'ingredient' && st.holding.ingredient.state === 'raw') ||
+        (st.kind === 'board' &&
+          st.holding?.type === 'ingredient' &&
+          st.holding.ingredient.state === 'raw' &&
+          INGREDIENT_DEFS[st.holding.ingredient.kind].chopSeconds > 0) ||
         (st.kind === 'sink' && st.holding?.type === 'plate' && st.holding.plate.dirty);
       if (usable && !chef.carrying) {
         st.active = true;
