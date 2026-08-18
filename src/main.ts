@@ -565,7 +565,36 @@ function resize() {
   measureUi();
 }
 window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+/**
+ * ROTATION ON iOS, AND THE ONE THING THIS CANNOT CLAIM TO FIX.
+ *
+ * A player reported "a weird white haze overlay when I rotate from portrait to
+ * landscape" on a real iPhone. It does not reproduce in headless Chromium: the
+ * rotate was driven at 393x852 -> 852x393 and traced, and `innerWidth`, the
+ * canvas CSS box and the canvas drawing buffer all land on the new size in the
+ * same resize event, with no element covering the viewport and no console
+ * error. So the haze is Safari-specific and is NOT diagnosed — the honest state
+ * is that something in iOS's own rotate compositing is showing through, and
+ * nothing here should pretend otherwise.
+ *
+ * What IS wrong and is fixed: `orientationchange` alone, deferred 120ms, is a
+ * bad signal on iOS. It fires before the viewport settles, so `innerWidth` is
+ * stale when it arrives — which is what the timeout was working around — and
+ * for the whole of that window the drawing buffer is the old shape while the
+ * canvas CSS box is already the new one, i.e. the frame on screen is a
+ * stretched copy of the previous orientation. `visualViewport`'s resize is the
+ * signal that actually tracks the settled viewport on iOS. Listening to all
+ * three, and resizing IMMEDIATELY as well as after the settle delay, makes that
+ * stretched window as short as the platform allows.
+ *
+ * `resize()` is idempotent and cheap — it sets a renderer size, re-solves the
+ * camera and measures one element — so calling it more often costs nothing.
+ */
+window.addEventListener('orientationchange', () => {
+  resize();
+  setTimeout(resize, 120);
+});
+window.visualViewport?.addEventListener('resize', resize);
 resize();
 
 // ------------------------------------------------------------------ ui glue

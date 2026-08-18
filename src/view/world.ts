@@ -2579,6 +2579,28 @@ export class WorldView {
         // four buckets, and the tone ladder above stays the ladder — this only
         // changes how it is sampled.
         const u = sy / archTop;
+        /**
+         * Z-FIGHTING, AND WHY NO SCREENSHOT IN THIS PROJECT EVER SHOWED IT.
+         *
+         * Each slat is `slatH * 1.25` tall on a `slatH` pitch — the deliberate
+         * 25% overlap that stops the tone ladder reading as stripes — and every
+         * one of them was drawn at the same z. So in the overlap band, two
+         * coplanar surfaces sit at identical depth across the whole back of the
+         * vault, which is the definition of a depth-buffer tie.
+         *
+         * The harness never caught it: shoot.mjs renders through SwiftShader,
+         * which resolves a tie the same way every frame, so it is stable in
+         * every capture and in every critic pass built on one. On a real GPU
+         * the winner flips per frame with interpolation noise, and the player
+         * reported the fireplace background doing "a weird vibratey gfx glitch"
+         * on an actual iPhone. A software rasteriser cannot find this class of
+         * bug, and no amount of looking at our own JPEGs would have.
+         *
+         * Alternating rather than ramping: adjacent slats are the only ones that
+         * overlap, so two planes 4mm apart is enough to break every tie, and it
+         * stays bounded — a monotonic ramp over 26 slats would walk the back of
+         * the vault 1.6cm forward and change the silhouette at the crown.
+         */
         S.box(
           rampTone(u),
           hw * 2,
@@ -2586,14 +2608,16 @@ export class WorldView {
           0.14,
           cx,
           sy,
-          back,
+          back + (i % 2) * 0.004,
         );
       }
       const ow = dy <= 0 ? ringOuter : Math.sqrt(Math.max(0, ringOuter * ringOuter - dy * dy));
       if (sy < archTop && ow < openHalf - 0.02) {
         const w = openHalf - Math.max(ow, 0);
         for (const s of [-1, 1]) {
-          S.box(C.stoneDark, w, slatH * 1.06, 0.4, cx + s * (openHalf - w / 2), sy, face - 0.02);
+          // Same tie, same fix: these spandrel slats overlap by 6% and were all
+          // at `face - 0.02`.
+          S.box(C.stoneDark, w, slatH * 1.06, 0.4, cx + s * (openHalf - w / 2), sy, face - 0.02 + (i % 2) * 0.004);
         }
       }
     }
