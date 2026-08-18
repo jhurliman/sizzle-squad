@@ -565,7 +565,36 @@ function resize() {
   measureUi();
 }
 window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+/**
+ * ROTATION ON iOS, AND THE ONE THING THIS CANNOT CLAIM TO FIX.
+ *
+ * A player reported "a weird white haze overlay when I rotate from portrait to
+ * landscape" on a real iPhone. It does not reproduce in headless Chromium: the
+ * rotate was driven at 393x852 -> 852x393 and traced, and `innerWidth`, the
+ * canvas CSS box and the canvas drawing buffer all land on the new size in the
+ * same resize event, with no element covering the viewport and no console
+ * error. So the haze is Safari-specific and is NOT diagnosed — the honest state
+ * is that something in iOS's own rotate compositing is showing through, and
+ * nothing here should pretend otherwise.
+ *
+ * What IS wrong and is fixed: `orientationchange` alone, deferred 120ms, is a
+ * bad signal on iOS. It fires before the viewport settles, so `innerWidth` is
+ * stale when it arrives — which is what the timeout was working around — and
+ * for the whole of that window the drawing buffer is the old shape while the
+ * canvas CSS box is already the new one, i.e. the frame on screen is a
+ * stretched copy of the previous orientation. `visualViewport`'s resize is the
+ * signal that actually tracks the settled viewport on iOS. Listening to all
+ * three, and resizing IMMEDIATELY as well as after the settle delay, makes that
+ * stretched window as short as the platform allows.
+ *
+ * `resize()` is idempotent and cheap — it sets a renderer size, re-solves the
+ * camera and measures one element — so calling it more often costs nothing.
+ */
+window.addEventListener('orientationchange', () => {
+  resize();
+  setTimeout(resize, 120);
+});
+window.visualViewport?.addEventListener('resize', resize);
 resize();
 
 // ------------------------------------------------------------------ ui glue
@@ -636,23 +665,40 @@ document.addEventListener('visibilitychange', () => {
 });
 
 const btnGrab = document.getElementById('btnGrab')!;
-const btnUse = document.getElementById('btnUse')!;
 const btnDash = document.getElementById('btnDash')!;
+/**
+ * ONE ACTION BUTTON. The press and the hold are the same finger.
+ *
+ * There were two discs: gold "pick up or put down" and blue "chop". A player
+ * testing on a phone asked why chop needed its own button, and on desktop
+ * could not find it at all — it was J/K, named nowhere on screen. Both are
+ * fair: the second button existed because the sim has two input channels, not
+ * because the player has two intentions. They only ever mean "do the thing in
+ * front of me".
+ *
+ * So one disc drives both channels. `pressGrab` fires the rising edge and
+ * `setUse(true)` runs for as long as the finger is down, and the domain's new
+ * 'prep' plan is what stops the two from fighting over a chopping board — see
+ * GrabKind in domain/sim.ts. Release clears the hold on every path a finger can
+ * leave by, including sliding off the disc, which main.ts already had to handle
+ * for the old chop button.
+ */
 btnGrab.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
   input.pressGrab();
-  haptic(8);
-});
-btnUse.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
   input.setUse(true);
-  // Two of the three discs used to buzz and the third didn't; a control that
-  // answers silently while its neighbours answer feels broken, not quiet.
-  haptic(5);
+  // ONE PULSE, AND IT HAS TO STILL BE HERE. The two handlers this replaced
+  // buzzed 8ms for grab and 5ms for use, and the note on the second one said
+  // why: "a control that answers silently while its neighbours answer feels
+  // broken, not quiet." Folding them into one button dropped both, which would
+  // have left the primary control the only silent disc in the cluster while
+  // dash still buzzed. 8ms, the grab value, because a press is a press.
+  haptic(8);
+  e.preventDefault();
 });
 for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) {
-  btnUse.addEventListener(ev, () => input.setUse(false));
+  btnGrab.addEventListener(ev, () => input.setUse(false));
 }
+
 btnDash.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   input.pressDash();

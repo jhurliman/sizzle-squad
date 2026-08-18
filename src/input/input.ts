@@ -4,7 +4,7 @@ import type { InputSnapshot, Vec2 } from '../domain/types';
  * One input abstraction, three device stories:
  *  - touch: floating thumbstick that spawns wherever the thumb lands, plus a
  *    three-disc action cluster in the bottom-right corner.
- *  - keyboard: WASD/arrows, Space = grab, Shift = dash, J/K = use.
+ *  - keyboard: WASD/arrows, Space (or E) = the one action button, Shift = dash.
  *  - gamepad: left stick, A = grab, X = use, B = dash.
  * Everything converges on InputSnapshot so the sim never knows the difference.
  *
@@ -707,6 +707,13 @@ export class InputManager {
       useHeld:
         (this.useButton && this.livePointers.size > 0) ||
         this.usePad ||
+        // THE SAME KEY AS GRAB. Space fires `grabQueued` on its rising edge and
+        // holds `useHeld` for as long as it is down, which is exactly what the
+        // one touch disc does — so a desktop player and a phone player are
+        // playing the same control. J and K stay bound because muscle memory
+        // and every existing tool that drives them should keep working.
+        this.keys.has('Space') ||
+        this.keys.has('KeyE') ||
         this.keys.has('KeyJ') ||
         this.keys.has('KeyK'),
       dashPressed: this.dashQueued,

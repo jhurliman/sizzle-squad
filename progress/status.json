@@ -1,6 +1,6 @@
 {
   "headline": "Endless score-attack cooking game in Three.js, original mascot chefs, built against real captures of Dash & Dine. Every piece is judged by a fresh critic that runs the game in Chromium at four device profiles and compares real pixels side by side with the reference.",
-  "wave": 2.0,
+  "wave": 3.0,
   "updatedAt": "2026-08-18T02:34:17.153864+00:00",
   "pieces": [
     {
@@ -23,9 +23,9 @@
       "id": "p03",
       "name": "Kitchen set & readability",
       "state": "critic",
-      "round": 15,
-      "note": "RECOMPOSE (wave 2B): cameraFailures 13 -> 0 on all four profiles, and the portrait picture is better, not just the number. Near floor cropped (bottom edge 10.00 -> 9.00): front-rank chef 13.9% -> 15.5% of frame height, one whole unit of bare stone off the bottom of every portrait frame. LOST_MAX 0.90 -> 0.95 pays for the narrower half-frame at the chef row (without it the worst cell puts his centre on the frame edge at |playerFrac| 0.996). Verified over 193 live samples: depth 2.27-2.76 inside its band, back wall 1.000 flat, |playerFrac| max 0.880, 0 console errors.",
-      "gap": "The two portrait assertions were landscape invariants and are now portrait-correct bands, set off LIVE telemetry after the first attempt failed 51% of frames by being set off the rest solve. A critic MUST be told this: the back-wall test now asserts the opposite (a tall frame must stay narrower than the room) and the depth band is 2.20-2.85, not the reference 1.75-1.81. Judge the retarget, not just the zero."
+      "round": 16,
+      "note": "WAVE 3, from real-device play: the arch IS the cooker now. The only two burners used to sit in the top-right corner rendered as a pale stone trivet under a copper pan, and the player reading them as hamburger buns was the correct reading. Burners moved into the oven mouth (map row 1 is now #DSS#=O=O=#S--#), rendered in iron on the hearth, with the flame tongues restored behind them. Decorative food is gone: the two oven loaves, both pancake towers and — the worst of it — the ceramic trays heaped with the game own tomato and lettuce, standing un-grabbable a few metres from the real crates.",
+      "gap": "Unverified by a critic. Also unresolved: two small marks on the arch voussoirs that only became visible once the pancake towers stopped occluding them."
     },
     {
       "id": "p04",
@@ -47,9 +47,9 @@
       "id": "p06",
       "name": "Touch controls",
       "state": "critic",
-      "round": 3,
-      "note": "Wave 2B r3: the drawn control is the math origin again. tools/honestprobe.mjs (new) measures the gap the other two probes are blind to: steering gain 3.65x -> 1.000, heading error at the end of a lateral sweep 47deg -> 0deg, drawn knob 302px median / 638px max from the finger -> 0.01px / 19.6px, on all three touch profiles. touchprobe unchanged to the digit (lag 62.00, mag 1.000, angErr 0.01deg, 45deg turn for 56px).",
-      "gap": "FORCED TRADE, NOW EXPLICIT: gain 1.0 requires the emitted vector to be measured from the point the ring is drawn at, and turn authority requires that point to stay a radius behind the thumb, so the ring must follow the thumb. r1 disliked exactly that (drift is back at 408px/s, ring 57% on glass at an edge press, 20/20 bounded sprints walk from the press point). Needs a critic told BOTH demands so it judges the trade, not one side of it."
+      "round": 4,
+      "note": "Wave 2B r3: the drawn control is the math origin again. tools/honestprobe.mjs (new) measures the gap the other two probes are blind to: steering gain 3.65x -> 1.000, heading error at the end of a lateral sweep 47deg -> 0deg, drawn knob 302px median / 638px max from the finger -> 0.01px / 19.6px, on all three touch profiles. touchprobe unchanged to the digit (lag 62.00, mag 1.000, angErr 0.01deg, 45deg turn for 56px). | WAVE 3: chop folded into the action button. One press now fires the grab edge AND holds the work channel (touchprobe: grabFired true, chopHeld true); the domain gains a \"prep\" plan so the press cannot steal the food off the board before the hold can cut it. Removing a disc gave the stick 92.7% -> 95.2% of the screen and halved the dead area, 3.2% -> 1.8%.",
+      "gap": "Unjudged by a critic. The white haze on iPhone rotate is reported but NOT reproduced headlessly and NOT diagnosed."
     },
     {
       "id": "p07",

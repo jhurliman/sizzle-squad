@@ -245,7 +245,6 @@ async function run() {
       return {
         cluster: rect('.action-cluster'),
         grab: rect('#btnGrab'),
-        use: rect('#btnUse'),
         dash: rect('#btnDash'),
       };
     });
@@ -569,9 +568,11 @@ async function run() {
     // OUTSIDE each edge (the near-miss a thumb actually produces).
     {
       const rows = [];
+      // Two discs, not three: the chop button was folded into the action button.
+      // The `if (!b) continue` below stays as the guard it always was, but it is
+      // no longer silently skipping a control this list still asks for.
       for (const [name, key] of [
         ['grab', 'grab'],
-        ['use', 'use'],
         ['dash', 'dash'],
       ]) {
         const b = R.geom[key];
@@ -637,10 +638,18 @@ async function run() {
     {
       const x0 = Math.round(w * 0.22);
       const y0 = Math.round(h * 0.6);
+      /**
+       * ONE BUTTON NOW, SO THIS TEST ASKS ONE BUTTON FOR BOTH ANSWERS.
+       *
+       * It used to tap #btnGrab and then move the finger to #btnUse to hold
+       * chop. The chop disc is gone: a single action button fires the rising
+       * edge and holds the work channel for as long as it is down. So the
+       * second finger lands on the action button once and stays there, and the
+       * probe checks that the SAME press produced both the grab edge and a held
+       * use — which is the whole claim the unification makes.
+       */
       const g = R.geom.grab;
-      const u = R.geom.use;
       const gc = [g.x + g.w / 2, g.y + g.h / 2];
-      const uc = [u.x + u.w / 2, u.y + u.h / 2];
       await clearTrace();
       await touch.start([{ id: 0, x: x0, y: y0 }]);
       await touch.move([{ id: 0, x: x0 + 50, y: y0 - 30 }]);
@@ -661,14 +670,8 @@ async function run() {
       ]);
       await step(2);
       const steerMag = await lastRow().then((r) => Math.hypot(r.mx, r.my));
-      // finger 1 moves to chop and holds; finger 0 lifts mid-hold
-      await touch.end([{ id: 1, x: gc[0], y: gc[1] }]);
-      await step(1);
-      await touch.start([
-        { id: 0, x: x0 + 90, y: y0 - 60 },
-        { id: 1, x: uc[0], y: uc[1] },
-      ]);
-      await step(2);
+      // finger 1 is STILL on the action button from the tap above — that is the
+      // point of one button — so the held channel should already be live.
       const useOn = await lastRow().then((r) => r.use);
       await touch.end([{ id: 0, x: x0 + 90, y: y0 - 60 }]);
       await step(3);
@@ -762,12 +765,13 @@ async function run() {
       };
       R.reach = {
         pivot,
+        // `use` is gone from the cluster — one action button now. Left out of
+        // the report rather than reported as null, so a diff against an older
+        // run shows a removed control instead of a broken measurement.
         grab: d(R.geom.grab),
-        use: d(R.geom.use),
         dash: d(R.geom.dash),
         sizesMm: {
           grab: +(R.geom.grab.w / PX_PER_MM).toFixed(1),
-          use: +(R.geom.use.w / PX_PER_MM).toFixed(1),
           dash: +(R.geom.dash.w / PX_PER_MM).toFixed(1),
         },
         clusterFracOfWidth: +(R.geom.cluster.w / w).toFixed(3),
@@ -780,8 +784,9 @@ async function run() {
       mark('shots');
       const gx = R.geom.grab.x + R.geom.grab.w / 2;
       const gy = R.geom.grab.y + R.geom.grab.h / 2;
-      const ux = R.geom.use.x + R.geom.use.w / 2;
-      const uy = R.geom.use.y + R.geom.use.h / 2;
+      // One button, so the "chop held" frame is the action disc held down.
+      const ux = gx;
+      const uy = gy;
       // 1: thumb down, stick at rest, exactly where it landed.
       const sx = Math.round(w * 0.2);
       const sy = Math.round(h * 0.72);
@@ -821,13 +826,13 @@ async function run() {
     const g = R.geom;
     console.log(`\n=== ${id}  ${w}x${h}  insets t${ins.t} b${ins.b} l${ins.l} r${ins.r}`);
     console.log(
-      `  discs      grab ${g.grab.w}px (${R.reach.sizesMm.grab}mm)  use ${g.use.w}px (${R.reach.sizesMm.use}mm)  dash ${g.dash.w}px (${R.reach.sizesMm.dash}mm)`,
+      `  discs      action ${g.grab.w}px (${R.reach.sizesMm.grab}mm)  dash ${g.dash.w}px (${R.reach.sizesMm.dash}mm)`,
     );
     console.log(
       `  cluster    ${g.cluster.w}x${g.cluster.h}  ${(R.reach.clusterFracOfWidth * 100).toFixed(1)}% of width  ${(R.reach.clusterFracOfArea * 100).toFixed(2)}% of area  gap to home-indicator ${R.reach.homeIndicatorGapPx}px`,
     );
     console.log(
-      `  reach      grab ${R.reach.grab.mm}mm  use ${R.reach.use.mm}mm  dash ${R.reach.dash.mm}mm  from thumb pivot`,
+      `  reach      action ${R.reach.grab.mm}mm  dash ${R.reach.dash.mm}mm  from thumb pivot`,
     );
     console.log(
       `  regions    stick ${R.region.pctStick}%  button ${R.region.pctButton}%  DEAD ${R.region.pctDead}%  (predicate mismatches: ${R.regionTruth.mismatch.length})`,
