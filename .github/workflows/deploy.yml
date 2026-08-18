@@ -1,0 +1,63 @@
+name: Deploy to GitHub Pages
+
+# Publishes the playable build to GitHub Pages so the game can be opened on a
+# phone. The typecheck runs first and is a gate, not decoration: AGENTS.md makes
+# `tsc --noEmit` clean a release condition, and a red build should never become
+# the thing someone taps on their home screen.
+on:
+  push:
+    branches: [main]
+  # So a deploy can be re-run from the Actions tab without an empty commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. `cancel-in-progress: false` because cancelling a run
+# that is mid-deploy can leave Pages serving a half-published site; queueing
+# costs a minute and never does.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # README states Node 20+; 22 is what the project is developed against.
+          node-version: '22'
+          cache: npm
+
+      # `npm ci` rather than `npm install` — package-lock.json is committed, and
+      # a deploy should build the dependency tree that was tested, not resolve a
+      # fresh one.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      # vite.config.ts sets `base: './'`, so dist/ is position-independent and
+      # works under the /sizzle-squad/ subpath Pages serves from. See the note
+      # there for why an absolute base would break the tools/ harness.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -126,7 +126,9 @@ for (const p of PROFILES) {
   );
   const pick = (k) => rows.map((r) => r[k]);
   const warn = new Map();
-  for (const r of rows) for (const w of r.warnings) {
+  // describe() splits defects from counted composition events; a trace that
+  // reads only `warnings` would stop seeing the rescue entirely. Both, tagged.
+  for (const r of rows) for (const w of [...r.warnings, ...(r.notes ?? []).map((n) => `note: ${n}`)]) {
     const key = w.replace(/-?\d+\.\d+/g, '#');
     warn.set(key, (warn.get(key) ?? 0) + 1);
   }

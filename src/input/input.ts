@@ -27,27 +27,54 @@ export interface TouchStickView {
   origin: Vec2;
   knob: Vec2;
   /**
-   * WHERE THE CONTROL IS DRAWN, WHICH IS NOT WHERE THE MATH HAPPENS.
+   * WHERE THE CONTROL IS DRAWN. IT IS THE ORIGIN, ON GLASS.
    *
-   * These used to be the same point, and that was the wave-2 verdict against
-   * this piece: the drag that keeps a sprint saturated walked the whole
-   * control — a 124px ring plus an opaque cream knob — 438px in one second of
-   * held run (51% of an 852px screen), parked it at 0.50,0.33 of the frame
-   * over the pizza oven and across an order balloon, and left it reading as a
-   * third order bubble. shots/w2-touch-crit/iphone-portrait-sprint-up.jpg.
+   * The history here is worth the twenty lines, because this one field has
+   * been wrong in both directions and the second way was worse.
    *
-   * The two jobs are not the same job. Steering wants a reference that follows
-   * the thumb (it is what buys angle error 0.00deg and magnitude 1.000 across
-   * a 700px drag). Drawing wants a control that stays where the player put it.
-   * So `origin` still drags and `anchor` does not: it is fixed at the press
-   * point, nudged only far enough to keep the whole ring on the glass, and the
-   * knob is drawn from it at the true deflection. Measured after
-   * (tools/stickprobe.mjs): drawn drift 0px at 250/500/750/1000ms of a 500px/s
-   * held run, against 63/188/313/438px before; 0 of 20 bounded sprints move the
-   * ring off the point the thumb pressed; ring 100% on glass at every edge
-   * press; and every fidelity number in touchprobe.mjs unchanged to the digit —
-   * sprint lag 62.00px, magnitude 1.000, angle error 0.00deg, 45deg of turn
-   * still costing 56px of lateral thumb after a 300px sprint.
+   * Wave 2 r1: `anchor` did not exist, the ring was drawn at `origin`, and the
+   * drag that keeps a sprint saturated walked the whole control — a 124px ring
+   * plus a 58px opaque cream knob — 438px in one second of held run, parked it
+   * over the pizza oven, and left it reading as a third order bubble.
+   * Score 78. The critic's demand was to bound that walk.
+   *
+   * Wave 2A r2 instead FROZE the drawing at the press point and let the maths
+   * keep dragging. That killed the walk (drawn drift 0px at every checkpoint)
+   * and every number in touchprobe.mjs stayed perfect to the digit, because
+   * touchprobe measures the emitted vector against `origin` and could not see
+   * what had been broken. What had been broken was the only thing the player
+   * can read. Score 62 — the one number in this project that went down.
+   *
+   * The lie, measured by tools/honestprobe.mjs on the frozen build: the
+   * painted knob sat a median 302px and up to 638px from the finger holding
+   * it, and a lateral sweep after a 300px sprint swung the chef's heading
+   * 64.7deg while the control the player was looking at swung 17.7deg —
+   * a steering gain of 3.65x on a control whose entire promise is 1.00x,
+   * ending 47deg away from where the drawn stick pointed, permanently.
+   *
+   * So: the ring is drawn at the origin again, and the walk is bounded by the
+   * thing that was always bounding it — the drag itself. `origin` is pushed
+   * only far enough to sit exactly one radius behind the thumb, so the drawn
+   * control is never more than 62px from the finger that is holding it, at any
+   * point in any run, and the knob is drawn AT the finger. That is the r1
+   * demand ("the stick stays under the thumb and remains absolute") satisfied
+   * literally, without freezing the reference the maths needs.
+   *
+   * The r1 complaint that the moving control read as content was a complaint
+   * about the ART, and wave 2A fixed the art independently: the knob went 58px
+   * opaque cream to 44px at 0.55 with a hard dark rim (measured luma 131 vs a
+   * balloon's 233 — 99 apart, against 10 before), and the whole ring drops to
+   * 0.55 opacity while the stick is deflected past 0.62. A control that is
+   * under the player's own thumb and no longer looks like food is not a third
+   * order bubble.
+   *
+   * The only reason this is not simply `origin` is the glass clamp: the whole
+   * 124px ring plus its drop shadow has to stay on screen, so an edge press
+   * nudges the DRAWN centre inward while `origin` stays exactly under the
+   * thumb — which is what keeps "edge press emits 0" true. The nudge is at
+   * most one radius plus the pad, it only exists while the thumb is inside
+   * that band, and the moment a sprint pulls the origin off the edge the two
+   * points are the same point again.
    */
   anchor: Vec2;
   radius: number;
@@ -102,6 +129,19 @@ const CLUSTER_MARGIN = 14;
 const STICK_EDGE_PAD = 8;
 
 /**
+ * HOW FAR THE ON-GLASS CLAMP MAY ROTATE THE DRAWN HEADING. tan(4deg).
+ *
+ * Bounds: 0 means the ring is never nudged sideways at all, so a thumb resting
+ * against the left edge and pushing up drags a third of the control off the
+ * screen for the whole run; past ~tan(8deg) the skew is large enough to see —
+ * 8deg on a 62px stick is a full knob-width of sideways lie, and 8deg of
+ * heading is the difference between hitting the pass and hitting the bin at
+ * the far end of a kitchen. 4deg costs at most 4.3px of sideways ring nudge at
+ * full deflection, which is under the 5px border width of `.stick-ring`.
+ */
+const ANCHOR_SKEW_TAN = Math.tan((4 * Math.PI) / 180);
+
+/**
  * WHEN A THUMB HAS CHANGED ITS MIND, AND WHAT THAT USED TO COST.
  *
  * The origin drag parks the math origin a full radius BEHIND the thumb, so a
@@ -148,6 +188,16 @@ export interface InputTraceRow {
   active: boolean;
   ox: number;
   oy: number;
+  /**
+   * WHERE THE CONTROL IS DRAWN, recorded alongside where the maths happens.
+   * These were the same number and then they were not, and the divergence was
+   * invisible to every probe in tools/ because nothing wrote it down: the
+   * wave-2A verdict measured a drawn knob up to 238px from the finger and a
+   * steering gain of 1.4-2.1x by reading pixels, because the trace could not
+   * tell it. tools/honestprobe.mjs reads these.
+   */
+  ax: number;
+  ay: number;
   kx: number;
   ky: number;
   mx: number;
@@ -420,6 +470,7 @@ export class InputManager {
         ) {
           this.stick.origin = { x: e.clientX, y: e.clientY };
           this.stick.knob = { x: e.clientX, y: e.clientY };
+          this.syncAnchor();
           e.preventDefault();
           return;
         }
@@ -431,21 +482,28 @@ export class InputManager {
         // 62.00px and magnitude at 1.000 for the whole of a 700px drag. The
         // drawn control does not move with it — see `anchor`.
         //
-        // AND THE DRAG IS NOT CLAMPED, WHICH WAS MEASURED, NOT ASSUMED. The
+        // AND THE DRAG IS NOT CAPPED, WHICH WAS MEASURED, NOT ASSUMED. The
         // obvious fix for a walking control is a hard cap on this drift, so it
         // was built and probed at the proposed 90px: `turn` went from 45deg of
         // heading for 56px of lateral thumb to NO 45deg turn at all within the
-        // entire width of a 393px screen after a 300px sprint. A frozen origin
+        // entire width of a 393px screen after a 300px sprint. A capped origin
         // leaves the thumb hundreds of px out along the old heading, and from
-        // there sideways travel barely rotates anything. The control furniture
-        // is what had to stop moving; the reference point is what has to keep
-        // up. Clamping the wrong one of the two costs the turn.
+        // there sideways travel barely rotates anything.
+        //
+        // It does not need capping, because it is already bounded: this line
+        // is what holds the origin at exactly one radius behind the thumb, so
+        // the drag has a hard 62px leash to the finger and the control drawn
+        // on it does too. Only its DISTANCE FROM THE PRESS POINT is unbounded,
+        // and the press point stops being a place the player is looking the
+        // moment the thumb leaves it.
         if (dist > STICK_RADIUS) {
           const over = dist - STICK_RADIUS;
           this.stick.origin.x += (dx / dist) * over;
           this.stick.origin.y += (dy / dist) * over;
         }
         this.stick.knob = { x: e.clientX, y: e.clientY };
+        // The ring goes where the maths went. See `anchor`.
+        this.syncAnchor();
         e.preventDefault();
       },
       opts,
@@ -484,12 +542,60 @@ export class InputManager {
     this.stick.origin = { x, y };
     this.stick.knob = { x, y };
     this.lastThumb = { x, y };
-    // The DRAWN ring is the only thing that moves off the thumb, and only far
-    // enough to keep itself whole. The emitted vector is still measured from
-    // the press point, so a corner press still emits exactly 0.000 (probe:
-    // `edge press ... emits 0`) — the clamp costs no fidelity at all.
-    this.stick.anchor = { x: clampAxis(x, window.innerWidth), y: clampAxis(y, window.innerHeight) };
+    this.syncAnchor();
     this.cancelAt = -1;
+  }
+
+  /**
+   * Put the drawn ring on the maths, then push it inboard to keep the whole
+   * 124px disc on the glass — but only as far as it can go without changing
+   * the direction the control appears to point.
+   *
+   * The clamp is the one thing that can still separate the drawn control from
+   * the maths, and at a press it is free: the deflection is 0, so there is no
+   * heading to be wrong about, which is what keeps "edge press emits 0" true
+   * (`origin` is never touched here). Once the thumb is deflected it is not
+   * free, and it is worst exactly where a thumb likes to sit: honestprobe
+   * measured a 43.6deg peak error on a sprint that rode the right edge of a
+   * portrait screen, purely from the ring being held 70px inboard of a finger
+   * that had reached the glass.
+   *
+   * So the offset is split against the current deflection. The component ALONG
+   * the deflection is free at any size — sliding the ring centre up or down the
+   * line the thumb is pushing cannot change which way it points — and that
+   * component is the whole of the clamp in the common case (thumb at the right
+   * edge pushing right, thumb at the bottom pushing down). The component ACROSS
+   * it is what rotates the drawn heading, and that one is capped at what
+   * ANCHOR_SKEW_TAN degrees of error is worth in pixels.
+   *
+   * Cost: at a hard edge press held perpendicular the ring can now hang off the
+   * screen instead of lying about the heading. That trade is deliberate and it
+   * is the r2 lesson — a visible-but-honest control beats an invisible one.
+   */
+  private syncAnchor() {
+    const o = this.stick.origin;
+    let ox = clampAxis(o.x, window.innerWidth) - o.x;
+    let oy = clampAxis(o.y, window.innerHeight) - o.y;
+    const dx = this.stick.knob.x - o.x;
+    const dy = this.stick.knob.y - o.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 1 && (ox !== 0 || oy !== 0)) {
+      const ux = dx / d;
+      const uy = dy / d;
+      const along = ox * ux + oy * uy;
+      let px = ox - along * ux;
+      let py = oy - along * uy;
+      const perp = Math.hypot(px, py);
+      const maxPerp = Math.min(d, STICK_RADIUS) * ANCHOR_SKEW_TAN;
+      if (perp > maxPerp) {
+        const k = maxPerp / perp;
+        px *= k;
+        py *= k;
+      }
+      ox = along * ux + px;
+      oy = along * uy + py;
+    }
+    this.stick.anchor = { x: o.x + ox, y: o.y + oy };
   }
 
   /** Newest surviving finger takes the stick, at its own position (no jump). */
@@ -613,6 +719,8 @@ export class InputManager {
         active: this.stick.active,
         ox: +this.stick.origin.x.toFixed(2),
         oy: +this.stick.origin.y.toFixed(2),
+        ax: +this.stick.anchor.x.toFixed(2),
+        ay: +this.stick.anchor.y.toFixed(2),
         kx: +this.stick.knob.x.toFixed(2),
         ky: +this.stick.knob.y.toFixed(2),
         mx: +snap.move.x.toFixed(4),

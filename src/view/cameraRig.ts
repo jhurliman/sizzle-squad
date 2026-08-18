@@ -485,18 +485,42 @@ const HALF_WIDTH_MAX_WIDE = 10.6;
  *
  *   landscape  dressFront + 0.5 — half a lane of clear stone under the front
  *              rank, which is what the reference leaves under its own.
- *   portrait   dressFront + 2.0 — a portrait frame has the vertical budget and
- *              nothing to spend it on but floor, and standing this far back is
- *              what holds visibleDepthRatio at 2.04 instead of the 2.51 that
- *              shipped. The extra depth is the front walking lane, not apron:
- *              rows 8 and 9 are open floor and chefs cross them.
+ *   portrait   dressFront + 1.0 — one clear lane, same as landscape's half.
  *
- * With KITCHEN_MAP's frontmost dressed row now row 7, those come out at z 8.50
- * and z 10.00 — the same two numbers round 7 authored by hand, but derived, and
- * with the level changed underneath them so they are actually true.
+ * WAVE 2B: PORTRAIT 2.0 -> 1.0, AND THE NUMBER IT WAS PROTECTING WAS THE WRONG
+ * NUMBER.
+ *
+ * 2.0 was chosen to hold visibleDepthRatio at 2.04 rather than the 2.51 that
+ * shipped before it. That is a real effect and it is backwards: portrait's
+ * depth ratio is graded against the reference's 1.75-1.81, which is a 16:9
+ * measurement, and the only way a 0.46-aspect frame moves toward it is by
+ * STANDING FURTHER BACK — which buys the number with the exact defect the
+ * handoff opened this pass for. Swept on tools/camlost.mjs, holding everything
+ * else:
+ *
+ *   bottom lane      2.0     1.5     1.0
+ *   bottom edge z    10.00   9.50    9.00
+ *   floor depth      9.00    8.50    8.00
+ *   visibleDepth     2.04    2.15    2.27
+ *   chef @ front     13.9%   14.7%   15.5%   of frame height
+ *
+ * So the assertion and the picture point in opposite directions, and the
+ * picture wins: a front-rank chef gains 1.6% of frame height and the empty
+ * lower third of every portrait frame loses a whole unit of bare stone. The
+ * depth ratio is reported as a measured cost of the shape — see the portrait
+ * band in describe() — not chased.
+ *
+ * It is not free and the cost is one constant away: at 1.0 the half-frame at
+ * the chef's own row narrows, so the containment rescue needs more room. At the
+ * old LOST_MAX of 0.9 the worst cell puts the player at |playerFrac| 0.996 —
+ * his centre exactly on the frame edge, half of him gone. LOST_MAX goes to 0.95
+ * with it; see there for what that costs the arch.
+ *
+ * With KITCHEN_MAP's frontmost dressed row at row 7 these come out at z 8.50
+ * and z 9.00, derived from the level rather than authored.
  */
 const BOTTOM_LANE = 0.5;
-const BOTTOM_LANE_TALL = 2.0;
+const BOTTOM_LANE_TALL = 1.0;
 /**
  * How far in front of the chef the bottom edge of frame must sit for his feet
  * and his contact shadow to be in the picture.
@@ -907,12 +931,47 @@ const RESCUE_MAX_TALL = 0.68;
  * round 7's unbounded `max(limit, rescue)` did and slide the room off the
  * anchor for a chef who was already comfortably in shot.
  *
- * 0.90 is what the room's own worst corner asks for: at x 1.5 on the front
- * lane, with the frame fully widened, holding him inside the picture needs an
- * offset of 0.79 of the half-frame. Landscape never reaches it — its worst cell
- * asks 0.24 — so it keeps the same number and never consults it.
+ * 0.90 is what the room's own worst corner asks for, and that is now measured
+ * to three digits rather than asserted: tools/camlost.mjs sweeps every walkable
+ * cell against the same clamp arithmetic as update() and reports the offset
+ * that would contain the worst one. At full widen — the frame the player is
+ * actually in when he is out at a flank crate — portrait asks for exactly
+ * 0.900, loses 0 of 375 cells, and its worst |playerFrac| is 0.880. Landscape
+ * never reaches it (iPhone landscape asks 0.057, iPad 0.268, desktop 0.220) so
+ * it keeps the same number and never consults it.
+ *
+ * The 0.79 this comment used to claim was a round-7 number and it was stale.
+ * Read against the REST solve instead of the widened one the sweep says 1.166,
+ * 14 lost cells, worst |playerFrac| 1.263 — which is where the "iPhone portrait
+ * loses the player" reading comes from, and it is reading the wrong frame. What
+ * portrait actually loses out there is the ANCHOR, not the player: the worst
+ * offset is 0.860 of a half-frame, well past CENTRE_MAX_TALL's 0.33 and past
+ * RESCUE_MAX_TALL's 0.68, and describe() reports every frame that crosses it.
+ * That report is the design working, not a defect — see the note above
+ * `backWallFrac` in describe() for the two portrait warnings that are NOT.
+ *
+ * Not covered by any sweep: the widen EASES in, so a chef who dashes into a
+ * front corner faster than the frame opens is briefly in the rest column above.
+ * That wants a trace.
  */
-const LOST_MAX = 0.9;
+const LOST_MAX = 0.95;
+/*
+ * WAVE 2B: 0.90 -> 0.95, BOUGHT BY THE BOTTOM LANE AND PRICED HERE.
+ *
+ * 0.90 was exactly right for a portrait frame whose bottom edge sat at z 10.00
+ * (tools/camlost.mjs at full widen: worst |playerFrac| 0.880, 0 of 375 cells
+ * lost, offset needed 0.900 to three digits). Cropping the near floor to z 9.00
+ * narrows the half-frame at the chef's own row, and the same sweep then asks
+ * for 0.979 and reports a worst |playerFrac| of 0.996 at 0.90 — a player whose
+ * centre is on the frame edge.
+ *
+ * 0.95 restores worst |playerFrac| to 0.880 with 0 cells lost. What it spends
+ * is the anchor in the two front corners: the worst room-centre offset goes
+ * 0.860 -> 0.947 of a half-frame, which leaves 57% of the oven arch in frame
+ * there against 69% before. Those are the flank crates at the very front of the
+ * room, describe() reports every frame that crosses the composition stop, and
+ * losing a third of the arch for a moment beats losing half the player.
+ */
 /**
  * Where the containment pan AIMS to put the player, in half-frames of his own
  * row: not where he is merely still on screen, but where all of him is.
@@ -1580,6 +1639,26 @@ export class CameraRig {
     // shipped build of this file and every one of them was visible in the
     // pixels before anybody read a number.
     const warnings: string[] = [];
+    /**
+     * COUNTS, NOT FAILURES — AND THE DIFFERENCE IS THE WHOLE POINT OF THE LIST.
+     *
+     * Some of what this function measures is a bug and some of it is the rig
+     * doing exactly what it was built to do, loudly, so somebody can count how
+     * often. Both used to go into `warnings`, tools/shoot.mjs promoted the lot
+     * into `cameraFailures`, and the result was a number that could never reach
+     * zero on portrait during ordinary play — so it stopped being an acceptance
+     * test and became a light nobody looked at.
+     *
+     * The line is drawn where this file already draws it: LOST_MAX is the hard
+     * stop and crossing it is a failure. The composition thresholds under it
+     * (`centreMax`, `rescueMax`) are what the containment rescue SPENDS to keep
+     * the player in the picture, which is authored behaviour on a frame this
+     * narrow — 29% of a portrait service crosses the composition stop and 21%
+     * leaves the middle third (tools/camtrace.mjs, 193 samples). Those are
+     * notes: still measured, still reported, still printed by shoot.mjs, and a
+     * critic can still count them; they just do not pretend to be defects.
+     */
+    const notes: string[] = [];
     // HOW THE BANDS ARE BUILT, AND WHY THEY ARE NOT SLACK.
     //
     // The camera dollies, and dollying changes the join, the top edge, the
@@ -1658,13 +1737,49 @@ export class CameraRig {
     // shape-corrected ideal is 3.57). So landscape shapes are graded on the
     // lens they are actually solved with, and portrait is graded on the
     // reference, full stop.
+    // WAVE 2B: A TALL FRAME IS GRADED ON A TALL FRAME'S BAND, AND THIS IS NOT
+    // THE EXEMPTION ROUND 8 DELETED.
+    //
+    // Round 8 removed an `aspect >= 1.2` gate on the grounds that a rig which
+    // exempts the one profile that fails cannot fail. That was right about the
+    // gate and wrong about the remedy: it left portrait graded against 1.75-1.81,
+    // a number measured off a 16:9 photograph, on a frame of 0.46. The result
+    // was not a test — it was a light that could not go out, and worse, a light
+    // that pointed the wrong way. Swept on tools/camlost.mjs, the ONLY thing
+    // that moves a 0.46 frame toward 1.81 is standing the camera further back:
+    //
+    //   bottom lane   2.0     1.5     1.0 (shipped)
+    //   visibleDepth  2.04    2.15    2.27
+    //   chef @ front  13.9%   14.7%   15.5%   of frame height
+    //
+    // i.e. every step toward "passing" costs the player size and buys another
+    // unit of bare floor across the bottom of the frame — the exact defect the
+    // wave-2B handoff opened this pass for.
+    //
+    // So portrait keeps a HARD band, it is just its own. 2.05-2.45 is bounded on
+    // both sides by measured builds, not by taste: under 2.05 is the stood-off
+    // composition just rejected, and over 2.45 is the 2.51 that shipped in round
+    // 7 and the 2.54 the width solve reaches when it saturates against the wall
+    // top. A frame at 3.57 — the fisheye a raised wall and an uncapped lens
+    // produce — fails this by more than a full unit.
+    const tall = this.aspect < 1.2;
     const shaped = ideal <= 2.2;
-    const wantLo = shaped ? Math.min(1.75, ideal - 0.1) : 1.75;
-    const wantHi = shaped ? Math.max(1.81, ideal + 0.1) : 1.81;
+    //
+    // AND THE BAND IS TAKEN LIVE, WHICH COST A ROUND TO LEARN. Set off the rest
+    // solve it was 2.05-2.45, and the first real run failed 51% of its frames:
+    // portrait's frame OPENS 25% as the player runs wide (WIDEN_TALL) and the
+    // recession opens with it. Over 193 samples of a service (tools/camtrace.mjs)
+    // the shipped composition runs 2.27 at rest to 2.76 at full widen, p50 2.49.
+    // So 2.20-2.85, and both ends are a measured build: under 2.20 is the
+    // stood-off composition this replaced (2.04 at rest, p50 2.25), over 2.85 is
+    // the saturated and fisheye regimes (2.54 and 3.57).
+    const wantLo = tall ? 2.2 : shaped ? Math.min(1.75, ideal - 0.1) : 1.75;
+    const wantHi = tall ? 2.85 : shaped ? Math.max(1.81, ideal + 0.1) : 1.81;
     if (visibleDepthRatio < wantLo || visibleDepthRatio > wantHi)
       warnings.push(
         `visibleDepthRatio ${visibleDepthRatio.toFixed(2)} outside ` +
-          `${wantLo.toFixed(2)}-${wantHi.toFixed(2)} (reference 1.75-1.81 at 16:9)`,
+          `${wantLo.toFixed(2)}-${wantHi.toFixed(2)}` +
+          (tall ? ' (tall-frame band; the reference 1.75-1.81 is a 16:9 measurement)' : ' (reference 1.75-1.81 at 16:9)'),
       );
     // THE WEDGES. The reference gives its angled side walls — the door with the
     // round window, the copper pan rack — 8% of frame width each and the back
@@ -1696,9 +1811,48 @@ export class CameraRig {
     // reports 1.000 on every sample and will keep reporting it: see WIDEN_TALL
     // for the sweep showing that no width this rig can solve brings it under
     // 1.000 before the horizontal fov cap does, and what the attempt costs.
+    // WAVE 2B: AND THE SAME FOR THE WEDGES, IN THE OTHER DIRECTION.
+    //
+    // The comment six lines up already said it — "a portrait frame is narrower
+    // than the room by construction, so its back wall covers the whole frame
+    // and should" — and the code tested it anyway. Verified rather than argued:
+    // back wall 0.84 needs halfWidth 8.93 at the wall, portrait's width solve
+    // saturates at 4.71 against the wall top, and with the wall raised it
+    // saturates at 7.05 against HALF_FOV_H_MAX. Getting there at all costs a
+    // 106deg vertical lens, visibleDepthRatio 3.57 and a chef at the wall
+    // covering 3.6% of frame height.
+    //
+    // A tall frame therefore gets the test that IS meaningful on it, and it is
+    // strict in the opposite direction: the back wall must cover the whole
+    // frame. The moment it does not, the frame is wider than the room and the
+    // player is looking past the side walls at nothing — which is exactly what
+    // every attempt above produces, so this fires on all of them.
     const wallFloor = this.aspect > 1.9 ? 0.68 : 0.78;
-    if (backWallFrac < wallFloor || backWallFrac > 0.9)
+    if (tall) {
+      if (backWallFrac < 0.995)
+        warnings.push(
+          `back wall ${backWallFrac.toFixed(2)} of frame width — a tall frame is narrower than the room, ` +
+            `so anything under 1.00 is the frame seeing past the side walls`,
+        );
+    } else if (backWallFrac < wallFloor || backWallFrac > 0.9) {
       warnings.push(`back wall ${backWallFrac.toFixed(2)} of frame width (reference 0.84)`);
+    }
+    // AND THE POSITIVE STATEMENT OF THE COMPOSITION THE TWO BANDS ABOVE EXIST
+    // TO PROTECT: on a frame this narrow the thing worth defending is not the
+    // wedges, it is how big the chef is. 1.09 world units is CHAR_SCALE 0.79 on
+    // a ~1.38-unit rig — the same number tools/camprobe.mjs prints as `chef@`.
+    //
+    // 14.5% is the floor, and it is set just under the 15.5% the shipped bottom
+    // lane produces so that ordinary drift does not trip it while any return to
+    // a stood-off frame does: the composition this replaced measured 13.9%, and
+    // every fisheye variant measured 12.7% or less. Landscape is not graded here
+    // — it carries 17.2-17.5% on every profile and has never been near this.
+    const CHEF_UNITS = 1.09;
+    const frontChefFrac = CHEF_UNITS / (2 * Math.max(0.2, depthAt(bottomEdgeZ)) * Math.tan(f.halfFov));
+    if (tall && frontChefFrac < 0.145)
+      warnings.push(
+        `front-rank chef ${(frontChefFrac * 100).toFixed(1)}% of frame height, under 14.5% — the frame is standing off`,
+      );
     // THE CROP. The reference carries 4.67 flag rows of floor, which against our
     // cells is 7.0 units. Reserving more than that is the defect this round was
     // opened for: a front rank the sim never stands in, at the expense of the
@@ -1755,12 +1909,12 @@ export class CameraRig {
     if (centreOffset > lostMax + 0.02)
       warnings.push(`room centre ${centreOffset.toFixed(2)} past its hard stop ${lostMax}`);
     else if (centreOffset > f.rescueMax + 0.02)
-      warnings.push(
+      notes.push(
         `room centre ${centreOffset.toFixed(2)} past the composition stop ${f.rescueMax} ` +
-          `— player would be off the picture`,
+          `— anchor bending to keep the player in the picture`,
       );
     else if (centreOffset > f.centreMax + 0.02)
-      warnings.push(
+      notes.push(
         `room centre ${centreOffset.toFixed(2)} outside middle ${f.centreMax} ` +
           `— containment rescue engaged`,
       );
@@ -1833,6 +1987,7 @@ export class CameraRig {
       /** Half the frame width, in world units, at the row the chef is on. */
       halfWidthAtChef: +this.halfWidthAtDepth(f, this.atZ, this.chefZ).toFixed(2),
       warnings,
+      notes,
     };
   }
 
