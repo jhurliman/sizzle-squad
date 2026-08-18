@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { INGREDIENT_DEFS } from '../domain/content';
-import { ovenSpan, stationCenter } from '../domain/kitchen';
+import { inOvenSpan, ovenSpan, stationCenter } from '../domain/kitchen';
 import type { Kitchen, Station, Carryable, Ingredient } from '../domain/types';
 import { PALETTE, flat, flatOwn, glazed, metal, toon, toonMapped } from './materials';
 import {
@@ -91,6 +91,18 @@ const WAINSCOT_H = 0.9;
  */
 const TABLE_H = 0.38;
 const COUNTER_H = 0.86;
+/**
+ * Where the arch springs, and the top of the stone floor under it.
+ *
+ * Both hearth slabs — the sooted floor inside the mouth and the pale lip that
+ * projects out of it — are built at centre `HEARTH_SPRING - 0.4` and 0.3 tall,
+ * so their shared upper surface is `HEARTH_SPRING - 0.25`. The burners that now
+ * live in the mouth stand on exactly that number rather than on a copy of it;
+ * one constant is the only thing keeping a hob from floating a centimetre above
+ * its own hearth or sinking into it.
+ */
+const HEARTH_SPRING = 0.86;
+const HEARTH_TOP = HEARTH_SPRING - 0.25;
 
 // ------------------------------------------------- THE VALUE CEILING (round 15)
 /**
@@ -1582,6 +1594,8 @@ export interface StationView {
   hot?: THREE.Mesh;
   contentRoot: THREE.Group;
   contentKey: string;
+  /** True for burners inside the oven arch: they have no bench, and a cavity behind them. */
+  inOven: boolean;
   /** World y of this station's bench top — where the focus wash and the action glyph hang off. */
   topY: number;
 }
@@ -1635,7 +1649,7 @@ export class WorldView {
     // this brings the arch down 20% as well and the near-semicircle flattens
     // toward the reference's broad shallow profile.
     const openHalf = cw * 0.28;
-    const spring = 0.86;
+    const spring = HEARTH_SPRING;
     return { span, cx: (span.x0 + span.x1) / 2, cw, chimH: BEAM_Y + 0.05, openHalf, spring, archTop: spring + openHalf };
   })();
 
@@ -1746,6 +1760,31 @@ export class WorldView {
       bar(g, 0.11, -0.13, 0.115, -0.9);
       bar(g, 0.3, 0, -0.075, 0);
       bar(g, 0.11, 0.13, -0.115, -0.9);
+    });
+    /**
+     * PREP — HOLD, DON'T TAP, AND THE SIGN HAS TO SAY THAT.
+     *
+     * Every other glyph in this set describes a transfer that happens on a
+     * press. This one is the only station verb that takes TIME, and it is the
+     * verb a player specifically could not find: chopping used to live on its
+     * own button and now shares the action button with everything else. A
+     * chevron would be a lie here — nothing arrives in your hands.
+     *
+     * A blade over a board, plus three progress pips under it. The pips are
+     * what carry "keep holding": a static icon with no duration in it is what
+     * made two buttons feel necessary in the first place.
+     */
+    mk('prep', (g) => {
+      // The blade: a long bar raked over a short one, so it reads as a knife on
+      // a board rather than as a cross.
+      bar(g, 0.3, 0.01, 0.075, -0.42);
+      bar(g, 0.1, -0.13, -0.02, -0.42, 0x3a2013);
+      bar(g, 0.34, 0, -0.09, 0);
+      for (const dx of [-0.1, 0, 0.1]) {
+        const pip = new THREE.Mesh(new THREE.CircleGeometry(0.022, 8), flatOwn(ink, 1));
+        pip.position.set(dx, -0.16, 0.006);
+        g.add(pip);
+      }
     });
     mk('discard', (g) => {
       const body = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), flatOwn(ink, 1));
@@ -2540,6 +2579,28 @@ export class WorldView {
         // four buckets, and the tone ladder above stays the ladder — this only
         // changes how it is sampled.
         const u = sy / archTop;
+        /**
+         * Z-FIGHTING, AND WHY NO SCREENSHOT IN THIS PROJECT EVER SHOWED IT.
+         *
+         * Each slat is `slatH * 1.25` tall on a `slatH` pitch — the deliberate
+         * 25% overlap that stops the tone ladder reading as stripes — and every
+         * one of them was drawn at the same z. So in the overlap band, two
+         * coplanar surfaces sit at identical depth across the whole back of the
+         * vault, which is the definition of a depth-buffer tie.
+         *
+         * The harness never caught it: shoot.mjs renders through SwiftShader,
+         * which resolves a tie the same way every frame, so it is stable in
+         * every capture and in every critic pass built on one. On a real GPU
+         * the winner flips per frame with interpolation noise, and the player
+         * reported the fireplace background doing "a weird vibratey gfx glitch"
+         * on an actual iPhone. A software rasteriser cannot find this class of
+         * bug, and no amount of looking at our own JPEGs would have.
+         *
+         * Alternating rather than ramping: adjacent slats are the only ones that
+         * overlap, so two planes 4mm apart is enough to break every tie, and it
+         * stays bounded — a monotonic ramp over 26 slats would walk the back of
+         * the vault 1.6cm forward and change the silhouette at the crown.
+         */
         S.box(
           rampTone(u),
           hw * 2,
@@ -2547,14 +2608,16 @@ export class WorldView {
           0.14,
           cx,
           sy,
-          back,
+          back + (i % 2) * 0.004,
         );
       }
       const ow = dy <= 0 ? ringOuter : Math.sqrt(Math.max(0, ringOuter * ringOuter - dy * dy));
       if (sy < archTop && ow < openHalf - 0.02) {
         const w = openHalf - Math.max(ow, 0);
         for (const s of [-1, 1]) {
-          S.box(C.stoneDark, w, slatH * 1.06, 0.4, cx + s * (openHalf - w / 2), sy, face - 0.02);
+          // Same tie, same fix: these spandrel slats overlap by 6% and were all
+          // at `face - 0.02`.
+          S.box(C.stoneDark, w, slatH * 1.06, 0.4, cx + s * (openHalf - w / 2), sy, face - 0.02 + (i % 2) * 0.004);
         }
       }
     }
@@ -2775,7 +2838,15 @@ export class WorldView {
       [-0.3, 0.09, -0.06, 0.5],
       [0.27, 0.0, 0.16, 0.42],
     ];
-    for (const [dx, dy, dz, r] of loaves) {
+    // THE MOUTH HOLDS REAL PANS NOW, SO IT NO LONGER HOLDS FAKE BREAD.
+    //
+    // Two things were wrong with leaving these in. They are decorative food in
+    // a game whose one readability rule is that anything edible-looking can be
+    // picked up — the same rule the pancake stacks broke. And they sit at
+    // z 0.72-0.94 on the sole, directly behind where the burners now stand, so
+    // every pan would have been silhouetted against a pair of loaves.
+    const SHOW_LOAVES = false;
+    for (const [dx, dy, dz, r] of SHOW_LOAVES ? loaves : []) {
       const px = cx + dx;
       const py = spring + dy;
       const pz = back + 0.62 + dz;
@@ -3026,10 +3097,78 @@ export class WorldView {
     // And the object they were chasing does not exist. Enlarge the reference's
     // mouth 6x: there is no flame in it. There is a warm rust vault, a dark
     // maroon block, two pizzas, and light coming from somewhere behind them.
-    // That is the whole fire. So the tongues and the strip are gone, the glow
-    // pool and the flicker pulse (both now BEHIND the loaves) are the entire
-    // light, and `this.fire` stays empty — update()'s loop over it is a no-op
-    // and costs nothing, and the pulse is what makes the mouth breathe.
+    //
+    // ================================================================
+    // WAVE 3 — THE FLAMES COME BACK, BECAUSE BOTH REASONS THEY LEFT ARE GONE.
+    //
+    // Round 17 deleted the tongues for two stated reasons and the notes above
+    // are careful about both. The first was mechanical: the tongues sat at
+    // z back+0.85..1.05 and the loaves at back+0.72..0.94, so four additive
+    // layers composited straight over the bread and turned two pizzas into
+    // orange gel. THE LOAVES ARE GONE — the mouth holds the game's real burners
+    // now — so there is nothing left in here for a tongue to wash out. The
+    // second was fidelity to the reference photograph, which shows no flame.
+    // That one was overruled by the person the game is for: asked directly,
+    // having played it on a phone, they wanted the fire back.
+    //
+    // It is also no longer only decoration. The arch is where you cook, and a
+    // visible flame is the cheapest possible way to say so — a burner that is
+    // obviously ON needs no tutorial text.
+    //
+    // What is kept from the deletion: the tongues stay BEHIND the burners
+    // (z back+0.55 against pans at the hearth lip, z 1.5), so they light the
+    // pans from behind and silhouette them instead of washing over them; and
+    // every tint goes through `fireTint`, which splits one clamped budget
+    // between all the additive layers in this arch rather than letting each
+    // one look reasonable on its own and the sum clip at V 1.00.
+    const TONGUES: [number, number, number][] = [
+      // x offset, height, phase
+      [-0.46, 0.42, 0.0],
+      [0.04, 0.54, 2.3],
+      [0.5, 0.38, 4.1],
+    ];
+    for (const [ox, fh, phase] of TONGUES) {
+      // A lathe tapering from a fat foot to a point, so the silhouette is a
+      // tongue rather than a cone: fire is widest just above the fuel, not at
+      // it. LatheGeometry lays v=0 at the first profile point (the foot), which
+      // is what the alpha ramp below is authored against.
+      const profile = [
+        new THREE.Vector2(0.001, 0),
+        new THREE.Vector2(0.1, fh * 0.16),
+        new THREE.Vector2(0.115, fh * 0.4),
+        new THREE.Vector2(0.07, fh * 0.72),
+        new THREE.Vector2(0.001, fh),
+      ];
+      const m = new THREE.Mesh(
+        new THREE.LatheGeometry(profile, 10),
+        new THREE.MeshBasicMaterial({
+          color: fireTint(0xb85a17, 1, 0.3),
+          map: flameRamp(),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      /**
+       * ON TOP OF THE EMBER BLOCK, WHICH IS THE MISTAKE THAT DELETED THEM.
+       *
+       * The block is built at centre `spring - 0.28`, 0.34 tall, z `back + 0.6`
+       * by 0.56 deep — so it occupies y 0.41-0.75 and z 0.48-1.04, and its lip
+       * tops out at 0.78. The first attempt at restoring these put the tongues
+       * at y 0.50, z 0.82: geometrically INSIDE the brick, which is the same
+       * failure the round-15 note describes as "authored behind the ember block
+       * and never once on screen". Fire comes off the top of the fuel.
+       */
+      const baseY = spring - 0.06;
+      m.position.set(cx + ox, baseY, back + 0.62);
+      m.userData.phase = phase;
+      m.userData.baseY = baseY;
+      this.root.add(m);
+      // update() already owns the flicker — two incommensurate frequencies per
+      // tongue, written and tuned in round 15 and left in place when the meshes
+      // were deleted. This is the loop finally having something to animate.
+      this.fire.push(m);
+    }
   }
 
   // ------------------------------------------------------------- furniture
@@ -3043,7 +3182,18 @@ export class WorldView {
     // Back-wall fixtures are counter height; anything out on the open floor is
     // a low prep bench so it can never hide a chef from a frontal camera.
     const againstWall = st.cell.y <= 1;
-    const h = againstWall ? COUNTER_H : (seat?.h ?? TABLE_H);
+    /**
+     * A BURNER IN THE ARCH STANDS ON THE HEARTH, NOT ON A PAINTED COUNTER.
+     *
+     * The hearth floor inside the mouth and the pale lip that projects out of
+     * it form one continuous stone surface at y 0.60-0.61 (see the hearth boxes
+     * in the arch builder: `spring - 0.4` centre, 0.3 tall). A hob placed there
+     * lands on the stone instead of hovering over it, and — the point of the
+     * whole change — it is lit by the fire behind it, so it reads as the hot
+     * part of the room without needing a label.
+     */
+    const inOven = inOvenSpan(st.cell);
+    const h = inOven ? HEARTH_TOP : againstWall ? COUNTER_H : (seat?.h ?? TABLE_H);
     const x = seat?.x ?? c.x;
     const z = seat?.z ?? c.y;
     g.position.set(x, 0, z);
@@ -3052,9 +3202,11 @@ export class WorldView {
 
     // Floor stations do NOT build their own furniture: buildBenches() has
     // already laid one continuous plank under each horizontal run of them.
-    if (againstWall) {
+    if (againstWall && !inOven) {
       // Team pass on the left, cook line on the right — the reference's red and
       // green counters, with the same painted body and pale top rail.
+      // NOT in the oven mouth: a painted counter body there would bury the
+      // hearth and put a red-or-green slab across the middle of the arch.
       const left = st.cell.x < this.kitchen.width / 2;
       const body = left ? C.teamRed : C.teamGreen;
       const dark = left ? C.teamRedDark : C.teamGreenDark;
@@ -3176,9 +3328,19 @@ export class WorldView {
         // A pale stone trivet with a steel ring set into it. The old hob was a
         // 0x4a3b2f plate under a 0x2f2620 disc — a near-black bullseye on the
         // green counter, and with a pan on it the whole cook line went dark.
-        P.cyl(C.stoneWarm, 0.36, 0.37, 0.08, 18, x, h + 0.04, z);
-        P.cyl(C.steelDark, 0.3, 0.3, 0.04, 18, x, h + 0.08, z);
-        P.cyl(0xa8663a, 0.24, 0.24, 0.02, 18, x, h + 0.1, z);
+        //
+        // ...AND IN THE OVEN MOUTH IT IS THE OPPOSITE PROBLEM. That pale stone
+        // is a 72cm disc, the widest single thing on the burner, and against
+        // sooted hearth stone it is the brightest — so the object a player
+        // actually sees at a burner is a big pale circle, which is precisely
+        // what got reported as "is that the hamburger bun?". The pan on top was
+        // only half of that read; this was the other half. Inside the arch the
+        // whole assembly goes to iron and the fire behind it does the lighting.
+        const trivet = inOven ? 0x574f4a : C.stoneWarm;
+        const ringCol = inOven ? 0x322d31 : C.steelDark;
+        P.cyl(trivet, 0.36, 0.37, 0.08, 18, x, h + 0.04, z);
+        P.cyl(ringCol, 0.3, 0.3, 0.04, 18, x, h + 0.08, z);
+        P.cyl(inOven ? 0x7a4a22 : 0xa8663a, 0.24, 0.24, 0.02, 18, x, h + 0.1, z);
         // Also per-instance: the hob glow is animated per station too.
         hot = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.02, 20), flatOwn(PALETTE.stoveHot, 0.0));
         hot.position.set(0, h + 0.085, 0);
@@ -3331,7 +3493,7 @@ export class WorldView {
     g.add(face);
 
     this.root.add(g);
-    const view: StationView = { station: st, group: g, anchor, ring, glow, face, hot, contentRoot, contentKey: '', topY: h };
+    const view: StationView = { station: st, group: g, anchor, ring, glow, face, hot, contentRoot, contentKey: '', topY: h, inOven };
     this.stationViews.push(view);
     this.byId.set(st.id, view);
   }
@@ -4078,7 +4240,12 @@ export class WorldView {
 
     // Tall pancake stacks flanking the pass, exactly where the reference puts
     // them: at the inboard end of each team counter, against the timber post.
-    for (const px of [span.x0 - 0.5, span.x1 + 0.5]) this.pancakes(px, 1.5);
+    // NO PANCAKE TOWERS EITHER. These flanked the oven at the two most looked-at
+    // places on the back wall, and a stack of pale discs is exactly what a bun
+    // looks like at phone size — the reported confusion was a player asking
+    // which of the round pale things was the bread. Nothing that reads as food
+    // is scenery any more; the crates are the only food source in the room.
+    void this.pancakes;
 
     this.dressPass(span);
     this.foreground();
@@ -4515,18 +4682,34 @@ export class WorldView {
       // Back-edge dressing. Kept off the station cells' centres and clear of
       // the server, so nothing here can ever hide a thing the player needs.
       const zb = z - 0.28;
-      if (left) {
-        this.bunTray(2.25, h, zb);
-        this.ceramicTray('lettuce', 4.0, h, zb);
-      } else {
-        // A plate stack at the inboard end and buns at the outboard end, which
-        // is the reference's arrangement on its green counter, mirrored.
+      /**
+       * CROCKERY YES, FOOD NO — AND THIS IS THE RULE, NOT A TRIM.
+       *
+       * This dressing used to be a bun tray and a ceramic dish heaped with
+       * lettuce on the left, and a plate stack, a dish of tomatoes and a second
+       * bun tray on the right. Three of those five are the game's own hero
+       * ingredients, rendered from the same `heap` the real crates use, sitting
+       * a couple of metres from the real crates and impossible to pick up.
+       *
+       * A player testing on a phone reported hunting the room for the bread and
+       * asking whether the pale round things were the buns. They were looking at
+       * scenery. When a set dresses itself with the exact objects the mechanics
+       * are made of, every one of them is a lie the player has to test by
+       * walking into it — and the cost of that lie is paid in the first two
+       * minutes, which is the only budget a new player has.
+       *
+       * So the rule is now absolute: if it reads as food, it is a crate or it
+       * is on a plate or in a pan. Plates, pots, bowls, shakers and the hanging
+       * rack stay — cookware says "kitchen" without ever claiming to be an
+       * ingredient.
+       */
+      if (!left) {
         for (let i = 0; i < 7; i++) {
           P.cyl(i % 3 === 0 ? 0xece4d2 : PALETTE.plates, 0.2, 0.18, 0.046, 14, W - 3.85, h + 0.03 + i * 0.046, zb);
         }
-        this.ceramicTray('tomato', W - 2.2, h, zb);
-        this.bunTray(W - 1.38, h, zb);
       }
+      void this.bunTray;
+      void this.ceramicTray;
     }
   }
 
@@ -4898,10 +5081,28 @@ export class WorldView {
      * moving it off the bench in plan), clears the tallest hat in the cast by
      * about half a head and keeps the sign visibly attached to its bench.
      */
+    /**
+     * ...EXCEPT IN THE OVEN, WHERE 'BEHIND THE BENCH' IS 'INSIDE THE CAVITY'.
+     *
+     * The -0.22 of depth above is what pushes the sign up-screen without moving
+     * it off its bench in plan, and it is right for every bench in the room
+     * because there is a wall behind them. A burner in the arch has a two-metre
+     * hole behind it: the same offset puts the disc at z 1.28 against an arch
+     * face at 1.36, i.e. THROUGH the opening and floating in the middle of the
+     * fire — which is the exact failure the note above records from
+     * shots/ab-marker-on, arrived at from the other direction.
+     *
+     * So an oven burner pushes the sign the other way, out over the hearth lip
+     * where it is in front of the masonry and against the pale stone rather
+     * than against a dark glowing cavity. Height comes down to match: it no
+     * longer has to clear a bench, only the hearth.
+     */
+    const depth = v.inOven ? 0.3 : -0.22;
+    const lift = v.inOven ? 0.72 : 0.98;
     this.glyphRoot.position.set(
       this.glyphAt.x,
-      v.topY + 0.98 + Math.sin(time * 2.6) * 0.035,
-      this.glyphAt.z - 0.22,
+      v.topY + lift + Math.sin(time * 2.6) * 0.035,
+      this.glyphAt.z + depth,
     );
   }
 
@@ -5262,6 +5463,30 @@ function focusWash(): THREE.DataTexture {
  * as a decal rather than as stone that has aged unevenly.
  */
 let softBlobTex: THREE.DataTexture | null = null;
+let flameRampTex: THREE.DataTexture | null = null;
+function flameRamp(): THREE.DataTexture {
+  if (flameRampTex) return flameRampTex;
+  const n = 32;
+  const data = new Uint8Array(n * 4);
+  for (let y = 0; y < n; y++) {
+    const v = (y + 0.5) / n;
+    // Opaque at the foot, gone by the tip, with the falloff biased late so the
+    // tongue keeps a body and only the last third dissolves. A linear ramp
+    // reads as a triangle with a soft edge; this reads as flame.
+    const a = Math.pow(Math.max(0, 1 - v), 1.5) * (0.55 + 0.45 * Math.min(1, v * 4));
+    const i = y * 4;
+    data[i] = data[i + 1] = data[i + 2] = 255;
+    data[i + 3] = Math.round(255 * Math.min(1, a));
+  }
+  const tex = new THREE.DataTexture(data, 1, n, THREE.RGBAFormat);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  flameRampTex = tex;
+  return tex;
+}
+
 function softBlob(): THREE.DataTexture {
   if (softBlobTex) return softBlobTex;
   const n = 48;
@@ -5329,21 +5554,42 @@ export function buildCarryable(c: Carryable): THREE.Group {
       g.add(m);
     });
   } else {
-    // COPPER, not slate. This was 0x3f4756 with a 0x2c323d handle: three of
-    // these sit on the cook line all game, and at Y≈18 they were by a wide
-    // margin the darkest objects anywhere in the room — three black holes
-    // punched in the one back counter the reference dresses in white ceramic
-    // and green paint. Nothing in this palette should be black. Copper puts
-    // them in the room's warm band and echoes the hanging rack behind them.
-    const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.13, 20), toon(0xb5763a));
+    /**
+     * IRON AGAIN, BECAUSE THE THING IT HAD TO NOT LOOK LIKE CHANGED.
+     *
+     * History: this was slate 0x3f4756, and was moved to copper 0xb5763a on the
+     * grounds that three near-black discs on the pale green cook line were the
+     * darkest objects in the room. That was the correct call FOR THAT PLACE.
+     * The burners are not there any more — they stand on sooted stone inside
+     * the oven mouth, lit by the fire behind them — and against that a warm
+     * mid-value disc is the single worst choice available. A player testing on
+     * an iPhone asked which of the round pale things was the hamburger bun; one
+     * of the things they were looking at was a copper pan sitting on a trivet,
+     * and they were not wrong to ask. A pan that reads as bread in a game about
+     * cooking bread is the whole failure.
+     *
+     * So: a dark iron body that no ingredient in INGREDIENT_DEFS can be
+     * confused with, kept off pure black (0x4a4550, not 0x000) because the
+     * palette rule against black still holds, with a warm worn rim so it stays
+     * in the room's band and still catches the fire. And the handle is long
+     * enough to be a HANDLE — 0.34 was a stub that vanished at phone size, and
+     * silhouette is what tells a pan from a plate from a loaf at 40 pixels.
+     */
+    const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.13, 20), toon(0x4a4550));
     pan.castShadow = true;
     g.add(pan);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.04, 20), toon(0xd9a463));
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.045, 20), toon(0x8a6a44));
     rim.position.y = 0.065;
     g.add(rim);
-    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.08), toon(0x7d5427));
-    handle.position.set(0.3, 0.03, 0);
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.055, 0.075), toon(0x2f2b33));
+    handle.position.set(0.36, 0.035, 0);
     g.add(handle);
+    // A pale end-cap on the handle, so the silhouette has a terminator rather
+    // than fading into whatever is behind it.
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.09, 10), toon(0x8a6a44));
+    grip.rotation.z = Math.PI / 2;
+    grip.position.set(0.56, 0.035, 0);
+    g.add(grip);
     c.pan.contents.forEach((ing, i) => {
       const m = ingredientMesh(ing);
       m.position.set((i - 1) * 0.11, 0.09, 0);
@@ -5570,6 +5816,11 @@ function updateContents(v: StationView, time: number) {
   const h = v.station.holding;
   if (!h) return;
   if (h.type === 'pan' && h.pan.onHeat) {
-    v.contentRoot.position.y = 1.0 + Math.sin(time * 22 + v.station.id) * 0.006;
+    // RELATIVE TO THE STATION, NOT A LITERAL 1.0. This was a hardcoded height
+    // that happened to sit 4cm above a counter-height hob, so every pan visibly
+    // jumped the instant its burner lit — and the moment burners moved into the
+    // arch, where the hearth is 25cm lower than a counter, the same line would
+    // have hung the pan in mid-air above the fire.
+    v.contentRoot.position.y = v.topY + 0.1 + Math.sin(time * 22 + v.station.id) * 0.006;
   }
 }

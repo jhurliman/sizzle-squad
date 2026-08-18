@@ -41,15 +41,11 @@
               </g>
             </svg>
           </button>
-          <button id="btnUse" class="btn btn-use" aria-label="Chop">
-            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-              <path d="M3 17.5 19 1.5c2.8 3.6 4.2 7.4 4.2 11.4 0 3-.9 5.8-2.6 8.4l-2 3z" fill="#fff" />
-              <path d="M3 17.5 19 1.5c1.5 2 2.6 4 3.2 6.2L6.6 21z" fill="#cfeaf2" />
-              <rect x="17.4" y="22.4" width="13" height="6" rx="3" transform="rotate(45 17.4 22.4)" fill="#ffd166" />
-              <rect x="19.2" y="23.4" width="9" height="2.2" rx="1.1" transform="rotate(45 19.2 23.4)" fill="#fff0c0" />
-            </svg>
-          </button>
-          <button id="btnGrab" class="btn btn-grab" aria-label="Pick up or put down">
+          <!-- The chop disc is gone. One action button now drives both the press
+               and the hold; see the wiring note in main.ts and the 'prep' plan
+               in domain/sim.ts for why the two could not simply be pointed at
+               the same finger without the domain answering first. -->
+          <button id="btnGrab" class="btn btn-grab" aria-label="Pick up, put down, chop or serve">
             <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
               <path
                 d="M11 20V7.5a2.2 2.2 0 0 1 4.4 0V17V5.4a2.2 2.2 0 0 1 4.4 0V17v-8.4a2.2 2.2 0 0 1 4.4 0V21c0 5-3.4 8.4-8.3 8.4-3 0-5.2-1.2-7-3.7l-3.6-5a2.3 2.3 0 0 1 3.4-3z"
@@ -81,7 +77,12 @@
           <p class="tagline">One tiny kitchen. Three hungry minutes. Go.</p>
           <button id="btnStart" class="cta">Start Cooking</button>
           <div class="how">
-            <span class="k-desktop">WASD move · Space grab · J chop · Shift dash</span>
+            <!-- Space is now the whole verb set: tap to pick up, put down or
+                 serve, HOLD it at a board to chop. The old line named a J key
+                 for chop that appeared nowhere else on screen, and a player on
+                 desktop reported not being able to find the chop control at
+                 all. One key, and the line says what holding it does. -->
+            <span class="k-desktop">WASD move · Space to use (hold to chop) · Shift dash</span>
             <!-- "Left thumb" was the old rule and it was also the old bug: the
                  stick only ever spawned on the left half, so 46.8% of the
                  screen was a place a thumb could press and nothing happened,
@@ -91,7 +92,7 @@
             <!-- The purple disc is on screen on exactly one platform and this
                  line is the only place it is ever named; the k-desktop line
                  above names all four verbs, so this one does too. -->
-            <span class="k-touch">Drag anywhere to run · gold grabs · blue chops · purple dashes</span>
+            <span class="k-touch">Drag anywhere to run · gold does everything · purple dashes</span>
           </div>
         </div>
       </div>
