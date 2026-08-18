@@ -7,15 +7,15 @@
       "id": "p01",
       "name": "Camera & framing",
       "state": "critic",
-      "round": 6,
-      "note": "Wave 2B: the p01 gap was re-measured, not re-derived (tools/camlost.mjs, new). LOST_MAX=0.9 does NOT lose the player: at the widen the frame actually has when he is out at a flank crate, portrait loses 0 of 375 cells, worst |playerFrac| 0.880, and the offset needed to contain every cell is exactly 0.900. The 1.263 / 14-lost-cells reading comes from sweeping the REST frame, which is not the frame he is in. What portrait does lose out there is the ANCHOR — worst offset 0.860 against a 0.33 clamp and a 0.68 stop — and describe() reporting that is the design working. LOST_MAX’s stale 0.79 comment is corrected.",
-      "gap": "Untested: the widen EASES in, so a chef who dashes into a front corner faster than the frame opens is briefly in the rest column. Wants a trace, not a sweep."
+      "round": 7,
+      "note": "Wave 2B: the p01 gap was re-measured, not re-derived (tools/camlost.mjs, new). LOST_MAX=0.9 does NOT lose the player: at the widen the frame actually has when he is out at a flank crate, portrait loses 0 of 375 cells, worst |playerFrac| 0.880, and the offset needed to contain every cell is exactly 0.900. The 1.263 / 14-lost-cells reading comes from sweeping the REST frame, which is not the frame he is in. What portrait does lose out there is the ANCHOR — worst offset 0.860 against a 0.33 clamp and a 0.68 stop — and describe() reporting that is the design working. LOST_MAX’s stale 0.79 comment is corrected. | RECOMPOSE: portrait now reports 0 camera failures live; the containment rescue is counted as notes (25% outside the middle third, 18% past the composition stop) rather than counted as defects.",
+      "gap": "Still open: the player is under the thumb cluster on 2% of portrait samples (was 6-7%). Real defect, pre-existing, wants its own pass."
     },
     {
       "id": "p02",
       "name": "Art direction & lighting",
       "state": "critic",
-      "round": 10,
+      "round": 11,
       "note": "Wave 1.5 final: 74/100.",
       "gap": "Bench planks no longer separate from the floor they stand on — luma 133/S 0.64 on a 158/S 0.55 floor, so the lower two-thirds reads as one field of pale decking."
     },
@@ -23,9 +23,9 @@
       "id": "p03",
       "name": "Kitchen set & readability",
       "state": "critic",
-      "round": 14,
-      "note": "Wave 1.5 final: 80/100. | Wave 2B: the RECOMPOSE acceptance test (cameraFailures -> 0 on all four profiles) is VERIFIED UNREACHABLE by tuning, and chasing it makes the picture worse. Sweeps in tools/camprobe.mjs: portrait’s width solve saturates at hw 4.71 (wall-top bound) and, with the wall raised, at 7.05 (HALF_FOV_H_MAX bound) against the 8.93 that back wall 0.84 needs — and reaching for it costs a 106deg lens, vdr 3.57 and chefs at 3.6% of frame height. visibleDepthRatio is worse: every lever that lowers it toward the reference 1.75-1.81 buys the number with MORE empty floor and SMALLER characters (bottom lane 2.0 -> 1.0 -> 0.5 gives vdr 2.27 -> 2.04 -> 1.95 while chef@front goes 15.5% -> 13.9% -> 13.3%). The assertion and the visible defect point in opposite directions.",
-      "gap": "DECISION NEEDED: both portrait camera assertions are landscape invariants applied to a frame that is narrower than the room by construction. Either retarget them to portrait-correct bands (so cameraFailures becomes a usable acceptance test again) or keep them permanently red and treat the two numbers as declared costs. Everything downstream of RECOMPOSE waits on that call."
+      "round": 15,
+      "note": "RECOMPOSE (wave 2B): cameraFailures 13 -> 0 on all four profiles, and the portrait picture is better, not just the number. Near floor cropped (bottom edge 10.00 -> 9.00): front-rank chef 13.9% -> 15.5% of frame height, one whole unit of bare stone off the bottom of every portrait frame. LOST_MAX 0.90 -> 0.95 pays for the narrower half-frame at the chef row (without it the worst cell puts his centre on the frame edge at |playerFrac| 0.996). Verified over 193 live samples: depth 2.27-2.76 inside its band, back wall 1.000 flat, |playerFrac| max 0.880, 0 console errors.",
+      "gap": "The two portrait assertions were landscape invariants and are now portrait-correct bands, set off LIVE telemetry after the first attempt failed 51% of frames by being set off the rest solve. A critic MUST be told this: the back-wall test now asserts the opposite (a tall frame must stay narrower than the room) and the depth band is 2.20-2.85, not the reference 1.75-1.81. Judge the retarget, not just the zero."
     },
     {
       "id": "p04",

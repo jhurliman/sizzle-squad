@@ -63,11 +63,11 @@ const K = {
   WALL_TOP: 9.3,
   HALF_WIDTH_MAX_WIDE: 10.6,
 };
-for (const a of process.argv.slice(2)) {
-  const [k, v] = a.split('=');
-  if (k in K) K[k] = Number(v);
-  else throw new Error('unknown key ' + k);
-}
+// The clamp constants live in CL, which is declared further down, so overrides
+// are parsed here and applied there. camprobe.mjs only accepts K keys, which is
+// why LOST_MAX could never be swept from the command line.
+const OVERRIDES = Object.fromEntries(process.argv.slice(2).map((a) => a.split('=')).map(([k, v]) => [k, Number(v)]));
+for (const k of Object.keys(OVERRIDES)) if (k in K) K[k] = OVERRIDES[k];
 WALL_TOP = K.WALL_TOP;
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -221,6 +221,10 @@ const CL = {
   HOLD_WIDE: 0.84,
   FOLLOW_TALL: 0.1,
 };
+for (const k of Object.keys(OVERRIDES)) {
+  if (k in CL) CL[k] = OVERRIDES[k];
+  else if (!(k in K)) throw new Error('unknown key ' + k);
+}
 function shoulder(a, soft, hold) {
   if (a <= soft) return a;
   const span = Math.max(1e-3, hold - soft);
