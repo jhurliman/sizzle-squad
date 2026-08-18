@@ -636,23 +636,33 @@ document.addEventListener('visibilitychange', () => {
 });
 
 const btnGrab = document.getElementById('btnGrab')!;
-const btnUse = document.getElementById('btnUse')!;
 const btnDash = document.getElementById('btnDash')!;
+/**
+ * ONE ACTION BUTTON. The press and the hold are the same finger.
+ *
+ * There were two discs: gold "pick up or put down" and blue "chop". A player
+ * testing on a phone asked why chop needed its own button, and on desktop
+ * could not find it at all — it was J/K, named nowhere on screen. Both are
+ * fair: the second button existed because the sim has two input channels, not
+ * because the player has two intentions. They only ever mean "do the thing in
+ * front of me".
+ *
+ * So one disc drives both channels. `pressGrab` fires the rising edge and
+ * `setUse(true)` runs for as long as the finger is down, and the domain's new
+ * 'prep' plan is what stops the two from fighting over a chopping board — see
+ * GrabKind in domain/sim.ts. Release clears the hold on every path a finger can
+ * leave by, including sliding off the disc, which main.ts already had to handle
+ * for the old chop button.
+ */
 btnGrab.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
   input.pressGrab();
-  haptic(8);
-});
-btnUse.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
   input.setUse(true);
-  // Two of the three discs used to buzz and the third didn't; a control that
-  // answers silently while its neighbours answer feels broken, not quiet.
-  haptic(5);
+  e.preventDefault();
 });
 for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) {
-  btnUse.addEventListener(ev, () => input.setUse(false));
+  btnGrab.addEventListener(ev, () => input.setUse(false));
 }
+
 btnDash.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   input.pressDash();

@@ -782,7 +782,30 @@ export type GrabKind =
   | 'swap' // exchange what you hold for what is there
   | 'return' // put it back where you found it
   | 'serve'
-  | 'discard';
+  | 'discard'
+  /**
+   * HOLD THIS ONE — it is what makes a single action button possible.
+   *
+   * A board with raw food on it, or a sink with a dirty plate in it, is a
+   * station whose job is WORK rather than a transfer. Before the button was
+   * unified, a press there resolved to 'take' and the chopping lived on a
+   * separate held button, which is the arrangement a player called out
+   * directly: "on desktop I don't even know how to use that action button, on
+   * mobile it's weird to have a dedicated button, why not combine into a
+   * unified action button?"
+   *
+   * Naively pointing one button at both signals does not work. The press fires
+   * `grabPressed` on the same tick the hold begins, `doGrab` lifts the raw
+   * tomato off the board, and `useHeld`'s own `!chef.carrying` guard then
+   * refuses to chop the thing now in your hands. You would pick food up every
+   * single time you tried to cut it.
+   *
+   * So the plan layer answers first: at a station that wants work from empty
+   * hands, the press is a NO-OP that consumes itself, and the hold does the
+   * job. Taking raw food back off a board is the one thing this costs, and the
+   * bin already undoes a mistake in one press.
+   */
+  | 'prep';
 
 /** Flat surfaces: anything can rest on them. */
 function isSurface(kind: Station['kind']): boolean {
@@ -814,6 +837,7 @@ function isSurface(kind: Station['kind']): boolean {
  */
 function affordance(chef: Chef, st: Station, plan: GrabKind): 0 | 1 | 2 {
   if (plan === 'none') return 2;
+  if (plan === 'prep') return 0;
   if (plan === 'swap' || plan === 'return') return 1;
   if (plan === 'place') {
     const held = chef.carrying;
@@ -830,6 +854,11 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
   if (!held) {
     if (st.kind === 'crate' && st.dispenses) return 'dispense';
     if (st.kind === 'plates') return 'dispense';
+    // See 'prep' above. Same two conditions the `useHeld` gate in step() tests,
+    // written once here so the sign the player reads and the work the button
+    // does can never disagree.
+    if (st.kind === 'board' && st.holding?.type === 'ingredient' && st.holding.ingredient.state === 'raw') return 'prep';
+    if (st.kind === 'sink' && st.holding?.type === 'plate' && st.holding.plate.dirty) return 'prep';
     return st.holding ? 'take' : 'none';
   }
 
@@ -1098,6 +1127,13 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       // player and it was the one thing the kitchen could not do.
       chef.carrying = null;
       emit(s, { t: 'place', chef: chef.id, at });
+      return true;
+    case 'prep':
+      // Consumed, deliberately doing nothing. The hold on the same button is
+      // what works the station (see the `useHeld` gate at the bottom of step).
+      // Returning true rather than false is the whole point: false emits a
+      // grabMiss, and a thunk every time the player taps a board would make the
+      // unified button feel broken exactly where it is doing its job.
       return true;
     case 'discard':
       // ONE ITEM PER PRESS, NOT THE WHOLE PLATE. The bin used to empty a plate

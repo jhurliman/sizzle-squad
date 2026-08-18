@@ -1761,6 +1761,31 @@ export class WorldView {
       bar(g, 0.3, 0, -0.075, 0);
       bar(g, 0.11, 0.13, -0.115, -0.9);
     });
+    /**
+     * PREP — HOLD, DON'T TAP, AND THE SIGN HAS TO SAY THAT.
+     *
+     * Every other glyph in this set describes a transfer that happens on a
+     * press. This one is the only station verb that takes TIME, and it is the
+     * verb a player specifically could not find: chopping used to live on its
+     * own button and now shares the action button with everything else. A
+     * chevron would be a lie here — nothing arrives in your hands.
+     *
+     * A blade over a board, plus three progress pips under it. The pips are
+     * what carry "keep holding": a static icon with no duration in it is what
+     * made two buttons feel necessary in the first place.
+     */
+    mk('prep', (g) => {
+      // The blade: a long bar raked over a short one, so it reads as a knife on
+      // a board rather than as a cross.
+      bar(g, 0.3, 0.01, 0.075, -0.42);
+      bar(g, 0.1, -0.13, -0.02, -0.42, 0x3a2013);
+      bar(g, 0.34, 0, -0.09, 0);
+      for (const dx of [-0.1, 0, 0.1]) {
+        const pip = new THREE.Mesh(new THREE.CircleGeometry(0.022, 8), flatOwn(ink, 1));
+        pip.position.set(dx, -0.16, 0.006);
+        g.add(pip);
+      }
+    });
     mk('discard', (g) => {
       const body = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), flatOwn(ink, 1));
       body.position.set(0, -0.045, 0.004);
