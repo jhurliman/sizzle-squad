@@ -907,10 +907,28 @@ const RESCUE_MAX_TALL = 0.68;
  * round 7's unbounded `max(limit, rescue)` did and slide the room off the
  * anchor for a chef who was already comfortably in shot.
  *
- * 0.90 is what the room's own worst corner asks for: at x 1.5 on the front
- * lane, with the frame fully widened, holding him inside the picture needs an
- * offset of 0.79 of the half-frame. Landscape never reaches it — its worst cell
- * asks 0.24 — so it keeps the same number and never consults it.
+ * 0.90 is what the room's own worst corner asks for, and that is now measured
+ * to three digits rather than asserted: tools/camlost.mjs sweeps every walkable
+ * cell against the same clamp arithmetic as update() and reports the offset
+ * that would contain the worst one. At full widen — the frame the player is
+ * actually in when he is out at a flank crate — portrait asks for exactly
+ * 0.900, loses 0 of 375 cells, and its worst |playerFrac| is 0.880. Landscape
+ * never reaches it (iPhone landscape asks 0.057, iPad 0.268, desktop 0.220) so
+ * it keeps the same number and never consults it.
+ *
+ * The 0.79 this comment used to claim was a round-7 number and it was stale.
+ * Read against the REST solve instead of the widened one the sweep says 1.166,
+ * 14 lost cells, worst |playerFrac| 1.263 — which is where the "iPhone portrait
+ * loses the player" reading comes from, and it is reading the wrong frame. What
+ * portrait actually loses out there is the ANCHOR, not the player: the worst
+ * offset is 0.860 of a half-frame, well past CENTRE_MAX_TALL's 0.33 and past
+ * RESCUE_MAX_TALL's 0.68, and describe() reports every frame that crosses it.
+ * That report is the design working, not a defect — see the note above
+ * `backWallFrac` in describe() for the two portrait warnings that are NOT.
+ *
+ * Not covered by any sweep: the widen EASES in, so a chef who dashes into a
+ * front corner faster than the frame opens is briefly in the rest column above.
+ * That wants a trace.
  */
 const LOST_MAX = 0.9;
 /**
