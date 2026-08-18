@@ -294,7 +294,7 @@ import type { CellKind, IngredientKind, Kitchen, Station, StationKind, Vec2 } fr
  */
 export const KITCHEN_MAP = [
   '###############',
-  '#DSS#=====#SOO#',
+  '#DSS#=O=O=#S--#',
   '#.............#',
   '#.............#',
   '#X-D..TKL..D-W#',
@@ -324,19 +324,42 @@ const STATION_CHARS: Record<string, StationKind> = {
 };
 
 /**
- * The back wall's stone alcove, in cells: the run of '=' in the map. The view
- * builds the arch oven and the chimney breast off this, so the architecture can
- * never drift out of step with what the sim treats as solid.
+ * The back wall's stone alcove, in cells. The view builds the arch oven and the
+ * chimney breast off this, so the architecture can never drift out of step with
+ * what the sim treats as solid.
+ *
+ * THE ARCH IS THE COOKER NOW, SO THE SPAN IS '=' AND 'O' TOGETHER.
+ *
+ * It used to be a run of '=' and nothing else, with the only two stoves in the
+ * game parked at the far right of the same row. That shipped a kitchen whose
+ * most oven-looking object was scenery: a player on a phone reported hunting
+ * for somewhere to cook bacon while looking straight at a two-metre stone arch,
+ * and read the actual hobs — a pale trivet with a pan on it, against a green
+ * counter, in the corner — as hamburger buns. Both readings were correct. The
+ * arch did nothing and the hobs did not look like hobs.
+ *
+ * So the mouth carries the burners: '=' is arch masonry, 'O' is arch masonry
+ * WITH a hob on the hearth in front of it, and the span is the contiguous run
+ * of either. Keeping both characters inside one span is what stops the view's
+ * arch geometry from splitting in two the moment a burner is added or moved.
  */
+const OVEN_SPAN_CHARS = '=O';
+
 export function ovenSpan(map: string[] = KITCHEN_MAP): { x0: number; x1: number; row: number } {
   for (let y = 0; y < map.length; y++) {
     const i = map[y].indexOf('=');
     if (i < 0) continue;
     let j = i;
-    while (map[y][j + 1] === '=') j++;
+    while (OVEN_SPAN_CHARS.includes(map[y][j + 1] ?? '')) j++;
     return { x0: i, x1: j + 1, row: y };
   }
   return { x0: 0, x1: 0, row: 0 };
+}
+
+/** Is this cell inside the oven alcove? The view renders those differently. */
+export function inOvenSpan(cell: Vec2, map: string[] = KITCHEN_MAP): boolean {
+  const span = ovenSpan(map);
+  return cell.y === span.row && cell.x >= span.x0 && cell.x < span.x1;
 }
 
 export function buildKitchen(map: string[] = KITCHEN_MAP): Kitchen {

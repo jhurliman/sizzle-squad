@@ -1,6 +1,6 @@
 {
   "headline": "Endless score-attack cooking game in Three.js, original mascot chefs, built against real captures of Dash & Dine. Every piece is judged by a fresh critic that runs the game in Chromium at four device profiles and compares real pixels side by side with the reference.",
-  "wave": 2.0,
+  "wave": 3.0,
   "updatedAt": "2026-08-18T02:34:17.153864+00:00",
   "pieces": [
     {
@@ -23,9 +23,9 @@
       "id": "p03",
       "name": "Kitchen set & readability",
       "state": "critic",
-      "round": 15,
-      "note": "RECOMPOSE (wave 2B): cameraFailures 13 -> 0 on all four profiles, and the portrait picture is better, not just the number. Near floor cropped (bottom edge 10.00 -> 9.00): front-rank chef 13.9% -> 15.5% of frame height, one whole unit of bare stone off the bottom of every portrait frame. LOST_MAX 0.90 -> 0.95 pays for the narrower half-frame at the chef row (without it the worst cell puts his centre on the frame edge at |playerFrac| 0.996). Verified over 193 live samples: depth 2.27-2.76 inside its band, back wall 1.000 flat, |playerFrac| max 0.880, 0 console errors.",
-      "gap": "The two portrait assertions were landscape invariants and are now portrait-correct bands, set off LIVE telemetry after the first attempt failed 51% of frames by being set off the rest solve. A critic MUST be told this: the back-wall test now asserts the opposite (a tall frame must stay narrower than the room) and the depth band is 2.20-2.85, not the reference 1.75-1.81. Judge the retarget, not just the zero."
+      "round": 16,
+      "note": "WAVE 3, from real-device play: the arch IS the cooker now. The only two burners used to sit in the top-right corner rendered as a pale stone trivet under a copper pan, and the player reading them as hamburger buns was the correct reading. Burners moved into the oven mouth (map row 1 is now #DSS#=O=O=#S--#), rendered in iron on the hearth, with the flame tongues restored behind them. Decorative food is gone: the two oven loaves, both pancake towers and — the worst of it — the ceramic trays heaped with the game own tomato and lettuce, standing un-grabbable a few metres from the real crates.",
+      "gap": "Unverified by a critic. Also unresolved: two small marks on the arch voussoirs that only became visible once the pancake towers stopped occluding them."
     },
     {
       "id": "p04",
