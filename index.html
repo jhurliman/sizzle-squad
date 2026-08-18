@@ -11,6 +11,12 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#2a1d16" />
+    <!-- Inline, because this project ships no asset files by design (see
+         README) and because a browser asks for /favicon.ico all by itself:
+         served from a GitHub Pages subpath that request lands outside the
+         site root and 404s on every load. A data URI answers it without
+         adding a file or a fetch. -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMyYTFkMTYiLz48cGF0aCBkPSJNMzIgOWMzIDctMSAxMC0xIDE0IDAgMyAyIDUgNCA1IDMgMCA1LTMgNC03IDUgNCA4IDkgOCAxNSAwIDktNyAxNi0xNSAxNnMtMTUtNy0xNS0xNmMwLTkgNi0xNiAxNS0yN3oiIGZpbGw9IiNmZjhhM2QiLz48cGF0aCBkPSJNMzIgMzBjMiA0LTEgNi0xIDggMCA0IDMgNiA2IDYgMSA2LTMgMTAtOCAxMC01IDAtOS00LTktMTAgMC02IDYtMTEgMTItMTR6IiBmaWxsPSIjZmZkNDVlIi8+PC9zdmc+" />
     <meta name="description" content="A tiny frantic kitchen. Chop, cook, plate, serve." />
     <link rel="stylesheet" href="/src/ui/styles.css" />
   </head>
