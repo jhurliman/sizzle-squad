@@ -10,6 +10,19 @@ The visual and gameplay bar is *Dash and Dine* (Super Mario Party); the
 moment-to-moment feel bar is *Overcooked!*. See `REFERENCE.md` — the images in
 `refs/` are authoritative and every critic pass judges against them.
 
+## Play it
+
+**[jhurliman.github.io/sizzle-squad](https://jhurliman.github.io/sizzle-squad/)** — open it on a phone.
+
+Every push to `main` builds and publishes to GitHub Pages
+(`.github/workflows/deploy.yml`); the typecheck is a gate on that deploy. There
+is nothing to install and no assets to download — the whole game is about 215kB
+gzipped, because every mesh, texture and sound is generated at runtime.
+
+On iOS, Share → *Add to Home Screen* launches it fullscreen with the notch and
+home-indicator insets already handled. Sound needs one tap to start, which is
+the browser's rule, not ours.
+
 ## Run it
 
 ```bash
@@ -72,6 +85,16 @@ capture run taking minutes and taking hours.
 node tools/shoot.mjs --out shots/mine --seconds 14
 node tools/shoot.mjs --out shots/mine --insets --marks 4,9,15
 ```
+
+```bash
+node tools/pagescheck.mjs
+```
+
+Serves `dist/` under `/sizzle-squad/` the way GitHub Pages serves a project
+site and boots the real game there. Every other harness server mounts `dist/`
+at the root, so none of them can catch an asset URL that only resolves from `/`
+— which is a blank page on Pages and a clean report everywhere else. Exits
+non-zero, so it can gate the deploy.
 
 `shoot.mjs` captures four device profiles — iPhone portrait (393×852), iPhone
 landscape (852×393), iPad Pro (1194×834) and desktop (1440×900) — and writes

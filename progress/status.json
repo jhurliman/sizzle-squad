@@ -7,25 +7,25 @@
       "id": "p01",
       "name": "Camera & framing",
       "state": "critic",
-      "round": 6,
-      "note": "Wave 1.5 final: 76/100.",
-      "gap": "iPhone portrait still loses its anchor: LOST_MAX=0.9 overrides the tall-aspect clamps on exactly the profile they were written to protect."
+      "round": 7,
+      "note": "Wave 2B: the p01 gap was re-measured, not re-derived (tools/camlost.mjs, new). LOST_MAX=0.9 does NOT lose the player: at the widen the frame actually has when he is out at a flank crate, portrait loses 0 of 375 cells, worst |playerFrac| 0.880, and the offset needed to contain every cell is exactly 0.900. The 1.263 / 14-lost-cells reading comes from sweeping the REST frame, which is not the frame he is in. What portrait does lose out there is the ANCHOR — worst offset 0.860 against a 0.33 clamp and a 0.68 stop — and describe() reporting that is the design working. LOST_MAX’s stale 0.79 comment is corrected. | RECOMPOSE: portrait now reports 0 camera failures live; the containment rescue is counted as notes (25% outside the middle third, 18% past the composition stop) rather than counted as defects.",
+      "gap": "Still open: the player is under the thumb cluster on 2% of portrait samples (was 6-7%). Real defect, pre-existing, wants its own pass."
     },
     {
       "id": "p02",
       "name": "Art direction & lighting",
       "state": "critic",
-      "round": 10,
+      "round": 11,
       "note": "Wave 1.5 final: 74/100.",
-      "gap": "Bench planks no longer separate from the floor they stand on \u2014 luma 133/S 0.64 on a 158/S 0.55 floor, so the lower two-thirds reads as one field of pale decking."
+      "gap": "Bench planks no longer separate from the floor they stand on — luma 133/S 0.64 on a 158/S 0.55 floor, so the lower two-thirds reads as one field of pale decking."
     },
     {
       "id": "p03",
       "name": "Kitchen set & readability",
       "state": "critic",
-      "round": 14,
-      "note": "Wave 1.5 final: 80/100.",
-      "gap": "Overcorrected: filling the floor fused the near half of every landscape frame into a raft of plank \u2014 41% honey wood in the lower 45% against the reference 18-23%."
+      "round": 15,
+      "note": "RECOMPOSE (wave 2B): cameraFailures 13 -> 0 on all four profiles, and the portrait picture is better, not just the number. Near floor cropped (bottom edge 10.00 -> 9.00): front-rank chef 13.9% -> 15.5% of frame height, one whole unit of bare stone off the bottom of every portrait frame. LOST_MAX 0.90 -> 0.95 pays for the narrower half-frame at the chef row (without it the worst cell puts his centre on the frame edge at |playerFrac| 0.996). Verified over 193 live samples: depth 2.27-2.76 inside its band, back wall 1.000 flat, |playerFrac| max 0.880, 0 console errors.",
+      "gap": "The two portrait assertions were landscape invariants and are now portrait-correct bands, set off LIVE telemetry after the first attempt failed 51% of frames by being set off the rest solve. A critic MUST be told this: the back-wall test now asserts the opposite (a tall frame must stay narrower than the room) and the depth band is 2.20-2.85, not the reference 1.75-1.81. Judge the retarget, not just the zero."
     },
     {
       "id": "p04",
@@ -33,7 +33,7 @@
       "state": "critic",
       "round": 8,
       "note": "Wave 1.5 final: 68/100.",
-      "gap": "Legs animate but nothing above the hips rotates \u2014 rigid torso, both arms abducted at every speed. Tightrope walkers, not runners."
+      "gap": "Legs animate but nothing above the hips rotates — rigid torso, both arms abducted at every speed. Tightrope walkers, not runners."
     },
     {
       "id": "p05",
@@ -41,15 +41,15 @@
       "state": "critic",
       "round": 2,
       "note": "Wave 2A final: 74/100.",
-      "gap": "The chefs' feet never touch the floor \u2014 the weight-bearing foot travels through world space at a median 1.05x the body's own speed, so a superbly-tuned sim reads as two pendulums dragged across stone."
+      "gap": "The chefs' feet never touch the floor — the weight-bearing foot travels through world space at a median 1.05x the body's own speed, so a superbly-tuned sim reads as two pendulums dragged across stone."
     },
     {
       "id": "p06",
       "name": "Touch controls",
       "state": "critic",
-      "round": 2,
-      "note": "Wave 2A final: 62/100 (regressed from 78 at r1 \u2014 the rework closed the gap differently than briefed and made steering worse).",
-      "gap": "Once the thumb passes the ring's own radius \u2014 every sustained run \u2014 the stick stops being absolute: steering gain climbs to 1.4-2.1x, the chef runs up to 62\u00b0 away from the thumb with zero self-correction, and the knob is parked up to 238px from the finger."
+      "round": 3,
+      "note": "Wave 2B r3: the drawn control is the math origin again. tools/honestprobe.mjs (new) measures the gap the other two probes are blind to: steering gain 3.65x -> 1.000, heading error at the end of a lateral sweep 47deg -> 0deg, drawn knob 302px median / 638px max from the finger -> 0.01px / 19.6px, on all three touch profiles. touchprobe unchanged to the digit (lag 62.00, mag 1.000, angErr 0.01deg, 45deg turn for 56px).",
+      "gap": "FORCED TRADE, NOW EXPLICIT: gain 1.0 requires the emitted vector to be measured from the point the ring is drawn at, and turn authority requires that point to stay a radius behind the thumb, so the ring must follow the thumb. r1 disliked exactly that (drift is back at 408px/s, ring 57% on glass at an edge press, 20/20 bounded sprints walk from the press point). Needs a critic told BOTH demands so it judges the trade, not one side of it."
     },
     {
       "id": "p07",
@@ -57,7 +57,7 @@
       "state": "critic",
       "round": 11,
       "note": "Wave 1.5 final: 76/100.",
-      "gap": "With three live orders the third is display:none, and no ticket ever shows time pressure \u2014 the two states that end a run are the two the HUD does not draw."
+      "gap": "With three live orders the third is display:none, and no ticket ever shows time pressure — the two states that end a run are the two the HUD does not draw."
     },
     {
       "id": "p08",
@@ -80,7 +80,7 @@
       "state": "critic",
       "round": 2,
       "note": "Wave 2A final: 68/100.",
-      "gap": "Three bots close 98% of tickets on their own, so a competently-played fourth chef is worth +0.8% to +6.3% of dishes \u2014 statistically indistinguishable from zero. The kitchen does not need you."
+      "gap": "Three bots close 98% of tickets on their own, so a competently-played fourth chef is worth +0.8% to +6.3% of dishes — statistically indistinguishable from zero. The kitchen does not need you."
     },
     {
       "id": "p11",
@@ -109,7 +109,7 @@
       "state": "critic",
       "round": 2,
       "note": "Wave 2A final: 79/100.",
-      "gap": "The sim's targeting is world-class but the sign that communicates it thrashes \u2014 the verb changes 3.21 times a second and each glyph pop costs 258ms, so the indicator is mid-animation 83% of the time it is on screen."
+      "gap": "The sim's targeting is world-class but the sign that communicates it thrashes — the verb changes 3.21 times a second and each glyph pop costs 258ms, so the indicator is mid-animation 83% of the time it is on screen."
     }
   ],
   "log": [

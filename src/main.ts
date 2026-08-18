@@ -832,10 +832,12 @@ function frame(now: number) {
   );
   vfx.update(rawDt, cameraRig.camera, window.innerWidth, window.innerHeight);
 
-  // Floating touch stick. It is DRAWN at the anchor (the press point, nudged
-  // on-glass) and never at the math origin, which trails the thumb by a radius
-  // and used to drag the whole control across the play field with it — see
-  // TouchStickView.anchor in src/input/input.ts.
+  // Floating touch stick. `anchor` IS the math origin, nudged only far enough
+  // inboard to keep the whole ring on the glass, so the knob below is painted
+  // at the finger and the drawn heading is the emitted heading. It was briefly
+  // frozen at the press point instead, and the chef then steered up to 47deg
+  // away from the control the player was reading — see TouchStickView.anchor
+  // in src/input/input.ts and tools/honestprobe.mjs.
   if (input.device === 'touch' && input.stick.active) {
     stickRing.classList.add('on');
     stickRing.style.left = `${input.stick.anchor.x}px`;

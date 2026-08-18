@@ -402,11 +402,17 @@ async function main() {
     // the top of the profile and printed in the console summary. A failing
     // frame announces itself.
     const cameraFailures = [];
+    // ...and `notes` beside them, because describe() now separates the two.
+    // A note is the containment rescue spending composition to keep the player
+    // in the picture — authored behaviour that is worth COUNTING and is not a
+    // defect. Keeping them in the same list is what stopped cameraFailures from
+    // ever reaching zero on portrait. They are still collected and still
+    // printed; they just do not fail the run.
+    const cameraNotes = [];
     const sampleCamera = async (name) => {
-      const w = await page
-        .evaluate(() => window.__game.snapshot()?.camera?.warnings ?? [])
-        .catch(() => []);
-      for (const msg of w) cameraFailures.push(`${name}: ${msg}`);
+      const cam = await page.evaluate(() => window.__game.snapshot()?.camera ?? null).catch(() => null);
+      for (const msg of cam?.warnings ?? []) cameraFailures.push(`${name}: ${msg}`);
+      for (const msg of cam?.notes ?? []) cameraNotes.push(`${name}: ${msg}`);
     };
     const shoot = async (name) => {
       await sampleCamera(name);
@@ -452,11 +458,12 @@ async function main() {
       driveStats,
       errors: errors.slice(0, 40),
       cameraFailures,
+      cameraNotes,
       snapshots,
       final,
     });
     console.log(
-      `${cameraFailures.length ? '✗' : '✓'} ${prof.label}  render=${driveStats?.renderCostMs ?? '?'}ms/frame  served=${final.score?.served ?? 0}  errors=${errors.length}  cameraFailures=${cameraFailures.length}`,
+      `${cameraFailures.length ? '✗' : '✓'} ${prof.label}  render=${driveStats?.renderCostMs ?? '?'}ms/frame  served=${final.score?.served ?? 0}  errors=${errors.length}  cameraFailures=${cameraFailures.length}  cameraNotes=${cameraNotes.length}`,
     );
     for (const f of cameraFailures.slice(0, 12)) console.log(`    ! ${f}`);
   }
