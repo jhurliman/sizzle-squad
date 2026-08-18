@@ -1,0 +1,1853 @@
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --ink: #3a2a1e;
+  --cream: #fff8ec;
+  --shadow: 0 4px 0 rgba(58, 42, 30, 0.28);
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #2a1d16;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: 'Nunito', 'Baloo 2', ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, sans-serif;
+  color: var(--ink);
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.labels,
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.labels {
+  transition: opacity 0.35s ease;
+}
+
+/* =================================================================== the HUD
+
+   Three chips along the top strip and nothing else. Everything else the player
+   needs to read lives in the room: see .bubbles below.
+   ========================================================================= */
+
+.hud {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.hud.live {
+  opacity: 1;
+}
+
+/* CLEAR AIR ON BOTH AXES.
+   The score pill used to sit with its left edge at x≈0 and a 6px top margin —
+   welded to the frame. The reference pill floats: roughly 2.5% of frame width
+   in from the left and 3% of frame height down from the top, with nothing
+   touching it. */
+/* AND THE INSET HAS TO CLEAR THE OVERHANG, NOT JUST THE FRAME.
+   The leading portrait deliberately hangs out past the pill's left cap and
+   wears a 7px gold ring, so the chip's true left edge is ~0.3 of a portrait
+   further left than `.strip` is. At `max(12px, 2.4vw)` that solved to 12px on
+   a 393px phone against 20px of overhang, and the bear's ring was sliced clean
+   off at x=0 on iPhone portrait AND, with the landscape inset, sat under the
+   Dynamic Island. The floor is now larger than any overhang the chip can
+   produce, and it is vmin-based so a short landscape phone does not get a
+   desktop-sized margin. */
+.strip {
+  /* --fd lives here so BOTH the inset arithmetic below and the chip contents
+     size off one number. --edge is the air the reference leaves round its top
+     strip: its leading portrait's ring starts 39px in on a 1280x720 frame, i.e.
+     5.4vmin, and nothing in the strip is ever nearer the frame than that. */
+  /* FOUR FACES, NOT TWO PLUS A "+2". The reference runs its portraits at 8.9%
+     of frame height, but it splits four of them across two pills; we have one
+     squad and one pill, so the row is a step smaller and overlaps by 30% — a
+     stacked avatar row, which is a shape every player already reads. */
+  /* WAVE 2: 7.2vmin put a 65px portrait next to a 32px numeral — a ratio of
+     2.0 where the reference's is 1.35 (58px bust, 43px cap height). The chip
+     was a row of faces with a score tacked on. Portraits down, numerals up. */
+  --fd: clamp(38px, 6vmin, 58px);
+  --edge: max(20px, 4.4vmin);
+  position: absolute;
+  top: calc(var(--safe-t) + max(14px, 3.2vmin));
+  /* The overhang (0.22 of a portrait) plus the player's 6px gold ring is added
+     BACK, so what lands at --edge is the ring's outer edge and not the pill's
+     hidden left cap. Without this term the chip's true leading edge sat at
+     x=7.6px on desktop and at x=-8px on a 393px phone: sliced. */
+  /* 0.22 of overhang plus the 0.12 the patience gauge stands proud of the
+     player's portrait: what lands at --edge is the gauge's outer edge, not the
+     pill's hidden left cap. */
+  left: calc(var(--safe-l) + var(--edge) + var(--fd) * 0.36 + 4px);
+  /* Symmetric with the left, because the right pill now has an overhanging
+     portrait of its own: what lands at --edge is the trailing Toad's ring, not
+     the pill's hidden right cap. */
+  right: calc(var(--safe-r) + var(--edge) + var(--fd) * 0.28 + 4px);
+  /* The clock is centred on the FRAME, the way the reference centres its own
+     — not between the two side chips. The third column is an empty spacer
+     standing in for the pause button, which lives outside the HUD root. */
+  display: grid;
+  /* minmax(auto, 1fr), not 1fr. A plain 1fr is a MAXIMUM, so on a 393px phone
+     the squad chip — four portraits plus the score — overran its column and
+     slid under the clock chip: the score numeral shipped half-hidden behind
+     the clock glyph. With an auto floor the side columns can never be smaller
+     than their content, so the clock stays centred on the FRAME wherever it
+     fits and gets nudged sideways rather than overlapped where it does not. */
+  grid-template-columns: minmax(auto, 1fr) auto minmax(auto, 1fr);
+  align-items: start;
+  column-gap: 8px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  /* The reference chip: dark translucent brown, fully rounded, white numerals
+     heavy enough to read over a bright stone floor. */
+  background: rgba(46, 30, 20, 0.72);
+  border-radius: 999px;
+  /* A FEATHERED LOZENGE, NOT A ROUNDED RECT. The reference chip has no crisp
+     rim and no hard drop — it is a soft dark shape the numerals sit inside. The
+     hard 3px offset ledge that used to be here is what made ours read as a
+     button. A wide low-opacity spread does the feathering. */
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.13),
+    0 2px 10px rgba(24, 15, 10, 0.34),
+    0 0 0 6px rgba(46, 30, 20, 0.13);
+  color: #fff;
+}
+
+/* THE SCORE IS A BIG NUMBER.
+   The reference's numeral is 5.5% of frame height; ours shipped at 2.2%, which
+   is a caption, not a score. Driven off frame HEIGHT — the dimension the
+   reference holds constant — with a floor that keeps a 393-tall landscape phone
+   legible. */
+/* MEASURED AGAIN IN WAVE 2, AND WE WERE STILL 40% SHORT.
+   refs/dash-and-dine-01.jpeg at 3x: the "2" in the left pill is 43px of cap
+   height on a 720-tall frame — 6.0% — and the clock's "32" is 33px, 4.5%. Ours
+   measured 3.56% and 2.89%. 4.9vh solved to a 44px font (≈32px of cap) on a
+   900-tall frame, which is where those numbers came from.
+   The cap is `min(vh, vw)`-shaped, not pure vh: a 393x852 phone is 852 tall and
+   a numeral at 6% of THAT is 51px, which on a 393px-wide strip is a banner. The
+   vw term is what stops portrait inheriting a television's HUD. */
+.pill .num {
+  font-weight: 900;
+  font-size: clamp(26px, min(6.6vh, 4.4vw), 62px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 3px 0 rgba(28, 18, 12, 0.5);
+  /* WAVE 3 — A RESERVED TWO-DIGIT SLOT, SO THE PILLS DO NOT BREATHE.
+     The gaps the strip holds between its three chips were solved at a one-digit
+     score and then collapsed to ~8px the moment the run reached 56 / 81 / 5 —
+     a critic caught exactly that in shots/j-orders-r1-late/iphone-portrait. Two
+     digits are reserved from the first frame (tabular figures make `ch` the
+     digit's own advance), so the chip that carries "0" is exactly as wide as the
+     chip that will carry "56" and the air between the pills is a constant. */
+  min-width: 2ch;
+  text-align: center;
+}
+
+/* The clock is deliberately lighter and smaller than the score. They used to
+   carry identical weight, so the frame offered two equally loud numbers and no
+   hierarchy between "how well am I doing" and "how long have I got". */
+.pill .num-clock {
+  font-size: clamp(22px, min(5.4vh, 3.6vw), 52px);
+  font-weight: 800;
+  color: rgba(255, 252, 245, 0.94);
+}
+
+/* NO min-width: 0 here.
+   A grid item's automatic minimum size is its min-content width, which is what
+   stops the side columns from ever being narrower than the chips inside them.
+   min-width:0 cancels exactly that rule, so on a 393px phone the score chip
+   overflowed its own column and painted underneath the clock: "10" with the
+   clock pill's left edge sitting across the zero. Let the column keep its
+   content floor and let the clock be nudged off dead centre instead. */
+.strip-left {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+}
+
+.strip-left > *,
+.strip-right > * {
+  flex: 0 0 auto;
+}
+
+/* Right group: the dishes-served pill and nothing else. It used to hold a mood
+   chip that never rendered plus a spacer reserving room for a pause button, so
+   the right third of the reference's balanced triad was, in every captured
+   frame, empty. */
+.strip-right {
+  display: flex;
+  align-items: start;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* The portraits BREAK THE PILL. In refs/dash-and-dine-01.jpeg Waluigi's cap
+   crosses the top edge of the chip and Shy Guy's mask crosses the right — the
+   silhouette is deliberately violated, which is what stops the chip reading as
+   a UI rectangle with pictures in it. So: no left padding, the squad row is
+   shorter than the faces inside it, and the leading face is pulled out past the
+   pill's left edge. */
+/* HUG THE CONTENT.
+   This shipped with 16px of pill after the numeral and 8px before it, on a chip
+   whose numeral is the only thing in it — so the score sat hard against its own
+   left cap with a slab of empty brown to its right. The reference's is
+   symmetric at roughly 0.6 of the numeral's cap height on both sides, and the
+   pill ends where the digit ends. Driven off the numeral's own size so a
+   four-digit score does not change the rhythm. */
+.pill-score {
+  padding: 5px 0.62em 5px 0;
+  gap: 0.4em;
+  font-size: clamp(26px, min(6.6vh, 4.4vw), 62px);
+  justify-self: start;
+  align-items: center;
+}
+
+/* Sets the score pill's height, and it is chosen so all three pills stand the
+   same height — the strip carried a 57px score pill beside a 65px clock, which
+   is a third size in a set of three objects. */
+.squad {
+  height: calc(var(--fd) * 0.92);
+  overflow: visible;
+}
+
+.squad .face:first-child {
+  margin-left: calc(var(--fd) * -0.22);
+}
+
+.pill-score.pop {
+  animation: pillPop 0.34s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+@keyframes pillPop {
+  0% {
+    transform: scale(1);
+  }
+  38% {
+    transform: scale(1.13);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.squad {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+/* PORTRAITS YOU CAN NAME.
+   27px at -28% overlap meant the middle two were 60% hidden and every face was
+   the same coloured cap arc over two black dots. Bigger, barely overlapped, and
+   each skin now draws its own silhouette in hud.ts — ears, hat, muzzle, beak. */
+/* 8.6% OF FRAME HEIGHT, WHICH IS THE REFERENCE'S NUMBER.
+   Its portraits are 64px on a 720-tall frame. Ours ran at 7.2vmin with four of
+   them overlapping, which a critic measured at 4% of frame height and called
+   unreadable. Two at 8.6vmin, barely touching. */
+/* A STACKED AVATAR ROW.
+   All four chefs, overlapped 30%, back-to-front so nobody's ring is cut by the
+   face in front. This replaces two portraits plus a "+2" chip welded to the
+   left of the score numeral — which read as "+2 points" and never changed. */
+.face {
+  width: var(--fd);
+  height: var(--fd);
+  flex: 0 0 auto;
+  display: block;
+  margin-right: calc(var(--fd) * -0.3);
+  border-radius: 50%;
+  background: #2e2016;
+  /* An opaque warm-brown separator UNDER the cream ring, so overlapped faces
+     never bleed into one another at 40px. */
+  box-shadow:
+    0 0 0 2.5px rgba(255, 250, 240, 0.94),
+    0 0 0 5px rgba(38, 24, 15, 0.9);
+  /* Later portraits sit UNDER earlier ones, so the player's face — always
+     first — is the one that is never clipped. */
+  position: relative;
+  z-index: calc(8 - var(--fi, 0));
+}
+
+.face:last-child {
+  margin-right: 0;
+}
+
+/* WHICH ONE IS YOU — and how the customers feel about the kitchen.
+   The player's portrait is 12% larger and wears the patience gauge. It reads
+   as the gold identity ring while service is calm, and it drains through amber
+   to red, which is the whole of the escalation the deleted mood chip carried
+   and never once rendered. */
+.face-you {
+  width: calc(var(--fd) * 1.12);
+  height: calc(var(--fd) * 1.12);
+  box-shadow: 0 0 0 2.5px rgba(38, 24, 15, 0.92);
+  z-index: 9;
+}
+
+.face .mug {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+}
+
+/* THE GAUGE IS A RING ROUND THE FACE, NOT A CHIP IN THE CORNER.
+   Drawn outside the portrait so it never covers it, over a FULLY OPAQUE track
+   — an unfilled gauge you cannot see is not a gauge, it is a coloured arc, and
+   that is exactly what the old dial shipped as. */
+.gauge {
+  position: absolute;
+  inset: calc(var(--fd) * -0.12);
+  width: auto;
+  height: auto;
+  display: block;
+  transform: rotate(-90deg);
+  overflow: visible;
+  filter: drop-shadow(0 2px 0 rgba(28, 18, 12, 0.4));
+}
+
+.gauge-track {
+  fill: none;
+  stroke: #33210f;
+  stroke-width: 4.6;
+}
+
+.gauge-arc {
+  fill: none;
+  stroke: #ffc21e;
+  stroke-width: 4.6;
+  stroke-linecap: round;
+  transition:
+    stroke-dashoffset 0.4s ease,
+    stroke 0.5s ease;
+}
+
+.pill-score.mood-warn .gauge-arc {
+  stroke: #f79226;
+}
+
+.pill-score.mood-danger .gauge-arc {
+  stroke: #ee4630;
+}
+
+/* Its own keyframes, because chipAlarm animates `transform` and would wipe out
+   the -90deg that puts the gauge's zero at twelve o'clock. */
+@keyframes gaugeAlarm {
+  0%,
+  100% {
+    transform: rotate(-90deg) scale(1);
+  }
+  50% {
+    transform: rotate(-90deg) scale(1.09);
+  }
+}
+
+.pill-score.mood-danger .gauge {
+  animation: gaugeAlarm 0.9s ease-in-out infinite;
+}
+
+
+/* ---------------------------------------------------------------- the clock
+
+   The reference's centre chip is a clock glyph and the seconds LEFT in the
+   round, and that single number is what makes the frame legible as a race. We
+   shipped a smiley in a green ring next to Math.floor(elapsed) — a patience
+   dial wearing the clock's slot, counting UP, and on a phone the digits were
+   deleted outright by a media query, so the highest-volume device got a chip
+   with no time in it at all. Both of those are gone. This is a clock. */
+
+/* Vertical padding, not a bigger glyph: the clock pill measured 57px tall
+   beside a 66px score pill and a 66px pause chip, so the strip carried three
+   different chip heights. Padding equalises them without inflating the clock
+   glyph past the reference's 1.13x-the-numeral proportion. */
+.pill-clock {
+  padding: 8px 16px 8px 7px;
+  gap: 7px;
+  justify-self: center;
+}
+
+/* Solid, never a hairline: REFERENCE.md rules hairlines out by name and a
+   2.6px stroked ring on a 27px glyph was the thinnest mark on the screen. The
+   glyph is a filled cream disc with a warm-brown face and fat cream hands, so
+   it holds its shape at thumbnail size. */
+.clock {
+  width: clamp(30px, 4.6vmin, 44px);
+  height: clamp(30px, 4.6vmin, 44px);
+  display: block;
+  filter: drop-shadow(0 2px 0 rgba(28, 18, 12, 0.4));
+}
+
+.pill-clock.warn {
+  background: rgba(120, 74, 14, 0.82);
+}
+
+.pill-clock.warn .num {
+  color: #ffd166;
+}
+
+.pill-clock.danger {
+  background: rgba(96, 26, 18, 0.84);
+  animation: chipAlarm 0.9s ease-in-out infinite;
+}
+
+.pill-clock.danger .clock {
+  filter: drop-shadow(0 2px 0 rgba(28, 18, 12, 0.4)) hue-rotate(-16deg) saturate(1.4);
+}
+
+.pill-clock.danger .num {
+  color: #ffd7cf;
+}
+
+@keyframes chipAlarm {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+/* -------------------------------------------------------- dishes served
+
+   The right-hand pill of the triad, and the mirror of the score pill about the
+   clock — exactly the relationship refs/dash-and-dine-01.jpeg has between its
+   two team pills. The numeral is inboard and the glyph outboard, so the two
+   outer pills point their heavy ends at each other across the clock rather
+   than both leaning left.
+
+   What was here before: a mood chip that only appeared below 86% patience,
+   which no capture ever reached, so the right third of the strip was empty in
+   every frame ever shot and the pause button became the strip's terminator. */
+
+/* WAVE 3 — IT IS THE SAME PILL, REFLECTED, AND NOW IT MEASURES LIKE ONE.
+   The cloche is gone; the pill carries the two Toads at the two passes with the
+   count of plates that have reached them inboard, which is the reference's exact
+   arrangement mirrored about the clock. Padding mirrors .pill-score's so the two
+   chips are the same object seen twice. */
+.pill-served {
+  padding: 5px 0 5px 0.62em;
+  gap: 0.4em;
+  font-size: clamp(26px, min(6.6vh, 4.4vw), 62px);
+  justify-self: end;
+  align-items: center;
+}
+
+/* The trailing Toad breaks the pill's right cap exactly as the leading squad
+   portrait breaks its left one — the reference violates both outer silhouettes
+   and that is what stops the strip reading as three rectangles. */
+.squad-pass .face:last-child {
+  margin-right: calc(var(--fd) * -0.22);
+}
+
+.pill-served.pop {
+  animation: pillPop 0.34s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.pill-served.pop .face {
+  animation: toadNod 0.5s cubic-bezier(0.2, 1.7, 0.4, 1);
+}
+
+/* The servers nod when a plate reaches them. The score pill pops; this one pops
+   AND nods, so the two outer pills celebrate in different words. */
+@keyframes toadNod {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  40% {
+    transform: translateY(-14%) rotate(-7deg);
+  }
+}
+
+/* ------------------------------------------------------------------ phones
+
+   THIS BLOCK HAS TO LIVE AFTER THE RULES IT OVERRIDES, and for three rounds it
+   did not. It sat above `.pill-clock`, `.clock`, `.pill-served` and `.dish`, so
+   at equal specificity source order won and every one of its overrides was
+   silently discarded — the probe in tmp-probe.mjs caught the served pill still
+   running a 41.7px font and a 25.9px left pad on a 393px phone, which is why it
+   shipped sliced by the frame edge. Same numbers, 150 lines further down. */
+/* Phones: tighten the squad chip so the clock usually still lands dead centre
+   even with a four-digit score. */
+/* Phones. Every value here exists to buy the strip headroom: four portraits, a
+   score that reaches four digits, a clock and a mood chip all have to fit
+   across 373 usable pixels without the clock leaving the middle third. */
+/* The squad is TWO portraits everywhere now (see strip() in hud.ts), so this
+   block no longer has to hide anything — it only buys back the width a 393px
+   strip needs for a four-digit score, a centred clock and a pause chip. */
+@media (max-width: 480px) {
+  .face:last-child {
+    margin-right: 0;
+  }
+  /* MEASURED, BECAUSE THE FIRST CUT OVERFLOWED AND SHIPPED THE SERVED PILL
+     SLICED IN HALF BY THE FRAME EDGE (p05r11-a/iphone-portrait).
+     Four faces at 36px overlapped 36% is 101px; plus the score numeral the left
+     pill is 139, the clock 89 and the served pill 67 — 303px of content with
+     two 4px gaps across the 336 usable pixels a 393px iPhone has once the
+     strip's own edge margins are paid. 25px of headroom, and the grid's side
+     columns have an auto floor so any overflow past it lands on the right-hand
+     pill, which is why it has to fit rather than merely nearly fit. */
+  /* WAVE 2 — TWO PORTRAITS, NOT FOUR, AND THE STRIP BREATHES.
+     Four faces plus a score plus a clock plus a served count measured 324 of
+     the 336 usable pixels a 393px iPhone has: 12px of air across the whole
+     strip, so the three chips fused into one toolbar and the clock's glyph sat
+     ~8px off the score's last digit. The reference leaves over HALF its strip
+     empty. Dropping to the player plus one — the squad row is a stacked avatar
+     stack, not a roster, and hud.ts picks the count off the same breakpoint —
+     gives back 65px, which buys both the air and a portrait big enough to name
+     (40px, against the 36px a critic measured as four indistinguishable pastel
+     fields at 3x). */
+  /* WAVE 3 — ONE DISC EACH SIDE, AND THE TRIAD BALANCES ON A PHONE TOO.
+     The right pill stopped being a glyph (see .pill-served): it now carries the
+     two Toads at the two passes, which is what fixed a 3.7:1 triad on iPhone
+     landscape. That costs width, and a 393px strip does not have any — two squad
+     portraits plus two Toads plus three numerals measured 308 of the 318 usable
+     pixels, i.e. the toolbar again. So below the breakpoint the strip runs ONE
+     disc each side: the player wearing the patience gauge on the left, the pass
+     they cook for on the right, both at 40px rather than the 26px a critic could
+     not name. Measured after: left pill 95px, right 102px (1.07:1, against the
+     reference's 1.0:1) and 20px — 5.1% of frame width — of clear air in BOTH
+     gaps, held at a two-digit score by the reserved numeral slot below. */
+  .strip {
+    --fd: 40px;
+    column-gap: 6px;
+  }
+  .face {
+    margin-right: calc(var(--fd) * -0.3);
+  }
+  .squad-pass .face:first-child {
+    display: none;
+  }
+  .pill-score {
+    font-size: 30px;
+    padding: 7px 0.34em 7px 0;
+    gap: 0.2em;
+  }
+  .pill-clock {
+    padding: 7px 9px 7px 5px;
+    gap: 4px;
+  }
+  .pill-served {
+    padding: 7px 0 7px 0.34em;
+    gap: 0.2em;
+    font-size: 30px;
+  }
+  .pill .num {
+    font-size: 30px;
+  }
+  .pill .num-clock {
+    font-size: 24px;
+  }
+  /* A three- or four-digit score is the one thing that can push the clock off
+     centre on a 393px strip. The chip gives back a little weight rather than
+     letting the grid overflow. */
+  .strip:has(.pill-score.wide) {
+    --fd: 36px;
+  }
+  .pill-score.wide,
+  .pill-score.wide .num,
+  .strip:has(.pill-score.wide) .num {
+    font-size: 26px;
+  }
+  .clock {
+    width: 27px;
+    height: 27px;
+  }
+}
+
+/* ============================================================ order bubbles
+
+   Not HUD. These are objects in the room: a white speech balloon with a soft
+   coloured awning behind it, anchored to a point above the pass and projected
+   into screen space every frame, so they pan and scale with the camera.
+   ========================================================================= */
+
+/* --icon is the ONE number that decides whether an order can be read from
+   across the room. It shipped as a 46px constant — 5.0% of frame height against
+   the reference's 8.1% — so the food was 38% smaller than the bar relative to
+   the screen, and the padding around it was bigger than the reference's, which
+   meant we paid full screen real estate for less information. It is now driven
+   off frame height in hud.ts (see ICON_VH) and these are only the fallbacks. */
+.bubbles {
+  position: absolute;
+  inset: 0;
+  --icon: clamp(34px, 11vh, 124px);
+  --padx: calc(var(--icon) * 0.12);
+  --pady: calc(var(--icon) * 0.1);
+  pointer-events: none;
+}
+
+.bub {
+  position: absolute;
+  left: 0;
+  top: 0;
+  /* The canopy takes the colour of the pass it hangs over, exactly as the
+     reference does: pink over the red counter on the left, green over the
+     green one on the right. Two identical pink awnings on two differently
+     painted stations is the tell that the balloons are not really attached to
+     anything. */
+  /* Desaturated ~18% from the flat mid-pink and mid-green that shipped. The
+     canopy is a colour-coded backing plate; it is not allowed to out-shout a
+     tomato, and the reference's is a dusty rose, not a highlighter. */
+  /* SAMPLED, NOT GUESSED. refs/dash-and-dine-01.jpeg, mean of the pink dome:
+     rgb(203,97,93), S 0.51. Mean of the green dome: rgb(120,190,117), S 0.36.
+     Ours shipped at S 0.33 with a comment claiming the reference canopy was
+     "dusty, low-contrast" — it measures half again as saturated as ours was. */
+  --tint: #cb615d;
+  --iw: 1;
+  --ih: 1;
+  --bw: calc(var(--icon) * var(--iw) + var(--padx) * 2);
+  --bh: calc(var(--icon) * var(--ih) + var(--pady) * 2);
+  width: var(--bw);
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+
+.bub.pass-b {
+  --tint: #62b25f;
+}
+
+/* THE CANOPY NEVER CHANGES COLOUR.
+   It used to be recoloured amber then red as the ticket aged, which threw away
+   the one thing the canopy is for — saying WHICH PASS this order belongs to.
+   Escalation lives on the balloon's own rim instead; see --rim / --urg below. */
+
+/* A PARASOL, AND YOU CAN SEE THAT IT IS ONE.
+   The last cut sat its crown 0.08 of a balloon height above the balloon's top
+   edge, and at that rise the apex of the dome falls INSIDE the white ellipse on
+   every profile — so no unbroken arc ever read, and what the player saw was two
+   flat coloured slivers flanking the balloon, which scans as a misregistered
+   duplicate print. Crown lifted to 0.19 of a balloon height and the dome
+   widened to 0.94, so the arc clears the white shape and the fabric hangs down
+   past the balloon's waist the way the reference's does. Aspect is its own
+   (140:120) — never stretched to whatever box the CSS hands it. */
+/* The box is now 140x208 rather than 140x120: the extra 88 units are the POLE,
+   which runs out of the bottom of the fabric, down behind the balloon, and on
+   past its waist to the counter. Same dome, same width, same crown height — the
+   canopy has simply stopped floating. */
+/* WAVE 2, MEASURED OFF THE JPEG AT 6x.
+   The reference dome is 0.77 of a balloon WIDTH, 1.28:1 (wider than tall), its
+   centre sits +0.49 of a balloon width outboard, its crown clears the balloon's
+   top by 0.07 of a balloon height and its hem lands at 0.66 of one — so the
+   whole inboard half is simply hidden behind the white shape and what reads is
+   a squat outboard arc. Ours ran 0.94 wide at 140:120 with the crown 0.23 up,
+   which is a taller dome lifted twice as high: a parasol. 0.78 wide and 0.07 up
+   puts our centre at +0.45 and our hem at 0.65, one for one with the reference.
+   Two soft shadows became one: the dome is cloth in flat baked light, not a
+   plastic shell floating 8px off the wall. */
+.awn {
+  position: absolute;
+  right: var(--awn-off, -34%);
+  width: 78%;
+  aspect-ratio: 140 / 200;
+  top: calc(var(--bh) * -0.07);
+  filter: drop-shadow(0 3px 7px rgba(40, 26, 16, 0.22));
+}
+
+.bub.flip .awn {
+  right: auto;
+  left: var(--awn-off, -34%);
+  transform: scaleX(-1);
+}
+
+/* A PLATE, AND IT IS THE BRIGHTEST THING IN THE TOP HALF OF THE FRAME.
+   Two changes, both measured. SHAPE: a true ellipse, because the reference's is
+   — 44%/38% left flats at the top and sides and the thing read as a card. VALUE
+   AND HUE: the reference balloon's brightest pixels run 248–253 on all three
+   channels and its mean is rgb(244,223,225), i.e. near-neutral white with a
+   whisper of pink, against an ochre wall at rgb(189,153,106). That is a hue
+   break AND a value break, and it is the entire reason the eye lands on the
+   ticket first. Ours sampled 247,233,222 — warm cream, inside the wall's own
+   hue family, a weak value break and no hue break at all. The tint is down from
+   13% to 6% and the base is off-neutral by three points. The pass is
+   colour-coded by its canopy, which is what the canopy is for. */
+/* WAVE 2 — THE TICKET IS QUIET AGAIN.
+   The last cut chased "the balloon must be the brightest thing in the top half"
+   and got there: #fdfcfc under a 6% tint is rgb(250,243,243), a hard cream inner
+   ring at 4% of an icon, a coloured urgency ring over it, and a 32%-opacity
+   black drop — the loudest, whitest, hardest-edged object in the frame, on a
+   card whose entire job is to make a TOMATO the loudest thing.
+   Sampled off refs/dash-and-dine-01.jpeg: the left balloon's fill is
+   rgb(242,222,221) and the right's rgb(228,240,226). Both are a good half-stop
+   BELOW paper white and carry roughly 12% of their pass's tint — the reference
+   balloon is soft warm plaster, not a highlight. And it has NO outline of any
+   kind: no keyline, no rim, no ring. Both rings are gone; the base is off-white;
+   the tint is up to the measured 12%; the drop is one soft shadow, not a hard
+   ledge plus a heavy blur. */
+/* WAVE 3 — THE TWO BALLOONS ARE THE SAME OBJECT AGAIN.
+   At a 12% tint the pink pass's balloon measured ~#f7e7ea and the green pass's
+   ~#eef0ee in the same 4x crop: 9 units apart on the red channel and 3 on the
+   green, which is enough that the pair does not read as two of one thing. The
+   pink one read washed and dirty beside the green one, and its icons lost value
+   separation against a fill that had crept toward the tomato's own hue.
+   The reference carries the team colour on the CANOPY and only on the canopy —
+   its two balloons sample within a couple of units of each other. So: 2.5%, a
+   whisper of warmth that keeps the shape off pure paper white, identical in
+   feel on both passes. */
+.balloon {
+  position: relative;
+  background: #f6f0ec;
+  background: color-mix(in srgb, var(--tint) 2.5%, #f0eae4);
+  border-radius: 50%;
+  /* NO RIM. --urg still runs 0..1 from the second the ticket lands (hud.ts
+     place()), but what it drives is an inner GLOW that blooms from the rim
+     inward — a warm ticket, not a ringed one. At urg 0 it is 0px and there is
+     nothing on the shape at all. */
+  box-shadow: inset 0 0 calc(var(--icon) * 0.18 * var(--urg, 0)) 0 var(--rim);
+  padding: var(--pady) var(--padx);
+  transition: box-shadow 0.3s ease;
+  filter: drop-shadow(0 4px 9px rgba(46, 30, 20, 0.28));
+  animation: bob 3.4s ease-in-out infinite;
+}
+
+/* THE HEARTBEAT.
+   A wash of the rim's own colour across the balloon's fill, opacity driven
+   straight off --urg, plus a once-a-second flash of the same wash. A rim that
+   thickens by two pixels over half a minute is not perceptible in a still and
+   barely is in motion; a warm ticket that pulses every second is both. It is
+   its own paint layer so it never contends for .balloon's animation slot,
+   which already has four claimants. */
+.balloon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(120% 120% at 50% 118%, var(--rim), rgba(255, 255, 255, 0) 72%);
+  /* WAVE 3 — 0.15 WAS ENOUGH TO MAKE THE TWO TICKETS DIFFERENT OBJECTS.
+     The pass tint is down to 2.5% and both balloons now sample identically, but
+     the older ticket carries this warm wash and at 0.15 it put the left balloon
+     4 units of red and 4 of green off the right one — visible at 4x as "the pink
+     pass's ticket reads washed beside the green one", which is the complaint the
+     tint was blamed for. At 0.09 the ticket still warms perceptibly over its
+     life and the pair still measure as one object. */
+  opacity: calc(var(--urg, 0) * 0.09);
+  pointer-events: none;
+}
+
+.bub.tick .balloon::before {
+  animation: tickFlash 0.42s ease-out;
+}
+
+@keyframes tickFlash {
+  0% {
+    opacity: calc(0.1 + var(--urg, 0) * 0.62);
+    transform: scale(1.012);
+  }
+  100% {
+    opacity: calc(var(--urg, 0) * 0.34);
+    transform: scale(1);
+  }
+}
+
+.bub {
+  --rim: #d8c9a8;
+}
+
+.bub.warn {
+  --rim: #e8ae43;
+}
+
+.bub.danger {
+  --rim: #e35a45;
+}
+
+/* EDGE-DOCKED.
+   When the pass a ticket belongs to has been cropped out of the frame — which
+   iPhone portrait does to the pink pass every single run — a tail pointing at
+   it points at nothing, and the balloon reads as pinned to the corner. Drop the
+   tail, keep the colour, and put a small directional notch on the outer side so
+   it reads as "the left team's order". */
+.bub.docked .tail {
+  display: none;
+}
+
+/* AN ARROW, NOT A NOTCH.
+   A 45deg square peeking out from behind the rim reads as a speech tail that
+   has slipped, which on the one profile that needs this most (iPhone portrait,
+   where the right-hand pass is off frame every run) is exactly the wrong
+   message. A fat isoceles triangle pointing at the edge the pass is beyond says
+   "that team, over there" and nothing else. */
+.bub.docked .balloon::after {
+  content: '';
+  position: absolute;
+  /* Dead centre vertically, because that is the ONE height at which an ellipse
+     touches its own bounding box — anywhere else the arrow is swallowed by the
+     curve and the balloon just looks tail-less. */
+  top: 50%;
+  width: calc(var(--icon) * 0.4);
+  height: calc(var(--icon) * 0.52);
+  background: inherit;
+  transform: translateY(-50%);
+  z-index: -1;
+}
+
+.bub.dock-l .balloon::after {
+  left: calc(var(--icon) * -0.28);
+  clip-path: polygon(0% 50%, 100% 0%, 100% 100%);
+}
+
+.bub.dock-r .balloon::after {
+  right: calc(var(--icon) * -0.28);
+  clip-path: polygon(100% 50%, 0% 0%, 0% 100%);
+}
+
+/* A POLE NEEDS A FLOOR TO STAND ON.
+   When the pass a ticket belongs to is off frame the balloon docks to the edge
+   and stops claiming to hang over anything — so the pole, whose entire job is
+   to say "this canopy is standing on that counter", would be standing on a
+   stone wall two metres from any counter. It goes with the tail. */
+.bub.docked .awn-pole {
+  display: none;
+}
+
+/* WAVE 3 — ONE TICKET PER PASS, AND A SPIKE OF PAPER BEHIND IT.
+   The queued chit is deleted. Across two waves it was measured under the score
+   pill, on top of the other pass's balloon, clipped by the left frame edge at
+   x=0 on iPhone portrait, and still wearing the green stroke the balloon had
+   been told to drop — and the reference never shows more than one ticket per
+   team at all. What is left is the honest half of the signal: the EDGES of the
+   chits underneath, two crescents of the same paper offset behind the balloon.
+   They live inside the front ticket's own footprint, so nothing about them can
+   be clipped, collide, or be mistaken for a second order. */
+.stack {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #efe6dd;
+  /* ALWAYS IN THE LAYOUT, NEVER `display: none`.
+     Toggling display cancels and restarts a running animation, so a paper edge
+     that appeared the moment a pass went two deep re-ran the spawn slam out of
+     phase with the balloon in front of it — shots/j2-probe/ipad-landscape.jpg
+     caught a full-size bare disc behind a balloon still at 0.43 of its size.
+     Opacity has no such side effect and cross-fades for free. */
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: -1;
+  /* `rotate` and `scale` as their OWN properties, not inside `transform`: the
+     spawn slam animates `transform`, and an animated transform replaces a static
+     one outright. With the offset written as transform the paper edge stayed at
+     full size while the balloon slammed in from 0.42, so for the first ~0.3s of
+     every ticket's life there was a large bare white disc with a small balloon
+     sitting on it — caught in shots/j2-probe/ipad-landscape.jpg. */
+  rotate: 4deg;
+  scale: 0.965;
+  filter: drop-shadow(0 3px 6px rgba(46, 30, 20, 0.22));
+}
+
+.bub.deep .stack {
+  opacity: 1;
+}
+
+.bub.deep2 .stack::before {
+  content: '';
+  opacity: 1;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #e4d8cc;
+  rotate: 4.5deg;
+  scale: 0.985;
+  z-index: -1;
+}
+
+.bub.flip .stack {
+  rotate: -4deg;
+}
+
+.bub.flip.deep2 .stack::before {
+  rotate: -4.5deg;
+}
+
+.bub.hid {
+  display: none;
+}
+
+/* Translate only. Scaling an element that carries a drop-shadow filter forces
+   the filter to re-rasterise every frame, and doing it on two balloons for the
+   whole round cost desktop ~10ms of frame budget for a 1% size wobble. */
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(calc(var(--icon) * -0.08));
+  }
+}
+
+@keyframes wobble {
+  0%,
+  100% {
+    rotate: -2.2deg;
+  }
+  50% {
+    rotate: 2.2deg;
+  }
+}
+
+/* A CLUSTER, NOT A ROW.
+   Icons in a row make a 2.1:1 lozenge and a lozenge reads as a banner. The
+   reference stacks them — a lettuce over two tomatoes — and that is the only
+   reason its balloon comes out 1.2:1, a round plate. hud.ts hands each item its
+   own (--ix,--iy) in icon units and the cluster's footprint as (--iw,--ih). */
+.items {
+  position: relative;
+  width: calc(var(--icon) * var(--iw));
+  height: calc(var(--icon) * var(--ih));
+}
+
+/* One ticket line: the ingredient, the verb chit that says how to get there,
+   and a tick slot the HUD flips on the moment a plate carries it. */
+.item {
+  position: absolute;
+  left: calc(var(--icon) * var(--ix, 0));
+  top: calc(var(--icon) * var(--iy, 0));
+  width: var(--icon);
+  height: var(--icon);
+  display: block;
+}
+
+/* THE FOOD SITS ON THE CARD, IT IS NOT PASTED TO IT.
+   Every object in the reference's balloon casts a soft short shadow onto the
+   white fill — the lettuce's is plainly visible under its base at 6x. Ours had
+   none, so the icons read as stickers. One cheap elliptical drop under each,
+   scaled off --icon so it holds at any ticket size. */
+.ico {
+  width: 100%;
+  height: 100%;
+  display: block;
+  --sit: drop-shadow(0 calc(var(--icon) * 0.028) calc(var(--icon) * 0.036) rgba(88, 58, 34, 0.3));
+  filter: var(--sit);
+  transition:
+    filter 0.32s ease,
+    transform 0.32s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+/* ONE BADGE, ONE CORNER.
+   A four-item BLT used to carry four badges in three colours across two
+   different corners of one card: a verb chit pinned lower-right and, once the
+   component landed, a saturated green tick at the UPPER-left, so the diagonal
+   scatter alone was more visual event than the food. The chit and the tick now
+   share the SAME slot and cross-fade in place — the badge count halves, the
+   diagonal goes away, and nothing green ever out-saturates a tomato. */
+/* AND IT HAS A FLOOR.
+   `calc(var(--icon) * 0.27)` with no minimum solves to 10px on the 852x393
+   landscape profile and 14px on portrait, and a dark disc at 10px stuck to a
+   red tomato is a rivet, a smudge or an eyeball — every critic who has looked
+   at this has said one of those three. 20px is the smallest a two-shape glyph
+   survives; below that the chit is not communicating, it is just dirt. */
+/* WAVE 2 — THE BADGE WAS FALLING OFF THE BALLOON.
+   At 0.32 of an icon hung on the icon's own outer corner at -0.01, a badge on
+   the outermost tile of a three-item pyramid straddled the balloon's rim, and in
+   shots/critic-p05-orders-r4/iphone-portrait/t0016s.jpg one of them sat FULLY
+   outside the white shape on the ochre wall. The balloon is an ELLIPSE: its
+   corners are 29% of the way in from the bounding box, so anything pinned to a
+   corner of a corner tile is outside the fill by construction.
+   0.24 of an icon, pulled 0.10 of an icon INBOARD and 0.07 UP, puts the badge's
+   own centre at least half its radius inside the ellipse on every cluster the
+   game can build — and it is a third smaller, which was the other half of the
+   complaint. */
+/* WAVE 3 — THE BADGE IS SOLVED AGAINST THE ELLIPSE, NOT AGAINST THE ICON.
+   Every previous cut pinned it to a corner of the icon's own bounding box and
+   then argued about the constant. That cannot work: how much white there is
+   around a tile depends on WHERE IN THE BALLOON the tile is, and the rim is an
+   ellipse whose corners are 29% of the way in. A critic measured the result at
+   4x — three badges of four breaking the silhouette on iphone-portrait and one
+   sitting entirely outside the white on the canopy on ipad-landscape.
+   `--bx` / `--by` are now computed per icon per cluster in hud.ts
+   (badgeSpots()), in icon units from the tile's own top-left, and the solve
+   guarantees the badge's OUTER EDGE is inside the rim for every cluster the game
+   can build. This rule only has to place a box round that point. */
+.chit,
+.done {
+  position: absolute;
+  left: calc(var(--icon) * (var(--bx, 0.86) - 0.12));
+  top: calc(var(--icon) * (var(--by, 0.86) - 0.12));
+  right: auto;
+  bottom: auto;
+  width: calc(var(--icon) * 0.24);
+  height: calc(var(--icon) * 0.24);
+  min-width: 16px;
+  min-height: 16px;
+  display: block;
+  filter: drop-shadow(0 1.5px 2px rgba(58, 42, 30, 0.28));
+  transition:
+    opacity 0.24s ease,
+    transform 0.34s cubic-bezier(0.2, 1.7, 0.4, 1);
+}
+
+.done {
+  opacity: 0;
+  transform: scale(0.3) rotate(-24deg);
+}
+
+.done svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* WAVE 2 — A CREAM DISC WITH A GREEN TICK, NOT A GREEN DISC.
+   icons.ts draws the check as keyline / disc / stroke; those are presentation
+   attributes, so a stylesheet rule outranks them and the art file does not have
+   to change. The disc used to be #4c7a29 — dark saturated green sitting on top
+   of a LETTUCE, where it had almost no value separation from the food it was
+   annotating and where it took the green channel off the one object that is
+   supposed to own it. Inverted: warm cream body, warm-brown keyline so it still
+   separates from the white balloon, and the green survives only in the tick
+   itself, which is a 3.4-unit stroke and cannot out-saturate a cabbage. */
+.done svg circle:first-of-type {
+  fill: #6e4c2c;
+}
+
+.done svg circle + circle {
+  fill: #fff4dd;
+}
+
+.done svg path {
+  stroke: #4f8a24;
+}
+
+/* Ticked off, but still food. The old treatment dropped the icon to 55% opacity
+   and greyed it, which handed the saturation crown on a completed ticket to the
+   tick disc — on a ticket whose entire job is to make food the loudest thing in
+   the frame. Now it just settles back a little. */
+.item.ok .ico {
+  filter: var(--sit) saturate(0.86);
+  opacity: 0.82;
+  transform: scale(0.95);
+}
+
+.item.ok .chit {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.item.ok .done {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+/* Every tick-off pops the ticket's contents. Applied to .items, not .balloon —
+   the balloon's own animation slot is a four-way contest between bob, wobble,
+   ready and the spawn pop, and stacking a fifth claimant on it is how the
+   ready state ended up never animating at all. */
+.bub.step .items {
+  animation: stepPop 0.36s cubic-bezier(0.2, 1.7, 0.4, 1);
+}
+
+/* THE PLATE IS BUILT. RUN.
+   This shipped as a static green outline that sat unchanged for six seconds
+   while the score never moved — a "ready" state with no escalation, which is
+   worse than static, it is stalled. The moment the plate exists is the moment
+   the player should be sprinting, so the balloon leans toward its pass, bobs
+   hard, and its rim pulses. It is now the most animated thing on screen, which
+   is the correct answer to "what should I do next". */
+.bub.ready .item.ok .ico {
+  filter: var(--sit);
+  opacity: 1;
+  transform: scale(1);
+}
+
+@keyframes readyLean {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(calc(var(--icon) * -0.16)) rotate(2deg);
+  }
+}
+
+/* WAVE 2 — THE GREEN RING IS GONE.
+   A 6px saturated green stroke round a white card is a focus state, and the
+   reference's balloon carries no stroke of any kind. Worse, it was pure green
+   wrapped round a lettuce: the one hue on the card that already belonged to the
+   food. "Ready" is now carried entirely by MOTION — readyLean below, which is a
+   fast bob-and-tilt toward the pass and is the only thing on the screen moving
+   at that rate — plus the fill's own warm bloom, which the ticket already has.
+   Nothing about the ready state adds a colour, an edge or a saturated pixel. */
+@keyframes readyRim {
+  0%,
+  100% {
+    box-shadow: inset 0 0 calc(var(--icon) * 0.2) 0 rgba(216, 201, 168, 0.55);
+  }
+  50% {
+    box-shadow: inset 0 0 calc(var(--icon) * 0.42) 0 rgba(216, 201, 168, 0.85);
+  }
+}
+
+@keyframes stepPop {
+  0% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.045);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The tail slides along the bottom of the balloon to keep pointing at the
+   server it belongs to. A balloon clamped off the frame edge would otherwise
+   point at empty floor and stop reading as a thing hanging over the pass. */
+.tail {
+  position: absolute;
+  left: var(--tail, 26%);
+  /* The balloon rim is an ellipse, so a tail hung off the bounding box floats
+     in mid-air at the sides. Tucked up into the fill and drawn behind. */
+  bottom: calc(var(--bh) * 0.05);
+  /* SHORTER AND FATTER. Measured on refs/dash-and-dine-01.jpeg the tail is 0.28
+     of a balloon width at its base and drops 0.20 of a balloon height below the
+     rim — a stubby horn that stops well clear of the Toad's cap. Ours ran 0.5 of
+     an icon tall and reached the Toad's FACE on desktop/90-late, where it merged
+     with the plate stack behind him: a long narrow white spike, which is the
+     shape of an error, not of speech. */
+  width: calc(var(--icon) * 0.78);
+  height: calc(var(--icon) * 0.42);
+  transform: translate(-50%, 90%);
+}
+
+/* Same fill as the balloon, so the join is invisible rather than a lighter
+   wedge stuck to the underside. */
+.tail path {
+  fill: #f6f0ec;
+  fill: color-mix(in srgb, var(--tint) 2.5%, #f0eae4);
+}
+
+/* Mirrored by where the SERVER is, not by which way the canopy leans — those
+   are two different questions and tying them together made the tail curl away
+   from the Toad it belongs to whenever the canopy flipped. */
+.bub.tailr .tail {
+  transform: translate(-50%, 96%) scaleX(-1);
+}
+
+/* in / out */
+
+/* NO TRANSITION ON THE WAY IN, and this is not a style choice.
+   A CSS transition only advances when the page paints. The capture harness
+   starts the run, sleeps 400ms and grabs one frame, and on iPhone portrait that
+   frame landed with `.bub.in` applied and computed opacity still 0 — both order
+   balloons absent from 01-opening while report.json said two orders were live.
+   Verified with tmp-probe.mjs: `op: "0"` on an element already carrying `.in`.
+   The entrance is the `pop` keyframes on .balloon, which are an animation and
+   therefore have a defined value at t=0 whether or not a frame ever rendered.
+   The zero here only exists so a bubble that is spawned and never placed (a
+   fifth ticket, past the two the spike draws) cannot flash at 0,0. */
+.bub {
+  opacity: 0;
+}
+
+.bub.in {
+  opacity: 1;
+}
+
+/* ONE PLACE THAT DECIDES WHAT THE BALLOON IS DOING.
+   Five rules used to claim .balloon's animation slot from five different parts
+   of this file, all at three-class specificity, so the last one in source order
+   silently won every contest: the ready state — the single most important
+   escalation on the screen — never played a frame of its animation, and neither
+   did the danger wobble. They are all decided here now, most urgent last. */
+.bub.in .balloon {
+  animation:
+    pop 0.46s cubic-bezier(0.18, 1.7, 0.4, 1),
+    bob 3.4s ease-in-out 0.46s infinite;
+}
+
+/* The paper edges slam in with the ticket they belong to. */
+.bub.in .stack {
+  transform-origin: 50% 100%;
+  animation: pop 0.46s cubic-bezier(0.18, 1.7, 0.4, 1);
+}
+
+/* The two passes breathe out of phase. Two balloons rising and falling in
+   lockstep read as one animated object; offset, they read as two. */
+.bub.pass-b .balloon {
+  animation-delay: 0s, -1.7s;
+}
+
+.bub.in.danger .balloon {
+  animation:
+    pop 0.46s cubic-bezier(0.18, 1.7, 0.4, 1),
+    bob 3.4s ease-in-out 0.46s infinite,
+    wobble 0.34s ease-in-out infinite;
+}
+
+/* THE PLATE IS BUILT. RUN.
+   This shipped as a static green outline that sat unchanged for six seconds
+   while the score never moved — a "ready" state with no escalation, which is
+   worse than static, it is stalled. The moment the plate exists is the moment
+   the player should be sprinting, so the balloon leans toward its pass, bobs
+   hard, and its rim pulses. It is the most animated thing on screen, which is
+   the correct answer to "what do I do next". */
+.bub.in.ready .balloon,
+.bub.in.ready.danger .balloon {
+  animation:
+    readyLean 0.6s cubic-bezier(0.42, 0, 0.58, 1) infinite,
+    readyRim 0.6s ease-in-out infinite;
+}
+
+/* A SPAWN SLAM.
+   A new ticket is the drumbeat of the whole game — in Overcooked! it is a sound
+   you learn to fear — and ours used to ease in from 30% with a single soft
+   overshoot, which across seven timed frames per profile left no evidence that
+   anything had happened at all. It now drops in from above, overshoots wide,
+   undershoots, and settles: four keys, not two. */
+@keyframes pop {
+  0% {
+    transform: scale(0.42) translateY(-28px);
+  }
+  46% {
+    transform: scale(1.16) translateY(0);
+  }
+  70% {
+    transform: scale(0.94);
+  }
+  86% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The canopy arrives a beat behind the balloon, unfurling from its own hinge. */
+@keyframes awnIn {
+  0% {
+    transform: scale(0.4) rotate(-14deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+
+/* HINGE AT THE BOTTOM CENTRE, and nowhere else.
+   The flipped canopy carries a static scaleX(-1), and scaleX mirrors ABOUT THE
+   TRANSFORM ORIGIN — so a hinge at 80% slid the right-hand canopy 96px sideways
+   and parked it entirely behind its own balloon. The green awning was simply
+   absent from every landscape frame for one round because of it. 50% is the
+   only x that mirrors in place. */
+.bub.in .awn {
+  transform-origin: 50% 100%;
+  animation: awnIn 0.42s cubic-bezier(0.18, 1.6, 0.4, 1) 0.06s backwards;
+}
+
+/* The mirrored twin needs its own keyframes, or the animation's transform wipes
+   out the scaleX(-1) that makes the right-hand canopy lean the other way. */
+@keyframes awnInFlip {
+  0% {
+    transform: scale(0.4) scaleX(-1) rotate(-14deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) scaleX(-1) rotate(0);
+    opacity: 1;
+  }
+}
+
+.bub.in.flip .awn {
+  transform-origin: 50% 100%;
+  animation: awnInFlip 0.42s cubic-bezier(0.18, 1.6, 0.4, 1) 0.06s backwards;
+}
+
+.bub.served,
+.bub.gone {
+  opacity: 0;
+  transition:
+    opacity 0.3s ease 0.08s,
+    transform 0.4s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+/* Four classes, so the serve burst outranks the ready state. `.bub.in.ready
+   .balloon` is a four-class selector, so a ticket that was pulsing green when it
+   was served used to keep pulsing green all the way through its own removal and
+   never played a single frame of the burst. */
+.bub.served .balloon,
+.bub.in.served.ready .balloon,
+.bub.in.served .balloon {
+  animation: served 0.4s ease-out forwards;
+}
+
+.bub.gone .balloon,
+.bub.in.gone.ready .balloon,
+.bub.in.gone .balloon {
+  animation: lost 0.4s ease-in forwards;
+}
+
+/* SERVED. A burst, and it takes the colour of a win with it. */
+@keyframes served {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 5px 0 rgba(58, 42, 30, 0.2)) brightness(1);
+  }
+  30% {
+    transform: scale(1.14);
+    filter: drop-shadow(0 0 22px rgba(255, 236, 150, 0.95)) brightness(1.5);
+  }
+  100% {
+    transform: scale(1.6) translateY(calc(var(--icon) * -0.5));
+    filter: drop-shadow(0 0 30px rgba(255, 236, 150, 0.5)) brightness(1.2);
+  }
+}
+
+@keyframes lost {
+  0% {
+    transform: scale(1) rotate(0);
+  }
+  100% {
+    transform: scale(0.8) translateY(30px) rotate(9deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .balloon,
+  .bub.in .balloon,
+  .bub.in.danger .balloon,
+  .bub.step .items,
+  .bub.in.ready .balloon,
+  .bub.in.served.ready .balloon,
+  .bub.in .awn,
+  .bub.in.flip .awn,
+  .bub.tick .balloon::before,
+  .pill-clock.danger,
+  .pill-score.mood-danger .gauge {
+    animation: none !important;
+  }
+}
+
+/* ------------------------------------------------------------ float labels */
+
+/* INTEGRATION: THESE ARE THE SAME UI AS THE SCORE PILL, SO THEY LOOK LIKE IT.
+   They shipped as bare words with a 2px text-shadow — pale yellow "Ready!" on
+   ochre plaster, the only element in the game with no plate under it, while
+   every other piece of UI in the room (score, clock, pause, order balloon) is a
+   chunky rounded shape with a drop shadow. Same dark brown pill, same inner
+   highlight, same 3px hard shadow as the strip chips, so a
+   popup reads as this game's UI rather than as debug text over the set. */
+.float-label {
+  position: absolute;
+  font-weight: 900;
+  font-size: 20px;
+  color: #fff;
+  padding: 3px 12px 4px;
+  border-radius: 999px;
+  background: rgba(46, 30, 20, 0.78);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.16),
+    0 3px 0 rgba(28, 18, 12, 0.35),
+    0 6px 14px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 2px 0 rgba(28, 18, 12, 0.45);
+  pointer-events: none;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+.float-label.good {
+  color: #ffe98a;
+}
+.float-label.great {
+  color: #ffd166;
+  font-size: 25px;
+}
+.float-label.bad {
+  color: #ff9b8f;
+  font-size: 17px;
+}
+.float-label.combo {
+  color: #9be7ff;
+  font-size: 17px;
+}
+
+/* --------------------------------------------------------------- controls */
+
+.touch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+html[data-device='desktop'] .touch {
+  display: none;
+}
+
+/* THE STICK SITS IN THE MIDDLE OF THE PLAY AREA. IT MAY NOT ERASE IT.
+ *
+ * 124px across is 32% of a portrait phone's width. It no longer WALKS: the
+ * ring is drawn at the anchor (press point, nudged on-glass) while the math
+ * origin trails the thumb — see TouchStickView.anchor in src/input/input.ts.
+ * Measured off the first frames ever taken with a thumb down
+ * (shots/touch-thumb, tmp-fog): the old `backdrop-filter: blur(2px)` kept only
+ * 45% of the high-frequency detail of the game behind it — the benches under
+ * the ring smeared to mush — and it costs a full-surface readback on a phone
+ * GPU for the privilege.
+ *
+ * Bounds: with no fill and a thin rim the ring vanishes over busy flagstone;
+ * with the blur it eats the room. Target: >=85% of the detail behind it kept,
+ * and a rim that reads on BOTH the pale stone floor and the dark benches. So
+ * the blur is gone, the fill drops 0.12 -> 0.07, and all of the read is bought
+ * in the rim — white against the wood, dark against the stone.
+ *
+ * THE RIM WAS 3px AND THE COMMENT ABOVE IT ALREADY SAID 5. A 3px white line
+ * over the pale chimney stone is exactly the hairline REFERENCE.md forbids
+ * (2x crop: shots/w2-touch-crit/iphone-portrait-sprint-up.jpg). Bounds: under
+ * 4px it dissolves against stone; over ~7px the ring stops being a rim and
+ * becomes a painted donut competing with the food. 5px white + a 3px dark
+ * halo at 0.55 is the chunky, two-tone read, and it costs 2 painted px of
+ * radius, not 20. */
+.stick-ring {
+  position: absolute;
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  border: 5px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 0 0 3px rgba(46, 30, 17, 0.55),
+    inset 0 0 0 2px rgba(46, 30, 17, 0.16),
+    0 2px 10px rgba(0, 0, 0, 0.22);
+  transform: translate(-50%, -50%) scale(0.7);
+  opacity: 0;
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+.stick-ring.on {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* THE KNOB WAS THE MOST OPAQUE OBJECT IN THE PICTURE, AND IT LOOKED LIKE FOOD.
+ *
+ * 58px of #fffdf6..#e6d6bd is the exact value and chroma family as .balloon
+ * (line 719), which is why a critic looking at
+ * shots/w2-touch-crit/iphone-portrait-sprint-up.jpg counted three white blobs
+ * between the order bubbles and could not say which was the control; in
+ * shots/w2-touch-probe/iphone-portrait/stick-sprint.jpg the same disc lands on
+ * a chef's head and erases it. Measured: mean RGB 249,242,230, a distance of
+ * only 160 from the nearest balloon and 220 from the game it was covering —
+ * i.e. it was nearly opaque and nearly a ticket.
+ *
+ * Bounds. Size: under ~36px it stops reading as the thing you are pushing and
+ * becomes a dot at the rim; at 58 it is the biggest solid in the play field.
+ * 44px is the tap-target floor AGENTS.md sets, so it is the smallest size that
+ * is still unambiguously an object, and it takes the painted knob from 0.79%
+ * to 0.45% of a portrait frame. Fill: at 1.0 it erases what is behind it, at
+ * ~0.35 a pale knob over pale stone has nothing left to read; 0.55 keeps the
+ * shape and lets the room through. And it gets what a balloon never has: a
+ * hard 2px dark rim, so the silhouette is a CONTROL — ring, rim, seat — at any
+ * value it happens to be sitting on. */
+.stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  background: radial-gradient(
+    120% 120% at 34% 26%,
+    rgba(255, 253, 246, 0.68),
+    rgba(242, 230, 212, 0.6) 62%,
+    rgba(230, 214, 189, 0.56)
+  );
+  box-shadow:
+    0 0 0 2px rgba(46, 30, 17, 0.62),
+    inset 0 -3px 0 rgba(120, 92, 58, 0.2),
+    0 3px 10px rgba(0, 0, 0, 0.34);
+}
+
+/* The three action discs.
+ *
+ * They used to be laid out as a flex pair PLUS a third button absolutely
+ * positioned against the viewport, which is a layout that can only agree with
+ * itself at one aspect ratio: at iPad landscape the dash disc landed on top of
+ * the chop disc and the whole cluster read as a pile dumped in the corner. One
+ * grid, three fixed areas, sized off vmin so a 1194-wide tablet does not get
+ * phone-sized thumb targets and a 393-wide phone does not lose a third of its
+ * play area to them. Every cell still clears 44x44.
+ */
+.action-cluster {
+  position: absolute;
+  right: calc(var(--safe-r) + 18px);
+  bottom: calc(var(--safe-b) + 22px);
+  display: grid;
+  grid-template-areas:
+    '.   dash'
+    'use grab';
+  align-items: end;
+  justify-items: end;
+  column-gap: clamp(8px, 1.4vmin, 14px);
+  /* The dash disc's phone floor went 46 -> 52px (see .btn-dash), and the
+     cluster's painted footprint is a camera number that may not grow with it:
+     the rig's whole portrait pan budget is smaller than this cluster already.
+     Width is unaffected — dash shares its column with the 66px grab disc — so
+     the 6px is bought back out of the ROW gap alone. Bounds: at 8px the two
+     transparent halos meet exactly and no press is ambiguous; at 0 the discs
+     touch and read as one blob. 4px keeps 2px of halo each side and holds the
+     cluster at 126x123.5 against 126x120 before — 4.65% of a portrait frame
+     against 4.52%, and the WIDTH, which is the number the camera rig actually
+     fights, is unchanged at 126px. Measured, not assumed: on a 393px frame
+     1.4vmin is 5.5px, so the floor never binds and the real row gap went 8 ->
+     5.5. iPad and desktop never see this at all: 1.4vmin is 11.7px there. */
+  row-gap: clamp(4px, 1.4vmin, 14px);
+  pointer-events: none;
+}
+
+.btn {
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  touch-action: none;
+  transition:
+    transform 0.07s ease,
+    box-shadow 0.07s ease;
+  padding: 0;
+  position: relative;
+  /* iOS raises a callout / selection gesture on a long press, and a gesture
+     that starts is a pointercancel for everything already down — i.e. the chef
+     stops mid-sprint because the player held the chop button too long. */
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* HIT AREA IS NOT PAINTED AREA.
+ *
+ * Both bounds are real and they pull opposite ways. Below: a thumb aiming
+ * eyes-free at a disc lands within about 9.2mm of where it meant to (Parhi's
+ * one-handed thumb study; Apple's 44pt floor is the same 7.3mm number from the
+ * other end), and the painted discs are 66/52/52px = 10.9/8.6/8.6mm, so one of
+ * the three is still under it. Above: the camera piece measured this cluster at
+ * 126px = 32.1% of a 393px frame and argued the portrait pan budget cannot
+ * dodge anything wider, and every extra painted pixel is play space the
+ * composition already fought for.
+ *
+ * So the painted footprint does not move by one pixel — it is still
+ * 126x123.5, 32.1% of width, 4.65% of frame area — and the whole of the
+ * reachability is bought in transparent halo. Each disc claims the empty space
+ * on the sides where it HAS no neighbour, and exactly half of the 8px gutter
+ * where it does, so no two halos ever overlap and no press is ambiguous.
+ * Effective hit boxes: grab 82x80, chop 68x76, dash 76x70 — an 11.3mm minimum
+ * on all three. The halo also stops 10px clear of the home-indicator band and
+ * sits inside the 14px no-steer margin in input.ts, so the ring around a disc
+ * is a miss, never a sprint.
+ */
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+}
+/* The gutter each halo may claim is half the gap it sits in, and the phone row
+   gap is now 5.5px (see .action-cluster), so the two halos that face each other
+   across it take 2px, not 4. Scanned pixel by pixel with elementFromPoint down
+   the column: dash's halo, then exactly ONE row owned by nobody, then grab's.
+   No overlap, no ambiguous press, and probe `buttons` stays at zero on-disc
+   misses. */
+.btn-grab::before {
+  inset: -2px -12px -12px -4px;
+}
+.btn-use::before {
+  inset: -12px -4px -12px -12px;
+}
+.btn-dash::before {
+  inset: -16px -12px -2px -12px;
+}
+
+.btn svg {
+  width: 46%;
+  height: 46%;
+  display: block;
+  filter: drop-shadow(0 1.5px 0 rgba(58, 42, 30, 0.35));
+}
+
+/* A CHUNKY BUTTON PRESSES INTO ITS OWN SHADOW.
+ *
+ * The old press was `scale(0.9) translateY(3px)` — a 66px disc shrinking by
+ * 6px, under a thumb that is covering it, while its 6px hard drop shadow
+ * stayed exactly where it was. So the one moment the player most needs
+ * confirmation of, they cannot see: the finger hides the only thing that
+ * moved. Now the disc travels down 4px and the hard shadow under it collapses
+ * from 6px to 2px, which keeps the shadow's OUTER edge still and reads as
+ * compression at the rim — visible past the edge of a thumb. */
+.btn:active,
+.btn.pressing {
+  transform: translateY(4px);
+}
+.btn-grab:active,
+.btn-grab.pressing {
+  box-shadow:
+    inset 0 -3px 0 rgba(150, 88, 20, 0.35),
+    0 2px 0 #c97c25,
+    0 5px 12px rgba(0, 0, 0, 0.32);
+}
+.btn-use:active,
+.btn-use.pressing {
+  box-shadow:
+    inset 0 -2px 0 rgba(24, 88, 112, 0.35),
+    0 1px 0 #2f7796,
+    0 4px 10px rgba(0, 0, 0, 0.3);
+}
+.btn-dash:active,
+.btn-dash.pressing {
+  box-shadow:
+    inset 0 -2px 0 rgba(72, 48, 130, 0.35),
+    0 1px 0 #6a4ba8,
+    0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* THE FLOOR OF EACH CLAMP IS A CAMERA NUMBER, NOT A TASTE ONE.
+ *
+ * On a 393px phone the vmin term never binds, so these minima ARE the cluster
+ * on the one profile with the least room for it: at 74/58/50 the cluster
+ * measured 140px, i.e. 0.356 of the frame width, and the rig logged
+ * `player at 0.68, 0.96 of frame — under the thumb cluster` on a late-service
+ * portrait capture (shots/j-cam-r2f) — the player standing behind the blue
+ * disc. The camera cannot dodge that on portrait: its whole pan budget is
+ * 0.33 of a half-frame and the cluster is wider than that.
+ *
+ * 66/52/52 takes it to 0.32 of frame width, every target still over the 44px
+ * floor AGENTS.md sets, and only phones are affected — iPad and desktop are
+ * governed by the vmin term. (Dash was 46 here and is now 52: see the note on
+ * .btn-dash. The cluster's WIDTH is unmoved by that — dash shares its column
+ * with the 66px grab disc.) */
+.btn-grab {
+  grid-area: grab;
+  width: clamp(66px, 10.6vmin, 100px);
+  height: clamp(66px, 10.6vmin, 100px);
+  background: radial-gradient(120% 120% at 32% 22%, #ffe6a2, #f4a340 62%, #e08b2c);
+  box-shadow:
+    inset 0 -5px 0 rgba(150, 88, 20, 0.35),
+    0 6px 0 #c97c25,
+    0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btn-use {
+  grid-area: use;
+  width: clamp(52px, 8.2vmin, 78px);
+  height: clamp(52px, 8.2vmin, 78px);
+  background: radial-gradient(120% 120% at 32% 22%, #d3f0f4, #4fa3c7 62%, #3d8fb3);
+  box-shadow:
+    inset 0 -4px 0 rgba(24, 88, 112, 0.35),
+    0 5px 0 #2f7796,
+    0 8px 16px rgba(0, 0, 0, 0.28);
+}
+
+/* THE RUNT. On every phone the vmin term is dead (7vmin = 27px on a 393px
+ * frame) so this floor WAS the dash disc everywhere it matters: 46px = 7.6mm
+ * painted, under the 9.2mm eyes-free thumb-landing figure the note at the top
+ * of this section cites as the bound, on the disc that sits furthest from the
+ * grip pivot (24.0mm against grab's 14.6mm) — the one target most likely to be
+ * hit blind. Bounds: 44px is the hard floor AGENTS.md sets and 46 was already
+ * only 2px clear of it; anything at or near grab's 66px flattens the hierarchy
+ * that says grab is the verb you press twenty times a minute and dash is not.
+ * 52px = 8.6mm makes the two secondaries equal and leaves the primary
+ * dominant, and it costs the cluster nothing in width. */
+.btn-dash {
+  grid-area: dash;
+  width: clamp(52px, 7vmin, 66px);
+  height: clamp(52px, 7vmin, 66px);
+  background: radial-gradient(120% 120% at 32% 22%, #e0d2ff, #8f6fd0 62%, #7d5cc0);
+  box-shadow:
+    inset 0 -4px 0 rgba(72, 48, 130, 0.35),
+    0 5px 0 #6a4ba8,
+    0 8px 16px rgba(0, 0, 0, 0.28);
+}
+
+/* The pause chip is gone; see the note where it used to live in index.html.
+   The rule below is kept for the touch cluster and the float labels. */
+body.overlaid .touch,
+body.overlaid .labels {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- overlay */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(120% 90% at 50% 20%, rgba(58, 42, 30, 0.55), rgba(26, 18, 13, 0.88));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+  padding: calc(var(--safe-t) + 12px) 16px calc(var(--safe-b) + 12px);
+  /* Above the order balloons, which carry an inline z-index of 90 (hud.ts) and
+     were painting over the results panel — see showOverlay() in main.ts. */
+  z-index: 200;
+}
+
+.overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* AN OVERLAY IS A MODAL, SO THE HUD GOES WITH IT.
+   Three classes, so it beats `.hud.live` whatever the source order. The HUD
+   keeps its own 0.35s curve, so the strip and the balloons dissolve as the
+   scrim comes up rather than being cut. */
+body.overlaid .hud.live {
+  opacity: 0;
+}
+
+.panel {
+  text-align: center;
+  max-width: 380px;
+  width: 100%;
+}
+
+.title {
+  font-size: clamp(38px, 11vw, 66px);
+  line-height: 0.92;
+  margin: 0 0 6px;
+  font-weight: 900;
+  color: #ffd166;
+  text-shadow:
+    0 5px 0 #b9762a,
+    0 9px 24px rgba(0, 0, 0, 0.5);
+  letter-spacing: -0.02em;
+}
+
+.title span {
+  color: #8fd0d8;
+  text-shadow:
+    0 5px 0 #3d7f95,
+    0 9px 24px rgba(0, 0, 0, 0.5);
+}
+
+.tagline {
+  color: #f6e6cf;
+  opacity: 0.86;
+  font-size: 14px;
+  margin: 0 0 22px;
+  font-weight: 700;
+}
+
+.cta {
+  border: none;
+  border-radius: 999px;
+  padding: 15px 40px;
+  font-size: 19px;
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(180deg, #78c850, #4f9a34);
+  box-shadow:
+    0 6px 0 #35701f,
+    0 12px 26px rgba(0, 0, 0, 0.36);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.cta:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 2px 0 #35701f,
+    0 6px 14px rgba(0, 0, 0, 0.36);
+}
+
+.how {
+  margin-top: 20px;
+  color: #e8d8c2;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+html[data-device='touch'] .k-desktop,
+html[data-device='desktop'] .k-touch {
+  display: none;
+}
+
+.results {
+  color: #fff8ec;
+}
+
+.results h2 {
+  font-size: 30px;
+  margin: 0 0 4px;
+  color: #ffd166;
+}
+
+.results .big {
+  font-size: 60px;
+  font-weight: 900;
+  color: #ffd166;
+  line-height: 1;
+  margin: 6px 0 2px;
+  text-shadow: 0 5px 0 #b9762a;
+}
+
+.results .row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 4px 0;
+  border-bottom: 1px dashed rgba(255, 248, 236, 0.22);
+}
+
+/* INTEGRATION: THE ONE PANEL IN THE GAME WITH NOTHING UNDER IT.
+   The four stat rows were 14px text with a dashed hairline, floating straight
+   on the dimmed room — so "Dishes served  2" read across a bench, a chef and a
+   pass counter, and the results screen (which every single run ends on) was the
+   only place the game breaks its own rule that UI sits on a chunky rounded
+   plate. Same dark brown fill and same shadow stack as the score pill, the
+   clock, the pause chip and the float labels. No new colour, no new radius. */
+.results .stats {
+  margin: 16px auto 22px;
+  max-width: 260px;
+  padding: 6px 16px 8px;
+  border-radius: 18px;
+  background: rgba(46, 30, 20, 0.72);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.14),
+    0 3px 0 rgba(28, 18, 12, 0.35),
+    0 8px 18px rgba(0, 0, 0, 0.3);
+}
+
+.results .row:last-child {
+  border-bottom: none;
+}

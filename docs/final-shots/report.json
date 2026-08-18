@@ -1,0 +1,4186 @@
+{
+  "generatedAt": "2026-08-18T02:27:26.517Z",
+  "profiles": [
+    {
+      "id": "iphone-portrait",
+      "label": "iPhone 15 Pro — portrait",
+      "viewport": {
+        "width": 393,
+        "height": 852
+      },
+      "dpr": 1,
+      "shots": [
+        "shots/handoff-final/iphone-portrait/00-title.jpg",
+        "shots/handoff-final/iphone-portrait/01-opening.jpg",
+        "shots/handoff-final/iphone-portrait/t0008s.jpg",
+        "shots/handoff-final/iphone-portrait/t0013s.jpg",
+        "shots/handoff-final/iphone-portrait/t0018s.jpg",
+        "shots/handoff-final/iphone-portrait/90-late.jpg"
+      ],
+      "driveStats": {
+        "gameSeconds": 16.08,
+        "renderCostMs": 4.7
+      },
+      "errors": [],
+      "cameraFailures": [
+        "00-title: visibleDepthRatio 2.04 outside 1.75-1.81 (reference 1.75-1.81 at 16:9)",
+        "00-title: back wall 1.00 of frame width (reference 0.84)",
+        "01-opening: visibleDepthRatio 2.04 outside 1.75-1.81 (reference 1.75-1.81 at 16:9)",
+        "01-opening: back wall 1.00 of frame width (reference 0.84)",
+        "t0008s: visibleDepthRatio 2.49 outside 1.75-1.81 (reference 1.75-1.81 at 16:9)",
+        "t0008s: back wall 1.00 of frame width (reference 0.84)",
+        "t0008s: room centre 0.71 past the composition stop 0.68 — player would be off the picture",
+        "t0013s: visibleDepthRatio 2.04 outside 1.75-1.81 (reference 1.75-1.81 at 16:9)",
+        "t0013s: back wall 1.00 of frame width (reference 0.84)",
+        "t0018s: visibleDepthRatio 2.05 outside 1.75-1.81 (reference 1.75-1.81 at 16:9)",
+        "t0018s: back wall 1.00 of frame width (reference 0.84)",
+        "90-late: visibleDepthRatio 2.04 outside 1.75-1.81 (reference 1.75-1.81 at 16:9)",
+        "90-late: back wall 1.00 of frame width (reference 0.84)"
+      ],
+      "snapshots": [
+        {
+          "phase": "playing",
+          "time": 2.9999999999999942,
+          "heat": 0.012499999999999976,
+          "score": {
+            "coins": 0,
+            "combo": 0,
+            "bestCombo": 0,
+            "served": 0,
+            "missed": 0,
+            "patience": 1
+          },
+          "orders": [
+            {
+              "id": 1,
+              "name": "Garden Salad",
+              "remaining": 39,
+              "total": 42,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Chopped Salad",
+              "remaining": 43,
+              "total": 46,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped",
+                "tomato:prepped"
+              ]
+            }
+          ],
+          "chefs": [
+            {
+              "id": 0,
+              "isPlayer": true,
+              "skin": "bramble",
+              "x": 7.5,
+              "y": 8.6,
+              "speed": 0,
+              "intent": "idle",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": null
+            },
+            {
+              "id": 1,
+              "isPlayer": false,
+              "skin": "pip",
+              "x": 4.37,
+              "y": 7.51,
+              "speed": 0.04,
+              "intent": "working",
+              "focus": 18,
+              "focusAction": "take",
+              "carrying": null
+            },
+            {
+              "id": 2,
+              "isPlayer": false,
+              "skin": "nori",
+              "x": 2.72,
+              "y": 3.5,
+              "speed": 4.74,
+              "intent": "moving",
+              "focus": 8,
+              "focusAction": "combine",
+              "carrying": "tomato:raw"
+            },
+            {
+              "id": 3,
+              "isPlayer": false,
+              "skin": "mochi",
+              "x": 8.85,
+              "y": 6.51,
+              "speed": 4.74,
+              "intent": "moving",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": "tomato:raw"
+            }
+          ],
+          "stations": [
+            {
+              "id": 1,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 2,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 3,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 4,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 5,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 6,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 7,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 8,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 4
+              },
+              "work": 0,
+              "holding": "plate"
+            },
+            {
+              "id": 9,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 10,
+              "kind": "crate",
+              "dispenses": "tomato",
+              "cell": {
+                "x": 6,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 11,
+              "kind": "sink",
+              "dispenses": null,
+              "cell": {
+                "x": 7,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 12,
+              "kind": "crate",
+              "dispenses": "lettuce",
+              "cell": {
+                "x": 8,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 13,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 14,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 4
+              },
+              "work": 0,
+              "holding": "plate"
+            },
+            {
+              "id": 15,
+              "kind": "bin",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 16,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 17,
+              "kind": "crate",
+              "dispenses": "bacon",
+              "cell": {
+                "x": 2,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 18,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 7
+              },
+              "work": 0.86,
+              "holding": "ingredient"
+            },
+            {
+              "id": 19,
+              "kind": "crate",
+              "dispenses": "bun",
+              "cell": {
+                "x": 11,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 20,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 21,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            }
+          ],
+          "camera": {
+            "aspect": 0.461,
+            "pitchDeg": 23,
+            "fovDeg": 52.5,
+            "height": 6.71,
+            "camZ": 15.78,
+            "restZ": 15.78,
+            "wallFloorJoin": 0.525,
+            "halfWidth": 3.69,
+            "backWallFrac": 1,
+            "centreOffset": 0,
+            "bottomEdgeZ": 10,
+            "floorDepth": 9,
+            "topEdgeWallY": 7.55,
+            "visibleDepthRatio": 2.04,
+            "depthRatio": 1.66,
+            "playerFrac": 0,
+            "halfWidthAtChef": 2.1,
+            "warnings": [
+              "visibleDepthRatio 2.04 outside 1.75-1.81 (reference 1.75-1.81 at 16:9)",
+              "back wall 1.00 of frame width (reference 0.84)"
+            ]
+          },
+          "perf": {
+            "frames": 6,
+            "fps": 53.1,
+            "worstFrameMs": 0
+          }
+        },
+        {
+          "phase": "playing",
+          "time": 19.466666666666843,
+          "heat": 0.08111111111111184,
+          "score": {
+            "coins": 24,
+            "combo": 2,
+            "bestCombo": 2,
+            "served": 2,
+            "missed": 0,
+            "patience": 1
+          },
+          "orders": [
+            {
+              "id": 2,
+              "name": "Chopped Salad",
+              "remaining": 26.53,
+              "total": 46,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped",
+                "tomato:prepped"
+              ]
+            }
+          ],
+          "chefs": [
+            {
+              "id": 0,
+              "isPlayer": true,
+              "skin": "bramble",
+              "x": 9.68,
+              "y": 4.21,
+              "speed": 4.84,
+              "intent": "moving",
+              "focus": 12,
+              "focusAction": "return",
+              "carrying": "lettuce:raw"
+            },
+            {
+              "id": 1,
+              "isPlayer": false,
+              "skin": "pip",
+              "x": 5.13,
+              "y": 7.24,
+              "speed": 1.75,
+              "intent": "moving",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": "tomato:prepped"
+            },
+            {
+              "id": 2,
+              "isPlayer": false,
+              "skin": "nori",
+              "x": 11.98,
+              "y": 5.52,
+              "speed": 1.47,
+              "intent": "moving",
+              "focus": 14,
+              "focusAction": "place",
+              "carrying": "plate[tomato:prepped]"
+            },
+            {
+              "id": 3,
+              "isPlayer": false,
+              "skin": "mochi",
+              "x": 8.96,
+              "y": 3.3,
+              "speed": 1.82,
+              "intent": "moving",
+              "focus": 12,
+              "focusAction": "dispense",
+              "carrying": null
+            }
+          ],
+          "stations": [
+            {
+              "id": 1,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 2,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 3,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 4,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 5,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 6,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 7,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 8,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 9,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 10,
+              "kind": "crate",
+              "dispenses": "tomato",
+              "cell": {
+                "x": 6,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 11,
+              "kind": "sink",
+              "dispenses": null,
+              "cell": {
+                "x": 7,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 12,
+              "kind": "crate",
+              "dispenses": "lettuce",
+              "cell": {
+                "x": 8,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 13,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 14,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 15,
+              "kind": "bin",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 16,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 17,
+              "kind": "crate",
+              "dispenses": "bacon",
+              "cell": {
+                "x": 2,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 18,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 19,
+              "kind": "crate",
+              "dispenses": "bun",
+              "cell": {
+                "x": 11,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 20,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 21,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            }
+          ],
+          "camera": {
+            "aspect": 0.461,
+            "pitchDeg": 23,
+            "fovDeg": 52.5,
+            "height": 6.71,
+            "camZ": 15.77,
+            "restZ": 15.77,
+            "wallFloorJoin": 0.525,
+            "halfWidth": 3.69,
+            "backWallFrac": 1,
+            "centreOffset": 0.04,
+            "bottomEdgeZ": 10,
+            "floorDepth": 9,
+            "topEdgeWallY": 7.55,
+            "visibleDepthRatio": 2.04,
+            "depthRatio": 1.66,
+            "playerFrac": 0.655,
+            "halfWidthAtChef": 3.02,
+            "warnings": [
+              "visibleDepthRatio 2.04 outside 1.75-1.81 (reference 1.75-1.81 at 16:9)",
+              "back wall 1.00 of frame width (reference 0.84)"
+            ]
+          },
+          "perf": {
+            "frames": 972,
+            "fps": 60,
+            "worstFrameMs": 16.7
+          }
+        }
+      ],
+      "final": {
+        "phase": "playing",
+        "time": 21.550000000000058,
+        "heat": 0.08979166666666691,
+        "score": {
+          "coins": 24,
+          "combo": 2,
+          "bestCombo": 2,
+          "served": 2,
+          "missed": 0,
+          "patience": 1
+        },
+        "orders": [
+          {
+            "id": 2,
+            "name": "Chopped Salad",
+            "remaining": 24.45,
+            "total": 46,
+            "components": [
+              "lettuce:prepped",
+              "tomato:prepped",
+              "tomato:prepped"
+            ]
+          }
+        ],
+        "chefs": [
+          {
+            "id": 0,
+            "isPlayer": true,
+            "skin": "bramble",
+            "x": 9.81,
+            "y": 4.97,
+            "speed": 0,
+            "intent": "idle",
+            "focus": null,
+            "focusAction": "none",
+            "carrying": "lettuce:raw"
+          },
+          {
+            "id": 1,
+            "isPlayer": false,
+            "skin": "pip",
+            "x": 9.61,
+            "y": 6.19,
+            "speed": 2.88,
+            "intent": "moving",
+            "focus": null,
+            "focusAction": "none",
+            "carrying": "tomato:prepped"
+          },
+          {
+            "id": 2,
+            "isPlayer": false,
+            "skin": "nori",
+            "x": 10.79,
+            "y": 6.7,
+            "speed": 0.68,
+            "intent": "moving",
+            "focus": 19,
+            "focusAction": "dispense",
+            "carrying": null
+          },
+          {
+            "id": 3,
+            "isPlayer": false,
+            "skin": "mochi",
+            "x": 10.14,
+            "y": 5.7,
+            "speed": 3.38,
+            "intent": "moving",
+            "focus": null,
+            "focusAction": "none",
+            "carrying": null
+          }
+        ],
+        "stations": [
+          {
+            "id": 1,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 2,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 2,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 3,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 4,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 11,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 5,
+            "kind": "stove",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 1
+            },
+            "work": 0,
+            "holding": "pan"
+          },
+          {
+            "id": 6,
+            "kind": "stove",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 1
+            },
+            "work": 0,
+            "holding": "pan"
+          },
+          {
+            "id": 7,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 8,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 2,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 9,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 10,
+            "kind": "crate",
+            "dispenses": "tomato",
+            "cell": {
+              "x": 6,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 11,
+            "kind": "sink",
+            "dispenses": null,
+            "cell": {
+              "x": 7,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 12,
+            "kind": "crate",
+            "dispenses": "lettuce",
+            "cell": {
+              "x": 8,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 13,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 11,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 14,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 4
+            },
+            "work": 0,
+            "holding": "plate"
+          },
+          {
+            "id": 15,
+            "kind": "bin",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 16,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 17,
+            "kind": "crate",
+            "dispenses": "bacon",
+            "cell": {
+              "x": 2,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 18,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 19,
+            "kind": "crate",
+            "dispenses": "bun",
+            "cell": {
+              "x": 11,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 20,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 21,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          }
+        ],
+        "camera": {
+          "aspect": 0.461,
+          "pitchDeg": 23,
+          "fovDeg": 52.5,
+          "height": 6.71,
+          "camZ": 15.77,
+          "restZ": 15.77,
+          "wallFloorJoin": 0.525,
+          "halfWidth": 3.69,
+          "backWallFrac": 1,
+          "centreOffset": 0.067,
+          "bottomEdgeZ": 10,
+          "floorDepth": 9,
+          "topEdgeWallY": 7.55,
+          "visibleDepthRatio": 2.04,
+          "depthRatio": 1.66,
+          "playerFrac": 0.721,
+          "halfWidthAtChef": 2.86,
+          "warnings": [
+            "visibleDepthRatio 2.04 outside 1.75-1.81 (reference 1.75-1.81 at 16:9)",
+            "back wall 1.00 of frame width (reference 0.84)"
+          ]
+        },
+        "perf": {
+          "frames": 978,
+          "fps": 46.8,
+          "worstFrameMs": 950.1
+        }
+      }
+    },
+    {
+      "id": "iphone-landscape",
+      "label": "iPhone 15 Pro — landscape",
+      "viewport": {
+        "width": 852,
+        "height": 393
+      },
+      "dpr": 1,
+      "shots": [
+        "shots/handoff-final/iphone-landscape/00-title.jpg",
+        "shots/handoff-final/iphone-landscape/01-opening.jpg",
+        "shots/handoff-final/iphone-landscape/t0009s.jpg",
+        "shots/handoff-final/iphone-landscape/t0013s.jpg",
+        "shots/handoff-final/iphone-landscape/t0018s.jpg",
+        "shots/handoff-final/iphone-landscape/90-late.jpg"
+      ],
+      "driveStats": {
+        "gameSeconds": 16.08,
+        "renderCostMs": 5.5
+      },
+      "errors": [],
+      "cameraFailures": [],
+      "snapshots": [
+        {
+          "phase": "playing",
+          "time": 3.049999999999994,
+          "heat": 0.01270833333333331,
+          "score": {
+            "coins": 0,
+            "combo": 0,
+            "bestCombo": 0,
+            "served": 0,
+            "missed": 0,
+            "patience": 1
+          },
+          "orders": [
+            {
+              "id": 1,
+              "name": "Garden Salad",
+              "remaining": 38.95,
+              "total": 42,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Chopped Salad",
+              "remaining": 42.95,
+              "total": 46,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped",
+                "tomato:prepped"
+              ]
+            }
+          ],
+          "chefs": [
+            {
+              "id": 0,
+              "isPlayer": true,
+              "skin": "bramble",
+              "x": 7.5,
+              "y": 8.6,
+              "speed": 0,
+              "intent": "idle",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": null
+            },
+            {
+              "id": 1,
+              "isPlayer": false,
+              "skin": "pip",
+              "x": 4.37,
+              "y": 7.51,
+              "speed": 0.03,
+              "intent": "working",
+              "focus": 18,
+              "focusAction": "take",
+              "carrying": null
+            },
+            {
+              "id": 2,
+              "isPlayer": false,
+              "skin": "nori",
+              "x": 9.9,
+              "y": 6.51,
+              "speed": 4.73,
+              "intent": "moving",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": "tomato:raw"
+            },
+            {
+              "id": 3,
+              "isPlayer": false,
+              "skin": "mochi",
+              "x": 2.13,
+              "y": 6.57,
+              "speed": 1.82,
+              "intent": "moving",
+              "focus": 16,
+              "focusAction": "take",
+              "carrying": null
+            }
+          ],
+          "stations": [
+            {
+              "id": 1,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 2,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 3,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 4,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 5,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 6,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 7,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 8,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 4
+              },
+              "work": 0,
+              "holding": "plate"
+            },
+            {
+              "id": 9,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 10,
+              "kind": "crate",
+              "dispenses": "tomato",
+              "cell": {
+                "x": 6,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 11,
+              "kind": "sink",
+              "dispenses": null,
+              "cell": {
+                "x": 7,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 12,
+              "kind": "crate",
+              "dispenses": "lettuce",
+              "cell": {
+                "x": 8,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 13,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 14,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 15,
+              "kind": "bin",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 16,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 7
+              },
+              "work": 0,
+              "holding": "ingredient"
+            },
+            {
+              "id": 17,
+              "kind": "crate",
+              "dispenses": "bacon",
+              "cell": {
+                "x": 2,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 18,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 7
+              },
+              "work": 0.99,
+              "holding": "ingredient"
+            },
+            {
+              "id": 19,
+              "kind": "crate",
+              "dispenses": "bun",
+              "cell": {
+                "x": 11,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 20,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 21,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 7
+              },
+              "work": 0,
+              "holding": "plate"
+            }
+          ],
+          "camera": {
+            "aspect": 2.168,
+            "pitchDeg": 22.5,
+            "fovDeg": 28.6,
+            "height": 7.55,
+            "camZ": 18.89,
+            "restZ": 18.59,
+            "wallFloorJoin": 0.513,
+            "halfWidth": 10.73,
+            "backWallFrac": 0.699,
+            "centreOffset": 0.107,
+            "bottomEdgeZ": 8.8,
+            "floorDepth": 7.8,
+            "topEdgeWallY": 4.97,
+            "visibleDepthRatio": 1.59,
+            "depthRatio": 1.48,
+            "playerFrac": 0,
+            "halfWidthAtChef": 6.85,
+            "warnings": []
+          },
+          "perf": {
+            "frames": 7,
+            "fps": 54.2,
+            "worstFrameMs": 0
+          }
+        },
+        {
+          "phase": "playing",
+          "time": 19.51666666666684,
+          "heat": 0.08131944444444517,
+          "score": {
+            "coins": 24,
+            "combo": 2,
+            "bestCombo": 2,
+            "served": 2,
+            "missed": 0,
+            "patience": 1
+          },
+          "orders": [
+            {
+              "id": 2,
+              "name": "Chopped Salad",
+              "remaining": 26.48,
+              "total": 46,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped",
+                "tomato:prepped"
+              ]
+            }
+          ],
+          "chefs": [
+            {
+              "id": 0,
+              "isPlayer": true,
+              "skin": "bramble",
+              "x": 9.04,
+              "y": 3.63,
+              "speed": 2.89,
+              "intent": "moving",
+              "focus": 12,
+              "focusAction": "return",
+              "carrying": "tomato:raw"
+            },
+            {
+              "id": 1,
+              "isPlayer": false,
+              "skin": "pip",
+              "x": 4.88,
+              "y": 6.58,
+              "speed": 4.29,
+              "intent": "moving",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": "plate[lettuce:prepped]"
+            },
+            {
+              "id": 2,
+              "isPlayer": false,
+              "skin": "nori",
+              "x": 10.15,
+              "y": 4.33,
+              "speed": 3.69,
+              "intent": "moving",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": "plate[]"
+            },
+            {
+              "id": 3,
+              "isPlayer": false,
+              "skin": "mochi",
+              "x": 5.03,
+              "y": 5.54,
+              "speed": 12,
+              "intent": "moving",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": null
+            }
+          ],
+          "stations": [
+            {
+              "id": 1,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 2,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 3,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 4,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 5,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 6,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 7,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 8,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 4
+              },
+              "work": 0,
+              "holding": "ingredient"
+            },
+            {
+              "id": 9,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 10,
+              "kind": "crate",
+              "dispenses": "tomato",
+              "cell": {
+                "x": 6,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 11,
+              "kind": "sink",
+              "dispenses": null,
+              "cell": {
+                "x": 7,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 12,
+              "kind": "crate",
+              "dispenses": "lettuce",
+              "cell": {
+                "x": 8,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 13,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 14,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 15,
+              "kind": "bin",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 16,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 7
+              },
+              "work": 0,
+              "holding": "ingredient"
+            },
+            {
+              "id": 17,
+              "kind": "crate",
+              "dispenses": "bacon",
+              "cell": {
+                "x": 2,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 18,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 19,
+              "kind": "crate",
+              "dispenses": "bun",
+              "cell": {
+                "x": 11,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 20,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 21,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            }
+          ],
+          "camera": {
+            "aspect": 2.168,
+            "pitchDeg": 22.5,
+            "fovDeg": 28.6,
+            "height": 7.55,
+            "camZ": 18.59,
+            "restZ": 18.59,
+            "wallFloorJoin": 0.525,
+            "halfWidth": 10.58,
+            "backWallFrac": 0.709,
+            "centreOffset": 0.107,
+            "bottomEdgeZ": 8.5,
+            "floorDepth": 7.5,
+            "topEdgeWallY": 5.02,
+            "visibleDepthRatio": 1.57,
+            "depthRatio": 1.49,
+            "playerFrac": 0.167,
+            "halfWidthAtChef": 9.24,
+            "warnings": []
+          },
+          "perf": {
+            "frames": 973,
+            "fps": 60,
+            "worstFrameMs": 16.7
+          }
+        }
+      ],
+      "final": {
+        "phase": "playing",
+        "time": 21.566666666666723,
+        "heat": 0.08986111111111135,
+        "score": {
+          "coins": 24,
+          "combo": 2,
+          "bestCombo": 2,
+          "served": 2,
+          "missed": 0,
+          "patience": 1
+        },
+        "orders": [
+          {
+            "id": 2,
+            "name": "Chopped Salad",
+            "remaining": 24.43,
+            "total": 46,
+            "components": [
+              "lettuce:prepped",
+              "tomato:prepped",
+              "tomato:prepped"
+            ]
+          },
+          {
+            "id": 18,
+            "name": "Garden Salad",
+            "remaining": 39.83,
+            "total": 40.99958333333333,
+            "components": [
+              "lettuce:prepped",
+              "tomato:prepped"
+            ]
+          }
+        ],
+        "chefs": [
+          {
+            "id": 0,
+            "isPlayer": true,
+            "skin": "bramble",
+            "x": 9.29,
+            "y": 3.78,
+            "speed": 0,
+            "intent": "idle",
+            "focus": 12,
+            "focusAction": "return",
+            "carrying": "tomato:raw"
+          },
+          {
+            "id": 1,
+            "isPlayer": false,
+            "skin": "pip",
+            "x": 4.56,
+            "y": 5.5,
+            "speed": 4.32,
+            "intent": "moving",
+            "focus": 9,
+            "focusAction": "none",
+            "carrying": "plate[lettuce:prepped]"
+          },
+          {
+            "id": 2,
+            "isPlayer": false,
+            "skin": "nori",
+            "x": 3.07,
+            "y": 3.61,
+            "speed": 1.36,
+            "intent": "moving",
+            "focus": 8,
+            "focusAction": "place",
+            "carrying": "plate[tomato:prepped]"
+          },
+          {
+            "id": 3,
+            "isPlayer": false,
+            "skin": "mochi",
+            "x": 7.91,
+            "y": 6.51,
+            "speed": 4.27,
+            "intent": "moving",
+            "focus": null,
+            "focusAction": "none",
+            "carrying": "plate[]"
+          }
+        ],
+        "stations": [
+          {
+            "id": 1,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 2,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 2,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 3,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 4,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 11,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 5,
+            "kind": "stove",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 1
+            },
+            "work": 0,
+            "holding": "pan"
+          },
+          {
+            "id": 6,
+            "kind": "stove",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 1
+            },
+            "work": 0,
+            "holding": "pan"
+          },
+          {
+            "id": 7,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 8,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 2,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 9,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 10,
+            "kind": "crate",
+            "dispenses": "tomato",
+            "cell": {
+              "x": 6,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 11,
+            "kind": "sink",
+            "dispenses": null,
+            "cell": {
+              "x": 7,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 12,
+            "kind": "crate",
+            "dispenses": "lettuce",
+            "cell": {
+              "x": 8,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 13,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 11,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 14,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 15,
+            "kind": "bin",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 16,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 7
+            },
+            "work": 0,
+            "holding": "ingredient"
+          },
+          {
+            "id": 17,
+            "kind": "crate",
+            "dispenses": "bacon",
+            "cell": {
+              "x": 2,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 18,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 19,
+            "kind": "crate",
+            "dispenses": "bun",
+            "cell": {
+              "x": 11,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 20,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 21,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          }
+        ],
+        "camera": {
+          "aspect": 2.168,
+          "pitchDeg": 22.5,
+          "fovDeg": 28.6,
+          "height": 7.55,
+          "camZ": 18.59,
+          "restZ": 18.59,
+          "wallFloorJoin": 0.525,
+          "halfWidth": 10.58,
+          "backWallFrac": 0.709,
+          "centreOffset": 0.107,
+          "bottomEdgeZ": 8.5,
+          "floorDepth": 7.5,
+          "topEdgeWallY": 5.02,
+          "visibleDepthRatio": 1.57,
+          "depthRatio": 1.49,
+          "playerFrac": 0.196,
+          "halfWidthAtChef": 9.16,
+          "warnings": []
+        },
+        "perf": {
+          "frames": 979,
+          "fps": 58.3,
+          "worstFrameMs": 33.5
+        }
+      }
+    },
+    {
+      "id": "ipad-landscape",
+      "label": "iPad Pro 11\" — landscape",
+      "viewport": {
+        "width": 1194,
+        "height": 834
+      },
+      "dpr": 1,
+      "shots": [
+        "shots/handoff-final/ipad-landscape/00-title.jpg",
+        "shots/handoff-final/ipad-landscape/01-opening.jpg",
+        "shots/handoff-final/ipad-landscape/t0009s.jpg",
+        "shots/handoff-final/ipad-landscape/t0013s.jpg",
+        "shots/handoff-final/ipad-landscape/t0018s.jpg",
+        "shots/handoff-final/ipad-landscape/90-late.jpg"
+      ],
+      "driveStats": {
+        "gameSeconds": 16.08,
+        "renderCostMs": 6.2
+      },
+      "errors": [],
+      "cameraFailures": [],
+      "snapshots": [
+        {
+          "phase": "playing",
+          "time": 3.0666666666666607,
+          "heat": 0.012777777777777753,
+          "score": {
+            "coins": 0,
+            "combo": 0,
+            "bestCombo": 0,
+            "served": 0,
+            "missed": 0,
+            "patience": 1
+          },
+          "orders": [
+            {
+              "id": 1,
+              "name": "Chopped Salad",
+              "remaining": 42.93,
+              "total": 46,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped",
+                "tomato:prepped"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Garden Salad",
+              "remaining": 38.93,
+              "total": 42,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped"
+              ]
+            }
+          ],
+          "chefs": [
+            {
+              "id": 0,
+              "isPlayer": true,
+              "skin": "bramble",
+              "x": 7.5,
+              "y": 8.6,
+              "speed": 0,
+              "intent": "idle",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": null
+            },
+            {
+              "id": 1,
+              "isPlayer": false,
+              "skin": "pip",
+              "x": 4.37,
+              "y": 7.51,
+              "speed": 0.03,
+              "intent": "working",
+              "focus": 18,
+              "focusAction": "take",
+              "carrying": null
+            },
+            {
+              "id": 2,
+              "isPlayer": false,
+              "skin": "nori",
+              "x": 9.98,
+              "y": 6.51,
+              "speed": 4.73,
+              "intent": "moving",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": "tomato:raw"
+            },
+            {
+              "id": 3,
+              "isPlayer": false,
+              "skin": "mochi",
+              "x": 2.17,
+              "y": 6.58,
+              "speed": 2.48,
+              "intent": "moving",
+              "focus": 17,
+              "focusAction": "dispense",
+              "carrying": null
+            }
+          ],
+          "stations": [
+            {
+              "id": 1,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 2,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 3,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 4,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 5,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 6,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 7,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 8,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 4
+              },
+              "work": 0,
+              "holding": "plate"
+            },
+            {
+              "id": 9,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 10,
+              "kind": "crate",
+              "dispenses": "tomato",
+              "cell": {
+                "x": 6,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 11,
+              "kind": "sink",
+              "dispenses": null,
+              "cell": {
+                "x": 7,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 12,
+              "kind": "crate",
+              "dispenses": "lettuce",
+              "cell": {
+                "x": 8,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 13,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 14,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 15,
+              "kind": "bin",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 16,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 7
+              },
+              "work": 0,
+              "holding": "ingredient"
+            },
+            {
+              "id": 17,
+              "kind": "crate",
+              "dispenses": "bacon",
+              "cell": {
+                "x": 2,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 18,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 7
+              },
+              "work": 1,
+              "holding": "ingredient"
+            },
+            {
+              "id": 19,
+              "kind": "crate",
+              "dispenses": "bun",
+              "cell": {
+                "x": 11,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 20,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 21,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 7
+              },
+              "work": 0,
+              "holding": "plate"
+            }
+          ],
+          "camera": {
+            "aspect": 1.432,
+            "pitchDeg": 22.5,
+            "fovDeg": 46.3,
+            "height": 5.78,
+            "camZ": 14.44,
+            "restZ": 14.14,
+            "wallFloorJoin": 0.515,
+            "halfWidth": 8.96,
+            "backWallFrac": 0.837,
+            "centreOffset": 0.068,
+            "bottomEdgeZ": 8.8,
+            "floorDepth": 7.8,
+            "topEdgeWallY": 5.93,
+            "visibleDepthRatio": 1.97,
+            "depthRatio": 1.82,
+            "playerFrac": 0,
+            "halfWidthAtChef": 4.66,
+            "warnings": []
+          },
+          "perf": {
+            "frames": 7,
+            "fps": 57.3,
+            "worstFrameMs": 0
+          }
+        },
+        {
+          "phase": "playing",
+          "time": 19.533333333333506,
+          "heat": 0.08138888888888961,
+          "score": {
+            "coins": 24,
+            "combo": 2,
+            "bestCombo": 2,
+            "served": 2,
+            "missed": 0,
+            "patience": 1
+          },
+          "orders": [
+            {
+              "id": 1,
+              "name": "Chopped Salad",
+              "remaining": 26.47,
+              "total": 46,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped",
+                "tomato:prepped"
+              ]
+            }
+          ],
+          "chefs": [
+            {
+              "id": 0,
+              "isPlayer": true,
+              "skin": "bramble",
+              "x": 9.04,
+              "y": 3.63,
+              "speed": 2.89,
+              "intent": "moving",
+              "focus": 12,
+              "focusAction": "return",
+              "carrying": "tomato:raw"
+            },
+            {
+              "id": 1,
+              "isPlayer": false,
+              "skin": "pip",
+              "x": 3.28,
+              "y": 6.64,
+              "speed": 0.38,
+              "intent": "moving",
+              "focus": 17,
+              "focusAction": "dispense",
+              "carrying": null
+            },
+            {
+              "id": 2,
+              "isPlayer": false,
+              "skin": "nori",
+              "x": 10.87,
+              "y": 6.07,
+              "speed": 4.96,
+              "intent": "moving",
+              "focus": 19,
+              "focusAction": "dispense",
+              "carrying": null
+            },
+            {
+              "id": 3,
+              "isPlayer": false,
+              "skin": "mochi",
+              "x": 4.69,
+              "y": 5.81,
+              "speed": 4.91,
+              "intent": "moving",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": null
+            }
+          ],
+          "stations": [
+            {
+              "id": 1,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 2,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 3,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 4,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 5,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 6,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 7,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 8,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 4
+              },
+              "work": 0,
+              "holding": "plate"
+            },
+            {
+              "id": 9,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 10,
+              "kind": "crate",
+              "dispenses": "tomato",
+              "cell": {
+                "x": 6,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 11,
+              "kind": "sink",
+              "dispenses": null,
+              "cell": {
+                "x": 7,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 12,
+              "kind": "crate",
+              "dispenses": "lettuce",
+              "cell": {
+                "x": 8,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 13,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 14,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 15,
+              "kind": "bin",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 16,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 7
+              },
+              "work": 0,
+              "holding": "ingredient"
+            },
+            {
+              "id": 17,
+              "kind": "crate",
+              "dispenses": "bacon",
+              "cell": {
+                "x": 2,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 18,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 19,
+              "kind": "crate",
+              "dispenses": "bun",
+              "cell": {
+                "x": 11,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 20,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 21,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            }
+          ],
+          "camera": {
+            "aspect": 1.432,
+            "pitchDeg": 22.5,
+            "fovDeg": 46.3,
+            "height": 5.78,
+            "camZ": 14.14,
+            "restZ": 14.14,
+            "wallFloorJoin": 0.525,
+            "halfWidth": 8.79,
+            "backWallFrac": 0.853,
+            "centreOffset": 0.068,
+            "bottomEdgeZ": 8.5,
+            "floorDepth": 7.5,
+            "topEdgeWallY": 5.93,
+            "visibleDepthRatio": 1.93,
+            "depthRatio": 1.85,
+            "playerFrac": 0.21,
+            "halfWidthAtChef": 7.31,
+            "warnings": []
+          },
+          "perf": {
+            "frames": 973,
+            "fps": 60,
+            "worstFrameMs": 16.7
+          }
+        }
+      ],
+      "final": {
+        "phase": "playing",
+        "time": 22.033333333333363,
+        "heat": 0.09180555555555568,
+        "score": {
+          "coins": 24,
+          "combo": 2,
+          "bestCombo": 2,
+          "served": 2,
+          "missed": 0,
+          "patience": 1
+        },
+        "orders": [
+          {
+            "id": 1,
+            "name": "Chopped Salad",
+            "remaining": 23.97,
+            "total": 46,
+            "components": [
+              "lettuce:prepped",
+              "tomato:prepped",
+              "tomato:prepped"
+            ]
+          }
+        ],
+        "chefs": [
+          {
+            "id": 0,
+            "isPlayer": true,
+            "skin": "bramble",
+            "x": 9.38,
+            "y": 3.8,
+            "speed": 0,
+            "intent": "idle",
+            "focus": 12,
+            "focusAction": "return",
+            "carrying": "tomato:raw"
+          },
+          {
+            "id": 1,
+            "isPlayer": false,
+            "skin": "pip",
+            "x": 3.2,
+            "y": 6.64,
+            "speed": 0,
+            "intent": "moving",
+            "focus": 17,
+            "focusAction": "dispense",
+            "carrying": null
+          },
+          {
+            "id": 2,
+            "isPlayer": false,
+            "skin": "nori",
+            "x": 11.77,
+            "y": 6.55,
+            "speed": 1.06,
+            "intent": "moving",
+            "focus": null,
+            "focusAction": "none",
+            "carrying": null
+          },
+          {
+            "id": 3,
+            "isPlayer": false,
+            "skin": "mochi",
+            "x": 6.8,
+            "y": 7.12,
+            "speed": 1.04,
+            "intent": "moving",
+            "focus": null,
+            "focusAction": "none",
+            "carrying": null
+          }
+        ],
+        "stations": [
+          {
+            "id": 1,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 2,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 2,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 3,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 4,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 11,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 5,
+            "kind": "stove",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 1
+            },
+            "work": 0,
+            "holding": "pan"
+          },
+          {
+            "id": 6,
+            "kind": "stove",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 1
+            },
+            "work": 0,
+            "holding": "pan"
+          },
+          {
+            "id": 7,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 8,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 2,
+              "y": 4
+            },
+            "work": 0,
+            "holding": "plate"
+          },
+          {
+            "id": 9,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 10,
+            "kind": "crate",
+            "dispenses": "tomato",
+            "cell": {
+              "x": 6,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 11,
+            "kind": "sink",
+            "dispenses": null,
+            "cell": {
+              "x": 7,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 12,
+            "kind": "crate",
+            "dispenses": "lettuce",
+            "cell": {
+              "x": 8,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 13,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 11,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 14,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 15,
+            "kind": "bin",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 16,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 7
+            },
+            "work": 0,
+            "holding": "ingredient"
+          },
+          {
+            "id": 17,
+            "kind": "crate",
+            "dispenses": "bacon",
+            "cell": {
+              "x": 2,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 18,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 19,
+            "kind": "crate",
+            "dispenses": "bun",
+            "cell": {
+              "x": 11,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 20,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 21,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          }
+        ],
+        "camera": {
+          "aspect": 1.432,
+          "pitchDeg": 22.5,
+          "fovDeg": 46.3,
+          "height": 5.78,
+          "camZ": 14.14,
+          "restZ": 14.14,
+          "wallFloorJoin": 0.525,
+          "halfWidth": 8.79,
+          "backWallFrac": 0.853,
+          "centreOffset": 0.068,
+          "bottomEdgeZ": 8.5,
+          "floorDepth": 7.5,
+          "topEdgeWallY": 5.93,
+          "visibleDepthRatio": 1.93,
+          "depthRatio": 1.85,
+          "playerFrac": 0.261,
+          "halfWidthAtChef": 7.21,
+          "warnings": []
+        },
+        "perf": {
+          "frames": 979,
+          "fps": 60.5,
+          "worstFrameMs": 16.7
+        }
+      }
+    },
+    {
+      "id": "desktop",
+      "label": "Desktop 1440×900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "dpr": 1,
+      "shots": [
+        "shots/handoff-final/desktop/00-title.jpg",
+        "shots/handoff-final/desktop/01-opening.jpg",
+        "shots/handoff-final/desktop/t0008s.jpg",
+        "shots/handoff-final/desktop/t0013s.jpg",
+        "shots/handoff-final/desktop/t0018s.jpg",
+        "shots/handoff-final/desktop/90-late.jpg"
+      ],
+      "driveStats": {
+        "gameSeconds": 16.08,
+        "renderCostMs": 6.9
+      },
+      "errors": [],
+      "cameraFailures": [],
+      "snapshots": [
+        {
+          "phase": "playing",
+          "time": 2.5999999999999956,
+          "heat": 0.010833333333333315,
+          "score": {
+            "coins": 0,
+            "combo": 0,
+            "bestCombo": 0,
+            "served": 0,
+            "missed": 0,
+            "patience": 1
+          },
+          "orders": [
+            {
+              "id": 1,
+              "name": "Garden Salad",
+              "remaining": 39.4,
+              "total": 42,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Chopped Salad",
+              "remaining": 43.4,
+              "total": 46,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped",
+                "tomato:prepped"
+              ]
+            }
+          ],
+          "chefs": [
+            {
+              "id": 0,
+              "isPlayer": true,
+              "skin": "bramble",
+              "x": 7.5,
+              "y": 8.6,
+              "speed": 0,
+              "intent": "idle",
+              "focus": null,
+              "focusAction": "none",
+              "carrying": null
+            },
+            {
+              "id": 1,
+              "isPlayer": false,
+              "skin": "pip",
+              "x": 4.37,
+              "y": 7.54,
+              "speed": 0.17,
+              "intent": "working",
+              "focus": 18,
+              "focusAction": "take",
+              "carrying": null
+            },
+            {
+              "id": 2,
+              "isPlayer": false,
+              "skin": "nori",
+              "x": 7.9,
+              "y": 6.02,
+              "speed": 4.58,
+              "intent": "moving",
+              "focus": 12,
+              "focusAction": "return",
+              "carrying": "tomato:raw"
+            },
+            {
+              "id": 3,
+              "isPlayer": false,
+              "skin": "mochi",
+              "x": 3.83,
+              "y": 6.31,
+              "speed": 4.65,
+              "intent": "moving",
+              "focus": 18,
+              "focusAction": "swap",
+              "carrying": "tomato:raw"
+            }
+          ],
+          "stations": [
+            {
+              "id": 1,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 2,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 3,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 4,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 5,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 6,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 7,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 8,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 4
+              },
+              "work": 0,
+              "holding": "plate"
+            },
+            {
+              "id": 9,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 10,
+              "kind": "crate",
+              "dispenses": "tomato",
+              "cell": {
+                "x": 6,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 11,
+              "kind": "sink",
+              "dispenses": null,
+              "cell": {
+                "x": 7,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 12,
+              "kind": "crate",
+              "dispenses": "lettuce",
+              "cell": {
+                "x": 8,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 13,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 14,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 15,
+              "kind": "bin",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 16,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 17,
+              "kind": "crate",
+              "dispenses": "bacon",
+              "cell": {
+                "x": 2,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 18,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 7
+              },
+              "work": 0.59,
+              "holding": "ingredient"
+            },
+            {
+              "id": 19,
+              "kind": "crate",
+              "dispenses": "bun",
+              "cell": {
+                "x": 11,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 20,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 21,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 7
+              },
+              "work": 0,
+              "holding": "plate"
+            }
+          ],
+          "camera": {
+            "aspect": 1.6,
+            "pitchDeg": 22.5,
+            "fovDeg": 38.9,
+            "height": 6.33,
+            "camZ": 15.85,
+            "restZ": 15.55,
+            "wallFloorJoin": 0.514,
+            "halfWidth": 9.11,
+            "backWallFrac": 0.824,
+            "centreOffset": 0,
+            "bottomEdgeZ": 8.8,
+            "floorDepth": 7.8,
+            "topEdgeWallY": 5.53,
+            "visibleDepthRatio": 1.81,
+            "depthRatio": 1.67,
+            "playerFrac": 0,
+            "halfWidthAtChef": 5.14,
+            "warnings": []
+          },
+          "perf": {
+            "frames": 6,
+            "fps": 57,
+            "worstFrameMs": 0
+          }
+        },
+        {
+          "phase": "playing",
+          "time": 19.066666666666865,
+          "heat": 0.07944444444444528,
+          "score": {
+            "coins": 24,
+            "combo": 2,
+            "bestCombo": 2,
+            "served": 2,
+            "missed": 0,
+            "patience": 1
+          },
+          "orders": [
+            {
+              "id": 2,
+              "name": "Chopped Salad",
+              "remaining": 26.93,
+              "total": 46,
+              "components": [
+                "lettuce:prepped",
+                "tomato:prepped",
+                "tomato:prepped"
+              ]
+            }
+          ],
+          "chefs": [
+            {
+              "id": 0,
+              "isPlayer": true,
+              "skin": "bramble",
+              "x": 9,
+              "y": 3.64,
+              "speed": 2.64,
+              "intent": "moving",
+              "focus": 12,
+              "focusAction": "return",
+              "carrying": "lettuce:raw"
+            },
+            {
+              "id": 1,
+              "isPlayer": false,
+              "skin": "pip",
+              "x": 4.86,
+              "y": 7.06,
+              "speed": 4.89,
+              "intent": "moving",
+              "focus": 18,
+              "focusAction": "take",
+              "carrying": null
+            },
+            {
+              "id": 2,
+              "isPlayer": false,
+              "skin": "nori",
+              "x": 11.31,
+              "y": 6.5,
+              "speed": 4.32,
+              "intent": "moving",
+              "focus": 20,
+              "focusAction": "place",
+              "carrying": "plate[tomato:prepped]"
+            },
+            {
+              "id": 3,
+              "isPlayer": false,
+              "skin": "mochi",
+              "x": 12.53,
+              "y": 5.76,
+              "speed": 4.02,
+              "intent": "moving",
+              "focus": 14,
+              "focusAction": "place",
+              "carrying": "plate[lettuce:prepped]"
+            }
+          ],
+          "stations": [
+            {
+              "id": 1,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 2,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 3,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 4,
+              "kind": "serve",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 1
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 5,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 6,
+              "kind": "stove",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 1
+              },
+              "work": 0,
+              "holding": "pan"
+            },
+            {
+              "id": 7,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 8,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 2,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 9,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 10,
+              "kind": "crate",
+              "dispenses": "tomato",
+              "cell": {
+                "x": 6,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 11,
+              "kind": "sink",
+              "dispenses": null,
+              "cell": {
+                "x": 7,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 12,
+              "kind": "crate",
+              "dispenses": "lettuce",
+              "cell": {
+                "x": 8,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 13,
+              "kind": "plates",
+              "dispenses": null,
+              "cell": {
+                "x": 11,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 14,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 15,
+              "kind": "bin",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 4
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 16,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 1,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 17,
+              "kind": "crate",
+              "dispenses": "bacon",
+              "cell": {
+                "x": 2,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 18,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 3,
+                "y": 7
+              },
+              "work": 0,
+              "holding": "ingredient"
+            },
+            {
+              "id": 19,
+              "kind": "crate",
+              "dispenses": "bun",
+              "cell": {
+                "x": 11,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 20,
+              "kind": "board",
+              "dispenses": null,
+              "cell": {
+                "x": 12,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            },
+            {
+              "id": 21,
+              "kind": "counter",
+              "dispenses": null,
+              "cell": {
+                "x": 13,
+                "y": 7
+              },
+              "work": 0,
+              "holding": null
+            }
+          ],
+          "camera": {
+            "aspect": 1.6,
+            "pitchDeg": 22.5,
+            "fovDeg": 38.9,
+            "height": 6.33,
+            "camZ": 15.55,
+            "restZ": 15.55,
+            "wallFloorJoin": 0.525,
+            "halfWidth": 8.95,
+            "backWallFrac": 0.838,
+            "centreOffset": 0,
+            "bottomEdgeZ": 8.5,
+            "floorDepth": 7.5,
+            "topEdgeWallY": 5.55,
+            "visibleDepthRatio": 1.78,
+            "depthRatio": 1.69,
+            "playerFrac": 0.198,
+            "halfWidthAtChef": 7.57,
+            "warnings": []
+          },
+          "perf": {
+            "frames": 972,
+            "fps": 60,
+            "worstFrameMs": 16.7
+          }
+        }
+      ],
+      "final": {
+        "phase": "playing",
+        "time": 21.600000000000055,
+        "heat": 0.09000000000000023,
+        "score": {
+          "coins": 24,
+          "combo": 2,
+          "bestCombo": 2,
+          "served": 2,
+          "missed": 0,
+          "patience": 1
+        },
+        "orders": [
+          {
+            "id": 2,
+            "name": "Chopped Salad",
+            "remaining": 24.4,
+            "total": 46,
+            "components": [
+              "lettuce:prepped",
+              "tomato:prepped",
+              "tomato:prepped"
+            ]
+          }
+        ],
+        "chefs": [
+          {
+            "id": 0,
+            "isPlayer": true,
+            "skin": "bramble",
+            "x": 9.33,
+            "y": 3.72,
+            "speed": 0,
+            "intent": "idle",
+            "focus": 12,
+            "focusAction": "return",
+            "carrying": "lettuce:raw"
+          },
+          {
+            "id": 1,
+            "isPlayer": false,
+            "skin": "pip",
+            "x": 1.36,
+            "y": 6.64,
+            "speed": 0,
+            "intent": "moving",
+            "focus": 16,
+            "focusAction": "take",
+            "carrying": null
+          },
+          {
+            "id": 2,
+            "isPlayer": false,
+            "skin": "nori",
+            "x": 7.01,
+            "y": 7.52,
+            "speed": 4.32,
+            "intent": "moving",
+            "focus": null,
+            "focusAction": "none",
+            "carrying": "plate[lettuce:prepped]"
+          },
+          {
+            "id": 3,
+            "isPlayer": false,
+            "skin": "mochi",
+            "x": 2.06,
+            "y": 6.55,
+            "speed": 1.24,
+            "intent": "working",
+            "focus": 16,
+            "focusAction": "take",
+            "carrying": null
+          }
+        ],
+        "stations": [
+          {
+            "id": 1,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 2,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 2,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 3,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 4,
+            "kind": "serve",
+            "dispenses": null,
+            "cell": {
+              "x": 11,
+              "y": 1
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 5,
+            "kind": "stove",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 1
+            },
+            "work": 0,
+            "holding": "pan"
+          },
+          {
+            "id": 6,
+            "kind": "stove",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 1
+            },
+            "work": 0,
+            "holding": "pan"
+          },
+          {
+            "id": 7,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 8,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 2,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 9,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 10,
+            "kind": "crate",
+            "dispenses": "tomato",
+            "cell": {
+              "x": 6,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 11,
+            "kind": "sink",
+            "dispenses": null,
+            "cell": {
+              "x": 7,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 12,
+            "kind": "crate",
+            "dispenses": "lettuce",
+            "cell": {
+              "x": 8,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 13,
+            "kind": "plates",
+            "dispenses": null,
+            "cell": {
+              "x": 11,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 14,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 15,
+            "kind": "bin",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 4
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 16,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 1,
+              "y": 7
+            },
+            "work": 0.77,
+            "holding": "ingredient"
+          },
+          {
+            "id": 17,
+            "kind": "crate",
+            "dispenses": "bacon",
+            "cell": {
+              "x": 2,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 18,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 3,
+              "y": 7
+            },
+            "work": 0,
+            "holding": "ingredient"
+          },
+          {
+            "id": 19,
+            "kind": "crate",
+            "dispenses": "bun",
+            "cell": {
+              "x": 11,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 20,
+            "kind": "board",
+            "dispenses": null,
+            "cell": {
+              "x": 12,
+              "y": 7
+            },
+            "work": 0,
+            "holding": null
+          },
+          {
+            "id": 21,
+            "kind": "counter",
+            "dispenses": null,
+            "cell": {
+              "x": 13,
+              "y": 7
+            },
+            "work": 0,
+            "holding": "plate"
+          }
+        ],
+        "camera": {
+          "aspect": 1.6,
+          "pitchDeg": 22.5,
+          "fovDeg": 38.9,
+          "height": 6.33,
+          "camZ": 15.55,
+          "restZ": 15.55,
+          "wallFloorJoin": 0.525,
+          "halfWidth": 8.95,
+          "backWallFrac": 0.838,
+          "centreOffset": 0,
+          "bottomEdgeZ": 8.5,
+          "floorDepth": 7.5,
+          "topEdgeWallY": 5.55,
+          "visibleDepthRatio": 1.78,
+          "depthRatio": 1.69,
+          "playerFrac": 0.243,
+          "halfWidthAtChef": 7.53,
+          "warnings": []
+        },
+        "perf": {
+          "frames": 978,
+          "fps": 58.1,
+          "worstFrameMs": 34.3
+        }
+      }
+    }
+  ]
+}

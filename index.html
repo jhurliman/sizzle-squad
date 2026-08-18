@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sizzle Squad</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#2a1d16" />
+    <meta name="description" content="A tiny frantic kitchen. Chop, cook, plate, serve." />
+    <link rel="stylesheet" href="/src/ui/styles.css" />
+  </head>
+  <body class="overlaid">
+    <div id="app">
+      <canvas id="stage"></canvas>
+      <div id="labels" class="labels"></div>
+      <div id="hud" class="hud"></div>
+
+      <div id="touch" class="touch">
+        <div id="stickRing" class="stick-ring"><div id="stickKnob" class="stick-knob"></div></div>
+        <!-- Drawn glyphs, not system emoji: the platform emoji font decides
+             what a raised hand looks like, and on iOS it arrived as a full
+             colour illustration sitting on a flat disc, at a completely
+             different drawing weight from everything else on screen. -->
+        <div class="action-cluster">
+          <button id="btnDash" class="btn btn-dash" aria-label="Dash">
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <g fill="none" stroke="#fff" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 7l8 9-8 9" opacity=".55" />
+                <path d="M17 7l8 9-8 9" />
+              </g>
+            </svg>
+          </button>
+          <button id="btnUse" class="btn btn-use" aria-label="Chop">
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <path d="M3 17.5 19 1.5c2.8 3.6 4.2 7.4 4.2 11.4 0 3-.9 5.8-2.6 8.4l-2 3z" fill="#fff" />
+              <path d="M3 17.5 19 1.5c1.5 2 2.6 4 3.2 6.2L6.6 21z" fill="#cfeaf2" />
+              <rect x="17.4" y="22.4" width="13" height="6" rx="3" transform="rotate(45 17.4 22.4)" fill="#ffd166" />
+              <rect x="19.2" y="23.4" width="9" height="2.2" rx="1.1" transform="rotate(45 19.2 23.4)" fill="#fff0c0" />
+            </svg>
+          </button>
+          <button id="btnGrab" class="btn btn-grab" aria-label="Pick up or put down">
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <path
+                d="M11 20V7.5a2.2 2.2 0 0 1 4.4 0V17V5.4a2.2 2.2 0 0 1 4.4 0V17v-8.4a2.2 2.2 0 0 1 4.4 0V21c0 5-3.4 8.4-8.3 8.4-3 0-5.2-1.2-7-3.7l-3.6-5a2.3 2.3 0 0 1 3.4-3z"
+                fill="#fff"
+              />
+              <path d="M11 20 8.3 16.7a2.3 2.3 0 0 0-3.4 3l1.3 1.8z" fill="#f6dcae" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- THERE IS NO PAUSE BUTTON, and that is the point.
+           refs/dash-and-dine-01.jpeg carries three objects in its top strip and
+           nothing else on the screen at all. Ours carried four, and the fourth
+           was a dark disc with two white capsules parked in the corner where a
+           critic — reasonably — read it as the whole strip's terminating
+           element and called the composition left-heavy. main.ts already binds
+           this button with `?.`, and visibilitychange still pauses the run the
+           moment the tab or app is backgrounded, which is the only time a
+           three-minute score attack on a phone actually needs to stop. The
+           right-hand element of the strip is now the dishes-served pill, which
+           mirrors the score pill about the clock the way the reference's pair
+           of team pills do.
+           See src/ui/hud.ts (the strip markup) and .pill-served in styles.css. -->
+
+      <div id="overlay" class="overlay show">
+        <div class="panel">
+          <h1 class="title">Sizzle<span>Squad</span></h1>
+          <p class="tagline">One tiny kitchen. Three hungry minutes. Go.</p>
+          <button id="btnStart" class="cta">Start Cooking</button>
+          <div class="how">
+            <span class="k-desktop">WASD move · Space grab · J chop · Shift dash</span>
+            <!-- "Left thumb" was the old rule and it was also the old bug: the
+                 stick only ever spawned on the left half, so 46.8% of the
+                 screen was a place a thumb could press and nothing happened,
+                 and the game could not be played right-handed at all. It now
+                 spawns wherever a thumb lands except on the discs, so the line
+                 says what the control actually does. -->
+            <!-- The purple disc is on screen on exactly one platform and this
+                 line is the only place it is ever named; the k-desktop line
+                 above names all four verbs, so this one does too. -->
+            <span class="k-touch">Drag anywhere to run · gold grabs · blue chops · purple dashes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
