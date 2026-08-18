@@ -634,8 +634,51 @@ const APRON_MAX_TALL = 0.0;
  * this round could fix is everything else about it, and did: see BOTTOM_LANE_TALL
  * (recession 2.51 -> 2.04), DOLLY_MAX_TALL (frozen in z) and CENTRE_MAX_TALL
  * (the oven arch is now clamped inside the frame rather than shouldered).
+ *
+ * ROUND 9 — 3.55 -> 4.60, AND IT STOPS THE FRAME BREATHING ALTOGETHER.
+ *
+ * A playtest on a real iPhone came back with two complaints that read as
+ * separate bugs and are one number: "the portrait camera is too zoomed in, I
+ * can't see any of the stations I need to go to" and "it's easy to get my
+ * character almost out of frame when I need to go all the way left or right".
+ *
+ * Both are this constant, because portrait's rest frame and its widened frame
+ * were 25% apart. Swept on tools/camlost.mjs over every walkable cell, at REST:
+ *
+ *   HALF_WIDTH_MIN   3.55    3.90    4.20    4.40    4.60
+ *   hw               3.69    3.90    4.20    4.40    4.60
+ *   hw at row 8      1.88    ----    1.97    ----    2.04
+ *   worst|playerFrac| 1.421   1.291   1.110   0.993   0.880
+ *   cells off-picture 16/375  10/375  4/375   0/375   0/375
+ *
+ * The old value lost the player outright in 16 of 375 standing positions, and
+ * the widen is what covered it — WIDEN_TALL opens the lens 25% when he runs,
+ * so the sweep at full widen reported a clean 0.880 and nobody looked at the
+ * column the chef is actually in for the first moments of a dash. That is the
+ * "almost out of frame going hard left" report, exactly: he outruns the widen.
+ *
+ * 4.60 is where the rest solve MEETS the widened one (hwWant 4.60 against the
+ * widen's saturation at 4.61), so portrait no longer breathes at all — rest and
+ * dolly solve to the same camZ 11.45, and the transient the widen used to paper
+ * over cannot exist. It is not a tuned number: both ends are pinned by the same
+ * ceiling, the bisection that gives width back until the top edge clears
+ * WALL_TOP, so this holds by construction rather than by luck.
+ *
+ * The cost is a chef 8.0% of frame height instead of 9.5%, and the brief asked
+ * for that in so many words — "I'd rather more smaller things on screen in
+ * portrait so I can see what I'm doing". It is also cheaper than it looks:
+ * halfWidth at the chef's OWN row goes UP, 1.88 -> 2.04, because retreating
+ * widens the near rows too. He is 16% smaller in a view 25% wider at his feet.
+ *
+ * vdr goes 2.27 -> 2.75, which is a wide portrait lens and a real departure
+ * from the reference's 1.6. It is not a NEW look: the widened solve has run at
+ * 2.76 all along, so this is the lens portrait already used every time the
+ * player moved. What changes is that it stops snapping between two of them.
+ *
+ * Landscape is untouched — every landscape aspect solves at t = 1.00, where
+ * this floor is lerped out entirely.
  */
-const HALF_WIDTH_MIN = 3.55;
+const HALF_WIDTH_MIN = 4.6;
 /**
  * ROUND 8 — THE PORTRAIT FRAME BREATHES, AND HERE IS THE WHOLE ARITHMETIC.
  *
@@ -2163,8 +2206,33 @@ export class CameraRig {
     // inside it. The lag tightens to 0.08 s as he approaches the edge and
     // relaxes back the instant he is safe: nobody can see a camera stiffen at
     // 0.85 of a half-frame, and everybody can see half a chef.
+    //
+    // ROUND 9: 0.2/0.08 -> 0.13/0.07. The same playtest that moved
+    // HALF_WIDTH_MIN called the follow "a little too loose". The urgency ramp
+    // above only starts at |playerFrac| 0.6, so every approach to the edge is
+    // run at the RELAXED constant, and 0.2 s is a fifth of a second of the
+    // camera not being where the clamps just said it should be.
+    //
+    // Tightening the base is the only lever here that does not cost pan.
+    // Tightening the TARGET instead was tried first and measured worse: hold
+    // 0.88 -> 0.80 on portrait moved p90 |playerFrac| 0.879 -> 0.800 but took
+    // the max 0.879 -> 0.927 and pushed the composition-stop warnings 19% ->
+    // 28%, because a nearer hold demands more pan and the damper then lags the
+    // bigger target moves. The target is right; it was the arriving that was slow.
+    //
+    // Measured on tools/camtrace.mjs, 40 s of portrait play, 193 samples:
+    //
+    //                    0.2/0.08        0.13/0.07
+    //   |playerFrac| p50   0.599           0.580
+    //   |playerFrac| max   0.879           0.879
+    //   centreOffset p50   0.074           0.069
+    //   composition warns  19% / 17%       20% / 16%
+    //
+    // The max is unchanged because the worst corner is pan-capped, not lag-
+    // capped (see HALF_WIDTH_MIN). What moves is the typical frame: the chef
+    // sits closer to where the composition asked for him, all the time.
     const urgency = smoothstep(clamp((Math.abs(this.playerFrac) - 0.6) / 0.3, 0, 1));
-    const k = 1 - Math.exp(-dt / lerp(0.2, 0.08, urgency));
+    const k = 1 - Math.exp(-dt / lerp(0.13, 0.07, urgency));
     this.atX += (wantX - this.atX) * k;
     this.atZ += (wantZ - this.atZ) * k;
 

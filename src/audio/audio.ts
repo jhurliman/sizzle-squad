@@ -196,6 +196,27 @@ export class AudioEngine {
           if (document.hidden) void this.ctx?.suspend();
           else this.resume();
         });
+        /**
+         * ...AND AGAIN ON THE NEXT TOUCH, BECAUSE iOS WANTS A GESTURE.
+         *
+         * Safari will refuse to restart a context that lost its audio session
+         * unless the call happens inside a user gesture, and `visibilitychange`
+         * is not one. So the return-to-foreground path above is best-effort and
+         * this is the one that actually works: the first tap after coming back
+         * asks again, from inside the gesture, where it is allowed to succeed.
+         *
+         * Capture phase on the window so it cannot be swallowed by a control
+         * that stops propagation, and it stays bound for the life of the page
+         * because a context can be interrupted any number of times — a phone
+         * call, a timer, another tab taking the session.
+         */
+        window.addEventListener(
+          'pointerdown',
+          () => {
+            if (this.ctx && this.ctx.state !== 'running') this.resume();
+          },
+          true,
+        );
       }
       // Mute has to be REACHABLE, not merely implemented. The HUD is
       // deliberately three elements and nothing else (see index.html), so audio
@@ -208,10 +229,29 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * ANY STATE THAT IS NOT 'running', NOT JUST 'suspended'.
+   *
+   * This tested `state === 'suspended'` and did nothing otherwise. WebKit has a
+   * third state the spec does not: an AudioContext that loses the audio session
+   * — which is exactly what backgrounding an iPhone does — comes back as
+   * **'interrupted'**, and this guard skipped it silently. Reported from a real
+   * device as "sound worked great until I backgrounded the app and brought it
+   * back, now it's silent", and there is no way to recover from inside the game
+   * because every later call took the same branch and did nothing.
+   *
+   * Resuming an already-running context is a no-op, so there is nothing to be
+   * careful about here: if it is not running, ask for it back.
+   */
   resume() {
-    if (this.ctx?.state === 'suspended') void this.ctx.resume();
+    if (this.ctx && this.ctx.state !== 'running') void this.ctx.resume();
     // Whatever the gap was, the music clock is now stale; tickMusic resyncs.
     if (this.ctx) this.lastMusicTick = 0;
+  }
+
+  /** For callers that want to know whether the sound actually came back. */
+  get running(): boolean {
+    return this.ctx?.state === 'running';
   }
 
   /** Mute ramps rather than jumps — a gain step on a running bed is a click. */

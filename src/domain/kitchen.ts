@@ -396,6 +396,8 @@ export function buildKitchen(map: string[] = KITCHEN_MAP): Kitchen {
         dispenses: CRATE_CHARS[ch],
         holding: null,
         work: 0,
+        cook: 0,
+        burn: 0,
         active: false,
       };
       stations.push(st);

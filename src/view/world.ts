@@ -248,6 +248,35 @@ function capArchitecture<T extends Record<string, number>>(tones: T): { [K in ke
  * is simply not spent — it belonged to the three layers that were deleted, and
  * handing it back to the two survivors is how this object got loud in the
  * first place.
+ *
+ * WAVE 4 — THE UNSPENT 0.54 IS WHY THE RESTORED FIRE LOOKED DEAD.
+ *
+ * The tongues came back in wave 3 and were given `share: 0.3` without anyone
+ * re-deriving this budget, and 0.3 is not a dim flame, it is arithmetic that
+ * deletes one. Worked through: the authored tint 0xb85a17 has V 0.722, its cap
+ * is 1.1 x 0.3 = 0.33, so every tongue rendered at 0.33/0.722 = 46% of the
+ * colour it was written as — rgb(84,41,10). That is a dark brown. Six dark
+ * brown lathes over a dark red block is exactly the "looks like the fire is
+ * almost out" the second playtest reported, and re-tuning the geometry (which
+ * wave 3 did) could never have fixed it, because the geometry was never the
+ * thing that was wrong.
+ *
+ * The share is now 0.55, which is the 0.54 the comment above says is sitting
+ * unspent, and it is spent on the layer it was taken from. The tongues are the
+ * only reason this arch reads as a working burner rather than an alcove, so
+ * they get the largest single share of the budget; glow and pulse keep theirs.
+ * Sum of declared shares is 0.24 + 0.22 + 0.08 + 0.55 = 1.09, just inside 1.10.
+ *
+ * The six tongues overlap along x deliberately, so 2-3 of them sum in the same
+ * pixels near the base. That is not budget overrun, it is where a fire's hot
+ * core comes from: the tongues are alpha-ramped to nothing by their tips, so
+ * only the feet stack, and stacking feet is the effect being bought. Measured
+ * on the rendered hearth after this change, 1.4% of the mouth's pixels clip at
+ * V 1.00 and the rest sit below it. That IS the flame cores, and it is the
+ * intended result rather than the failure this budget guards against: the thing
+ * that made the oven unreadable was the WHOLE mouth sitting on the clip as one
+ * flat slab, not a fire having a white-hot centre. A light source with no
+ * clipped pixels anywhere is not reading as a light source.
  */
 const FIRE_ADD_BUDGET = 1.1;
 function fireTint(hex: number, opacity: number, share: number): number {
@@ -1588,6 +1617,8 @@ export interface StationView {
   /** Where a carried item sits when placed here. */
   anchor: THREE.Object3D;
   ring: THREE.Mesh;
+  /** The billboarded dial the arc lives on. */
+  ringRoot: THREE.Group;
   glow: THREE.Mesh;
   /** The vertical half of the focus wash, on the bench's front face. */
   face: THREE.Mesh;
@@ -3121,28 +3152,54 @@ export class WorldView {
     // every tint goes through `fireTint`, which splits one clamped budget
     // between all the additive layers in this arch rather than letting each
     // one look reasonable on its own and the sum clip at V 1.00.
+    /**
+     * SIX OVERLAPPING TONGUES, NOT THREE SEPARATED ONES.
+     *
+     * Three tongues at ±0.46 and 0.04 left visible gaps between them, and with
+     * the flicker below swinging each one's height by 2.4x they spent much of
+     * the time as three small disconnected blobs over the ember bar. Reported
+     * from play as "the flames in the fire are janky, it looks like the fire is
+     * almost out". That is a fair description of what it was drawing.
+     *
+     * Fire reads as ONE body with a moving edge, so the tongues now overlap
+     * along x — the spacing is under half the width of a tongue — and the
+     * heights are staggered rather than alternating, so the silhouette has a
+     * high middle and falls away at the ends the way a fire in a hearth does.
+     */
     const TONGUES: [number, number, number][] = [
       // x offset, height, phase
-      [-0.46, 0.42, 0.0],
-      [0.04, 0.54, 2.3],
-      [0.5, 0.38, 4.1],
+      [-0.58, 0.3, 0.0],
+      [-0.36, 0.46, 1.7],
+      [-0.13, 0.58, 3.1],
+      [0.11, 0.62, 4.6],
+      [0.34, 0.48, 0.9],
+      [0.56, 0.32, 2.4],
     ];
     for (const [ox, fh, phase] of TONGUES) {
       // A lathe tapering from a fat foot to a point, so the silhouette is a
       // tongue rather than a cone: fire is widest just above the fuel, not at
       // it. LatheGeometry lays v=0 at the first profile point (the foot), which
       // is what the alpha ramp below is authored against.
+      // Slimmer and taller-shouldered than wave 3: the belly moves down to
+      // 0.28 of the height and the radius is off 40% by 0.6, so the top half is
+      // a long point instead of a dome. Read with the alpha ramp above, this is
+      // what makes the silhouette a tongue.
       const profile = [
         new THREE.Vector2(0.001, 0),
-        new THREE.Vector2(0.1, fh * 0.16),
-        new THREE.Vector2(0.115, fh * 0.4),
-        new THREE.Vector2(0.07, fh * 0.72),
+        new THREE.Vector2(0.085, fh * 0.12),
+        new THREE.Vector2(0.098, fh * 0.28),
+        new THREE.Vector2(0.058, fh * 0.6),
+        new THREE.Vector2(0.022, fh * 0.84),
         new THREE.Vector2(0.001, fh),
       ];
       const m = new THREE.Mesh(
         new THREE.LatheGeometry(profile, 10),
         new THREE.MeshBasicMaterial({
-          color: fireTint(0xb85a17, 1, 0.3),
+          // Hot and SATURATED, not the dull 0xb85a17 of wave 3. The ramp
+          // below carries the hue falloff up the tongue, so this is the
+          // colour of the FOOT of the flame — the hottest part — and the map
+          // walks it to red by the tip. See FIRE_ADD_BUDGET for the share.
+          color: fireTint(0xff7a10, 1, 0.55),
           map: flameRamp(),
           transparent: true,
           depthWrite: false,
@@ -3340,7 +3397,7 @@ export class WorldView {
         const ringCol = inOven ? 0x322d31 : C.steelDark;
         P.cyl(trivet, 0.36, 0.37, 0.08, 18, x, h + 0.04, z);
         P.cyl(ringCol, 0.3, 0.3, 0.04, 18, x, h + 0.08, z);
-        P.cyl(inOven ? 0x7a4a22 : 0xa8663a, 0.24, 0.24, 0.02, 18, x, h + 0.1, z);
+        P.cyl(inOven ? 0x4b4750 : 0xa8663a, 0.24, 0.24, 0.02, 18, x, h + 0.1, z);
         // Also per-instance: the hob glow is animated per station too.
         hot = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.02, 20), flatOwn(PALETTE.stoveHot, 0.0));
         hot.position.set(0, h + 0.085, 0);
@@ -3414,11 +3471,52 @@ export class WorldView {
     contentRoot.position.y = h + 0.1;
     g.add(contentRoot);
 
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.4, 24, 1, 0, 0), flat(0xffe066));
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = h + 0.14;
-    ring.visible = false;
-    g.add(ring);
+    /**
+     * THE PROGRESS DIAL — UPRIGHT AND OVER THE BENCH, NOT FLAT ON IT.
+     *
+     * This was a ring lying face-up at `h + 0.14`, i.e. in the plane of the
+     * bench top. From a 22.5-degree camera a horizontal circle is squashed to
+     * about 38% of its height and it sits among the props it is drawn between,
+     * which is why the report from real play was that there was no progress
+     * indicator at all — not that it was hard to read. It was there and it was
+     * a sliver.
+     *
+     * Now it stands up, faces the camera (see update(), which billboards it off
+     * the live camera quaternion rather than assuming a fixed pitch — the rig
+     * pans and dollies), and floats clear above the station where nothing in
+     * the room occludes it. Same 12 o'clock start and same clockwise sweep,
+     * because a dial that fills anticlockwise reads as time running backwards.
+     *
+     * A dark disc behind it, because the arc has to be legible against a pale
+     * hearth, a green counter and an open flame without changing colour.
+     */
+    /**
+     * PARENTED TO THE ROOT, NOT TO THE STATION GROUP.
+     *
+     * `g` carries the bench's yaw (`g.rotation.y = seat.yaw`), and a billboard
+     * has to be set from the camera's WORLD orientation. A child of a rotated
+     * parent given the camera's world quaternion ends up skewed by exactly that
+     * yaw — the dial would face a slightly different direction on every bench in
+     * the room. Stations never move, so the dial can simply live in world space.
+     *
+     * Height clears the cast. At `h + 0.66` it landed at chest height on the
+     * chef working the bench, which is the one place a progress read must not
+     * be: you approach a bench from the camera side, so the worker is always
+     * between the lens and the thing they are working at. Same lesson, and
+     * nearly the same number, as the action glyph above.
+     */
+    const ringRoot = new THREE.Group();
+    ringRoot.position.set(x, h + 1.02, z);
+    ringRoot.visible = false;
+    this.root.add(ringRoot);
+    const ringBack = new THREE.Mesh(new THREE.CircleGeometry(0.17, 24), flatOwn(0x24190f, 0.5));
+    ringBack.position.z = -0.004;
+    ringRoot.add(ringBack);
+    const ringTrack = new THREE.Mesh(new THREE.RingGeometry(0.105, 0.155, 28), flatOwn(0x000000, 0.3));
+    ringRoot.add(ringTrack);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.105, 0.155, 28, 1, 0, 0), flatOwn(0xffe066, 1));
+    ring.position.z = 0.004;
+    ringRoot.add(ring);
 
     // flatOwn, not flat: this material is written every frame by the update
     // loop below, and the cached flat() handed the same instance to all twenty
@@ -3493,7 +3591,7 @@ export class WorldView {
     g.add(face);
 
     this.root.add(g);
-    const view: StationView = { station: st, group: g, anchor, ring, glow, face, hot, contentRoot, contentKey: '', topY: h, inOven };
+    const view: StationView = { station: st, group: g, anchor, ring, ringRoot, glow, face, hot, contentRoot, contentKey: '', topY: h, inOven };
     this.stationViews.push(view);
     this.byId.set(st.id, view);
   }
@@ -3565,7 +3663,16 @@ export class WorldView {
         // most of the frame. The reference never lines two benches up exactly;
         // breaking the rank by a tenth of a cell is enough to kill the banding
         // without moving a single walkable cell.
-        const dz = this.runOffset(x, y) * 0.34 - 0.17 + part * 0.22;
+        /**
+         * HALF THE WANDER. This was `* 0.34 - 0.17 + part * 0.22`, so a bench
+         * could sit up to 0.39 of a cell off its row — and a split run's two
+         * halves could pull 0.44 apart from each other. That is most of a
+         * bench's own depth, which is how "several of the tables are clipping
+         * into other geometry in the room" happens: a rank shifted that far
+         * reaches into the row behind it, into the wainscot, or into the oven
+         * piers. The scatter was doing a real job and doing it far too hard.
+         */
+        const dz = this.runOffset(x, y) * 0.17 - 0.085 + part * 0.11;
         // YAW, AND WHY IT IS WORTH THE BOOKKEEPING.
         //
         // Every bench in the room stood at exactly zero rotation, ranked to the
@@ -3579,7 +3686,19 @@ export class WorldView {
         // The cost is that a station's dish no longer sits at its cell centre,
         // so the run records where each cell ENDED UP and buildStation reads it
         // back. Nothing in the sim moves: the walkable cell is untouched.
-        const yaw = (this.runOffset(x + 31, y + 7) * 2 - 1) * 0.12 + part * 0.05;
+        /**
+         * ...AND THE YAW NOW MATCHES WHAT THE NOTE ABOVE PROMISES.
+         *
+         * "Four degrees is enough — below the threshold where you notice a
+         * bench is crooked" is the right argument, and the code did not
+         * implement it: 0.12 rad is 6.9 degrees, plus another 2.9 from the
+         * `part` term, for up to 9.8. That is well over the threshold the
+         * comment names, and it came back from play as "having the tables not
+         * perfectly straight is a nice touch but they are too crooked right
+         * now, it just looks messy". 0.05 + 0.02 rad is 4.0 degrees worst case,
+         * which is the number this was always meant to be.
+         */
+        const yaw = (this.runOffset(x + 31, y + 7) * 2 - 1) * 0.05 + part * 0.02;
         // A bench is a made thing, not a mould. ±3cm of height across the room
         // stops four ranks of tops from lining up into one continuous plane in
         // the middle distance, which is what a low camera does to a level set.
@@ -3601,7 +3720,38 @@ export class WorldView {
         // table rather than a plinth; longer runs get proportionally less. A
         // split half loses the overhang on its inboard end, or the two pieces
         // of one run touch and the split is invisible.
-        this.bench(bcx, bcz, n + (n === 1 ? 0.26 : 0.2) - (part === 0 ? 0 : 0.16), h, yaw);
+        /**
+         * ...AND NOT INTO THE WALL, WHICH IS THE OTHER HALF OF "TABLES ARE
+         * CLIPPING INTO OTHER GEOMETRY".
+         *
+         * Halving the depth wander (see dz above) fixed the benches that
+         * reached into the row behind them. It could not fix these, because
+         * these never depended on the wander at all — they are the overhang,
+         * and it is applied to both ends unconditionally.
+         *
+         * The map puts a station run hard against the side wall four times:
+         * rows 4 and 7 both run x 1-3 and x 11-13, and the walls are x 0 and
+         * x 14. A run of three centred at x+n/2 with width n+0.2 spans
+         * [10.9, 14.1] — so a tenth of a cell of every one of those benches is
+         * inside the stonework, before the yaw swings a corner further in
+         * still. Cropped at 2x on the right rank it is unmistakable: the plank
+         * end vanishes into the pier with the barrel sitting over the seam.
+         *
+         * So the overhang is decided per END rather than as one width: a plank
+         * that has floor to overhang into gets it, and a plank that has masonry
+         * there stops at its own last cell. Nothing else moves — same centre
+         * arithmetic, same yaw, same recorded cell positions for buildStation.
+         */
+        const solidAt = (cxx: number) =>
+          cxx < 0 || cxx >= k.width || k.cells[y * k.width + cxx] === 'blocked';
+        const lip = n === 1 ? 0.13 : 0.1;
+        const trim = part === 0 ? 0 : 0.08;
+        // `part` -1 is the LEFT half of a split run and 1 the right half, so the
+        // inboard end — the one that must not grow into its sibling — is the
+        // right end of part -1 and the left end of part 1.
+        const lLip = (solidAt(x - 1) ? 0 : lip) - (part === 1 ? trim : 0);
+        const rLip = (solidAt(x1 + 1) ? 0 : lip) - (part === -1 ? trim : 0);
+        this.bench(bcx + (rLip - lLip) / 2, bcz, n + lLip + rLip, h, yaw);
       }
     }
   }
@@ -5106,7 +5256,7 @@ export class WorldView {
     );
   }
 
-  update(focusId: number | null, focusAction: string, dt: number, time: number) {
+  update(focusId: number | null, focusAction: string, dt: number, time: number, camera: THREE.Camera) {
     this.updateActionGlyph(focusId, focusAction, dt, time);
     for (const v of this.stationViews) {
       const st = v.station;
@@ -5117,12 +5267,65 @@ export class WorldView {
       }
       updateContents(v, time);
 
-      if (st.work > 0 && st.work < 1) {
-        v.ring.visible = true;
+      /**
+       * THREE THINGS ONE DIAL HAS TO SAY, AND THE ORDER THEY WIN IN.
+       *
+       *   burning  red, pulsing, and it OUTRANKS everything — a pan two
+       *            seconds from catching fire is the most urgent fact on the
+       *            screen and must not be hidden behind a cook arc
+       *   cooking  a warm amber fill toward done
+       *   working  chopping or washing, the same amber
+       *
+       * Burn goes last-but-first deliberately: `st.burn` only rises once
+       * something is already cooked, so the two never compete for the same
+       * pan except in the moment the arc should switch, and it switches to red.
+       */
+      let amount = 0;
+      let colour = 0xffd24a;
+      let pulse = 1;
+      if (st.burn > 0) {
+        amount = st.burn;
+        // Green-to-red is the wrong ramp here: the arc means "time left", so it
+        // holds one alarming colour and gets FULLER, which is the thing a
+        // player reads at a glance while running. The pulse is what carries
+        // urgency, and it accelerates as the pan runs out of time.
+        colour = 0xff5a2a;
+        pulse = 0.72 + Math.sin(time * (6 + st.burn * 16)) * 0.28;
+      } else if (st.cook > 0) {
+        amount = st.cook;
+        colour = 0xffb03a;
+      } else if (st.work > 0 && st.work < 1) {
+        amount = st.work;
+      }
+      if (amount > 0) {
+        v.ringRoot.visible = true;
+        // Billboard off the live camera, not a fixed tilt: the rig pans, dollies
+        // and re-solves its pitch per profile, so a hardcoded rotation would be
+        // right on one shape and wrong on the other three.
+        v.ringRoot.quaternion.copy(camera.quaternion);
         v.ring.geometry.dispose();
-        v.ring.geometry = new THREE.RingGeometry(0.3, 0.4, 24, 1, Math.PI / 2, -Math.PI * 2 * st.work);
-      } else if (v.ring.visible) {
-        v.ring.visible = false;
+        /**
+         * POSITIVE SWEEP, AND THIS IS WHY THERE WAS NEVER A VISIBLE RING.
+         *
+         * The arc was built as `RingGeometry(..., Math.PI / 2, -2π * work)` —
+         * a NEGATIVE thetaLength, which three.js emits with reversed winding.
+         * The material is MeshBasicMaterial at its default FrontSide, so every
+         * triangle faced away from the camera and the ring has been invisible
+         * for its entire life. That is the real reason a player reported having
+         * no idea how long was left on a chop: the indicator existed, was
+         * described in two comments, and had never once been drawn.
+         *
+         * Same visual result with a positive sweep: start the arc `sweep` short
+         * of 12 o'clock and run it TO 12 o'clock, so it grows clockwise out of
+         * the top exactly as before, with the winding the right way round.
+         */
+        const sweep = Math.PI * 2 * Math.min(1, amount);
+        v.ring.geometry = new THREE.RingGeometry(0.105, 0.155, 28, 1, Math.PI / 2 - sweep, sweep);
+        const m = v.ring.material as THREE.MeshBasicMaterial;
+        m.color.setHex(colour);
+        m.opacity = pulse;
+      } else if (v.ringRoot.visible) {
+        v.ringRoot.visible = false;
       }
 
       const glowMat = v.glow.material as THREE.MeshBasicMaterial;
@@ -5154,10 +5357,23 @@ export class WorldView {
     // The oven is the only light source in the room that moves. Keep it lively
     // but slow — a flicker you notice, never one you have to look away from.
     for (const f of this.fire) {
+      /**
+       * A FLICKER, NOT A GUTTER.
+       *
+       * This ran k over 0.42-1.02 — every tongue's height swinging by a factor
+       * of 2.4, several times a second, out of phase with its neighbours. Fire
+       * does not do that; a candle about to go out does, which is exactly what
+       * a player saw. Real flame moves mostly at its TIP and keeps its base.
+       *
+       * So the amplitude comes down to 0.86 +/- 0.14 and the vertical bob goes
+       * with it, while the two incommensurate frequencies stay — those are what
+       * stop the loop being learnable. The width term is nearly static now: a
+       * tongue that pulses in x as hard as it does in y reads as breathing.
+       */
       const p = f.userData.phase as number;
-      const k = 0.72 + Math.sin(time * 6.2 + p) * 0.2 + Math.sin(time * 11.3 + p * 1.7) * 0.1;
-      f.scale.set(0.85 + k * 0.25, k, 0.85 + k * 0.25);
-      f.position.y = (f.userData.baseY as number) + (k - 0.8) * 0.1;
+      const k = 0.86 + Math.sin(time * 5.1 + p) * 0.09 + Math.sin(time * 9.4 + p * 1.7) * 0.05;
+      f.scale.set(0.96 + k * 0.06, k, 0.96 + k * 0.06);
+      f.position.y = (f.userData.baseY as number) + (k - 0.86) * 0.04;
     }
     const gm = this.ovenGlow.material as THREE.MeshBasicMaterial;
     gm.opacity = 0.6 + Math.sin(time * 1.9) * 0.1 + Math.sin(time * 4.3) * 0.05;
@@ -5473,9 +5689,28 @@ function flameRamp(): THREE.DataTexture {
     // Opaque at the foot, gone by the tip, with the falloff biased late so the
     // tongue keeps a body and only the last third dissolves. A linear ramp
     // reads as a triangle with a soft edge; this reads as flame.
-    const a = Math.pow(Math.max(0, 1 - v), 1.5) * (0.55 + 0.45 * Math.min(1, v * 4));
+    // Exponent 1.5 -> 0.85: at 1.5 the ramp was down to 12% opacity by half
+    // height, so the visible body of every tongue ended in a round shoulder
+    // long before the lathe's own point — six orange eggs in a row rather than
+    // six flames. Holding the opacity further up lets the GEOMETRY draw the
+    // silhouette, which is where the taper was authored in the first place.
+    const a = Math.pow(Math.max(0, 1 - v), 0.85) * (0.55 + 0.45 * Math.min(1, v * 4));
+    // AND THE RAMP CARRIES HUE, NOT JUST ALPHA.
+    //
+    // It used to write 255,255,255 all the way up, which made every tongue a
+    // single flat colour with a soft edge — a paper cut-out of a flame. Real
+    // flame is hottest at the fuel and cools as it rises, and that gradient is
+    // most of what makes the eye read "fire" rather than "orange triangle".
+    // MeshBasicMaterial multiplies color x map, so this costs nothing: white
+    // at the foot leaves the material's hot tint alone, and the fall to a deep
+    // red by the tip walks it down the spectrum for free. No extra layer, no
+    // extra additive budget — the tip is nearly transparent by then anyway.
+    const g = 1 - Math.pow(Math.min(1, v * 1.15), 1.4) * 0.62;
+    const b = 1 - Math.pow(Math.min(1, v * 1.15), 0.9) * 0.95;
     const i = y * 4;
-    data[i] = data[i + 1] = data[i + 2] = 255;
+    data[i] = 255;
+    data[i + 1] = Math.round(255 * Math.max(0, g));
+    data[i + 2] = Math.round(255 * Math.max(0, b));
     data[i + 3] = Math.round(255 * Math.min(1, a));
   }
   const tex = new THREE.DataTexture(data, 1, n, THREE.RGBAFormat);
@@ -5575,18 +5810,32 @@ export function buildCarryable(c: Carryable): THREE.Group {
      * enough to be a HANDLE — 0.34 was a stub that vanished at phone size, and
      * silhouette is what tells a pan from a plate from a loaf at 40 pixels.
      */
-    const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.13, 20), toon(0x4a4550));
+    /**
+     * CAST IRON, AND THE WARM RIM WAS THE PROBLEM.
+     *
+     * The body went to dark grey last round to stop the pan reading as bread,
+     * and it still came back from a real device as "the frying pans should be
+     * cast iron colored not brown, I can't tell what they are right now". The
+     * body was not what was wrong: the RIM and the handle cap were 0x8a6a44, a
+     * warm mid brown, and they are the parts that catch the fire and the room
+     * key. Two bright brown bands round a dark disc is a wooden bowl.
+     *
+     * The whole object is one material family now — three values of the same
+     * cool near-neutral, so the only warmth on it is the light. Iron in a lit
+     * hearth reads as iron BECAUSE it is the cold thing the fire is warming.
+     */
+    const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.13, 20), toon(0x3e3c42));
     pan.castShadow = true;
     g.add(pan);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.045, 20), toon(0x8a6a44));
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.045, 20), toon(0x565259));
     rim.position.y = 0.065;
     g.add(rim);
-    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.055, 0.075), toon(0x2f2b33));
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.055, 0.075), toon(0x2c2a30));
     handle.position.set(0.36, 0.035, 0);
     g.add(handle);
-    // A pale end-cap on the handle, so the silhouette has a terminator rather
+    // A slightly lighter end-cap, so the silhouette has a terminator rather
     // than fading into whatever is behind it.
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.09, 10), toon(0x8a6a44));
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.09, 10), toon(0x565259));
     grip.rotation.z = Math.PI / 2;
     grip.position.set(0.56, 0.035, 0);
     g.add(grip);
