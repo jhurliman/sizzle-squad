@@ -1,0 +1,281 @@
+{
+  "headline": "Endless score-attack cooking game in Three.js, original mascot chefs, built against real captures of Dash & Dine. Every piece is judged by a fresh critic that runs the game in Chromium at four device profiles and compares real pixels side by side with the reference.",
+  "wave": 2.0,
+  "updatedAt": "2026-08-18T02:34:17.153864+00:00",
+  "pieces": [
+    {
+      "id": "p01",
+      "name": "Camera & framing",
+      "state": "critic",
+      "round": 6,
+      "note": "Wave 1.5 final: 76/100.",
+      "gap": "iPhone portrait still loses its anchor: LOST_MAX=0.9 overrides the tall-aspect clamps on exactly the profile they were written to protect."
+    },
+    {
+      "id": "p02",
+      "name": "Art direction & lighting",
+      "state": "critic",
+      "round": 10,
+      "note": "Wave 1.5 final: 74/100.",
+      "gap": "Bench planks no longer separate from the floor they stand on \u2014 luma 133/S 0.64 on a 158/S 0.55 floor, so the lower two-thirds reads as one field of pale decking."
+    },
+    {
+      "id": "p03",
+      "name": "Kitchen set & readability",
+      "state": "critic",
+      "round": 14,
+      "note": "Wave 1.5 final: 80/100.",
+      "gap": "Overcorrected: filling the floor fused the near half of every landscape frame into a raft of plank \u2014 41% honey wood in the lower 45% against the reference 18-23%."
+    },
+    {
+      "id": "p04",
+      "name": "Mascot chefs & animation",
+      "state": "critic",
+      "round": 8,
+      "note": "Wave 1.5 final: 68/100.",
+      "gap": "Legs animate but nothing above the hips rotates \u2014 rigid torso, both arms abducted at every speed. Tightrope walkers, not runners."
+    },
+    {
+      "id": "p05",
+      "name": "Movement feel",
+      "state": "critic",
+      "round": 2,
+      "note": "Wave 2A final: 74/100.",
+      "gap": "The chefs' feet never touch the floor \u2014 the weight-bearing foot travels through world space at a median 1.05x the body's own speed, so a superbly-tuned sim reads as two pendulums dragged across stone."
+    },
+    {
+      "id": "p06",
+      "name": "Touch controls",
+      "state": "critic",
+      "round": 2,
+      "note": "Wave 2A final: 62/100 (regressed from 78 at r1 \u2014 the rework closed the gap differently than briefed and made steering worse).",
+      "gap": "Once the thumb passes the ring's own radius \u2014 every sustained run \u2014 the stick stops being absolute: steering gain climbs to 1.4-2.1x, the chef runs up to 62\u00b0 away from the thumb with zero self-correction, and the knob is parked up to 238px from the finger."
+    },
+    {
+      "id": "p07",
+      "name": "Orders & HUD",
+      "state": "critic",
+      "round": 11,
+      "note": "Wave 1.5 final: 76/100.",
+      "gap": "With three live orders the third is display:none, and no ticket ever shows time pressure \u2014 the two states that end a run are the two the HUD does not draw."
+    },
+    {
+      "id": "p08",
+      "name": "VFX & juice",
+      "state": "queued",
+      "round": 0,
+      "note": "Steam, fire, confetti, hitstop, screen shake."
+    },
+    {
+      "id": "p09",
+      "name": "Audio",
+      "state": "queued",
+      "round": 0,
+      "note": "Wave 2A builder died on an API 529 before ever being judged. Never scored.",
+      "gap": "Unjudged."
+    },
+    {
+      "id": "p10",
+      "name": "Bot teammates",
+      "state": "critic",
+      "round": 2,
+      "note": "Wave 2A final: 68/100.",
+      "gap": "Three bots close 98% of tickets on their own, so a competently-played fourth chef is worth +0.8% to +6.3% of dishes \u2014 statistically indistinguishable from zero. The kitchen does not need you."
+    },
+    {
+      "id": "p11",
+      "name": "Order flow & difficulty",
+      "state": "queued",
+      "round": 0,
+      "note": "Score-attack pacing, patience meter, fail state."
+    },
+    {
+      "id": "p12",
+      "name": "Onboarding & screens",
+      "state": "queued",
+      "round": 0,
+      "note": "Title, first 30 seconds, results."
+    },
+    {
+      "id": "p13",
+      "name": "Performance",
+      "state": "queued",
+      "round": 0,
+      "note": "Urgent: the dressed set renders at under 2fps in the software rasteriser, which is now distorting the whole critic loop."
+    },
+    {
+      "id": "p14",
+      "name": "Station interaction",
+      "state": "critic",
+      "round": 2,
+      "note": "Wave 2A final: 79/100.",
+      "gap": "The sim's targeting is world-class but the sign that communicates it thrashes \u2014 the verb changes 3.21 times a second and each glyph pop costs 258ms, so the indicator is mid-animation 83% of the time it is on screen."
+    }
+  ],
+  "log": [
+    {
+      "t": "09:41",
+      "m": "Spine built: pure deterministic sim, Three.js view layer, DOM HUD, bots driving the same input path as the player."
+    },
+    {
+      "t": "09:44",
+      "m": "First real build renders in Chromium at all four device profiles. Screenshot harness (tools/shoot.mjs) online."
+    },
+    {
+      "t": "09:45",
+      "m": "No reference images were supplied - critics are working from the Dash & Dine spec plus the Overcooked! feel bar until they arrive."
+    },
+    {
+      "t": "09:52",
+      "m": "Wave 1 launched: camera & framing, art direction, kitchen set, mascot chefs. Each builder is followed by a fresh critic that runs the game in Chromium and looks at the real PNGs, then loops until it scores 90+."
+    },
+    {
+      "t": "09:58",
+      "m": "Reference images arrived. They change the design materially: not a top-down walled box but a LOW FRONTAL camera looking into a warm room, with knee-height prep tables scattered across an open floor so nothing ever occludes a chef."
+    },
+    {
+      "t": "10:02",
+      "m": "Stopped wave 1 mid-flight rather than let four agents polish the wrong structure."
+    },
+    {
+      "t": "10:12",
+      "m": "Re-laid the foundation myself: new KITCHEN_MAP (open floor, staggered low tables, back wall with pass and oven alcove), low tables in the view layer, front wall culled from render, frontal 26-degree camera."
+    },
+    {
+      "t": "10:18",
+      "m": "Wave 1 relaunched against the real references: camera & framing, art direction & lighting, kitchen set, mascot chefs, orders & HUD. Critics now open the reference JPEGs and do a literal side-by-side before scoring."
+    },
+    {
+      "t": "11:20",
+      "m": "Set dressing landed: ochre plaster and timber beams, a stone chimney with a fire-lit oven arch, a door with a round window, hanging copper pans, a wall clock, plank benches with white ceramic trays of actual ingredients, pancake stacks flanking the red and green pass counters."
+    },
+    {
+      "t": "11:22",
+      "m": "Four mascots now read apart from behind: green frog, orange bird, red bear, blue cat. Critics are running the side-by-side now."
+    },
+    {
+      "t": "17:19",
+      "m": "Round-1 critics reported. Every piece lost the side-by-side against the reference: camera 58, art direction 61, kitchen set 58, chefs 58, orders 41. All five sent back with their single biggest gap named."
+    },
+    {
+      "t": "20:16",
+      "m": "Caught a stall: the wave went quiet around 17:19 and the run had died. Repo verified healthy (tsc and build clean, nothing corrupted)."
+    },
+    {
+      "t": "20:22",
+      "m": "Root cause was the screenshot harness: desktop and iPad were rendering 2880x1800 and 2388x1668 buffers under a software rasteriser, 15-35s per frame. Dropped both to 1.5x and added a hard watchdog so a wedged run dies instead of hanging."
+    },
+    {
+      "t": "20:24",
+      "m": "Wave resumed from the checkpoint - the twelve finished agents replay from cache, work picks up at the rework round."
+    },
+    {
+      "t": "21:02",
+      "m": "Spotted in a real frame: three of four chefs lying flat, one apparently skydiving across the kitchen. Pulled it out as its own bug hunt rather than let every critic burn its one biggest-gap on it."
+    },
+    {
+      "t": "21:48",
+      "m": "Root cause proven with numbers, not guessed. Another agent had raised the render delta clamp to 0.5s so game time tracks wall time; the character rig's spring integrators are only stable to 0.25s. Dominant eigenvalue -1.66, so lean multiplied by 1.66 and flipped sign every frame: 0.73 rad, then 4.9, then 23, then 39 rad. 39 rad is 78 degrees mod 2pi - exactly the skydiving frog."
+    },
+    {
+      "t": "21:50",
+      "m": "Fixed by sub-stepping every spring at a fixed 1/120s. Peak lean now identical at every delta from 1/60s to 0.5s. The 60fps step response is unchanged, so the lean, the overshoot on stops and the bank into turns all survive: max lean 39.07 -> 0.394 rad, frames past 0.9 rad 17 -> 0."
+    },
+    {
+      "t": "21:55",
+      "m": "Reaped 11 orphaned Chromium processes left by timed-out harness runs (~4GB on a two-core box) and taught the harness to always tear its browser down, on crash, signal or watchdog."
+    },
+    {
+      "t": "22:38",
+      "m": "Wave healthy: 8 builds and 6 critiques through. Camera is on round 5, art direction round 5, kitchen set round 2, orders round 2."
+    },
+    {
+      "t": "22:38",
+      "m": "Orders climbed 41 -> 61 after rework. New gap named: the ticket says which four groceries exist but never what state they need or how far along you are, and the flat pastel icons don't match the food actually sitting in the room."
+    },
+    {
+      "t": "23:05",
+      "m": "Measured where agent time actually goes, across all 19 agents: 1194 minutes of wall time, 28% model generation, 73% waiting on tool calls. 99% of that tool time is Bash, and 71% of the Bash time is one command - the screenshot harness. 159 runs, 606 minutes. Over half of everything the wave has spent is waiting for screenshots."
+    },
+    {
+      "t": "23:12",
+      "m": "Profiled the harness itself rather than guessing. A single render costs 3.8ms. Advancing a full second of game time costs 71ms. Capturing one frame costs 8,600ms. Rendering was never the problem: the cost is a buffer readback and encode of the whole surface through a software rasteriser, and it scales with pixels and nothing else."
+    },
+    {
+      "t": "23:20",
+      "m": "Rebuilt the harness on three findings. Capture mode: the page hands over its clock, game time advances in fixed 1/60s steps with rendering suppressed, and one frame is drawn per screenshot - a 16s run goes from ~200 renders to ~5, and marks land on exact game-seconds so runs are now deterministic across profiles."
+    },
+    {
+      "t": "23:22",
+      "m": "Capture resolution dropped to 1x. The iPhone-portrait surface was 1179x2556, nine times the pixels the layout actually occupies, and nothing a critic judges depends on device pixel density. --dpr 2 remains for a final fidelity pass."
+    },
+    {
+      "t": "23:24",
+      "m": "Capture switched from Playwright's screenshot wrapper to raw CDP JPEG. The wrapper blocks on font loading and goes through the surface compositor, which was stalling past a 120s timeout. Files went from ~900KB PNG to ~165KB JPEG, which also makes them much faster for an agent to open."
+    },
+    {
+      "t": "00:19",
+      "m": "11 builds through, 129 harness runs on record. Camera is back under the critic for round 2; kitchen set finished five rework rounds. Harness now writing JPEGs through capture mode - the new runs are visibly quicker off the mark."
+    },
+    {
+      "t": "01:07",
+      "m": "Scores moved on three pieces: camera 58 -> 61, art direction 61 -> 71, kitchen set 58 -> 70."
+    },
+    {
+      "t": "01:07",
+      "m": "Two critics working independently, on different pieces, converged on the same diagnosis: the room has become one warm-orange hue and value band. One measured it - our furniture and beige set dressing fill 87-90% of the lower frame against the reference's 73-75%. The set got so much richer that it started competing with the food it exists to frame."
+    },
+    {
+      "t": "02:28",
+      "m": "Chefs came back 62, up from 58. Wave resumed cleanly after the second stall and is running again."
+    },
+    {
+      "t": "07:24",
+      "m": "Two highest scores of the run so far: 74 and 76. Sixteen builds and sixteen critiques through."
+    },
+    {
+      "t": "06:40",
+      "m": "31 builds and 30 critiques on record. First-round scores were 41-61; the recent cluster sits 62-76, with two 74s and a 76 as the high-water marks."
+    },
+    {
+      "t": "06:40",
+      "m": "The room now reads: ochre plaster and timber posts, a stone chimney with loaves baking in a fire-lit arch, hanging copper pans, a wall clock, plank benches carrying white ceramic trays. Order bubbles hang over the red and green pass counters with wordless icons and a green tick for the part already delivered."
+    },
+    {
+      "t": "06:40",
+      "m": "Still open: portrait crops the oven to the frame edge and leaves a large empty floor in the lower half, and the touch buttons sit over live play space. That is the next dedicated pass."
+    },
+    {
+      "t": "11:05",
+      "m": "WAVE 1 COMPLETE. 41 agents, 15.4 hours, 35 critiques. Final scores: kitchen set 74, art direction 68, orders 68, camera 66, chefs 52. Every piece still loses the side-by-side, and every one now has a named, measured gap rather than an impression."
+    },
+    {
+      "t": "11:05",
+      "m": "The coherence pass found seven seams. The largest: the green pass counter was not a pass at all - the view painted a team counter and stood a Toad across cells 11-13 and the HUD hung half the order tickets there, but those cells are the STOVE BANK. A player following a green ticket walked to a character standing behind three lit burners at a counter that cannot accept a dish."
+    },
+    {
+      "t": "11:05",
+      "m": "It also found the game unwinnable. The round is 180 seconds and three missed tickets end it, so surveyed over 14 bot-only runs the service died between 118 and 164 seconds, and with a player driving, between 54 and 87. Not one run ever reached the end of the round."
+    },
+    {
+      "t": "11:05",
+      "m": "And it measured the rule inversion directly: reference fire V 0.66 against tomato V 0.73, so food wins by 0.07. Ours was fire V 0.93 against tomato 0.79 - fire wins by 0.14. A 0.21 inversion of the one rule the whole composition is built on."
+    },
+    {
+      "t": "01:20",
+      "m": "WAVE 1.5 COMPLETE. 20 agents. Every piece improved: chefs 52->68, camera 66->76, art 68->74, orders 68->76, kitchen set 74->80."
+    },
+    {
+      "t": "01:20",
+      "m": "The game is winnable again. An integration agent measured the failure with a survey tool it wrote - 14 bot-only runs all died on patience between 118s and 164s of a 180s round, and with a player driving, between 54s and 87s - then traced it to arithmetic: three misses cost 1.02 of a meter that starts at 1.0, so the third expired ticket ended the service outright. Miss cost is now 0.16, which lands seven misses against seven serves at 0.30 rather than -0.12."
+    },
+    {
+      "t": "01:20",
+      "m": "The critics now audit claims as well as pixels. Camera's verdict confirmed the dolly fix in the telemetry: camZ-restZ at most 0.30 against 1.3-1.4 last wave, wall/floor join holding 0.513-0.525 against the authored 0.525."
+    },
+    {
+      "t": "01:20",
+      "m": "Recurring failure mode logged for wave 2: pieces overshoot one-directional instructions. Tickets went too small then too loud; the room went too empty then too full. Wave-2 briefs carry BOTH bounds and a measured target."
+    }
+  ]
+}

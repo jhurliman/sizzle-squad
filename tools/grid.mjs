@@ -1,0 +1,10 @@
+import sharp from 'sharp';
+const [f,out]=process.argv.slice(2);
+const meta=await sharp(f).metadata();
+const W=meta.width,H=meta.height;
+let svg=`<svg width="${W}" height="${H}">`;
+for(let x=0;x<W;x+=Math.round(W/12)) svg+=`<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="#0ff" stroke-width="1.5"/><text x="${x+3}" y="14" fill="#0ff" font-size="16" font-family="monospace">${x}</text>`;
+for(let y=0;y<H;y+=Math.round(H/9)) svg+=`<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="#0ff" stroke-width="1.5"/><text x="3" y="${y+16}" fill="#0ff" font-size="16" font-family="monospace">${y}</text>`;
+svg+='</svg>';
+await sharp(f).composite([{input:Buffer.from(svg),top:0,left:0}]).toFile(out);
+console.log('ok',out);
