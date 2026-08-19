@@ -644,6 +644,13 @@ overlay.addEventListener('click', (e) => {
   if (t.id === 'btnResume') {
     phase = 'playing';
     hideOverlay();
+    // THE ONE GESTURE THAT EXISTS AFTER BACKGROUNDING, AND IT DID NOT RESTART
+    // THE SOUND. `startRun` resumes audio and this path — the only way back
+    // into a running game once visibilitychange has paused it — did not, so a
+    // player who backgrounded the app and came back got a silent kitchen with
+    // no way to fix it. iOS also needs the call to happen inside a gesture,
+    // which is exactly what this click is.
+    audio.resume();
   }
 });
 
@@ -867,7 +874,7 @@ function frame(now: number) {
   const player = sim.chefs[0];
   updateFire(time);
   for (const v of chefViews) v.update(rawDt, time);
-  world.update(player.focus, player.focusAction, rawDt, time);
+  world.update(player.focus, player.focusAction, rawDt, time, cameraRig.camera);
   // Every chef, not just the player: the rig crops the frame to the rows the
   // play actually uses, and needs to know if a bot has walked under the crop.
   cameraRig.update(
@@ -1002,6 +1009,11 @@ requestAnimationFrame(frame);
         dispenses: st.dispenses ?? null,
         cell: st.cell,
         work: +st.work.toFixed(2),
+        // The two new dial inputs, so a probe can SEARCH for the frame it needs
+        // — a pan mid-cook, a pan about to burn — instead of shooting blind and
+        // hoping one of eight captures happens to have one.
+        cook: +st.cook.toFixed(3),
+        burn: +st.burn.toFixed(3),
         holding: st.holding ? st.holding.type : null,
       })),
       camera: cameraRig.describe(),

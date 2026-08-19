@@ -129,6 +129,24 @@ export interface Station {
   holding: Carryable | null;
   /** Generic 0..1 work progress (chopping, washing). */
   work: number;
+  /**
+   * WHAT THE PAN IS DOING, PUBLISHED FOR THE PLAYER TO SEE.
+   *
+   * `cook` is 0..1 toward done for the least-finished thing in the pan; `burn`
+   * is 0..1 from the moment it finishes toward catching fire. Both are mirrored
+   * off the pan every tick because the ingredient's own counters
+   * (`progress`, `overcook`) are per-item and in different units, and the view
+   * needs one number per station it can draw an arc from.
+   *
+   * These exist because of a direct report: "chopping and cooking need progress
+   * rings or bars or something, I have no idea when the food is about to burn
+   * or how long I have left chopping." Chopping had a ring and it lay flat on
+   * the bench where a 22.5-degree camera turns it into a sliver. Cooking had
+   * nothing at all — the only tell that bacon was about to burn was the bacon
+   * burning.
+   */
+  cook: number;
+  burn: number;
   /** True while a chef is actively working this station this tick. */
   active: boolean;
 }
@@ -182,6 +200,21 @@ export interface Chef {
   intent: ChefIntentKind;
   /** Station currently in interaction range and facing, or null. */
   focus: number | null;
+  /**
+   * THE STATION THIS CHEF HAS COMMITTED TO WORKING, OR NULL.
+   *
+   * Chopping used to be a HOLD: press and keep pressing, let go and it stops.
+   * That is the genre convention and it is undiscoverable — reported from play
+   * as "hold to chop is not discoverable", by someone who had already been told
+   * the controls. A tap is the only gesture a player will find on their own.
+   *
+   * So a tap COMMITS: the chef stays on the job until it finishes, and the sim
+   * has to remember which job that was, because the button is no longer held
+   * down to tell it. Movement is ignored while this is set — that is the
+   * "locks you into that action" half, and it is also what makes the commitment
+   * legible without any UI: the chef visibly will not walk away.
+   */
+  working: number | null;
   /**
    * WHAT THE BUTTON WOULD DO IF IT WERE PRESSED THIS FRAME — 'take', 'place',
    * 'combine', 'serve', 'return', 'swap', 'discard', 'dispense', or 'none'.
