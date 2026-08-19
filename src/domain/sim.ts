@@ -116,6 +116,7 @@ export function createSim(opts: SimOptions = {}): SimState {
       carrying: null,
       intent: 'idle',
       focus: null,
+      working: null,
       focusAction: 'none',
       grabBuffer: 0,
       focusHold: 0,
@@ -354,6 +355,70 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
     const kd = 1 - Math.exp(-dt / Math.max(0.0001, TUNING.stunDrag));
     chef.vel.x -= chef.vel.x * kd;
     chef.vel.y -= chef.vel.y * kd;
+  } else if (chef.working !== null) {
+    /**
+     * COMMITTED: THE STICK IS IGNORED UNTIL THE JOB IS DONE.
+     *
+     * This is the other half of tap-to-chop. A tap that started a job the
+     * player could immediately walk out of would be a tap that did nothing
+     * visible — and the old hold at least made the commitment obvious by
+     * occupying a thumb. Freezing the chef IS the feedback: you can see that
+     * you are busy, and you get the seconds back the moment it finishes.
+     *
+     * Deliberately not a stun: no knockback drag, no 'stunned' intent, and the
+     * chef keeps its heading. step() clears `working` on completion, on losing
+     * reach, on picking something up, and on a second press.
+     *
+     * AND IT HAS TO BRAKE, NOT JUST STOP STEERING.
+     *
+     * Zeroing the stick is not zeroing the chef. The deceleration a released
+     * stick relies on lives in the `else` branch below — `vel += (0 - vel) * k`
+     * with `decelTime` — and this branch skips that integration entirely, so
+     * the first version kept every unit per second the chef was carrying and
+     * coasted at a dead constant speed. Tap while walking in and the chef sails
+     * past the bench, `stillWants` sees `boxDist > reach` and cancels the job
+     * a fraction of a second after starting it: a one-tap chop that silently
+     * aborts, which is strictly worse than the hold it replaced. Nobody walks
+     * up to a board and stops before pressing, so this was the normal path.
+     *
+     * Same time constant as letting go of the stick, so it reads as the chef
+     * planting their feet rather than hitting a wall — EXCEPT for the one
+     * component that cannot be allowed to coast at all. Braking alone is not
+     * enough: at cruise the release curve still carries the chef 0.45 units,
+     * and committing from 0.5 out puts `boxDist` at 0.954 against a `reach` of
+     * 0.95, so the job died anyway — by four thousandths of a unit. Measured,
+     * not reasoned: see the "tapping while still moving" case in planprobe.
+     *
+     * So the OUTBOUND component — the part of the velocity pointing away from
+     * the bench just committed to — is removed outright, and everything else
+     * decays normally. That is the honest reading of the gesture: a chef who
+     * has committed to a station is not still walking away from it, while a
+     * chef sliding sideways along its face is fine and keeps the soft stop.
+     * A knockback still cancels the job, because a shove puts the chef outside
+     * `reach` in one tick rather than coasting there.
+     */
+    mx = 0;
+    my = 0;
+    m = 0;
+    const brake = 1 - Math.exp(-dt / Math.max(0.0001, TUNING.decelTime));
+    chef.vel.x -= chef.vel.x * brake;
+    chef.vel.y -= chef.vel.y * brake;
+    const ws = stationById(s.kitchen, chef.working);
+    if (ws) {
+      let ax = ws.cell.x + 0.5 - chef.pos.x;
+      let ay = ws.cell.y + 0.5 - chef.pos.y;
+      const a = Math.hypot(ax, ay);
+      if (a > 1e-4) {
+        ax /= a;
+        ay /= a;
+        // Positive is travelling TOWARD the bench, which is welcome.
+        const along = chef.vel.x * ax + chef.vel.y * ay;
+        if (along < 0) {
+          chef.vel.x -= along * ax;
+          chef.vel.y -= along * ay;
+        }
+      }
+    }
   } else {
     mx = input.move.x;
     my = input.move.y;
@@ -841,6 +906,11 @@ function affordance(chef: Chef, st: Station, plan: GrabKind): 0 | 1 | 2 {
   if (plan === 'swap' || plan === 'return') return 1;
   if (plan === 'place') {
     const held = chef.carrying;
+    // A board's job is food that needs cutting. It will still HOLD a bun — you
+    // should never be carrying something with nowhere to put it — but it does
+    // not get to outrank the counter you were walking to for the privilege.
+    if (st.kind === 'board' && held?.type === 'ingredient' && INGREDIENT_DEFS[held.ingredient.kind].chopSeconds <= 0)
+      return 1;
     if (st.kind === 'board' && held?.type !== 'ingredient') return 1;
     if (st.kind === 'sink' && !(held?.type === 'plate' && held.plate.dirty)) return 1;
   }
@@ -854,6 +924,44 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
   if (!held) {
     if (st.kind === 'crate' && st.dispenses) return 'dispense';
     if (st.kind === 'plates') return 'dispense';
+    /**
+     * A PAN IS FIXTURE, NOT LUGGAGE.
+     *
+     * Empty-handed at a burner used to resolve to 'take', so you could walk off
+     * with the frying pan. Asked directly what that was for, there is no
+     * answer: the design is that the pan stays on the heat and the PLATE comes
+     * to it (see the 'load' rung below), every recipe is fillable without ever
+     * moving a pan, and a pan in your hands is a pan not cooking. It was a
+     * legal move that could only lose you the game.
+     *
+     * The 'place' rung further down that puts a pan back on an empty burner is
+     * now unreachable, and stays only because a level with an unseeded burner
+     * would need it.
+     *
+     * ...EXCEPT A RUINED ONE, WHICH IS THE ONE PAN THAT MUST COME OFF.
+     *
+     * "Fixture, not luggage" is right for a working burner and a soft-lock for
+     * a spoiled one, because nothing else in this kitchen can empty a pan where
+     * it stands: the bin discards the contents of a pan you are CARRYING (see
+     * `case 'bin'`), and the plate `load` rung only ever moves items in state
+     * 'cooked', never 'burnt'. Refuse it unconditionally and burnt food is
+     * welded to the burner — with `updateStations` ticking `pan.fire` up to a
+     * fire the whole time, and bots/brain.ts's own rescue-priority "clear the
+     * burnt pan" job (rung 4c, whose comment already says "nothing else in the
+     * kitchen can... the burner is dead") reduced to a press that does nothing.
+     * Two burners lost that way and every cooked recipe is unfillable for the
+     * rest of the service.
+     *
+     * The design intent survives intact: you cannot walk off with a pan that is
+     * doing its job, and the only pan you can lift is one that has nothing left
+     * to do.
+     */
+    if (
+      st.kind === 'stove' &&
+      st.holding?.type === 'pan' &&
+      !st.holding.pan.contents.some((i) => i.state === 'burnt')
+    )
+      return 'none';
     // See 'prep' above. Same conditions the `useHeld` gate in step() tests, and
     // the SAME chopSeconds test updateStations makes before it advances any
     // work — all three have to agree or the button lies.
@@ -889,7 +997,23 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
     case 'crate':
       // "If you grab the wrong ingredient by accident, just put it back where
       // you found it!" — the reference's own on-screen instruction.
-      return held.type === 'ingredient' ? 'return' : 'none';
+      //
+      // WHERE YOU FOUND IT. A crate is an infinite SOURCE of exactly one kind,
+      // so anything handed to it is deleted rather than stored. Without the two
+      // tests below that made the lettuce bin a working incinerator for bread:
+      // reported from play as "I am able to pick up bread and put it in the
+      // lettuce supply station, where it disappears into." A chopped tomato
+      // went the same way, which is worse — that is work destroyed, silently,
+      // on a press the player thought was a put-down.
+      //
+      // So a crate takes back only the thing it dispenses, only in the state it
+      // dispenses it in. Anything else is 'none' and the bench next door gets
+      // the press.
+      return held.type === 'ingredient' &&
+        held.ingredient.kind === st.dispenses &&
+        held.ingredient.state === 'raw'
+        ? 'return'
+        : 'none';
     case 'plates':
       return held.type === 'plate' && !held.plate.dirty && held.plate.contents.length === 0 ? 'return' : 'none';
     case 'stove':
@@ -920,6 +1044,19 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
       )
         return 'load';
       return !st.holding && held.type === 'pan' ? 'place' : 'none';
+    case 'sink':
+      /**
+       * A SINK WASHES PLATES. That is its whole job, and until now it was also
+       * a shelf: `isSurface` lists it, so the default rung below let any loose
+       * ingredient be set down in the washing-up water, where it did nothing
+       * and could only be picked back up. Reported from play as "it looks like
+       * someone was able to set an ingredient in the sink? Another bug."
+       *
+       * It is not a crash, it is a station advertising an action worth nothing,
+       * and the ask was explicit: fewer useless actions. Dirty plates only.
+       */
+      if (held.type === 'plate' && held.plate.dirty && !st.holding) return 'place';
+      return 'none';
     default: {
       if (!st.holding) return 'place';
       if (st.holding.type === 'plate' && held.type === 'ingredient' && st.holding.plate.contents.length < PLATE_CAPACITY)
@@ -1143,11 +1280,12 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       emit(s, { t: 'place', chef: chef.id, at });
       return true;
     case 'prep':
-      // Consumed, deliberately doing nothing. The hold on the same button is
-      // what works the station (see the `useHeld` gate at the bottom of step).
-      // Returning true rather than false is the whole point: false emits a
-      // grabMiss, and a thunk every time the player taps a board would make the
-      // unified button feel broken exactly where it is doing its job.
+      // A TAP COMMITS. This used to consume the press and do nothing, because
+      // the HOLD on the same button did the work — and a hold is a gesture
+      // nobody finds. Now the press starts the job and `chef.working` keeps it
+      // running until the station stops needing work; see step().
+      chef.working = st.id;
+      chef.intent = 'working';
       return true;
     case 'discard':
       // ONE ITEM PER PRESS, NOT THE WHOLE PLATE. The bin used to empty a plate
@@ -1274,6 +1412,33 @@ function updateStations(s: SimState, dt: number) {
     if (st.kind === 'stove' && st.holding?.type === 'pan') {
       const pan = st.holding.pan;
       pan.onHeat = true;
+      /**
+       * ONE NUMBER FOR "COOKING" AND ONE FOR "ABOUT TO BURN".
+       *
+       * The pan can hold three things at different stages, so the arc the
+       * player reads has to pick. It picks the WORST case in each direction:
+       * the least-cooked item drives `cook` (the pan is not done until the last
+       * rasher is), and the most-overcooked drives `burn` (the pan is in danger
+       * as soon as ANY of it is). Anything else would show a reassuring number
+       * while something in there was catching fire.
+       */
+      let minCook = 1;
+      let maxBurn = 0;
+      let cooking = false;
+      for (const ing of pan.contents) {
+        const def = INGREDIENT_DEFS[ing.kind];
+        if (def.cookSeconds <= 0) continue;
+        if (ing.state === 'raw' || ing.state === 'prepped') {
+          cooking = true;
+          minCook = Math.min(minCook, ing.progress);
+        } else if (ing.state === 'cooked' && Number.isFinite(def.burnSeconds)) {
+          maxBurn = Math.max(maxBurn, Math.min(1, ing.overcook / def.burnSeconds));
+        } else if (ing.state === 'burnt') {
+          maxBurn = 1;
+        }
+      }
+      st.cook = cooking ? minCook : 0;
+      st.burn = maxBurn;
       for (const ing of pan.contents) {
         const def = INGREDIENT_DEFS[ing.kind];
         if (def.cookSeconds <= 0) continue;
@@ -1298,6 +1463,11 @@ function updateStations(s: SimState, dt: number) {
       }
     } else if (st.holding?.type === 'pan') {
       st.holding.pan.onHeat = false;
+      st.cook = 0;
+      st.burn = 0;
+    } else {
+      st.cook = 0;
+      st.burn = 0;
     }
 
     st.active = false;
@@ -1431,6 +1601,22 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
     chef.focusAction = planGrab(s, chef, st);
 
     /**
+     * CANCEL IS ANSWERED FIRST, AND THAT ORDERING IS THE WHOLE FIX.
+     *
+     * A committed chop is cancelled by pressing the button again. Handled
+     * further down — after the grab buffer — that press would reach `doGrab`,
+     * resolve to 'prep' against the same board, and re-commit on the very tick
+     * it was meant to cancel. The job would look uncancellable and the button
+     * dead. So the press is consumed HERE, before anything else can read it.
+     */
+    if (chef.working !== null && input.grabPressed) {
+      chef.working = null;
+      chef.grabBuffer = 0;
+      if (chef.intent === 'working') chef.intent = 'idle';
+      continue;
+    }
+
+    /**
      * THE PRESS IS A REQUEST, NOT AN INSTANT.
      *
      * This used to be `if (chef.stun > 0) continue; if (input.grabPressed)
@@ -1475,6 +1661,40 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
         emit(s, { t: 'grabMiss', chef: chef.id, at: { x: chef.pos.x, y: chef.pos.y } });
       }
     }
+    /**
+     * THE COMMITTED JOB, AND EVERY WAY OUT OF IT.
+     *
+     * `chef.working` is set by a tap (see doGrab's 'prep') and runs the station
+     * with no button held. It clears on the four things that genuinely end a
+     * job, and nothing else — in particular NOT on the movement stick, because
+     * being unable to wander off mid-chop is the feedback that says you are
+     * committed:
+     *   - the work finished, so the station no longer wants any
+     *   - the chef walked out of reach (knockback, a shove from a bot)
+     *   - the chef is holding something, so this is no longer a free hand
+     *   - the player pressed the button again, which is the deliberate escape
+     */
+    if (chef.working !== null) {
+      const ws = stationById(s.kitchen, chef.working);
+      const stillWants =
+        !!ws &&
+        !chef.carrying &&
+        boxDist(ws, chef.pos.x, chef.pos.y) <= TUNING.reach &&
+        ((ws.kind === 'board' &&
+          ws.holding?.type === 'ingredient' &&
+          ws.holding.ingredient.state === 'raw' &&
+          INGREDIENT_DEFS[ws.holding.ingredient.kind].chopSeconds > 0) ||
+          (ws.kind === 'sink' && ws.holding?.type === 'plate' && ws.holding.plate.dirty));
+      if (!stillWants) {
+        chef.working = null;
+        if (chef.intent === 'working') chef.intent = 'idle';
+      } else {
+        ws.active = true;
+        chef.intent = 'working';
+      }
+    }
+    // The held path stays for the bots, which emit a 'use' job rather than a
+    // tap, and for anything else driving InputSnapshot directly.
     if (input.useHeld && st) {
       // Same three-way agreement as planGrab above: without the chopSeconds
       // test this lights the station and puts the chef into 'working' over a
