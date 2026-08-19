@@ -71,6 +71,13 @@ no test, because it is trusted.
 - No text smaller than 12px. No tap target smaller than 44×44 CSS px.
 - No `localStorage`/`sessionStorage`.
 
+## Pull requests
+
+Open them **ready for review, never as drafts**. A draft does not get reviewed:
+this repo's automated reviewer only runs when a PR is opened for review, marked
+ready, or asked directly, so a draft sits there looking finished while nothing
+has actually looked at it. It has found real bugs in every round it has run on.
+
 ## Reporting
 
 Return a terse report: what you changed, what you saw in the screenshots after,

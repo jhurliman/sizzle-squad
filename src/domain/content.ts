@@ -179,6 +179,27 @@ export const TUNING = {
   turnRate: 12,
   chefRadius: 0.36,
   /**
+   * EXTRA CLEARANCE AT THE ROOM'S OWN WALLS, BECAUSE THE WALL IS NOT THE CELL.
+   *
+   * `chefRadius` keeps a body out of a blocked CELL, and for a bench that is
+   * exactly right — the bench is drawn inside its cell. The room shell is not:
+   * the side walls carry a rubble skirt whose stones bulge to 0.28 past the
+   * cell face and a plank door that stands proud of it, so a chef pressed
+   * against the left wall stood with a shoulder inside the stonework and half
+   * inside the door. Reported as "my character can clip about halfway through
+   * the door on the left, and a little ways through the stone in the walls".
+   *
+   * The chef is not the problem — its drawn half-width is about 0.27, well
+   * inside the 0.36 it collides with. The art is simply in front of the line
+   * the collision uses, so the collision moves to where the art is. 0.30 clears
+   * the skirt with room to spare and clears the door once the door is pulled
+   * back to 1.32 (see `door()` in view/world.ts, moved in the same change).
+   *
+   * Border cells only. Applying it to every blocked cell would push chefs a
+   * third of a cell off every bench in the room and break `reach`.
+   */
+  wallSkirt: 0.3,
+  /**
    * Speed above which the body keeps turning toward its own velocity after the
    * stick is released. Infinity disables it (which is what shipped before this
    * pass, and see sim.ts for why it mattered). 0.75 u/s is about an eighth of

@@ -292,6 +292,28 @@ import type { CellKind, IngredientKind, Kitchen, Station, StationKind, Vec2 } fr
  * the bench tops instead, where the reference buys it — five tables of three
  * cells is a lot more top surface than fifteen one-cell stubs.
  */
+/**
+ * THE PLAY AREA ENDS WHERE THE PICTURE ENDS.
+ *
+ * Row 9 used to be open floor. It held no stations and served no purpose — the
+ * front rank of benches sits on row 7 and is worked from row 8 — so the only
+ * thing it ever did was let you walk somewhere the camera does not go. The
+ * rig crops the front of the room deliberately (see FRONT_CROP / BOTTOM_LANE
+ * in cameraRig.ts: an apron of bare flagstone is most of a phone frame), so
+ * its bottom edge sits at z 9.00 while a chef on row 9 could reach y 9.64.
+ * Reported from play as "I can wander down into the bottom corners of the map
+ * where I'm basically off screen", and it was exactly that: two thirds of a
+ * cell of walkable floor below the bottom of the picture.
+ *
+ * Closing it costs nothing — no station becomes unreachable, and the floor is
+ * still DRAWN there, so the room keeps its depth. What changes is that the
+ * furthest a chef can stand is y 8.64, comfortably inside the frame.
+ *
+ * The containment sweeps missed this for the same reason it existed: they
+ * sampled a hardcoded `py <= 8.6` rather than the map's real extent, so they
+ * measured the band that was fine and reported no cells lost. They derive
+ * their bounds from this array now — see tools/camlost.mjs.
+ */
 export const KITCHEN_MAP = [
   '###############',
   '#DSS#=O=O=#S--#',
@@ -302,7 +324,7 @@ export const KITCHEN_MAP = [
   '#.............#',
   '#XBX.......UX-#',
   '#.............#',
-  '#.............#',
+  '###############',
   '###############',
 ];
 

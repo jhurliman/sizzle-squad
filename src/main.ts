@@ -1013,6 +1013,12 @@ requestAnimationFrame(frame);
         // — a pan mid-cook, a pan about to burn — instead of shooting blind and
         // hoping one of eight captures happens to have one.
         cook: +st.cook.toFixed(3),
+        // What is actually IN the pan, so a tool can find a burner that has
+        // ruined its food. `burn` cannot answer this: it measures the window
+        // between cooked and ruined and drops back to 0 the moment the food is
+        // spoilt, which is precisely when the skillet catches fire.
+        burnt: st.holding?.type === 'pan' ? st.holding.pan.contents.filter((i) => i.state === 'burnt').length : 0,
+        fire: st.holding?.type === 'pan' ? +st.holding.pan.fire.toFixed(3) : 0,
         burn: +st.burn.toFixed(3),
         holding: st.holding ? st.holding.type : null,
       })),
