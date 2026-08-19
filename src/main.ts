@@ -803,6 +803,9 @@ function frame(now: number) {
       hitstop -= rawDt;
     } else {
       acc += rawDt;
+      // Frozen: swallow the elapsed time rather than banking it, so unfreezing
+      // does not fire off a burst of catch-up steps.
+      if (simFrozen) acc = 0;
       let steps = 0;
       while (acc >= SIM_DT && steps < 32) {
         const botInputs = scriptedInput.freezeBots ? new Map() : bots.update(sim, SIM_DT);
@@ -1035,6 +1038,10 @@ requestAnimationFrame(frame);
    */
   warp(seconds: number) {
     if (phase !== 'playing') return;
+    // warp is an EXPLICIT request to advance, so it steps even when the frame
+    // loop is frozen — otherwise the freeze would be a trap for the next
+    // scenario that wants to settle the room before staging it.
+
     let t = 0;
     while (t < seconds && !sim.over) {
       const botInputs = scriptedInput.freezeBots ? new Map() : bots.update(sim, SIM_DT);
@@ -1098,6 +1105,11 @@ requestAnimationFrame(frame);
     };
     /** Park the bots so they cannot undo the scene before it is photographed. */
     freezeBots?: boolean;
+    /**
+     * Hold the simulation at the staged state (default true). The view keeps
+     * animating; only `step()` stops. Pass false to watch a scene play out.
+     */
+    freeze?: boolean;
   }) {
     const ing = (o: { kind: string; state: string; chop?: number }) => ({
       id: sim.nextId++,
@@ -1128,11 +1140,16 @@ requestAnimationFrame(frame);
         p.vel = { x: 0, y: 0 };
       }
     }
-    // A staged scene is a still life. The bots' whole job is to tidy exactly
-    // the situations worth photographing — a ruined pan is a rescue job at
-    // `P.rescue` priority — so without this the scene is gone before the
-    // shutter opens.
+    // A staged scene is a still life, and two different things would spoil it.
+    // The bots' whole job is to tidy exactly the situations worth photographing
+    // — a ruined pan is a rescue job at `P.rescue` priority — and the sim
+    // itself moves the very numbers the scenario declares. Both stop by
+    // default; freezing is what "staged" means.
     if (spec.freezeBots) scriptedInput.freezeBots = true;
+    if (spec.freeze ?? true) {
+      simFrozen = true;
+      scriptedInput.freezeBots = true;
+    }
   },
 
   /**
@@ -1220,6 +1237,23 @@ requestAnimationFrame(frame);
 };
 
 const scriptedInput = { ...NO_INPUT, move: { x: 0, y: 0 }, enabled: false, freezeBots: false };
+/**
+ * HARNESS ONLY: hold the SIMULATION still while the VIEW keeps animating.
+ *
+ * Parking the bots is not enough to photograph a declared state. `setScene`
+ * asks for `fire: 0` and the sim then raises a burnt pan's fire by dt/9 every
+ * step, so by the time the shutter opened the picture was of some other number
+ * — and a contact sheet, which needs seconds rather than milliseconds, drifted
+ * further still. The scenario's caption and its subject had quietly parted
+ * company, which is the one failure a photography harness must not have.
+ *
+ * The fix is NOT to stop the clock. The flames lick, sway, smoke and throw
+ * embers off the frame clock, so freezing everything would make every strip
+ * six copies of one picture and destroy the only instrument that can judge the
+ * animation. Simulation and presentation are separate, and only the first one
+ * is supposed to hold still: `step()` stops, `time` runs on.
+ */
+let simFrozen = false;
 /** Rising edges waiting for a sim tick to consume them. See `frame()`. */
 let pendingGrab = false;
 let pendingDash = false;

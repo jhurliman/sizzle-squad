@@ -3619,27 +3619,40 @@ export class WorldView {
       // flames. Fire comes off the top of the fuel; it has to start there.
       panFire.position.set(x, h + 0.24, z);
       panFire.visible = false;
+
       /**
-       * TALL ENOUGH TO BE A FLAME, WHICH THE FIRST CUT WAS NOT.
+       * SEVEN TONGUES, NOT THREE — THIS IS AN ALARM, NOT SET DRESSING.
        *
-       * 0.24-0.34 against a pan half a unit across is as wide as it is high,
-       * and a flame that is as wide as it is high is a blob. The hearth's own
-       * tongues run 0.30-0.62 and read correctly, so these are brought into the
-       * same range and kept narrow — the radii below are unchanged, so raising
-       * the height slims them at the same time.
+       * Three evenly-lit tongues of similar height is what a decorative flame
+       * looks like: it sits there. Asked for directly after seeing the first
+       * version — "this is user feedback not background art so the skillet
+       * fire should be kind of wild". A pan that has caught should look like
+       * an emergency from across the room, and the things that carry that are
+       * COUNT, HEIGHT SPREAD and MOTION, in that order.
+       *
+       * So: seven, scattered over the dish rather than in a line, with heights
+       * running 0.38 to 0.86 — a better than 2:1 spread, where the old three
+       * ran 0.40 to 0.62 and read as one ragged mass. The radius now grows
+       * with height (0.048 + fh*0.028) instead of being fixed, so the tall
+       * ones stay proportionally slim while the short ones keep a body.
        */
       for (const [ox, oz, fh, phase] of [
-        [-0.1, 0.02, 0.44, 0.0],
-        [0.02, -0.06, 0.62, 2.1],
-        [0.11, 0.05, 0.40, 4.2],
+        [-0.13, 0.03, 0.52, 0.0],
+        [-0.06, -0.09, 0.7, 1.3],
+        [0.01, 0.06, 0.86, 2.6],
+        [0.08, -0.04, 0.64, 3.9],
+        [0.14, 0.07, 0.44, 5.2],
+        [-0.02, -0.14, 0.38, 0.7],
+        [0.05, 0.13, 0.5, 4.5],
       ] as [number, number, number, number][]) {
+        const w = 0.048 + fh * 0.028;
         const m = new THREE.Mesh(
           new THREE.LatheGeometry(
             [
               new THREE.Vector2(0.001, 0),
-              new THREE.Vector2(0.055, fh * 0.14),
-              new THREE.Vector2(0.062, fh * 0.3),
-              new THREE.Vector2(0.034, fh * 0.62),
+              new THREE.Vector2(w * 0.88, fh * 0.12),
+              new THREE.Vector2(w, fh * 0.28),
+              new THREE.Vector2(w * 0.55, fh * 0.62),
               new THREE.Vector2(0.001, fh),
             ],
             8,
@@ -3653,9 +3666,42 @@ export class WorldView {
           }),
         );
         m.position.set(ox, 0, oz);
+        m.userData.role = 'tongue';
         m.userData.phase = phase;
+        // Each tongue pivots about its own foot when it leans, which is what
+        // makes a lean read as a flame bending rather than the whole group
+        // sliding sideways.
         panFire.add(m);
       }
+
+      /**
+       * NO SMOKE, NO EMBERS — BOTH WERE BUILT, PHOTOGRAPHED, AND CUT.
+       *
+       * Both seemed obviously right and both failed for the same reason, which
+       * is worth leaving here so the next round does not spend the afternoon
+       * rediscovering it.
+       *
+       * The oven mouth is a shallow lit box and the flames fill it. Anything
+       * added is therefore either INSIDE the flame column, where additive
+       * blending erases it, or above the mouth, where it draws over the stone
+       * facade — the hearth is a flat front, so everything on a burner renders
+       * over it. A smoke plume tuned to clear the flames read as grey smudges
+       * on the masonry; tuned to stay in the mouth it was invisible.
+       *
+       * Embers failed on scale rather than placement. This camera sits about
+       * eleven units back and never comes closer; at that distance a 0.03-unit
+       * spark is roughly one pixel on a phone. Sub-pixel detail cannot carry a
+       * signal, however bright it is.
+       *
+       * (Found by photographing the smoke at full opacity in magenta — the
+       * only way to see where an invisible thing actually goes. That is the
+       * technique worth keeping, more than the result.)
+       *
+       * So the alarm is carried entirely by the SILHOUETTE and MOTION of the
+       * flame mass: count, height spread, licks and lean. Those are the only
+       * things at this distance big enough to read.
+       */
+
       this.root.add(panFire);
     }
 
@@ -5361,23 +5407,68 @@ export class WorldView {
         const ruined = !!pan && pan.contents.some((i) => i.state === 'burnt');
         v.panFire.visible = ruined;
         if (ruined) {
-          // The floor matters more than the ceiling. `fire` is 0 at the exact
-          // moment food spoils, which is the moment the player needs telling,
-          // so a scale that starts near nothing says nothing when it counts.
-          // Starts clearly alight and grows half again as the pan gets worse.
-          // 0.72 -> 0.88 at the floor. Photographed side by side (scenarios
-          // `fire-new` at fire 0 against `fire-both-burners` at fire 1), the
-          // full-fire pans read unmistakably and the just-burned one was pale
-          // and easy to miss — which is backwards, because fire 0 is the
-          // instant the player still has time to act on it. The top end is
-          // pulled in to match so the range stays a growth, not a jump.
-          const grow = 0.88 + (pan?.fire ?? 0) * 0.34;
+          const f = pan?.fire ?? 0;
+          /**
+           * A FIRE THAT SURGES, NOT ONE THAT IDLES.
+           *
+           * The floor matters more than the ceiling. `fire` is 0 at the exact
+           * moment food spoils, which is the moment the player needs telling,
+           * so a scale that starts near nothing says nothing when it counts —
+           * measured against `fire-both-burners`, the just-burned pan was the
+           * pale one, which is backwards.
+           *
+           * On top of that floor sits a slow two-frequency SURGE. A fire that
+           * holds one size while its tips wobble is a gas ring; a real one
+           * breathes, and giving the whole group that breath is most of what
+           * separates "burner lit" from "pan on fire" at a glance.
+           */
+          const surge = 1 + Math.sin(time * 1.7) * 0.1 + Math.sin(time * 2.63 + 1.1) * 0.06;
+          /**
+           * BIG ENOUGH TO BEAT THE HEARTH IT STANDS IN FRONT OF.
+           *
+           * The first sizing was judged in isolation and looked fine there.
+           * Photographed in place (`fire-both-burners`), both pan fires sat at
+           * the same height, hue and scale as the row of decorative tongues on
+           * the hearth's back wall directly behind them — so the alarm was
+           * camouflaged by the set dressing, and two pans on fire read as a
+           * slightly busier oven. It has to break that silhouette to be seen at
+           * all, so it grows past the hearth's own tongues rather than matching
+           * them.
+           */
+          const grow = (1.1 + f * 0.7) * surge;
+
           for (const m of v.panFire.children) {
             const p = (m.userData.phase as number) ?? 0;
-            // Two incommensurate frequencies, same trick as the hearth, so the
-            // eye never learns the loop on a fire that may burn for a while.
-            const k = 0.82 + Math.sin(time * 8.3 + p) * 0.12 + Math.sin(time * 14.1 + p * 1.7) * 0.06;
-            m.scale.set(grow, grow * k, grow);
+            /**
+             * TONGUES: FLICKER, LICK, LEAN.
+             *
+             * Three incommensurate frequencies for the flicker so the eye
+             * never learns the loop on a fire that may burn for a while, then
+             * two things the old version did not have:
+             *
+             * LICK — a rare tall spike. `sin - 0.86` is positive about a
+             * seventh of the time, so each tongue occasionally shoots to
+             * nearly twice its height and drops back. Fire is not a wobble,
+             * it is a series of jumps, and this is the cheapest honest way to
+             * say so.
+             *
+             * LEAN — the tongue tips off vertical and sways. Flames bend.
+             *
+             * Width moves INVERSELY to height (1/sqrt of the stretch), so a
+             * lick pulls the tongue thin as it goes up instead of inflating
+             * it, and the volume stays roughly put.
+             */
+            const k =
+              0.78 +
+              Math.sin(time * 9.1 + p) * 0.16 +
+              Math.sin(time * 15.7 + p * 1.7) * 0.09 +
+              Math.sin(time * 23.3 + p * 2.3) * 0.05;
+            const lick = 1 + Math.max(0, Math.sin(time * 3.1 + p * 2.7) - 0.86) * (3.5 + f * 2.5);
+            const stretch = k * lick;
+            const wide = grow / Math.sqrt(Math.max(0.2, stretch));
+            m.scale.set(wide, grow * stretch, wide);
+            m.rotation.z = Math.sin(time * 4.3 + p) * 0.17;
+            m.rotation.x = Math.cos(time * 3.7 + p * 1.4) * 0.13;
           }
         }
       }

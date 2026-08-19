@@ -5,6 +5,7 @@
  *   node tools/scene.mjs --only fire        one of them
  *   node tools/scene.mjs --list             what there is
  *   node tools/scene.mjs --out shots/x      somewhere else
+ *   node tools/scene.mjs --strip 6          a contact sheet over time, for MOTION
  *
  * THE GAP THIS FILLS. shoot.mjs photographs whatever the game happens to be
  * doing. That is the right instrument for composition and for the HUD, and it
@@ -22,6 +23,13 @@
  * Every hand-typed pixel rectangle in this project's history went stale that
  * way; none of these can.
  *
+ * ONE FRAME CANNOT JUDGE AN ANIMATION. The skillet fire licks, sways, smokes
+ * and throws embers, and a single still says nothing about any of it — it can
+ * only show one instant, which is exactly how a fire that merely wobbles passes
+ * for a fire that moves. `--strip N` therefore shoots the same crop N times a
+ * fifth of a second apart and tiles them left to right, so what changes between
+ * frames is visible as a strip rather than having to be remembered.
+ *
  * These are pictures for a human to look at, not assertions. `npm test` covers
  * what a machine can judge; this covers the half that needs eyes.
  */
@@ -36,7 +44,14 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
 const argv = Object.fromEntries(
   process.argv.slice(2).reduce((acc, a, i, arr) => {
-    if (a.startsWith('--')) acc.push([a.slice(2), arr[i + 1]?.startsWith('--') ? true : arr[i + 1]]);
+    // A valueless flag is TRUE, including the last one on the line. `?.` made
+    // a trailing `--list` evaluate to undefined, so the documented invocation
+    // `node tools/scene.mjs --list` skipped the listing branch and photographed
+    // all six scenarios instead.
+    if (a.startsWith('--')) {
+      const next = arr[i + 1];
+      acc.push([a.slice(2), next === undefined || next.startsWith('--') ? true : next]);
+    }
     return acc;
   }, []),
 );
@@ -64,7 +79,7 @@ const SCENES = [
     name: 'fire-new',
     about: 'a rasher has just burned — the fire is at its smallest, which is the moment it has to read',
     scene: {
-      freezeBots: true,
+      freeze: true,
       stations: [{ cell: BURNER_L, pan: [{ kind: 'bacon', state: 'burnt' }], fire: 0 }],
     },
     look: mid(BURNER_L, 1.0),
@@ -74,7 +89,7 @@ const SCENES = [
     name: 'fire-spreading',
     about: 'the same pan left alone — fire 0.55, half way to catching',
     scene: {
-      freezeBots: true,
+      freeze: true,
       stations: [{ cell: BURNER_L, pan: [{ kind: 'bacon', state: 'burnt' }], fire: 0.55 }],
     },
     look: mid(BURNER_L, 1.0),
@@ -84,7 +99,7 @@ const SCENES = [
     name: 'fire-both-burners',
     about: 'both burners ruined and near catching — the worst the arch can look',
     scene: {
-      freezeBots: true,
+      freeze: true,
       stations: [
         { cell: BURNER_L, pan: [{ kind: 'bacon', state: 'burnt' }], fire: 1 },
         { cell: BURNER_R, pan: [{ kind: 'bacon', state: 'burnt' }], fire: 1 },
@@ -97,7 +112,7 @@ const SCENES = [
     name: 'pan-cooking',
     about: 'a working burner for comparison — no fire, food part-cooked, cook dial up',
     scene: {
-      freezeBots: true,
+      freeze: true,
       stations: [{ cell: BURNER_L, pan: [{ kind: 'bacon', state: 'raw' }], fire: 0 }],
     },
     look: mid(BURNER_L, 1.0),
@@ -107,7 +122,7 @@ const SCENES = [
     name: 'burnt-food-in-hand',
     about: 'the ruined rasher out of the pan — it used to be invisible against the iron',
     scene: {
-      freezeBots: true,
+      freeze: true,
       // FACING THE CAMERA. The first cut faced -y, away from the lens, and a
       // carried item rides on the chest — so the picture showed a chef's back
       // and proved nothing about the thing it was staged to examine. +y is
@@ -121,7 +136,7 @@ const SCENES = [
     name: 'wall-clearance',
     about: 'the chef pressed into the left wall — the door and rubble used to cut through them',
     scene: {
-      freezeBots: true,
+      freeze: true,
       player: { at: { x: 1.68, y: 5.9 }, facing: { x: -1, y: 0 }, carrying: null },
     },
     look: { x: 1.68, y: 5.9, z: 1.1 },
@@ -136,6 +151,10 @@ if (argv.list) {
 
 const OUT = path.join(ROOT, String(argv.out ?? 'shots/scenes'));
 const only = argv.only && argv.only !== true ? String(argv.only) : null;
+/** How many frames per scenario. 1 = a still; more = a contact sheet over time. */
+const STRIP = argv.strip && argv.strip !== true ? Math.max(1, Number(argv.strip)) : 1;
+/** Milliseconds between strip frames. Long enough to move, short enough to relate. */
+const STRIP_GAP = 200;
 const wanted = only ? SCENES.filter((s) => s.name.includes(only)) : SCENES;
 if (!wanted.length) {
   console.error(`no scenario matches '${only}'. --list to see them.`);
@@ -211,6 +230,33 @@ for (const sc of wanted) {
    * was of the wrong thing, which is the failure mode this whole file exists
    * to stop. So the request is checked against what the game settled on.
    */
+  /**
+   * AND DID THE STAGED NUMBERS SURVIVE TO THE SHUTTER?
+   *
+   * Parking the bots was not enough. The simulation kept stepping between
+   * `setScene` and the screenshot, and a burnt pan's `fire` climbs by dt/9
+   * every step — so `fire-new`, whose entire subject is the fire at zero,
+   * photographed whatever zero had drifted to during the settle, and a contact
+   * sheet spanning a second or more drifted further. The caption and the
+   * subject had quietly parted company. `freeze` stops the sim; this checks
+   * that it did, on the one number each scenario is actually about.
+   */
+  for (const want of sc.scene.stations ?? []) {
+    if (want.fire === undefined) continue;
+    const got = await page.evaluate(
+      (cell) => window.__game.snapshot().stations.find((s) => s.cell.x === cell.x && s.cell.y === cell.y) ?? null,
+      want.cell,
+    );
+    if (!got) {
+      console.log(`  ${sc.name.padEnd(20)} SCENE REFUSED: no station at (${want.cell.x}, ${want.cell.y}).`);
+    } else if (Math.abs(got.fire - want.fire) > 0.01) {
+      console.log(
+        `  ${sc.name.padEnd(20)} SCENE DRIFTED: asked for fire ${want.fire}, ` +
+          `photographed ${got.fire} — is the sim still stepping?`,
+      );
+    }
+  }
+
   if (sc.scene.player?.at) {
     const got = await page.evaluate(() => {
       const p = window.__game.snapshot().chefs.find((c) => c.isPlayer);
@@ -237,28 +283,80 @@ for (const sc of wanted) {
    * world space give the pixels-per-unit of the live lens, so `span` means the
    * same thing whatever the camera is currently doing.
    */
-  const box = await page.evaluate(
-    ({ look, span }) => {
-      const c = window.__game.project(look);
-      const edge = window.__game.project({ x: look.x + 1, y: look.y, z: look.z });
-      const pxPerUnit = Math.max(8, Math.abs(edge.x - c.x));
-      return { cx: c.x, cy: c.y, half: Math.round((span / 2) * pxPerUnit) };
-    },
-    { look: sc.look, span: sc.span },
-  );
+  const project = () =>
+    page.evaluate(
+      ({ look, span }) => {
+        const c = window.__game.project(look);
+        const edge = window.__game.project({ x: look.x + 1, y: look.y, z: look.z });
+        const pxPerUnit = Math.max(8, Math.abs(edge.x - c.x));
+        return { cx: c.x, cy: c.y, half: Math.round((span / 2) * pxPerUnit) };
+      },
+      { look: sc.look, span: sc.span },
+    );
 
-  const left = Math.max(0, Math.min(W - 32, box.cx - box.half));
-  const top = Math.max(0, Math.min(H - 32, box.cy - Math.round(box.half * 0.78)));
-  const width = Math.min(W - left, box.half * 2);
-  const height = Math.min(H - top, Math.round(box.half * 1.56));
+  const box = await project();
+  // The frame SIZE is fixed by the first projection so every tile in a strip is
+  // the same shape (sharp will not composite ragged tiles), but the OFFSET is
+  // re-projected per frame below. The camera damper is still converging during
+  // a strip, and the first cut let the subject slide across the contact sheet —
+  // which reads as the fire moving when it is the lens that moved, exactly the
+  // confusion the sheet was added to remove.
+  const width = Math.min(W, box.half * 2);
+  const height = Math.min(H, Math.round(box.half * 1.56));
+  const corner = (b) => ({
+    left: Math.max(0, Math.min(W - width, Math.round(b.cx - width / 2))),
+    top: Math.max(0, Math.min(H - height, Math.round(b.cy - height * 0.5))),
+  });
   const crop = path.join(OUT, `${sc.name}.png`);
+  const scale = STRIP > 1 ? 1 : 2;
+
   // Nearest-neighbour on the way up: this is for judging shapes and colours,
   // and a smooth resample invents gradients that are not in the render.
-  await sharp(full).extract({ left, top, width, height }).resize(width * 2, height * 2, { kernel: 'nearest' }).toFile(crop);
+  const shot = async (src, at) =>
+    sharp(src).extract({ ...at, width, height }).resize(width * scale, height * scale, { kernel: 'nearest' }).toBuffer();
+
+  const first = corner(box);
+  if (STRIP === 1) {
+    await sharp(await shot(full, first)).toFile(crop);
+  } else {
+    /**
+     * A CONTACT SHEET, BECAUSE THE SUBJECT MOVES.
+     *
+     * The first frame is the one already on disk; the rest are taken live at
+     * STRIP_GAP apart. Tiled left to right with a hairline between them, so a
+     * flame that licks shows a tall frame among short ones and a flame that
+     * merely breathes shows six of the same picture — which is precisely the
+     * distinction a single still cannot make and the reason this exists.
+     */
+    // Every tile shot live, including the first. Reusing the `-full` frame for
+    // tile one saved a screenshot and cost alignment: it was taken before the
+    // scene guards ran, by which time the camera damper had moved on, so the
+    // opening tile of every sheet sat a few pixels off from the rest.
+    const tiles = [];
+    for (let i = 0; i < STRIP; i++) {
+      if (i) await page.waitForTimeout(STRIP_GAP);
+      const buf = await page.screenshot({ type: 'jpeg', quality: 94 });
+      tiles.push(await shot(buf, corner(await project())));
+    }
+    const tw = width * scale;
+    const th = height * scale;
+    const GAP = 4;
+    await sharp({
+      create: {
+        width: tw * STRIP + GAP * (STRIP - 1),
+        height: th,
+        channels: 3,
+        background: { r: 20, g: 20, b: 22 },
+      },
+    })
+      .composite(tiles.map((input, i) => ({ input, left: i * (tw + GAP), top: 0 })))
+      .png()
+      .toFile(crop);
+  }
 
   console.log(
     `  ${sc.name.padEnd(20)} ${errors.length ? `${errors.length} CONSOLE ERROR(S): ${errors[0]}` : 'clean'}` +
-      `  crop ${width}x${height} at (${left},${top})`,
+      `  crop ${width}x${height}${STRIP > 1 ? ` x${STRIP} frames` : ''}`,
   );
   console.log(`  ${''.padEnd(20)} ${sc.about}`);
   await page.close();
