@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "node tools/planprobe.mjs && node tools/soak.mjs && node tools/camsync.mjs"
   },
   "keywords": [],
   "author": "",
