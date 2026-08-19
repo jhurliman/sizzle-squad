@@ -805,7 +805,7 @@ function frame(now: number) {
       acc += rawDt;
       let steps = 0;
       while (acc >= SIM_DT && steps < 32) {
-        const botInputs = bots.update(sim, SIM_DT);
+        const botInputs = scriptedInput.freezeBots ? new Map() : bots.update(sim, SIM_DT);
         const inputs: InputSnapshot[] = sim.chefs.map((c) =>
           c.isPlayer ? playerInput : (botInputs.get(c.id) ?? NO_INPUT),
         );
@@ -1037,7 +1037,7 @@ requestAnimationFrame(frame);
     if (phase !== 'playing') return;
     let t = 0;
     while (t < seconds && !sim.over) {
-      const botInputs = bots.update(sim, SIM_DT);
+      const botInputs = scriptedInput.freezeBots ? new Map() : bots.update(sim, SIM_DT);
       step(
         sim,
         sim.chefs.map((c) => (c.isPlayer ? NO_INPUT : (botInputs.get(c.id) ?? NO_INPUT))),
@@ -1055,6 +1055,103 @@ requestAnimationFrame(frame);
     if (i.dashPressed !== undefined) scriptedInput.dashPressed = i.dashPressed;
     if (i.enabled !== undefined) scriptedInput.enabled = i.enabled;
   },
+  /**
+   * STAGE A SCENE — the harness hook that makes visual claims checkable.
+   *
+   * WHY THIS EXISTS. The skillet fire shipped without anyone ever seeing a
+   * picture of it. Not for want of trying: food only reaches 'burnt' about
+   * twice in twelve minutes of bot play and a bot clears it within ~1.6s, so
+   * catching it live is a coin flip you lose. The only way to photograph it was
+   * to edit `world.ts` to force the state, shoot, and revert — which is not
+   * repeatable, leaves nothing behind, and is indistinguishable from lying.
+   *
+   * "You can't improve what you can't see" is the whole of it. Every visual
+   * feature in this game has the same problem in some degree: the burn dial
+   * needs a pan seconds from ruin, the chop dial needs a half-cut tomato, the
+   * wall clearance needs a chef pressed into a corner. Waiting for the game to
+   * produce those by chance is why several of them were shipped on faith.
+   *
+   * So the state can be asked for. It is declarative and it is the SAME shape
+   * the sim already uses, so a scenario reads as the situation it describes.
+   * This is a harness hook exactly like `warp` and `setInput` above it — it
+   * does not run in play, nothing in the game calls it, and it is reachable
+   * only from a browser console or a tool driving one.
+   */
+  setScene(spec: {
+    /** Per-station overrides, addressed by grid cell. */
+    stations?: {
+      cell: { x: number; y: number };
+      /** Ingredients to place in this station's pan, with their state. */
+      pan?: { kind: string; state: string }[];
+      /** 0..1 how far this pan is toward catching fire. */
+      fire?: number;
+      /** An ingredient sitting on the bench (a board's work, say). */
+      holding?: { kind: string; state: string; chop?: number };
+      /** 0..1 chop/wash progress. */
+      work?: number;
+    }[];
+    /** Where the player stands, what they face, and what is in their hands. */
+    player?: {
+      at?: { x: number; y: number };
+      facing?: { x: number; y: number };
+      carrying?: { kind: string; state: string } | null;
+    };
+    /** Park the bots so they cannot undo the scene before it is photographed. */
+    freezeBots?: boolean;
+  }) {
+    const ing = (o: { kind: string; state: string; chop?: number }) => ({
+      id: sim.nextId++,
+      kind: o.kind as never,
+      state: o.state as never,
+      progress: o.state === 'cooked' || o.state === 'burnt' ? 1 : 0,
+      overcook: o.state === 'burnt' ? 9 : 0,
+      chop: o.chop ?? 0,
+    });
+    for (const want of spec.stations ?? []) {
+      const st = sim.kitchen.stations.find((x) => x.cell.x === want.cell.x && x.cell.y === want.cell.y);
+      if (!st) continue;
+      if (want.pan) {
+        st.holding = { type: 'pan', pan: { id: sim.nextId++, contents: want.pan.map(ing), onHeat: true, fire: want.fire ?? 0 } };
+      } else if (want.holding) {
+        st.holding = { type: 'ingredient', ingredient: ing(want.holding) };
+      }
+      if (want.fire !== undefined && st.holding?.type === 'pan') st.holding.pan.fire = want.fire;
+      if (want.work !== undefined) st.work = want.work;
+    }
+    if (spec.player) {
+      const p = sim.chefs.find((c) => c.isPlayer);
+      if (p) {
+        if (spec.player.at) p.pos = { ...spec.player.at };
+        if (spec.player.facing) p.heading = Math.atan2(spec.player.facing.y, spec.player.facing.x);
+        if (spec.player.carrying !== undefined)
+          p.carrying = spec.player.carrying ? { type: 'ingredient', ingredient: ing(spec.player.carrying) } : null;
+        p.vel = { x: 0, y: 0 };
+      }
+    }
+    // A staged scene is a still life. The bots' whole job is to tidy exactly
+    // the situations worth photographing — a ruined pan is a rescue job at
+    // `P.rescue` priority — so without this the scene is gone before the
+    // shutter opens.
+    if (spec.freezeBots) scriptedInput.freezeBots = true;
+  },
+
+  /**
+   * WHERE A WORLD POINT LANDS ON SCREEN — so a crop can FOLLOW the subject.
+   *
+   * Every cropped image in this project's history was a hand-typed pixel
+   * rectangle, guessed once by eye and stale the moment the camera was retuned
+   * (which happens most rounds). Handing the harness the projection lets it
+   * frame the burner, or the chef, or the dial, and keep framing it after the
+   * lens changes.
+   */
+  project(p: { x: number; y: number; z?: number }) {
+    const v = new THREE.Vector3(p.x, p.z ?? 0.6, p.y).project(cameraRig.camera);
+    return {
+      x: Math.round(((v.x + 1) / 2) * window.innerWidth),
+      y: Math.round(((1 - v.y) / 2) * window.innerHeight),
+    };
+  },
+
   /** Take the clock away from requestAnimationFrame (harness only). */
   setCapture(on: boolean) {
     capture.on = on;
@@ -1122,7 +1219,7 @@ requestAnimationFrame(frame);
   },
 };
 
-const scriptedInput = { ...NO_INPUT, move: { x: 0, y: 0 }, enabled: false };
+const scriptedInput = { ...NO_INPUT, move: { x: 0, y: 0 }, enabled: false, freezeBots: false };
 /** Rising edges waiting for a sim tick to consume them. See `frame()`. */
 let pendingGrab = false;
 let pendingDash = false;

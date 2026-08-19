@@ -3612,12 +3612,26 @@ export class WorldView {
     let panFire: THREE.Group | undefined;
     if (st.kind === 'stove') {
       panFire = new THREE.Group();
-      panFire.position.set(x, h + 0.16, z);
+      // ABOVE THE RIM. At h + 0.16 the tongues started inside the pan, so the
+      // dish hid their lower half and what showed was three rounded tops —
+      // photographed at 2x (tools/scene.mjs, scenario `fire-new`) they read as
+      // orange pebbles sitting in the dish, next to hearth flames that read as
+      // flames. Fire comes off the top of the fuel; it has to start there.
+      panFire.position.set(x, h + 0.24, z);
       panFire.visible = false;
+      /**
+       * TALL ENOUGH TO BE A FLAME, WHICH THE FIRST CUT WAS NOT.
+       *
+       * 0.24-0.34 against a pan half a unit across is as wide as it is high,
+       * and a flame that is as wide as it is high is a blob. The hearth's own
+       * tongues run 0.30-0.62 and read correctly, so these are brought into the
+       * same range and kept narrow — the radii below are unchanged, so raising
+       * the height slims them at the same time.
+       */
       for (const [ox, oz, fh, phase] of [
-        [-0.1, 0.02, 0.26, 0.0],
-        [0.02, -0.06, 0.34, 2.1],
-        [0.11, 0.05, 0.24, 4.2],
+        [-0.1, 0.02, 0.44, 0.0],
+        [0.02, -0.06, 0.62, 2.1],
+        [0.11, 0.05, 0.40, 4.2],
       ] as [number, number, number, number][]) {
         const m = new THREE.Mesh(
           new THREE.LatheGeometry(
@@ -5351,7 +5365,13 @@ export class WorldView {
           // moment food spoils, which is the moment the player needs telling,
           // so a scale that starts near nothing says nothing when it counts.
           // Starts clearly alight and grows half again as the pan gets worse.
-          const grow = 0.72 + (pan?.fire ?? 0) * 0.5;
+          // 0.72 -> 0.88 at the floor. Photographed side by side (scenarios
+          // `fire-new` at fire 0 against `fire-both-burners` at fire 1), the
+          // full-fire pans read unmistakably and the just-burned one was pale
+          // and easy to miss — which is backwards, because fire 0 is the
+          // instant the player still has time to act on it. The top end is
+          // pulled in to match so the range stays a growth, not a jump.
+          const grow = 0.88 + (pan?.fire ?? 0) * 0.34;
           for (const m of v.panFire.children) {
             const p = (m.userData.phase as number) ?? 0;
             // Two incommensurate frequencies, same trick as the hearth, so the
@@ -6072,7 +6092,19 @@ function ingredientMesh(ing: Ingredient): THREE.Object3D {
   // food was still there the whole time, it just had no contrast against the
   // pan. Lifted and warmed enough to read as burnt food on both the dark pan
   // and a chef's hands, without pretending it is edible.
-  if (ing.state === 'burnt') color = 0x5b4438;
+  // 0x5b4438 -> 0x6f6459, AND THE CHANGE IS HUE, NOT JUST VALUE.
+  //
+  // Photographed in hand (tools/scene.mjs, `burnt-food-in-hand`) the warm
+  // brown still read as a shadow: a dark WARM strip against a honey bench and
+  // a red chef separates from neither, and against the cast-iron pan it was
+  // only a few values lighter. Cooked food is already a warm brown
+  // (mix toward 0x8a5a32), so warm-and-darker cannot say "ruined" — it says
+  // "cooked, in shadow".
+  //
+  // Ash is the cue that works: greyed and cooled, so it is lighter than the
+  // pan, cooler than cooked, and desaturated against everything the kitchen is
+  // built from, which are all warm.
+  if (ing.state === 'burnt') color = 0x6f6459;
   if (ing.state === 'raw') {
     const hero = heroProduce(ing.kind, color);
     if (hero) {
