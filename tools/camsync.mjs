@@ -222,8 +222,24 @@ R.section('the level fits inside the shot');
    * pose IS its dolly pose. That is why this bug reached a phone and nothing
    * else — and why comparing the dolly pose still catches it.
    */
+  // AND THE SAME PROFILE SET AS EVERY OTHER CHECK ON THIS PAGE.
+  //
+  // `dolly.length > 0` is the weak form: drop the portrait row from camprobe
+  // and this gate stays green on the strength of the three landscape profiles,
+  // silently retiring depth coverage for the one layout that cannot dolly out
+  // of trouble and the one this bug actually reached. The horizontal sweeps
+  // above already assert the exact set; there is no reason for this to be the
+  // odd one out, and it was only written that way because it came later.
   const dolly = rows.filter((r) => r.pose === 'dolly');
-  R.check('camprobe reported a dolly pose to compare against', dolly.length > 0, ` (${dolly.length} profiles)`);
+  const seenDolly = dolly.map((r) => r.profile);
+  const missingDolly = EXPECTED_PROFILES.filter((p) => !seenDolly.includes(p));
+  R.check(
+    'every expected profile reported a dolly pose',
+    missingDolly.length === 0,
+    missingDolly.length
+      ? ` (missing: ${missingDolly.join(', ')}; got ${seenDolly.join(', ') || 'nothing'})`
+      : ` (${dolly.length} profiles)`,
+  );
   for (const r of dolly) {
     R.check(
       `${r.profile.padEnd(9)} bottom edge clears the deepest chef`,
