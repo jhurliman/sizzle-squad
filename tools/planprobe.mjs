@@ -24,33 +24,13 @@
  *
  * Exits non-zero on any mismatch, so it can gate a deploy.
  */
-import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { compileDomain, makeReport, NO_INPUT } from './domainkit.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'planprobe-'));
+const kit = compileDomain(['src/domain/sim.ts']);
+const { createSim, planGrab, step, SIM_DT } = await kit.load('domain/sim');
+const { INGREDIENT_DEFS } = await kit.load('domain/content');
 
-// tsc with the config ignored: tsconfig.json targets the whole app (DOM libs,
-// three.js paths) and we want just the four pure files and their imports.
-execFileSync(
-  'npx',
-  ['tsc', path.join(ROOT, 'src/domain/sim.ts'), '--ignoreConfig', '--outDir', OUT,
-   '--module', 'esnext', '--target', 'es2022', '--moduleResolution', 'bundler', '--skipLibCheck'],
-  { cwd: ROOT, stdio: 'inherit' },
-);
-// tsc emits extensionless relative imports; Node's ESM loader requires them.
-for (const f of fs.readdirSync(OUT).filter((f) => f.endsWith('.js'))) {
-  const p = path.join(OUT, f);
-  fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace(/(from '\.\/[A-Za-z]+)'/g, "$1.js'"));
-}
-
-const { createSim, planGrab } = await import(path.join(OUT, 'sim.js'));
-const { INGREDIENT_DEFS } = await import(path.join(OUT, 'content.js'));
-
-const s = createSim(20260818);
+const s = createSim({ seed: 20260818 });
 const chef = s.chefs[0];
 const stationOf = (kind, dispenses) =>
   s.kitchen.stations.find((st) => st.kind === kind && (!dispenses || st.dispenses === dispenses));
@@ -88,6 +68,7 @@ const CASES = [
 ];
 
 let failed = 0;
+const R = makeReport();
 console.log('\n=== station plans');
 for (const [label, kindSpec, holding, carrying, expected] of CASES) {
   const [kind, dispenses] = kindSpec.split(':');
@@ -119,8 +100,7 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
  * when the food is cut.
  */
 {
-  const { step } = await import(path.join(OUT, 'sim.js'));
-  const t = createSim(4242);
+    const t = createSim({ seed: 4242 });
   const player = t.chefs[0];
   const board = t.kitchen.stations.find((st) => st.kind === 'board');
   // Stand the chef on the board's working side and give it something to cut.
@@ -185,8 +165,7 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
  * taken off the heat — which is the whole contract the ring depends on.
  */
 {
-  const { step } = await import(path.join(OUT, 'sim.js'));
-  const t = createSim(99);
+    const t = createSim({ seed: 99 });
   const stove = t.kitchen.stations.find((st) => st.kind === 'stove');
   stove.holding = { type: 'pan', pan: { contents: [], onHeat: false, fire: 0 } };
   stove.holding.pan.contents.push({ kind: 'bacon', state: 'raw', chop: 0, progress: 0, overcook: 0 });
@@ -245,8 +224,7 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
  * a real service; nobody walks up to a board and stops first.
  */
 {
-  const { step } = await import(path.join(OUT, 'sim.js'));
-  const t = createSim(7171);
+    const t = createSim({ seed: 7171 });
   const player = t.chefs[0];
   const board = t.kitchen.stations.find((st) => st.kind === 'board');
   board.holding = { type: 'ingredient', ingredient: { kind: 'tomato', state: 'raw', chop: 0 } };
@@ -296,7 +274,7 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
  * lost that way and no cooked recipe is fillable for the rest of the service.
  */
 {
-  const t = createSim(313);
+  const t = createSim({ seed: 313 });
   const chef = t.chefs[0];
   const stove = t.kitchen.stations.find((st) => st.kind === 'stove');
   chef.carrying = null;
@@ -318,6 +296,174 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
   }
 }
 
+/**
+ * THE INVARIANT ALL THREE SHIPPED BUGS BROKE — AND THE ONLY ONE WORTH HAVING.
+ *
+ * Wave 3 and wave 4 leaked three rule bugs to a real player. Written out, they
+ * look like three unrelated mistakes:
+ *
+ *   - a bun on a chopping board offered 'prep', and nothing could advance a
+ *     chop on something with chopSeconds 0, so the bun and the board were gone
+ *   - a crate offered 'return' for ANY ingredient and deleted it
+ *   - a burner refused every press once its pan held burnt food
+ *
+ * They are one bug in three costumes: THE BUTTON SAID SOMETHING WOULD HAPPEN
+ * AND NOTHING DID, or the reverse — nothing was offered and the object was
+ * stranded. Both are the same broken promise between `planGrab`, which decides
+ * what the prompt says, and `step`, which decides what actually happens.
+ *
+ * So rather than three more special cases, this sweeps EVERY station in the
+ * real level against every shape of thing a chef can be holding, and asserts
+ * the promise directly, by pressing the real button through the real `step`:
+ *
+ *   1. a plan of 'none' must leave the world alone   (no silent deletions)
+ *   2. any other plan MUST change the world          (no dead presses)
+ *
+ * A press that changes nothing is a soft-lock waiting for the object that gets
+ * stuck under it. Nothing here knows what a pan or a bun is, so it keeps
+ * working when the menu changes.
+ */
+{
+  const hands = () => [
+    ['empty handed', null],
+    ['raw tomato', { type: 'ingredient', ingredient: { kind: 'tomato', state: 'raw', chop: 0 } }],
+    ['chopped tomato', { type: 'ingredient', ingredient: { kind: 'tomato', state: 'prepped', chop: 1 } }],
+    ['raw bun', { type: 'ingredient', ingredient: { kind: 'bun', state: 'raw', chop: 0 } }],
+    ['cooked bacon', { type: 'ingredient', ingredient: { kind: 'bacon', state: 'cooked', chop: 0, progress: 1, overcook: 0 } }],
+    ['burnt bacon', { type: 'ingredient', ingredient: { kind: 'bacon', state: 'burnt', chop: 0, progress: 1, overcook: 9 } }],
+    ['clean plate', { type: 'plate', plate: { contents: [], dirty: false } }],
+    ['dirty plate', { type: 'plate', plate: { contents: [], dirty: true } }],
+    ['loaded plate', { type: 'plate', plate: { contents: [{ kind: 'tomato', state: 'prepped', chop: 1 }], dirty: false } }],
+    ['empty pan', { type: 'pan', pan: { contents: [], onHeat: false, fire: 0 } }],
+  ];
+  // What the station may be holding when the press lands. `undefined` means
+  // "leave whatever the level seeded there".
+  const sitting = () => [
+    ['as built', undefined],
+    ['nothing', null],
+    ['a raw tomato', { type: 'ingredient', ingredient: { kind: 'tomato', state: 'raw', chop: 0 } }],
+    ['a bun', { type: 'ingredient', ingredient: { kind: 'bun', state: 'raw', chop: 0 } }],
+    ['a dirty plate', { type: 'plate', plate: { contents: [], dirty: true } }],
+    ['a pan of burnt bacon', { type: 'pan', pan: { contents: [{ kind: 'bacon', state: 'burnt', chop: 0, progress: 1, overcook: 9 } ], onHeat: false, fire: 0 } }],
+  ];
+
+  /**
+   * A PRESS IS JUDGED AGAINST NOT PRESSING — NOT AGAINST THE PAST.
+   *
+   * The first cut of this diffed the world before and after `step`, and it
+   * accused the game of two things it had not done. `step` advances the WHOLE
+   * simulation: pans cook, fires spread, tickets expire, patience drains. So a
+   * plan of 'none' that legitimately did nothing still showed a changed world,
+   * because three seconds of stew had moved on underneath it.
+   *
+   * The honest comparison is the counterfactual. Two sims, same seed, same
+   * setup — therefore bit-identical, because `src/domain` is pure — stepped on
+   * the same tick, one with the button and one without. Whatever differs is
+   * the press and nothing else.
+   */
+  const stateSig = (t) =>
+    JSON.stringify([
+      t.chefs.map((c) => [c.carrying, c.working]),
+      t.kitchen.stations.map((x) => [x.holding, x.work]),
+      t.score,
+      t.orders.map((o) => o.id),
+    ]);
+
+  /**
+   * TWO DIFFERENT QUESTIONS, SO TWO DIFFERENT SIGNATURES.
+   *
+   * A press that is REFUSED still talks to the player: `grabMiss` is the thunk
+   * you hear when the button had nothing to do, and handing an empty plate to
+   * the pass fires `serveWrong`, a louder and more specific answer. Both are
+   * designed feedback, and they pull the two halves of this invariant apart:
+   *
+   *   - "it promised something" is satisfied by a change in state OR by any
+   *     event other than the plain refusal — an audible answer is an answer
+   *   - "it promised nothing" is about STATE only, because a refusal sound on
+   *     a dead press is exactly right and must not count as a side effect
+   *
+   * Running both against the same signature is what made the first two cuts of
+   * this sweep accuse the game of bugs it did not have.
+   */
+  const effectSig = (t) =>
+    JSON.stringify([stateSig(t), t.events.map((e) => e.t).filter((k) => k !== 'grabMiss')]);
+
+  // Identical ids matter: swapping a raw tomato for an indistinguishable raw
+  // tomato is a real change the game made, and a signature that cannot see it
+  // reports a working swap as a dead press. The level's own items are numbered
+  // from `nextId`, so fixtures get numbers well clear of them.
+  let fixtureId = 900000;
+  const stamp = (o) => {
+    if (!o) return null;
+    const c = JSON.parse(JSON.stringify(o));
+    if (c.ingredient) c.ingredient.id = fixtureId++;
+    if (c.plate) {
+      c.plate.id = fixtureId++;
+      for (const i of c.plate.contents) i.id = fixtureId++;
+    }
+    if (c.pan) {
+      c.pan.id = fixtureId++;
+      for (const i of c.pan.contents) i.id = fixtureId++;
+    }
+    return c;
+  };
+
+  /** Build one case identically every time, so two copies are the same world. */
+  const setup = (stationIndex, hand, sit, seedFixtureId) => {
+    fixtureId = seedFixtureId;
+    const t = createSim({ seed: 555 });
+    const st = t.kitchen.stations[stationIndex];
+    const chef = t.chefs[0];
+    if (sit !== undefined) st.holding = stamp(sit);
+    chef.carrying = stamp(hand);
+    chef.working = null;
+    chef.vel = { x: 0, y: 0 };
+    chef.pos = { x: st.cell.x + 0.5 + st.facing.x, y: st.cell.y + 0.5 + st.facing.y };
+    chef.heading = Math.atan2(-st.facing.y, -st.facing.x);
+    return { t, st, chef };
+  };
+
+  let dead = 0;
+  let ghost = 0;
+  let pressed = 0;
+  const deadEg = [];
+  const ghostEg = [];
+  const nStations = createSim({ seed: 555 }).kitchen.stations.length;
+
+  for (const [handLabel, hand] of hands()) {
+    for (const [sitLabel, sit] of sitting()) {
+      for (let i = 0; i < nStations; i++) {
+        const FIX = 900000;
+        const a = setup(i, hand, sit, FIX);
+        const b = setup(i, hand, sit, FIX);
+        const plan = planGrab(a.t, a.chef, a.st);
+
+        const press = a.t.chefs.map(() => ({ ...NO_INPUT, move: { x: 0, y: 0 } }));
+        press[0] = { ...NO_INPUT, move: { x: 0, y: 0 }, grabPressed: true };
+        const quiet = b.t.chefs.map(() => ({ ...NO_INPUT, move: { x: 0, y: 0 } }));
+        step(a.t, press);
+        step(b.t, quiet);
+        pressed++;
+
+        const stateDiffers = stateSig(a.t) !== stateSig(b.t);
+        const anyEffect = effectSig(a.t) !== effectSig(b.t);
+        const where = `${a.st.kind}${a.st.dispenses ? ':' + a.st.dispenses : ''} holding ${sitLabel}, ${handLabel} -> '${plan}'`;
+        if (plan === 'none' && stateDiffers) {
+          ghost++;
+          if (ghostEg.length < 5) ghostEg.push(where);
+        } else if (plan !== 'none' && !anyEffect) {
+          dead++;
+          if (deadEg.length < 5) deadEg.push(where);
+        }
+      }
+    }
+  }
+
+  R.section(`the button keeps its promise (${pressed} presses swept)`);
+  R.check('no press does nothing when it promised something', dead === 0, dead ? `\n       ${deadEg.join('\n       ')}` : '');
+  R.check("no press changes the world when it promised nothing", ghost === 0, ghost ? `\n       ${ghostEg.join('\n       ')}` : '');
+}
+
 // The chopSeconds split the board cases above depend on, stated outright so a
 // menu change that makes bacon choppable shows up here rather than as a bug.
 console.log('\n=== chopSeconds (0 means the board can only hand it back)');
@@ -325,6 +471,7 @@ for (const k of ['tomato', 'lettuce', 'bacon', 'bun']) {
   console.log(`  ${k.padEnd(8)} ${INGREDIENT_DEFS[k].chopSeconds}`);
 }
 
-fs.rmSync(OUT, { recursive: true, force: true });
-console.log(failed ? `\nFAIL: ${failed} plan(s) wrong` : '\nPASS: every station plan is what it should be');
+kit.cleanup();
+failed += R.failed;
+console.log(failed ? `\nFAIL: ${failed} rule(s) wrong` : '\nPASS: every station plan is what it should be');
 process.exit(failed ? 1 : 0);
