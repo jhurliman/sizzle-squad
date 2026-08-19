@@ -625,16 +625,25 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
 }
 
 function collides(k: Kitchen, x: number, y: number, r: number): boolean {
-  const minX = Math.floor(x - r);
-  const maxX = Math.floor(x + r);
-  const minY = Math.floor(y - r);
-  const maxY = Math.floor(y + r);
+  // The scan has to reach as far as the widest cell box can, or the border
+  // cells whose boxes `wallSkirt` grows are never even looked at: at x 1.38
+  // with r 0.36 this used to examine column 1 only, so the enlarged wall at
+  // column 0 sat outside the loop and the pad did nothing at all.
+  const P = TUNING.wallSkirt;
+  const minX = Math.floor(x - r - P);
+  const maxX = Math.floor(x + r + P);
+  const minY = Math.floor(y - r - P);
+  const maxY = Math.floor(y + r + P);
   for (let cy = minY; cy <= maxY; cy++) {
     for (let cx = minX; cx <= maxX; cx++) {
       if (isWalkable(k, cx, cy)) continue;
-      // circle vs axis-aligned cell
-      const closestX = Math.max(cx, Math.min(x, cx + 1));
-      const closestY = Math.max(cy, Math.min(y, cy + 1));
+      // circle vs axis-aligned cell — grown by `wallSkirt` at the room's own
+      // border, where the shell's rubble and its door stand proud of the cell
+      // face. See TUNING.wallSkirt.
+      const border = cx <= 0 || cy <= 0 || cx >= k.width - 1 || cy >= k.height - 1;
+      const pad = border ? TUNING.wallSkirt : 0;
+      const closestX = Math.max(cx - pad, Math.min(x, cx + 1 + pad));
+      const closestY = Math.max(cy - pad, Math.min(y, cy + 1 + pad));
       const dx = x - closestX;
       const dy = y - closestY;
       if (dx * dx + dy * dy < r * r) return true;
@@ -925,43 +934,32 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
     if (st.kind === 'crate' && st.dispenses) return 'dispense';
     if (st.kind === 'plates') return 'dispense';
     /**
-     * A PAN IS FIXTURE, NOT LUGGAGE.
+     * A PAN NEVER LEAVES THE BURNER. YOU ONLY EVER HANDLE FOOD.
      *
-     * Empty-handed at a burner used to resolve to 'take', so you could walk off
-     * with the frying pan. Asked directly what that was for, there is no
-     * answer: the design is that the pan stays on the heat and the PLATE comes
-     * to it (see the 'load' rung below), every recipe is fillable without ever
-     * moving a pan, and a pan in your hands is a pan not cooking. It was a
-     * legal move that could only lose you the game.
+     * Wave 4 made one exception to this: a pan with burnt food in it could be
+     * lifted, because nothing else could empty it and the burner would
+     * otherwise be dead for the rest of the service. That fixed the soft-lock
+     * and bought a mechanic nobody could explain, which is exactly how it came
+     * back from play:
      *
-     * The 'place' rung further down that puts a pan back on an empty burner is
-     * now unreachable, and stays only because a level with an unseeded burner
-     * would need it.
+     *   "I was able to pick up a frying pan off the stove... doesn't do
+     *    anything else does it? ...you can simply pick up the bacon to do the
+     *    same thing no? I don't get this mechanic of the game at all."
      *
-     * ...EXCEPT A RUINED ONE, WHICH IS THE ONE PAN THAT MUST COME OFF.
+     * They are right, and the answer is the simpler one they suggested. The
+     * escape hatch never needed the PAN to move — it needed the ruined food to
+     * come out. So the food comes out and the pan stays where it belongs:
+     * empty-handed at a burner whose pan holds something burnt, the press
+     * hands you the burnt rasher, which you then walk to the bin like any
+     * other spoiled ingredient. Same rescue, one fewer concept, and nothing in
+     * the kitchen is ever picked up except food and plates.
      *
-     * "Fixture, not luggage" is right for a working burner and a soft-lock for
-     * a spoiled one, because nothing else in this kitchen can empty a pan where
-     * it stands: the bin discards the contents of a pan you are CARRYING (see
-     * `case 'bin'`), and the plate `load` rung only ever moves items in state
-     * 'cooked', never 'burnt'. Refuse it unconditionally and burnt food is
-     * welded to the burner — with `updateStations` ticking `pan.fire` up to a
-     * fire the whole time, and bots/brain.ts's own rescue-priority "clear the
-     * burnt pan" job (rung 4c, whose comment already says "nothing else in the
-     * kitchen can... the burner is dead") reduced to a press that does nothing.
-     * Two burners lost that way and every cooked recipe is unfillable for the
-     * rest of the service.
-     *
-     * The design intent survives intact: you cannot walk off with a pan that is
-     * doing its job, and the only pan you can lift is one that has nothing left
-     * to do.
+     * `doGrab` does the extraction; see `case 'take'`. Everything else about
+     * the rule is unchanged: a pan doing its job stays put, and a plate still
+     * comes to the pan rather than the other way round (the 'load' rung below).
      */
-    if (
-      st.kind === 'stove' &&
-      st.holding?.type === 'pan' &&
-      !st.holding.pan.contents.some((i) => i.state === 'burnt')
-    )
-      return 'none';
+    if (st.kind === 'stove' && st.holding?.type === 'pan')
+      return st.holding.pan.contents.some((i) => i.state === 'burnt') ? 'take' : 'none';
     // See 'prep' above. Same conditions the `useHeld` gate in step() tests, and
     // the SAME chopSeconds test updateStations makes before it advances any
     // work — all three have to agree or the button lies.
@@ -1154,8 +1152,27 @@ function gateFocus(s: SimState, chef: Chef): Station | null {
     const ang = Math.acos(Math.max(-1, Math.min(1, dot)));
     if (ang > TUNING.reachCone + (held ? TUNING.focusKeepCone : 0)) continue;
     if (occluded(s.kitchen, chef.pos.x, chef.pos.y, st)) continue;
+    /**
+     * A STATION YOU CANNOT ACT ON IS NOT A STATION YOU GET TO FOCUS.
+     *
+     * This used to be a PENALTY: an inert bench scored `focusInertPenalty`
+     * worse than a live one, so it lost whenever something useful was in
+     * range — and won whenever nothing was. Standing at the sink with empty
+     * hands lit the sink up, offering a press that does nothing, which came
+     * back from play as "why are table positions like the sink even
+     * highlighting as interactive? There's nothing you can do at the sink".
+     *
+     * That is the same broken promise the whole plan matrix is built around,
+     * wearing its other face: the glow says yes and the button says no. The
+     * fix is not a bigger penalty, it is that a plan of 'none' is not a
+     * candidate. The press still answers — with `focus` null, `doGrab`
+     * refuses and the buffered press becomes the `grabMiss` thunk — so the
+     * player is told nothing happened rather than shown a light that lies.
+     */
+    const plan = planGrab(s, chef, st);
+    if (plan === 'none') continue;
     let score = ang * 0.8 + bd * 0.9;
-    score += [0, TUNING.focusOffLabelPenalty, TUNING.focusInertPenalty][affordance(chef, st, planGrab(s, chef, st))];
+    score += [0, TUNING.focusOffLabelPenalty, TUNING.focusInertPenalty][affordance(chef, st, plan)];
     if (held) score -= TUNING.focusStick;
     if (score < bestScore) {
       bestScore = score;
@@ -1181,6 +1198,10 @@ function coyoteFocus(s: SimState, chef: Chef): Station | null {
   if (!st) return null;
   if (boxDist(st, chef.pos.x, chef.pos.y) > TUNING.reach + TUNING.focusKeepReach) return null;
   if (occluded(s.kitchen, chef.pos.x, chef.pos.y, st)) return null;
+  // ...and it does not get to hand back a bench that has since gone inert:
+  // put the last plate in the sink and the sink must go dark immediately, not
+  // linger lit for the length of the coyote window. See findFocus.
+  if (planGrab(s, chef, st) === 'none') return null;
   return st;
 }
 
@@ -1207,12 +1228,29 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
           : { type: 'ingredient', ingredient: mkIngredient(s, st.dispenses!) };
       emit(s, { t: 'pickup', chef: chef.id, at });
       return true;
-    case 'take':
+    case 'take': {
+      // THE ONE THING YOU TAKE OFF A BURNER IS THE RUINED FOOD, NOT THE PAN.
+      // See planGrab: this is the whole of the burnt-pan rescue now. The pan
+      // is a fixture and stays on the heat; the rasher comes out and goes in
+      // the bin. If more than one thing in there is ruined, one press gets one
+      // of them, which is the same rhythm as clearing anything else.
+      if (st.kind === 'stove' && st.holding?.type === 'pan') {
+        const pan = st.holding.pan;
+        const n = pan.contents.findIndex((i) => i.state === 'burnt');
+        if (n < 0) return false;
+        const [ruined] = pan.contents.splice(n, 1);
+        chef.carrying = { type: 'ingredient', ingredient: ruined };
+        // The fire goes out with the fuel: an empty pan is not still burning.
+        if (!pan.contents.some((i) => i.state === 'burnt')) pan.fire = 0;
+        emit(s, { t: 'pickup', chef: chef.id, at });
+        return true;
+      }
       chef.carrying = st.holding;
       st.holding = null;
       st.work = 0;
       emit(s, { t: 'pickup', chef: chef.id, at });
       return true;
+    }
     case 'place':
       if (!held) return false;
       // The armful is down: the rest of the pile joins the bench, one plate

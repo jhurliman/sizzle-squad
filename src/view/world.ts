@@ -1629,6 +1629,8 @@ export interface StationView {
   inOven: boolean;
   /** World y of this station's bench top — where the focus wash and the action glyph hang off. */
   topY: number;
+  /** Small flames that erupt on a burner whose pan is holding ruined food. */
+  panFire?: THREE.Group;
 }
 
 export class WorldView {
@@ -3591,7 +3593,59 @@ export class WorldView {
     g.add(face);
 
     this.root.add(g);
-    const view: StationView = { station: st, group: g, anchor, ring, ringRoot, glow, face, hot, contentRoot, contentKey: '', topY: h, inOven };
+    /**
+     * A PAN THAT HAS RUINED ITS FOOD IS ON FIRE, AND YOU SHOULD SEE THAT.
+     *
+     * `pan.fire` has existed in the rules for rounds — it ramps from the moment
+     * food burns and emits `fireStart` when it tops out — and nothing ever drew
+     * it. The only tell was a red arc on the dial, which says "this pan is in
+     * trouble" in the same visual language as "this pan is nearly done". Asked
+     * for directly: "when food is burnt I want to see a small fire erupt on the
+     * skillet."
+     *
+     * Same lathe-and-ramp as the hearth tongues so it reads as the same fire,
+     * three of them rather than six and much smaller, sat just above the pan
+     * rim. It appears the instant something is ruined and GROWS with `fire`, so
+     * it is both an alarm and a clock — the pan you have not cleared gets more
+     * alarming, which is exactly what the number means.
+     */
+    let panFire: THREE.Group | undefined;
+    if (st.kind === 'stove') {
+      panFire = new THREE.Group();
+      panFire.position.set(x, h + 0.16, z);
+      panFire.visible = false;
+      for (const [ox, oz, fh, phase] of [
+        [-0.1, 0.02, 0.26, 0.0],
+        [0.02, -0.06, 0.34, 2.1],
+        [0.11, 0.05, 0.24, 4.2],
+      ] as [number, number, number, number][]) {
+        const m = new THREE.Mesh(
+          new THREE.LatheGeometry(
+            [
+              new THREE.Vector2(0.001, 0),
+              new THREE.Vector2(0.055, fh * 0.14),
+              new THREE.Vector2(0.062, fh * 0.3),
+              new THREE.Vector2(0.034, fh * 0.62),
+              new THREE.Vector2(0.001, fh),
+            ],
+            8,
+          ),
+          new THREE.MeshBasicMaterial({
+            color: fireTint(0xff7a10, 1, 0.55),
+            map: flameRamp(),
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          }),
+        );
+        m.position.set(ox, 0, oz);
+        m.userData.phase = phase;
+        panFire.add(m);
+      }
+      this.root.add(panFire);
+    }
+
+    const view: StationView = { station: st, group: g, anchor, ring, ringRoot, glow, face, hot, contentRoot, contentKey: '', topY: h, inOven, panFire };
     this.stationViews.push(view);
     this.byId.set(st.id, view);
   }
@@ -5108,7 +5162,13 @@ export class WorldView {
 
   private door(innerX: number, z: number) {
     const S = this.shell;
-    const x = innerX + 0.2;
+    // PULLED BACK FROM 0.2 TO 0.06. The furthest part of this assembly is the
+    // handle, at x + 0.26, so at 0.2 the door reached 1.46 into a room whose
+    // floor starts at 1.0 — a third of a cell of solid door standing in the
+    // walkable lane, which is what a chef was walking into. At 0.06 it reaches
+    // 1.32, inside the clearance TUNING.wallSkirt now holds bodies to, and it
+    // still stands proud enough to read as a door rather than a painting.
+    const x = innerX + 0.06;
     // Stone surround, then a plank door with the reference's round window.
     // THE DOOR SURROUND IS NOT CHIMNEY STONE. Built from C.stoneWarm it carried
     // the chimney's big neutral bounce term, so a 2.9m pale slab stood at the
@@ -5280,6 +5340,28 @@ export class WorldView {
        * something is already cooked, so the two never compete for the same
        * pan except in the moment the arc should switch, and it switches to red.
        */
+      // THE SKILLET FIRE. Visible the moment anything in the pan is ruined,
+      // growing with `pan.fire` toward the blaze the rules already model.
+      if (v.panFire) {
+        const pan = st.holding?.type === 'pan' ? st.holding.pan : null;
+        const ruined = !!pan && pan.contents.some((i) => i.state === 'burnt');
+        v.panFire.visible = ruined;
+        if (ruined) {
+          // The floor matters more than the ceiling. `fire` is 0 at the exact
+          // moment food spoils, which is the moment the player needs telling,
+          // so a scale that starts near nothing says nothing when it counts.
+          // Starts clearly alight and grows half again as the pan gets worse.
+          const grow = 0.72 + (pan?.fire ?? 0) * 0.5;
+          for (const m of v.panFire.children) {
+            const p = (m.userData.phase as number) ?? 0;
+            // Two incommensurate frequencies, same trick as the hearth, so the
+            // eye never learns the loop on a fire that may burn for a while.
+            const k = 0.82 + Math.sin(time * 8.3 + p) * 0.12 + Math.sin(time * 14.1 + p * 1.7) * 0.06;
+            m.scale.set(grow, grow * k, grow);
+          }
+        }
+      }
+
       let amount = 0;
       let colour = 0xffd24a;
       let pulse = 1;
@@ -5984,7 +6066,13 @@ function ingredientMesh(ing: Ingredient): THREE.Object3D {
   const def = INGREDIENT_DEFS[ing.kind];
   let color = def.color;
   if (ing.state === 'cooked') color = mix(color, 0x8a5a32, 0.42);
-  if (ing.state === 'burnt') color = 0x2b2622;
+  // CHARRED, NOT ABSENT. This was 0x2b2622 — near-black — against a cast-iron
+  // pan at 0x3e3c42, so a ruined rasher was invisible in the thing holding it.
+  // Reported as "this seems to have made the burnt bacon in it disappear": the
+  // food was still there the whole time, it just had no contrast against the
+  // pan. Lifted and warmed enough to read as burnt food on both the dark pan
+  // and a chef's hands, without pretending it is edible.
+  if (ing.state === 'burnt') color = 0x5b4438;
   if (ing.state === 'raw') {
     const hero = heroProduce(ing.kind, color);
     if (hero) {

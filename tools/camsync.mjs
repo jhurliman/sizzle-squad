@@ -169,4 +169,68 @@ for (const widen of [0, 1]) {
   }
 }
 
+/**
+ * AND NOBODY CAN WALK BELOW THE PICTURE.
+ *
+ * The containment sweep measures |playerFrac|, which is HORIZONTAL — how far
+ * across the frame the chef sits. It has nothing to say about depth, so a chef
+ * standing past the bottom edge of the shot is invisible to it, and that is
+ * exactly the bug that reached a player: the map had a walkable row at y 9
+ * while the rig crops the front of the room at z 9.00, so you could walk two
+ * thirds of a cell below the frame and vanish. Reported as "I can wander down
+ * into the bottom corners of the map where I'm basically off screen".
+ *
+ * The level and the lens are authored in different files by different rounds,
+ * and nothing compared them. This does: the deepest a BODY can stand, taken
+ * from KITCHEN_MAP, against the bottom edge each profile actually solves to.
+ */
+R.section('the level fits inside the shot');
+{
+  const CHEF_R = 0.36;
+  const map = fs
+    .readFileSync(path.join(ROOT, 'src/domain/kitchen.ts'), 'utf8')
+    .match(/export const KITCHEN_MAP = \[([\s\S]*?)\];/)[1]
+    .split('\n')
+    .map((l) => l.trim().replace(/^'|',?$/g, ''))
+    .filter((l) => l.length > 0 && !l.startsWith('//'));
+  let deepest = -1;
+  map.forEach((row, y) => {
+    if ([...row].some((ch) => ch === '.')) deepest = Math.max(deepest, y);
+  });
+  const reach = deepest + 1 - CHEF_R;
+
+  const probe = execFileSync('node', [path.join(ROOT, 'tools/camprobe.mjs')], { cwd: ROOT, encoding: 'utf8' });
+  const rows = [];
+  let profile = null;
+  for (const line of probe.split('\n')) {
+    const head = /^(\S+)\s+aspect/.exec(line);
+    if (head) profile = head[1];
+    const m = /^\s+(rest|dolly)\s+.*?bottom (\d+\.\d+)/.exec(line);
+    if (m && profile) rows.push({ profile, pose: m[1], bottom: Number(m[2]) });
+  }
+  /**
+   * JUDGE THE DOLLY POSE, NOT THE REST POSE.
+   *
+   * The rig pulls back when a chef comes forward — `wantZ` takes a `feet` term
+   * whose whole job is to keep the bottom edge clear of the front-most chef —
+   * so the frame that matters is the one his being there PRODUCES. Landscape
+   * rests at 8.50 and dollies to 8.90, and asserting against 8.50 would fail a
+   * camera that is working exactly as designed.
+   *
+   * Portrait is the one that cannot save itself: DOLLY_MAX_TALL is 0, frozen
+   * in z on purpose (a phone frame has no depth budget to spend), so its rest
+   * pose IS its dolly pose. That is why this bug reached a phone and nothing
+   * else — and why comparing the dolly pose still catches it.
+   */
+  const dolly = rows.filter((r) => r.pose === 'dolly');
+  R.check('camprobe reported a dolly pose to compare against', dolly.length > 0, ` (${dolly.length} profiles)`);
+  for (const r of dolly) {
+    R.check(
+      `${r.profile.padEnd(9)} bottom edge clears the deepest chef`,
+      r.bottom >= reach,
+      ` (bottom ${r.bottom.toFixed(2)}, chef reaches ${reach.toFixed(2)})`,
+    );
+  }
+}
+
 process.exit(R.finish('the camera sweeps are honest and the frame holds'));

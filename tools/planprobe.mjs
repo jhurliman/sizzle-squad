@@ -436,7 +436,28 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
         const FIX = 900000;
         const a = setup(i, hand, sit, FIX);
         const b = setup(i, hand, sit, FIX);
-        const plan = planGrab(a.t, a.chef, a.st);
+
+        /**
+         * ASK ABOUT THE STATION THE GAME ACTUALLY PICKED.
+         *
+         * The first cut computed the plan for the bench the chef was POSED at
+         * and assumed the press would land there. That held only because inert
+         * stations still won focus: once a plan of 'none' stopped being a
+         * candidate (see findFocus), standing at the sink empty-handed let a
+         * lettuce crate two feet away take focus instead, and the press
+         * correctly dispensed lettuce — which the sweep read as "a 'none' plan
+         * changed the world". The rule was right and the question was wrong.
+         *
+         * So the promise is checked against the FOCUSED station, which is the
+         * one the player sees lit and the only one the button can act on. One
+         * settling tick with no input lets `step` choose it, exactly as it does
+         * in play; both sims take that same tick, so they stay identical.
+         */
+        const settle = a.t.chefs.map(() => ({ ...NO_INPUT, move: { x: 0, y: 0 } }));
+        step(a.t, settle);
+        step(b.t, b.t.chefs.map(() => ({ ...NO_INPUT, move: { x: 0, y: 0 } })));
+        const focused = a.t.kitchen.stations.find((x) => x.id === a.chef.focus) ?? null;
+        const plan = focused ? planGrab(a.t, a.chef, focused) : 'none';
 
         const press = a.t.chefs.map(() => ({ ...NO_INPUT, move: { x: 0, y: 0 } }));
         press[0] = { ...NO_INPUT, move: { x: 0, y: 0 }, grabPressed: true };
@@ -447,7 +468,8 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
 
         const stateDiffers = stateSig(a.t) !== stateSig(b.t);
         const anyEffect = effectSig(a.t) !== effectSig(b.t);
-        const where = `${a.st.kind}${a.st.dispenses ? ':' + a.st.dispenses : ''} holding ${sitLabel}, ${handLabel} -> '${plan}'`;
+        const at = focused ? `${focused.kind}${focused.dispenses ? ':' + focused.dispenses : ''}` : 'nothing focused';
+        const where = `posed at ${a.st.kind} holding ${sitLabel}, ${handLabel}; focused ${at} -> '${plan}'`;
         if (plan === 'none' && stateDiffers) {
           ghost++;
           if (ghostEg.length < 5) ghostEg.push(where);
@@ -462,6 +484,93 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
   R.section(`the button keeps its promise (${pressed} presses swept)`);
   R.check('no press does nothing when it promised something', dead === 0, dead ? `\n       ${deadEg.join('\n       ')}` : '');
   R.check("no press changes the world when it promised nothing", ghost === 0, ghost ? `\n       ${ghostEg.join('\n       ')}` : '');
+}
+
+/**
+ * NOTHING LIGHTS UP THAT CANNOT BE USED.
+ *
+ * "Why are table positions like the sink even highlighting as interactive?
+ * There's nothing you can do at the sink" — and there was not: the sink took
+ * focus empty-handed and offered a press that did nothing. The glow is the
+ * promise the player reads BEFORE they press, so it has to be held to the same
+ * standard as the press itself.
+ */
+{
+  const t = createSim({ seed: 606 });
+  const chef = t.chefs[0];
+  const idle = t.chefs.map(() => ({ ...NO_INPUT, move: { x: 0, y: 0 } }));
+  let litButDead = 0;
+  let everLit = 0;
+  const examples = [];
+
+  // Stand at every station in turn, empty-handed, and see what lights up.
+  for (const st of t.kitchen.stations) {
+    chef.carrying = null;
+    chef.working = null;
+    chef.vel = { x: 0, y: 0 };
+    chef.pos = { x: st.cell.x + 0.5 + st.facing.x, y: st.cell.y + 0.5 + st.facing.y };
+    chef.heading = Math.atan2(-st.facing.y, -st.facing.x);
+    step(t, idle);
+    const lit = t.kitchen.stations.find((x) => x.id === chef.focus);
+    if (!lit) continue;
+    everLit++;
+    if (planGrab(t, chef, lit) === 'none') {
+      litButDead++;
+      if (examples.length < 4) examples.push(`${lit.kind} lit with nothing to do`);
+    }
+  }
+
+  R.section('the glow is a promise too');
+  R.check(
+    `nothing highlights that the button would refuse (${everLit} stations lit)`,
+    litButDead === 0,
+    litButDead ? `\n       ${examples.join('\n       ')}` : '',
+  );
+  // Guards the check above from passing by lighting nothing at all.
+  R.check('and the useful ones still light up', everLit > 0, ` (${everLit})`);
+}
+
+/**
+ * THE PAN STAYS ON THE HEAT; THE RUINED FOOD COMES OFF.
+ *
+ * The burnt-pan rescue used to hand you the whole pan, which was a mechanic
+ * with no other use and no explanation — "I don't get this mechanic of the
+ * game at all". Now the press hands you the burnt rasher and leaves the pan
+ * where it was, so nothing but food and plates is ever carried.
+ */
+{
+  const t = createSim({ seed: 707 });
+  const chef = t.chefs[0];
+  const stove = t.kitchen.stations.find((st) => st.kind === 'stove');
+  stove.holding = {
+    type: 'pan',
+    pan: {
+      contents: [
+        { id: 1, kind: 'bacon', state: 'burnt', chop: 0, progress: 1, overcook: 9 },
+        { id: 2, kind: 'bacon', state: 'cooked', chop: 0, progress: 1, overcook: 0 },
+      ],
+      onHeat: true,
+      fire: 0.7,
+    },
+  };
+  chef.carrying = null;
+  chef.working = null;
+  chef.vel = { x: 0, y: 0 };
+  chef.pos = { x: stove.cell.x + 0.5 + stove.facing.x, y: stove.cell.y + 0.5 + stove.facing.y };
+  chef.heading = Math.atan2(-stove.facing.y, -stove.facing.x);
+
+  const inputs = t.chefs.map(() => ({ ...NO_INPUT, move: { x: 0, y: 0 } }));
+  inputs[0] = { ...NO_INPUT, move: { x: 0, y: 0 }, grabPressed: true };
+  step(t, inputs);
+
+  const held = chef.carrying;
+  const pan = stove.holding?.pan;
+  R.section('clearing a ruined pan');
+  R.check('the pan stays on the burner', stove.holding?.type === 'pan', ` (station holds ${stove.holding?.type ?? 'nothing'})`);
+  R.check('you are handed the burnt food, not the pan', held?.type === 'ingredient' && held.ingredient.state === 'burnt', ` (got ${held?.type ?? 'nothing'})`);
+  R.check('the good food is left alone', !!pan && pan.contents.length === 1 && pan.contents[0].state === 'cooked', '');
+  R.check('and the fire goes out with the fuel', !!pan && pan.fire === 0, ` (fire ${pan?.fire})`);
+  R.check('a pan is never a thing you can hold', held?.type !== 'pan', '');
 }
 
 // The chopSeconds split the board cases above depend on, stated outright so a
