@@ -6,6 +6,11 @@
  *   node tools/camprobe.mjs [key=value ...]
  * e.g. node tools/camprobe.mjs HALF_WIDTH_MIN=5.2 FRONT_CROP=2.5
  */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
 const DEG = Math.PI / 180;
 const WALL_Z = 1;
 let WALL_TOP = 9.3;
@@ -202,6 +207,41 @@ function shoulder(a, soft, hold) {
   const span = Math.max(1e-3, hold - soft);
   return soft + span * (1 - Math.exp(-(a - soft) / (span * 0.8)));
 }
+/**
+ * WHERE A CHEF CAN ACTUALLY STAND — READ FROM THE MAP, NOT TYPED IN HERE.
+ *
+ * These bounds were hardcoded as `px 1.5..13.5, py 1.5..8.6`, and the map had
+ * a walkable row below the last one they sampled. So the sweep measured the
+ * band that was fine, reported "0 cells lost", and a chef could walk two
+ * thirds of a cell past the bottom edge of the picture — which is precisely
+ * what came back from play: "I can wander down into the bottom corners of the
+ * map where I'm basically off screen".
+ *
+ * A containment sweep whose bounds do not come from the level is measuring a
+ * room of its own invention. They come from KITCHEN_MAP now, and the chef
+ * RADIUS is included, because the question is where a body can be, not where
+ * a cell centre is.
+ */
+const KITCHEN_MAP = fs
+  .readFileSync(path.join(ROOT_DIR, 'src/domain/kitchen.ts'), 'utf8')
+  .match(/export const KITCHEN_MAP = \[([\s\S]*?)\];/)[1]
+  .split('\n')
+  .map((l) => l.trim().replace(/^'|',?$/g, ''))
+  .filter((l) => l.length > 0 && !l.startsWith('//'));
+const STATION_OR_WALL = /[^.]/;
+const CHEF_R = 0.36;
+const WALKABLE = (() => {
+  let x0 = 99, x1 = -1, y0 = 99, y1 = -1;
+  KITCHEN_MAP.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      if (STATION_OR_WALL.test(ch)) return;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+      y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    });
+  });
+  return { x0: x0 + CHEF_R, x1: x1 + 1 - CHEF_R, y0: y0 + CHEF_R, y1: y1 + 1 - CHEF_R };
+})();
+
 function worst(label, aspect) {
   const s = solve(aspect);
   const { f, z } = s;
@@ -217,8 +257,8 @@ function worst(label, aspect) {
   const follow = lerp(CL.FOLLOW_TALL, 0, t);
   const panX = Math.max(0.4, W * 0.5 - 0.6);
   let mo = 0, mp = 0, at = '';
-  for (let px = 1.5; px <= 13.5; px += 0.5)
-    for (let py = 1.5; py <= 8.6; py += 0.5) {
+  for (let px = WALKABLE.x0; px <= WALKABLE.x1 + 1e-9; px += 0.5)
+    for (let py = WALKABLE.y0; py <= WALKABLE.y1 + 1e-9; py += 0.5) {
       const atChef = hwAt(z, py);
       const freeX = centreX + (px - centreX) * follow;
       const raw = (px - freeX) / atChef;
