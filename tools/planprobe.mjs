@@ -232,6 +232,92 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
   }
 }
 
+/**
+ * A TAP AT A RUN STOPS THE CHEF — REGRESSION, CAUGHT IN REVIEW.
+ *
+ * The committed branch in moveChef zeroes the STICK, and the deceleration that
+ * a released stick relies on lives inside the branch it skips. So a chef who
+ * tapped while still moving kept every unit per second they had, coasted out
+ * past `reach`, and `stillWants` cancelled the job they had just started —
+ * a one-tap chop that silently aborts, which is worse than the hold it replaced.
+ *
+ * The tap here happens at full cruise on approach, which is how it happens in
+ * a real service; nobody walks up to a board and stops first.
+ */
+{
+  const { step } = await import(path.join(OUT, 'sim.js'));
+  const t = createSim(7171);
+  const player = t.chefs[0];
+  const board = t.kitchen.stations.find((st) => st.kind === 'board');
+  board.holding = { type: 'ingredient', ingredient: { kind: 'tomato', state: 'raw', chop: 0 } };
+  player.pos = { x: board.cell.x + 0.5 + board.facing.x, y: board.cell.y + 0.5 + board.facing.y };
+  player.carrying = null;
+  // Running, not standing: straight out from the board at cruise.
+  player.vel = { x: board.facing.x * 4, y: board.facing.y * 4 };
+
+  const idle = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+  const inputs = t.chefs.map(() => ({ ...idle, move: { x: 0, y: 0 } }));
+  inputs[0] = { move: { x: 0, y: 0 }, grabPressed: true, useHeld: false, dashPressed: false };
+  step(t, inputs);
+  inputs[0] = { ...idle, move: { x: 0, y: 0 } };
+
+  let ticks = 0;
+  while (ticks < 300 && player.working !== null && board.holding?.ingredient?.state === 'raw') {
+    step(t, inputs);
+    ticks++;
+  }
+  const cut = board.holding?.ingredient?.state === 'prepped';
+  const drift = Math.hypot(
+    player.pos.x - (board.cell.x + 0.5 + board.facing.x),
+    player.pos.y - (board.cell.y + 0.5 + board.facing.y),
+  );
+
+  console.log('\n=== tapping while still moving');
+  for (const [label, ok, extra] of [
+    ['the job survives the coast', cut, ''],
+    ['the chef comes to rest', Math.hypot(player.vel.x, player.vel.y) < 0.2, ''],
+    ['and does not slide out of reach', drift < 0.6, ` (drifted ${drift.toFixed(2)})`],
+  ]) {
+    if (!ok) failed++;
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}${extra}`);
+  }
+}
+
+/**
+ * A BURNT PAN CAN STILL BE CLEARED — REGRESSION, CAUGHT IN REVIEW.
+ *
+ * "A pan is fixture, not luggage" is right for a working burner and wrong for a
+ * ruined one. Nothing else in the kitchen can empty a pan in place: the bin
+ * only discards the contents of a pan you are CARRYING, and the plate `load`
+ * rung only ever moves items in state 'cooked'. So refusing the pan
+ * unconditionally left burnt food welded to the burner, ticking `pan.fire`
+ * toward a fire that never stops, with bots/brain.ts's own `rescue`-priority
+ * "clear the burnt pan" job resolving to a press that does nothing. Two burners
+ * lost that way and no cooked recipe is fillable for the rest of the service.
+ */
+{
+  const t = createSim(313);
+  const chef = t.chefs[0];
+  const stove = t.kitchen.stations.find((st) => st.kind === 'stove');
+  chef.carrying = null;
+
+  stove.holding = { type: 'pan', pan: { contents: [], onHeat: false, fire: 0 } };
+  const good = planGrab(t, chef, stove);
+
+  stove.holding.pan.contents.push({ kind: 'bacon', state: 'burnt', chop: 0, progress: 1, overcook: 9 });
+  const spoiled = planGrab(t, chef, stove);
+  chef.carrying = null;
+
+  console.log('\n=== the burner is not a one-way trip');
+  for (const [label, ok, extra] of [
+    ['a working pan stays put', good === 'none', ` (got '${good}')`],
+    ['a burnt pan can be lifted off', spoiled === 'take', ` (got '${spoiled}')`],
+  ]) {
+    if (!ok) failed++;
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}${extra}`);
+  }
+}
+
 // The chopSeconds split the board cases above depend on, stated outright so a
 // menu change that makes bacon choppable shows up here rather than as a bug.
 console.log('\n=== chopSeconds (0 means the board can only hand it back)');

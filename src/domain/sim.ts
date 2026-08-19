@@ -368,10 +368,57 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
      * Deliberately not a stun: no knockback drag, no 'stunned' intent, and the
      * chef keeps its heading. step() clears `working` on completion, on losing
      * reach, on picking something up, and on a second press.
+     *
+     * AND IT HAS TO BRAKE, NOT JUST STOP STEERING.
+     *
+     * Zeroing the stick is not zeroing the chef. The deceleration a released
+     * stick relies on lives in the `else` branch below — `vel += (0 - vel) * k`
+     * with `decelTime` — and this branch skips that integration entirely, so
+     * the first version kept every unit per second the chef was carrying and
+     * coasted at a dead constant speed. Tap while walking in and the chef sails
+     * past the bench, `stillWants` sees `boxDist > reach` and cancels the job
+     * a fraction of a second after starting it: a one-tap chop that silently
+     * aborts, which is strictly worse than the hold it replaced. Nobody walks
+     * up to a board and stops before pressing, so this was the normal path.
+     *
+     * Same time constant as letting go of the stick, so it reads as the chef
+     * planting their feet rather than hitting a wall — EXCEPT for the one
+     * component that cannot be allowed to coast at all. Braking alone is not
+     * enough: at cruise the release curve still carries the chef 0.45 units,
+     * and committing from 0.5 out puts `boxDist` at 0.954 against a `reach` of
+     * 0.95, so the job died anyway — by four thousandths of a unit. Measured,
+     * not reasoned: see the "tapping while still moving" case in planprobe.
+     *
+     * So the OUTBOUND component — the part of the velocity pointing away from
+     * the bench just committed to — is removed outright, and everything else
+     * decays normally. That is the honest reading of the gesture: a chef who
+     * has committed to a station is not still walking away from it, while a
+     * chef sliding sideways along its face is fine and keeps the soft stop.
+     * A knockback still cancels the job, because a shove puts the chef outside
+     * `reach` in one tick rather than coasting there.
      */
     mx = 0;
     my = 0;
     m = 0;
+    const brake = 1 - Math.exp(-dt / Math.max(0.0001, TUNING.decelTime));
+    chef.vel.x -= chef.vel.x * brake;
+    chef.vel.y -= chef.vel.y * brake;
+    const ws = stationById(s.kitchen, chef.working);
+    if (ws) {
+      let ax = ws.cell.x + 0.5 - chef.pos.x;
+      let ay = ws.cell.y + 0.5 - chef.pos.y;
+      const a = Math.hypot(ax, ay);
+      if (a > 1e-4) {
+        ax /= a;
+        ay /= a;
+        // Positive is travelling TOWARD the bench, which is welcome.
+        const along = chef.vel.x * ax + chef.vel.y * ay;
+        if (along < 0) {
+          chef.vel.x -= along * ax;
+          chef.vel.y -= along * ay;
+        }
+      }
+    }
   } else {
     mx = input.move.x;
     my = input.move.y;
@@ -890,8 +937,31 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
      * The 'place' rung further down that puts a pan back on an empty burner is
      * now unreachable, and stays only because a level with an unseeded burner
      * would need it.
+     *
+     * ...EXCEPT A RUINED ONE, WHICH IS THE ONE PAN THAT MUST COME OFF.
+     *
+     * "Fixture, not luggage" is right for a working burner and a soft-lock for
+     * a spoiled one, because nothing else in this kitchen can empty a pan where
+     * it stands: the bin discards the contents of a pan you are CARRYING (see
+     * `case 'bin'`), and the plate `load` rung only ever moves items in state
+     * 'cooked', never 'burnt'. Refuse it unconditionally and burnt food is
+     * welded to the burner — with `updateStations` ticking `pan.fire` up to a
+     * fire the whole time, and bots/brain.ts's own rescue-priority "clear the
+     * burnt pan" job (rung 4c, whose comment already says "nothing else in the
+     * kitchen can... the burner is dead") reduced to a press that does nothing.
+     * Two burners lost that way and every cooked recipe is unfillable for the
+     * rest of the service.
+     *
+     * The design intent survives intact: you cannot walk off with a pan that is
+     * doing its job, and the only pan you can lift is one that has nothing left
+     * to do.
      */
-    if (st.kind === 'stove' && st.holding?.type === 'pan') return 'none';
+    if (
+      st.kind === 'stove' &&
+      st.holding?.type === 'pan' &&
+      !st.holding.pan.contents.some((i) => i.state === 'burnt')
+    )
+      return 'none';
     // See 'prep' above. Same conditions the `useHeld` gate in step() tests, and
     // the SAME chopSeconds test updateStations makes before it advances any
     // work — all three have to agree or the button lies.
