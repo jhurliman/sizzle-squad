@@ -30,6 +30,7 @@ npx tsc --noEmit          # must be clean
 npm test                  # must be green — ~3s, pure Node, no browser
 npx vite build            # must succeed
 node tools/shoot.mjs --out shots/<your-piece>-<round> --seconds 14
+node tools/scene.mjs   # if you touched anything that is hard to catch in play
 ```
 
 Then **open the PNGs you just produced with the Read tool and look at them.**
@@ -59,6 +60,66 @@ burners a few minutes into every service, and a review bot caught it, not us.
 If you change a rule, add the case. If you add a probe, prove it can fail:
 re-introduce the bug and watch it go red. A test that cannot fail is worse than
 no test, because it is trusted.
+
+### Photographing something rare — `tools/scene.mjs`
+
+`shoot.mjs` photographs whatever the game happens to be doing, which is the
+right instrument for composition and the HUD and useless for anything rare.
+Food reaches `burnt` about twice in twelve minutes of bot play and a bot clears
+it inside two seconds, so the skillet fire shipped **unphotographed** — the only
+picture ever taken of it came from editing `world.ts` to force the state and
+reverting afterwards, which leaves nothing behind, cannot be re-run, and is
+indistinguishable from a claim.
+
+So ask for the state instead of waiting for it:
+
+```
+node tools/scene.mjs            # every scenario
+node tools/scene.mjs --list     # what there is
+node tools/scene.mjs --only fire
+node tools/scene.mjs --strip 5  # a contact sheet over time, for MOTION
+```
+
+Each scenario stages the kitchen through `__game.setScene` (see `main.ts`),
+parks the bots so they cannot tidy the state away before the shutter opens, and
+crops by projecting a **world point** through the live camera (`__game.project`)
+rather than a typed-in pixel rectangle. Every hand-typed rectangle in this
+project's history went stale when the camera moved; none of these can.
+
+`--strip N` tiles N frames of the same crop, a fifth of a second apart. One
+still cannot judge an animation — it shows one instant, which is exactly how a
+flame that merely wobbles passes for a flame that moves. The sim is frozen
+during a strip and the view clock is not, so what changes between tiles is the
+animation and nothing else.
+
+Three things it will tell you that are easy to miss:
+
+- **SCENE REFUSED.** A staged position is a request and the sim may refuse it.
+  The first `burnt-food-in-hand` asked for a chef inside the sink cell and
+  photographed one at `(7.94, 5.37)` instead. The picture looked fine and was of
+  the wrong thing, so the tool now compares what it asked for against what the
+  game settled on.
+- **SCENE DRIFTED.** Staging is not freezing. Parking the bots left the
+  simulation stepping, and a burnt pan's `fire` climbs by dt/9 every step — so
+  `fire-new`, whose whole subject is the fire at zero, photographed whatever
+  zero had drifted to. `freeze` (default on) stops `step()` while leaving the
+  frame clock running, and this check compares the staged number against the
+  one that reached the shutter.
+- **Cells are addressed by their corner and drawn about their centre.** Aim a
+  crop at a raw cell coordinate and half the burner falls outside the frame.
+  Use `mid()`.
+
+**To see where an invisible thing goes, draw it in magenta at full opacity.**
+The skillet's smoke was tuned three times against pictures that showed nothing,
+on the assumption it was too faint. Painted opaque, it turned out to be a plume
+twice the size intended, in the wrong place entirely — clearing the oven mouth
+and staining the stone facade. Guessing at a tuning number cannot find that;
+one deliberately wrong render can.
+
+These are pictures for a human to look at, not assertions. `npm test` covers
+what a machine can judge; this covers the half that needs eyes. Adding a
+scenario is cheap — if you fixed something you had to contrive by hand to see,
+leave the contrivance behind as a scenario.
 
 ## Non-negotiables
 
