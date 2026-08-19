@@ -187,20 +187,103 @@ R.check('no NaN or Infinity anywhere', nonFinite.length === 0, nonFinite.length 
  */
 R.section('determinism (the purity rule, enforced)');
 {
+  /**
+   * THE WHOLE STATE, NOT A CORNER OF IT.
+   *
+   * The first cut compared the final score and the chef positions. That is a
+   * keyhole: a wall clock reaching into ticket creation, station bookkeeping,
+   * id allocation or the heat ramp moves none of those two things on a 60s run,
+   * so the check would sit there green while the purity rule it exists to
+   * defend was already broken. `SimState` is plain data end to end — the only
+   * non-serialisable field is the seeded `rand` closure, which JSON drops by
+   * itself — so there is no reason to compare anything less than all of it.
+   */
+  const fullSig = (t) => JSON.stringify(t);
+
   const a = service(4242, 60);
   const b = service(4242, 60);
-  const same =
-    JSON.stringify(a.s.score) === JSON.stringify(b.s.score) &&
-    JSON.stringify(a.s.chefs.map((c) => [c.pos.x, c.pos.y])) ===
-      JSON.stringify(b.s.chefs.map((c) => [c.pos.x, c.pos.y]));
-  R.check('one seed, two runs, identical outcome', same, same ? '' : ` (${JSON.stringify(a.s.score)} vs ${JSON.stringify(b.s.score)})`);
+  const same = fullSig(a.s) === fullSig(b.s);
+  let firstDiff = '';
+  if (!same) {
+    // Point at the field that moved rather than dumping 7KB of JSON at whoever
+    // has to fix this: a purity bug is much easier to find with a name attached.
+    for (const k of Object.keys(a.s)) {
+      if (JSON.stringify(a.s[k]) !== JSON.stringify(b.s[k])) {
+        firstDiff = ` (first divergence: '${k}')`;
+        break;
+      }
+    }
+  }
+  R.check('one seed, two runs, identical in EVERY field', same, firstDiff);
 
   const c = service(9001, 60);
+  R.check('and a different seed is a different service', fullSig(c.s) !== fullSig(a.s), '');
+}
+
+/**
+ * ...AND A DIRECT GUARD, BECAUSE RUNNING IT TWICE IS NOT ENOUGH.
+ *
+ * The comparison above is necessary and it is not sufficient, which a review
+ * caught by proposing exactly the right counter-example: put
+ * `Math.floor(Date.now() / 1000)` in ticket creation and the two runs still
+ * match — they execute milliseconds apart, so the wall clock hands them the
+ * same number. Tried it; the check stayed green. A clock only shows up as
+ * nondeterminism if you wait, and a test that has to wait a second to be
+ * correct is a test that gets deleted.
+ *
+ * So the clock is caught where it can actually be seen: in the source. This is
+ * the AGENTS.md purity rule read literally — no wall clock and no unseeded
+ * randomness anywhere the simulation lives — and it is what makes every other
+ * assertion on this page trustworthy rather than merely usually-true.
+ *
+ * Comments are stripped first. These files argue with themselves at length
+ * about `Date.now()` and `Math.random()`, and a guard that cannot tell prose
+ * from code would fire on its own documentation.
+ */
+R.section('purity (no wall clock, no unseeded randomness)');
+{
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { ROOT } = await import('./domainkit.mjs');
+  const BANNED = [
+    [/\bDate\s*\.\s*now\s*\(/, 'Date.now()'],
+    [/\bnew\s+Date\s*\(/, 'new Date()'],
+    [/\bperformance\s*\.\s*now\s*\(/, 'performance.now()'],
+    [/\bMath\s*\.\s*random\s*\(/, 'Math.random()'],
+  ];
+  const walk = (dir, out = []) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const f = path.join(dir, e.name);
+      if (e.isDirectory()) walk(f, out);
+      else if (e.name.endsWith('.ts')) out.push(f);
+    }
+    return out;
+  };
+  const strip = (src) =>
+    src
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      .map((l) => l.replace(/\/\/.*$/, ''))
+      .join('\n');
+
+  const offences = [];
+  const roots = ['src/domain', 'src/bots'].map((r) => path.join(ROOT, r));
+  let scanned = 0;
+  for (const root of roots) {
+    for (const file of walk(root)) {
+      scanned++;
+      const code = strip(fs.readFileSync(file, 'utf8'));
+      code.split('\n').forEach((line, i) => {
+        for (const [re, name] of BANNED) {
+          if (re.test(line)) offences.push(`${path.relative(ROOT, file)}:${i + 1}  ${name}`);
+        }
+      });
+    }
+  }
   R.check(
-    'and a different seed is a different service',
-    JSON.stringify(c.s.chefs.map((x) => [x.pos.x, x.pos.y])) !==
-      JSON.stringify(a.s.chefs.map((x) => [x.pos.x, x.pos.y])),
-    '',
+    `no wall clock or unseeded randomness in the simulation (${scanned} files scanned)`,
+    offences.length === 0,
+    offences.length ? `\n       ${offences.join('\n       ')}` : '',
   );
 }
 

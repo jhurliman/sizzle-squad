@@ -29,51 +29,98 @@ import { makeReport } from './domainkit.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rig = fs.readFileSync(path.join(ROOT, 'src/view/cameraRig.ts'), 'utf8');
-const sweep = fs.readFileSync(path.join(ROOT, 'tools/camlost.mjs'), 'utf8');
 const R = makeReport();
 
-/** `const NAME = 1.23;` at the top level of the rig. */
-const rigConsts = new Map();
-for (const m of rig.matchAll(/^const ([A-Z][A-Z0-9_]*) = (-?[0-9.]+);/gm)) {
-  rigConsts.set(m[1], Number(m[2]));
-}
-
-/** `NAME: 1.23,` inside the sweep's K and CL blocks. */
-const sweepConsts = new Map();
-for (const block of ['K', 'CL']) {
-  const start = sweep.indexOf(`const ${block} = {`);
-  if (start < 0) continue;
-  const body = sweep.slice(start, sweep.indexOf('\n};', start));
-  for (const m of body.matchAll(/^\s{2}([A-Z][A-Z0-9_]*): (-?[0-9.]+),/gm)) {
-    sweepConsts.set(m[1], Number(m[2]));
-  }
-}
-
-const shared = [...sweepConsts.keys()].filter((k) => rigConsts.has(k)).sort();
-const drifted = shared.filter((k) => rigConsts.get(k) !== sweepConsts.get(k));
-const unchecked = [...sweepConsts.keys()].filter((k) => !rigConsts.has(k)).sort();
-
-R.section(`the sweep still describes the real rig (${shared.length} constants compared)`);
-R.check(
-  'every shared constant matches',
-  drifted.length === 0,
-  drifted.length
-    ? `\n       ${drifted.map((k) => `${k}: rig ${rigConsts.get(k)} vs camlost ${sweepConsts.get(k)}`).join('\n       ')}`
-    : '',
-);
+/**
+ * BOTH SWEEPS, NOT ONE.
+ *
+ * camprobe and camlost each carry their own hand-copied `K`/`CL` blocks.
+ * Checking only camlost leaves the other free to drift and keep printing
+ * confident measurements of a camera that no longer exists — which is the
+ * exact failure this file was written to prevent, just relocated.
+ */
+const SWEEPS = ['tools/camlost.mjs', 'tools/camprobe.mjs'];
 
 /**
- * NOT A FAILURE, BUT NOT A SECRET EITHER.
+ * A NAMED CONSTANT IS NOT ALWAYS A BARE NUMBER, AND THE UNITS DIFFER.
  *
- * Some of what the sweep models is not a top-level `const` in the rig — the
- * follow hold and the follow blend are written inline as `lerp(0.88, 0.84, t)`
- * inside the profile solve, and the tall-aspect crop is derived rather than
- * named. Those cannot be diffed automatically. Printing them keeps the size of
- * the blind spot honest instead of implying this file checks everything.
+ * The first cut matched `const NAME = 1.23;` only, so `HALF_FOV_H_MAX`, whose
+ * rig declaration is `31.5 * DEG`, fell out of the comparison entirely and was
+ * then reported as having "no named counterpart in the rig" — which was simply
+ * false. Retuning it would have sailed through the gate.
+ *
+ * The wrinkle worth naming: the rig stores angles in RADIANS (`31.5 * DEG`)
+ * while both sweeps store the same constants in DEGREES (`31.5`). Comparing
+ * the resolved values would report every angle as drifted. So the authored
+ * number is what gets compared — the literal the human typed — and the `* DEG`
+ * is recorded as the unit rather than folded into the value.
  */
-if (unchecked.length) {
-  console.log(`  note  ${unchecked.length} sweep constant(s) have no named counterpart in the rig`);
-  console.log(`        and are NOT auto-checked: ${unchecked.join(', ')}`);
+function rigConstants(src) {
+  const out = new Map();
+  for (const m of src.matchAll(/^const ([A-Z][A-Z0-9_]*) = ([^;]+);/gm)) {
+    const [, name, rawExpr] = m;
+    const expr = rawExpr.trim();
+    let lit = /^(-?[0-9.]+)$/.exec(expr);
+    if (lit) {
+      out.set(name, { value: Number(lit[1]), unit: '' });
+      continue;
+    }
+    lit = /^(-?[0-9.]+)\s*\*\s*DEG$/.exec(expr);
+    if (lit) {
+      out.set(name, { value: Number(lit[1]), unit: ' deg' });
+      continue;
+    }
+    // Anything else (a computed constant, a lerp, a call) is not comparable
+    // by inspection. Recorded so it can be REPORTED rather than dropped.
+    out.set(name, { value: null, unit: '', expr });
+  }
+  return out;
+}
+
+/** `NAME: 1.23,` inside a sweep's K and CL blocks. */
+function sweepConstants(src) {
+  const out = new Map();
+  for (const block of ['K', 'CL']) {
+    const start = src.indexOf(`const ${block} = {`);
+    if (start < 0) continue;
+    const body = src.slice(start, src.indexOf('\n};', start));
+    for (const m of body.matchAll(/^\s{2}([A-Z][A-Z0-9_]*): (-?[0-9.]+),/gm)) {
+      out.set(m[1], Number(m[2]));
+    }
+  }
+  return out;
+}
+
+const rigConsts = rigConstants(rig);
+
+for (const rel of SWEEPS) {
+  const sweepConsts = sweepConstants(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+  const shared = [...sweepConsts.keys()].filter((k) => rigConsts.get(k)?.value !== null && rigConsts.has(k)).sort();
+  const drifted = shared.filter((k) => rigConsts.get(k).value !== sweepConsts.get(k));
+  // Split the leftovers honestly: a name the rig does not declare at all is a
+  // different problem from one it declares as an expression this cannot read.
+  const absent = [...sweepConsts.keys()].filter((k) => !rigConsts.has(k)).sort();
+  const opaque = [...sweepConsts.keys()].filter((k) => rigConsts.get(k)?.value === null).sort();
+
+  R.section(`${rel} still describes the real rig (${shared.length} constants compared)`);
+  R.check(
+    'every shared constant matches',
+    drifted.length === 0,
+    drifted.length
+      ? `\n       ${drifted
+          .map((k) => `${k}: rig ${rigConsts.get(k).value}${rigConsts.get(k).unit} vs sweep ${sweepConsts.get(k)}`)
+          .join('\n       ')}`
+      : '',
+  );
+  R.check(
+    'nothing the rig declares is silently unreadable',
+    opaque.length === 0,
+    opaque.length ? ` (${opaque.join(', ')} — declared as an expression this cannot parse)` : '',
+  );
+  if (absent.length) {
+    console.log(`  note  ${absent.length} sweep constant(s) are not top-level rig constants and cannot be`);
+    console.log(`        auto-checked: ${absent.join(', ')}`);
+  }
 }
 
 /**
@@ -96,14 +143,27 @@ function offPicture(widen) {
   return rows;
 }
 
+/**
+ * THE EXACT PROFILE SET, NOT WHATEVER TURNED UP.
+ *
+ * Checking only that SOME rows parsed lets a renamed or dropped profile vanish
+ * from the gate while everything left behind still passes. Portrait is the
+ * first-class layout in this project; it disappearing quietly is precisely the
+ * regression nobody would notice.
+ */
+const EXPECTED_PROFILES = ['portrait', 'iph-land', 'ipad', 'desktop'];
+
 for (const widen of [0, 1]) {
   const rows = offPicture(widen);
   const label = widen ? 'at full widen' : 'at rest';
   R.section(`nobody loses the player ${label}`);
-  if (!rows.length) {
-    R.check(`camlost reported something readable ${label}`, false, ' (no profile rows parsed)');
-    continue;
-  }
+  const seen = rows.map((r) => r.profile);
+  const missing = EXPECTED_PROFILES.filter((p) => !seen.includes(p));
+  R.check(
+    'every expected profile was measured',
+    missing.length === 0,
+    missing.length ? ` (missing: ${missing.join(', ')}; got ${seen.join(', ') || 'nothing'})` : '',
+  );
   for (const r of rows) {
     R.check(`${r.profile.padEnd(9)} keeps the player in frame`, r.lost === 0, ` (${r.lost}/${r.total} cells lost)`);
   }
