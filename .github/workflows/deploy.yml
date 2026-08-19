@@ -42,6 +42,24 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      # THE RULES, NOT JUST THE TYPES.
+      #
+      # Three rule bugs reached a real player across waves 3 and 4 — a crate
+      # that deleted anything handed to it, a bun welded to a chopping board,
+      # and a burner that could never be cleared once its pan burned. Every one
+      # of them typechecked, built, and screenshotted perfectly; the last of
+      # them killed both burners a few minutes into every service.
+      #
+      # `npm test` runs the suite that catches that class: the station rules
+      # asserted directly (planprobe), full services played out by the real
+      # bots across many seeds (soak), and the camera sweeps checked against
+      # the rig they claim to describe (camsync). It is pure Node — no browser,
+      # no GPU — so it costs seconds, and a red suite must stop a deploy for
+      # the same reason a red typecheck does: nobody should tap a broken game
+      # on their home screen.
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build
 

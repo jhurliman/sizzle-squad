@@ -27,12 +27,38 @@ are high-traffic: additive changes only, never reorganise them.
 ```
 cd /home/claude/kitchen
 npx tsc --noEmit          # must be clean
+npm test                  # must be green — ~3s, pure Node, no browser
 npx vite build            # must succeed
 node tools/shoot.mjs --out shots/<your-piece>-<round> --seconds 14
 ```
 
 Then **open the PNGs you just produced with the Read tool and look at them.**
 A change you have not seen rendered is a change you have not made.
+
+### What `npm test` is for
+
+Screenshots cannot see a rule. Three rule bugs reached a real player in two
+waves — a crate that deleted anything handed to it, a bun welded to a chopping
+board, and a burner that could never be cleared once its pan burned. All three
+typechecked, built, and photographed perfectly. The last one killed both
+burners a few minutes into every service, and a review bot caught it, not us.
+
+- `tools/planprobe.mjs` — the station rules, asked directly. Includes a sweep of
+  every station against every shape of thing a chef can hold (~1400 presses),
+  asserting the promise `planGrab` makes to the player: a press that offers
+  something must do something, and a press that offers nothing must change
+  nothing. All three bugs above broke exactly that promise.
+- `tools/soak.mjs` — full services played by the real bots across many seeds.
+  Outcome measures, not rule checks: dishes served, burners used, no station
+  left a black hole, and the same seed twice giving the same service, which is
+  what keeps the `src/domain` purity rule honest.
+- `tools/camsync.mjs` — the camera sweeps reimplement the rig's solve with
+  hand-copied constants, so this asserts they still match the rig, and that no
+  profile loses the player at rest or at full widen.
+
+If you change a rule, add the case. If you add a probe, prove it can fail:
+re-introduce the bug and watch it go red. A test that cannot fail is worse than
+no test, because it is trusted.
 
 ## Non-negotiables
 
