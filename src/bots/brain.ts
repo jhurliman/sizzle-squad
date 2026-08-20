@@ -1064,7 +1064,6 @@ export class BotDirector {
           move: { x: (vx / d) * 0.95, y: (vy / d) * 0.95 },
           grabPressed: grab,
           useHeld: useUntil > 0,
-          dashPressed: false,
         };
       }
       step(s, inputs);
@@ -1196,7 +1195,7 @@ export class BotDirector {
     if (this.yieldTo(s, bot, m)) {
       tel.yields++;
       tel.hesitate += dt;
-      return { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+      return { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
     }
     // RATE-LIMITED, INCLUDING WHEN THERE IS NO PLAN. The condition here used to
     // be `!m.job || m.replanIn <= 0`, so a bot between plans re-planned every
@@ -1264,7 +1263,6 @@ export class BotDirector {
       move: { x: 0, y: 0 },
       grabPressed: false,
       useHeld: false,
-      dashPressed: false,
     };
 
     if (m.lagTimer > 0) {
@@ -1425,7 +1423,6 @@ export class BotDirector {
         input.move.x = d.x;
         input.move.y = d.y;
       }
-      if (dist > 5 && !bot.carrying) input.dashPressed = true;
     }
 
     // PROGRESS-BASED STALL DETECTOR, not speed-based. A speed threshold looks

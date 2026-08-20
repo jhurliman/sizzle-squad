@@ -156,8 +156,10 @@ possible. Never a hairline, never a 10px font, never a flat rectangle. And
 
 1. Open `refs/dash-and-dine-01.jpeg` and `refs/dash-and-dine-02.jpeg` with the
    Read tool and look at them.
-2. Run `node tools/shoot.mjs --out shots/<name>` and open **our** PNGs. All four
-   device profiles. Skipping iPhone portrait means you did not do the job.
+2. Run `node tools/shoot.mjs --out shots/<name> --insets` and open **our**
+   JPEGs. All four device profiles. Skipping iPhone portrait means you did not
+   do the job. (`--insets` matters: headless Chromium reports zero notch and
+   home-indicator insets, so without it you are judging a frame no phone has.)
 3. Describe what you actually see in ours, without charity.
 4. Put the two side by side and say **which is better and why**, in pixels —
    colour, contrast, silhouette, spacing, occlusion, density, motion evidence.

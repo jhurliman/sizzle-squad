@@ -202,7 +202,6 @@ async function driveCapture(page, seconds, shoot) {
       move: stepDef.move ?? { x: 0, y: 0 },
       grabPressed: !!stepDef.grab,
       useHeld: !!stepDef.use,
-      dashPressed: !!stepDef.dash,
       enabled: true,
     });
     let remaining = stepDef.s ?? 0.4;
@@ -263,7 +262,6 @@ async function driveLive(page, seconds, shoot) {
       move: stepDef.move ?? { x: 0, y: 0 },
       grabPressed: !!stepDef.grab,
       useHeld: !!stepDef.use,
-      dashPressed: !!stepDef.dash,
       enabled: true,
     });
     const end = Date.now() + (stepDef.ms ?? 400);

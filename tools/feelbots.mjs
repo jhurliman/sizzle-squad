@@ -57,7 +57,7 @@ const WHY = process.argv.includes('--why');
 // desktop 4.99, iPhone landscape 6.70. This is the one number the brain is
 // told about the shot; see OFFSTAGE_COST in brain.ts.
 const SHOT = Number(arg('--shot', 4.99));
-const NOIN = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+const NOIN = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
 const mul = (a) => () => {
   a = (a + 0x6d2b79f5) >>> 0;
   let t = a;
@@ -167,7 +167,7 @@ for (const MODE of MODES) {
         grabIn -= SIM_DT;
         const grab = grabIn <= 0;
         if (grab) grabIn = 0.7 + rand() * 1.3;
-        inputs[player.id] = { move: { x: (vx / d) * 0.95, y: (vy / d) * 0.95 }, grabPressed: grab, useHeld: false, dashPressed: false };
+        inputs[player.id] = { move: { x: (vx / d) * 0.95, y: (vy / d) * 0.95 }, grabPressed: grab, useHeld: false };
       } else if (MODE === 'thief') {
         // Walk at whatever station a bot is currently heading for and take it.
         const jd = bots.jobsDebug();
@@ -188,7 +188,7 @@ for (const MODE of MODES) {
           if (!player.carrying && player.focus === tgt.id && grabCd <= 0) { grab = true; grabCd = 0.25; A.thiefGrabs++; }
           if (player.carrying && grabCd <= 0) { grab = true; grabCd = 0.6; }
         }
-        inputs[player.id] = { move: mv, grabPressed: grab, useHeld: false, dashPressed: false };
+        inputs[player.id] = { move: mv, grabPressed: grab, useHeld: false };
       }
       step(s, inputs);
       for (const e of s.events) {

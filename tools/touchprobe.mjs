@@ -245,7 +245,6 @@ async function run() {
       return {
         cluster: rect('.action-cluster'),
         grab: rect('#btnGrab'),
-        dash: rect('#btnDash'),
       };
     });
 
@@ -568,13 +567,11 @@ async function run() {
     // OUTSIDE each edge (the near-miss a thumb actually produces).
     {
       const rows = [];
-      // Two discs, not three: the chop button was folded into the action button.
-      // The `if (!b) continue` below stays as the guard it always was, but it is
-      // no longer silently skipping a control this list still asks for.
-      for (const [name, key] of [
-        ['grab', 'grab'],
-        ['dash', 'dash'],
-      ]) {
+      // ONE disc, not three. The chop button was folded into the action button;
+      // the dash disc went with the dash mechanic. The `if (!b) continue` below
+      // stays as the guard it always was, but it is no longer silently skipping
+      // a control this list still asks for.
+      for (const [name, key] of [['grab', 'grab']]) {
         const b = R.geom[key];
         if (!b) continue;
         const cx = b.x + b.w / 2;
@@ -623,8 +620,7 @@ async function run() {
           }
           await lift();
           await step(2);
-          const fired =
-            name === 'use' ? tr.some((r) => r.use) : name === 'grab' ? tr.some((r) => r.grab) : tr.some((r) => r.dash);
+          const fired = tr.some((r) => r.grab);
           rows.push({ btn: name, at: label, fired, elem, pressed, stickStolen: s.active });
         }
       }
@@ -765,14 +761,13 @@ async function run() {
       };
       R.reach = {
         pivot,
-        // `use` is gone from the cluster — one action button now. Left out of
-        // the report rather than reported as null, so a diff against an older
-        // run shows a removed control instead of a broken measurement.
+        // `use` and `dash` are both gone from the cluster — one action button
+        // now. Left out of the report rather than reported as null, so a diff
+        // against an older run shows removed controls instead of broken
+        // measurements.
         grab: d(R.geom.grab),
-        dash: d(R.geom.dash),
         sizesMm: {
           grab: +(R.geom.grab.w / PX_PER_MM).toFixed(1),
-          dash: +(R.geom.dash.w / PX_PER_MM).toFixed(1),
         },
         clusterFracOfWidth: +(R.geom.cluster.w / w).toFixed(3),
         clusterFracOfArea: +((R.geom.cluster.w * R.geom.cluster.h) / (w * h)).toFixed(4),
@@ -826,13 +821,13 @@ async function run() {
     const g = R.geom;
     console.log(`\n=== ${id}  ${w}x${h}  insets t${ins.t} b${ins.b} l${ins.l} r${ins.r}`);
     console.log(
-      `  discs      action ${g.grab.w}px (${R.reach.sizesMm.grab}mm)  dash ${g.dash.w}px (${R.reach.sizesMm.dash}mm)`,
+      `  discs      action ${g.grab.w}px (${R.reach.sizesMm.grab}mm)`,
     );
     console.log(
       `  cluster    ${g.cluster.w}x${g.cluster.h}  ${(R.reach.clusterFracOfWidth * 100).toFixed(1)}% of width  ${(R.reach.clusterFracOfArea * 100).toFixed(2)}% of area  gap to home-indicator ${R.reach.homeIndicatorGapPx}px`,
     );
     console.log(
-      `  reach      action ${R.reach.grab.mm}mm  dash ${R.reach.dash.mm}mm  from thumb pivot`,
+      `  reach      action ${R.reach.grab.mm}mm from thumb pivot`,
     );
     console.log(
       `  regions    stick ${R.region.pctStick}%  button ${R.region.pctButton}%  DEAD ${R.region.pctDead}%  (predicate mismatches: ${R.regionTruth.mismatch.length})`,

@@ -254,7 +254,6 @@ const EV = {
   trash: { t: 'trash', at: { x: 7.5, y: 5 } },
   washDone: { t: 'washDone', at: { x: 7.5, y: 5 } },
   bump: { t: 'bump', a: 0, b: 1, at: { x: 7.5, y: 5 } },
-  dash: { t: 'dash', chef: 0, at: { x: 7.5, y: 5 } },
   footstep: { t: 'footstep', chef: 0, at: { x: 7.5, y: 5 } },
   gameOver: { t: 'gameOver', score: 900 },
 };
@@ -427,7 +426,7 @@ window.__runProbe = async () => {
     const SEC = 5;
     const burst = [];
     let n = 0;
-    const seq = ['footstep', 'footstep', 'pickup', 'chopTick', 'chopTick', 'place', 'serve', 'bump', 'dash', 'chopDone', 'cookDone', 'orderNew', 'footstep', 'chopTick', 'serve', 'trash', 'washDone', 'burn', 'serveWrong', 'footstep', 'fireStart', 'orderExpired'];
+    const seq = ['footstep', 'footstep', 'pickup', 'chopTick', 'chopTick', 'place', 'serve', 'bump', 'chopDone', 'cookDone', 'orderNew', 'footstep', 'chopTick', 'serve', 'trash', 'washDone', 'burn', 'serveWrong', 'footstep', 'fireStart', 'orderExpired'];
     const { buf, scheduled } = await render(SEC, ({ engine, ctx, at }) => {
       engine.start(ctx);
       for (let t = 0; t < SEC; t += 1 / 40) at(t, () => engine.tickMusic(1, 0.85));

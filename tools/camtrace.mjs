@@ -105,7 +105,6 @@ for (const p of PROFILES) {
           move: d.move ?? { x: 0, y: 0 },
           grabPressed: !!d.grab,
           useHeld: !!d.use,
-          dashPressed: !!d.dash,
         });
         let left = d.s ?? 0.4;
         while (left > 1e-4) {

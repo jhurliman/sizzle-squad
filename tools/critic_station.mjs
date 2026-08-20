@@ -31,7 +31,7 @@ const {
   findFocus, planGrab, buildKitchen, stationCenter, isWalkable, buildFlow, flowDir,
 } = S;
 
-const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
 const R = TUNING.chefRadius;
 const K0 = buildKitchen();
 

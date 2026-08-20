@@ -17,7 +17,7 @@ import type { SimEvent } from '../domain/types';
  *   serve / fire / game over      -6 dBFS   the three things you must not miss
  *   chopDone cookDone serveWrong -11 dBFS   task-completed tier
  *   orderNew orderWarn expired   -12 dBFS   the ticket drum beat
- *   pickup place trash dash bump -14 dBFS   handling tier
+ *   pickup place trash bump -14 dBFS        handling tier
  *   chopTick                     -19 dBFS   rhythm texture, one of many
  *   footstep                     -29 dBFS   floor texture, four chefs of it
  *   music (RMS, not peak)        -33 dBFS   under everything, never masking
@@ -362,7 +362,7 @@ export class AudioEngine {
     /**
      * A filter throws away most of white noise's energy, so an envelope peak of
      * 0.1 on a Q=5 bandpass produced a measured peak of 0.007 — which is why the
-     * old chop tick, bin, dash and footstep all measured 20-40 dB under where
+     * old chop tick, bin and footstep all measured 20-40 dB under where
      * the code said they were, and why a footstep was inaudible on a phone.
      * Compensate by how much of the spectrum survives, so `gain` means roughly
      * the same thing for a noise voice as it does for a tone.
@@ -603,13 +603,6 @@ export class AudioEngine {
       }
 
       // Whoosh. Broadband, no tone at all, sweeps up then falls away.
-      case 'dash':
-        this.noise(0.13, 0.095, 500, { to: 3400, q: 1.1, attack: 0.012, pan });
-        this.noise(0.12, 0.044, 2600, { to: 700, q: 1.0, delay: 0.1, pan });
-        break;
-
-      // Floor texture. 23 dB under a serve, detuned per chef so four chefs
-      // walking never phase-lock into one marching sound.
       case 'footstep': {
         if (!this.gate(`step${e.chef}`, 0.09)) return;
         const k = 1 + ((e.chef * 37) % 5) * 0.06;

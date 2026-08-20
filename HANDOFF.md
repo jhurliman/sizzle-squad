@@ -1,6 +1,6 @@
 # HANDOFF — Sizzle Squad
 
-*This file is the prompt for the agent taking over. Read it top to bottom before
+*This file is the brief for whoever takes over. Read it top to bottom before
 running anything. Then read `REFERENCE.md`, then `AGENTS.md`, then open
 `refs/dash-and-dine-01.jpeg` and `refs/dash-and-dine-02.jpeg` with the Read tool
 and actually look at them. Everything below assumes you have seen those images.*
@@ -10,33 +10,52 @@ and actually look at them. Everything below assumes you have seen those images.*
 ## 1. What you have inherited
 
 A single-player, endless score-attack cooking game in Three.js that runs in a
-browser on iPad, iPhone and desktop. You play one original mascot chef against
-three bot teammates in one kitchen; the pressure escalates until you fail. No
-Nintendo IP anywhere — the cast is four chunky big-headed originals (bramble
-bear, pip frog, nori cat, mochi bird).
+browser on iPad, iPhone and desktop, published to GitHub Pages on every push to
+`main`. You play one original mascot chef against three bot teammates in one
+kitchen; the pressure escalates until you fail. No Nintendo IP anywhere — the
+cast is four chunky big-headed originals (bramble bear, pip frog, nori cat,
+mochi bird), and every mesh, texture, sound and animation is generated at
+runtime. There are no asset files.
 
 The user's standing instruction, verbatim, is that this be **"utterly perfect,
 playful and gorgeous, with every single thing done at Nintendo-quality — from
 touch controls to bot behavior to the feel of rushing through a kitchen."**
-There is **no fixed number of rounds**. The loop ends when a harsh fresh-context
-critic, comparing our real pixels blind against the reference, stops being able
-to name a gap.
 
-It is not there yet. Section 5 is the honest list of what is wrong, with the
-measured number attached to each item.
+It is not there yet. Section 5 is the honest list of what is wrong.
 
 ## 2. The method — this is the important part
 
-This project has one working method and it is the reason anything here is good.
-Do not quietly drop it.
+This project has two working methods and they are the reason anything here is
+good. Do not quietly drop either.
 
-**Builders build. Critics judge. Critics never read the builder's summary.**
+### 2a. Real play beats every critic
 
-A critic gets: a fresh context, the reference images, and instructions to run
-the real game in real Chromium at four device profiles and open the actual
-pixels. It then puts ours and the reference side by side, says **which is
-better and why in pixels**, names **the single biggest gap in one sentence**,
-and scores 0–100. If it loses, the builder goes back in with that one gap.
+**The single highest-value input to this project is the user playing it on a
+phone and telling you what confused them.** Every wave since the game shipped to
+Pages has come from that, and it has found things no amount of instrumentation
+did: a mechanic nobody could explain, a grey object that read as cookware, a
+plate stack that implied a rule the game does not have, a button that mostly did
+nothing.
+
+Two things characterise good responses to this feedback, and both are worth
+copying:
+
+1. **Take the note as a symptom, then find the cause.** "The portrait camera is
+   too zoomed in" and "the follow feels too loose" were reported as two
+   complaints and were one number (`HALF_WIDTH_MIN`, whose rest solve and widened
+   solve were 25% apart).
+2. **Prefer deleting a concept to tuning one.** The dash, the plate tower, the
+   liftable pan and the carried burnt rasher were all removed rather than
+   adjusted, and every one of those removals made the game easier to explain.
+
+### 2b. Builders build, critics judge, critics never read the builder's summary
+
+For anything visual, a fresh-context critic gets the reference images and
+instructions to run the real game in real Chromium at four device profiles and
+open the actual pixels. It puts ours and the reference side by side, says
+**which is better and why in pixels**, names **the single biggest gap in one
+sentence**, and scores 0–100. If it loses, the builder goes back in with that
+one gap.
 
 Three rules learned the hard way:
 
@@ -46,70 +65,50 @@ Three rules learned the hard way:
 2. **The critic's first duty is to check which of the previous round's demands
    are genuinely visible in the pixels, versus claimed but not delivered.**
    Builders are sincere and still wrong about this constantly.
-3. **Every brief must carry both bounds and a measured target.** The single
-   most reliable failure mode in this project is one-directional briefs causing
-   overshoot. "Tickets are too small" produced tickets that were too loud.
-   "The room is too empty" produced 41% honey wood in the lower 45% of frame
-   against a reference 18–23%. Write briefs as ranges, never as directions.
+3. **Every brief must carry both bounds and a measured target.** The most
+   reliable failure mode here is one-directional briefs causing overshoot.
+   "Tickets are too small" produced tickets that were too loud. "The room is too
+   empty" produced 41% honey wood in the lower 45% of frame against a reference
+   18–23%. Write briefs as ranges, never as directions.
 
 **Instrumentation beats inspection.** Nearly every real defect here was found by
 measuring, not looking: the character springs diverging, the clamp whose floor
 sat above its ceiling, the sine dead-zone welding legs together, the game being
 arithmetically unwinnable, the bots not reacting to the player at all. When you
-suspect something, write a probe into `tools/` and get a number. That is what
-the forty scripts in there are.
+suspect something, write a probe into `tools/` and get a number.
 
-Between major waves, **spawn one fresh agent to play the whole game end to end
-and smooth everything into one coherent thing.** Piece-wise polish drifts.
+**And what a probe cannot judge, photograph deliberately.** `tools/scene.mjs`
+stages a named state — a burning pan, ruined food in hand, a chef pressed into a
+wall — freezes the simulation there and crops to it by projecting a world point
+through the live camera. `--strip N` tiles frames 200ms apart, because one still
+cannot tell a flame that moves from a flame that wobbles. The skillet fire
+shipped unphotographed before this existed, because bots clear a burnt pan
+within two seconds of it happening.
 
 ## 3. Where things stand
 
-Scores are the last fresh-critic verdict for each piece, 0–100, where 90+ means
-the critic would believe it shipped on a Nintendo platform.
+Merged to `main`, newest first:
 
-**Look (wave 1.5 finals)**
+| # | What it did |
+|---|---|
+| Wave 5 | The focus glow stops promising actions that do nothing; the pan never leaves the burner; the chef can no longer clip the door, the wall stone, or walk below the bottom of the frame. |
+| Test suite | `npm test`: three probes, wired into the deploy gate. See AGENTS.md. |
+| Wave 4 | One-tap chop, progress dials on chop and cook, portrait camera opened up and its follow tightened. |
+| Wave 3 | The arch became the real cooker, grab and chop merged into one action button, hearth fire restored. |
+| p06 + RECOMPOSE | Touch stick made absolute again, portrait framing re-solved to 0 camera failures, published to Pages. |
 
-| Piece | Score | The gap the critic named |
-|---|---|---|
-| p03 Kitchen set & readability | 80 | Overcorrected: 41% honey wood in the lower 45% of landscape frames vs reference 18–23%. The near half fused into a raft of plank. |
-| p01 Camera & framing | 76 | `cameraRig.ts:1993` substitutes `LOST_MAX = 0.9` for `rescueMax` on exactly the tall aspect that `RESCUE_MAX_TALL = 0.68` and `CENTRE_MAX_TALL = 0.33` exist to protect. iPhone portrait loses its anchor. |
-| p07 Orders & HUD | 76 | With three live orders the third is `display:none`, and no ticket ever shows time pressure — the two states that end a run are the two the HUD does not draw. |
-| p02 Art direction & lighting | 74 | Bench planks no longer separate from the floor they stand on. |
-| p04 Mascot chefs & animation | 68 | Legs animate but nothing above the hips rotates — rigid torso, both arms abducted at every speed. Tightrope walkers, not runners. |
+Since then, and in flight on this branch: the staged-photography harness, the
+wild skillet fire, and three simplifications (burnt food scrapes in place, one
+plate, no dash).
 
-**Feel (wave 2A finals — first time this axis was ever judged: build → judge →
-rework → judge, 17 agents, 3.6M tokens)**
+**Current measured state**, `tools/shoot.mjs --insets`, all four profiles:
+0 console errors, 0 camera failures, ~5ms/frame in the software rasteriser.
+`npm test` green in about six seconds.
 
-| Piece | r1 → r2 | The gap the critic named at r2 |
-|---|---|---|
-| p14 Station interaction | 62 → **79** | The sim's targeting is world-class but the sign that communicates it thrashes: the verb changes 3.21 times a second and each glyph pop costs 258ms, so the indicator is mid-animation 83% of the time it is on screen. |
-| p05 Movement feel | 68 → **74** | The chefs' feet never touch the floor. The weight-bearing foot travels through world space at a median **1.05× the body's own speed**, so a superbly-tuned sim is presented as two pendulums dragged across stone rather than a character that grips and pushes. |
-| p10 Bot teammates | 58 → **68** | Three bots close **98% of tickets on their own**. A competently-played fourth chef — you — is worth +0.8% to +6.3% of dishes, statistically indistinguishable from zero. The kitchen does not need you. |
-| p06 Touch controls | 78 → **62** | **Regressed.** Once the thumb passes the ring's own radius — every sustained run — the stick stops being an absolute control: steering gain climbs to 1.4–2.1×, the chef ends up running **up to 62° away from where the thumb points**, permanently, with zero self-correction, while the drawn knob that would expose the lie is parked up to 238px from the finger. |
-| p09 Audio | — | **Never judged.** The wave 2A audio builder died on an API 529 before finishing. This piece has had no pass at all. |
-
-### Read the touch regression before you do anything else
-
-p06 is the one number in this project that went **down**. The r1 critic asked
-for the floating stick's unbounded origin drag to be clamped. The rework agent
-decided to close the gap "differently than asked" and shipped a different
-model, which traded a visible-but-honest control for an invisible-and-lying
-one. Two lessons, both worth more than the fix:
-
-- When a critic names a gap and a builder substitutes its own solution, the
-  next critic must be told exactly what was asked for, so it can judge the
-  substitution rather than only the result.
-- **Re-judge after every rework, always.** Wave 2A only caught this because it
-  ran judge → rework → judge. A wave that stops at rework ships regressions.
-
-The correct fix for p06 is almost certainly the one originally asked for:
-bound the origin drag so the stick stays under the thumb and remains absolute.
-`tools/touchprobe.mjs` (real CDP `Input.dispatchTouchEvent`, not the
-`__game.setInput` hook — it exercises `src/input` for real) and
-`tools/stickprobe.mjs` are your regression suite. Use them.
-
-`progress/status.json` is the live board; `node tools/progress.mjs` regenerates
-the HTML page from it. **Keep it updated as you work** — the user watches it.
+> ⚠️ **`progress/status.json` is stale.** It reads wave 3.0, last updated
+> 2026-08-18, and several waves have shipped since. The user watches the page it
+> generates (`node tools/progress.mjs`), so either bring it up to date from the
+> table above or say plainly that it is behind — do not leave it quietly wrong.
 
 ## 4. How the code is shaped
 
@@ -119,21 +118,30 @@ the HTML page from it. **Keep it updated as you work** — the user watches it.
   unseeded `Math.random()`. Same seed + same inputs ⇒ same run (mulberry32).
   The sim emits `SimEvent`s and the view, audio and haptics subscribe — which
   is why juice can never disagree with sim truth. Preserve this. It is what
-  makes the whole harness possible.
+  makes the whole harness possible, and `tools/soak.mjs` enforces it by
+  scanning the source, because a determinism test comparing two runs inside the
+  same second will happily pass a `Date.now()` that has been added to the sim.
 - `src/view/**` reads domain state and never mutates it.
 - `src/ui/**` is DOM, so text stays crisp at every DPR.
 - Touch, keyboard, gamepad and **bots** all produce the same `InputSnapshot`.
   Bots cannot teleport, turn instantly or reach through walls, and must never
   be given a shortcut that the player does not have.
-- Audio is entirely synthesised at runtime. There are no asset files in this
-  project, by design.
+- Audio is entirely synthesised at runtime.
 - `src/domain/types.ts`, `src/domain/content.ts` and `src/main.ts` are shared
-  high-traffic surfaces: **additive changes only**, never reorganise them.
+  high-traffic surfaces: **additive changes only, never reorganise them**. That
+  rule is about not pulling a hot file out from under a concurrent piece — it is
+  *not* an API compatibility contract, and it does not mean dead fields must be
+  kept alive. Nothing outside this repository consumes these types; everything
+  that reads them is built from source in the same pass.
 
-Sizes, so you know what you are opening: `view/world.ts` 5575 lines,
-`view/characters.ts` 4057, `bots/brain.ts` 2501, `view/cameraRig.ts` 2128,
-`view/materials.ts` 1875, `ui/hud.ts` 1611, `domain/sim.ts` 1428, `main.ts`
-1062. About 25k lines of TypeScript across 17 files.
+Sizes, so you know what you are opening: `view/world.ts` 6286 lines,
+`view/characters.ts` 3832, `bots/brain.ts` 2507, `view/cameraRig.ts` 2351,
+`view/materials.ts` 1875, `domain/sim.ts` 1727, `ui/hud.ts` 1611, `main.ts`
+1248. About 26k lines of TypeScript across 17 files.
+
+The comments carry the archaeology — most of them record a measurement and the
+wrong turn it corrected. They are long on purpose. Read the one above a constant
+before you retune it.
 
 ### Things that will bite you
 
@@ -144,120 +152,78 @@ Sizes, so you know what you are opening: `view/world.ts` 5575 lines,
   add a spring anywhere, sub-step it. Do not raise or lower the 0.5.
 - **`ovenSpan()` is exported from `kitchen.ts`** so the view's architecture can
   never drift from what the sim treats as solid. Use it; do not re-derive.
-- **`Plate.stack` is cosmetic only** — the armful count for the reference's
-  comedy plate tower. It collapses to 1 when set down. Do not let logic depend
-  on it.
 - **Three.js `vertexColors` multiplies the geometry `color` attribute**, and an
   absent attribute reads (0,0,0). Particles rendered as black squares for a
   while because of this. Seed white plus a real per-instance alpha.
 - **An offline sim rig that calls `createSim()` without `seedPans()` is
   measuring a broken kitchen.** `main.ts` calls `seedPans()` immediately after
-  `createSim()`. Several throwaway critic probes did not, so with no pan on
-  either burner `planIngredient`'s cook rung could never match and whole
-  recipes were unreachable — and the resulting numbers were quoted in a verdict.
-  If you write a headless rig, mirror `main.ts`'s boot sequence exactly.
+  `createSim()`. With no pan on either burner, `planIngredient`'s cook rung can
+  never match and whole recipes are unreachable — and those numbers have been
+  quoted in a verdict before. Mirror `main.ts`'s boot sequence exactly. Note
+  also that `createSim` takes an options object: `createSim(4242)` silently runs
+  seed 1337.
 - **Tone mapping** is a custom highlight-shoulder applied to the *max channel*
   (`TONE_KNEE = 0.62`, `TONE_CEIL = 0.9` in `main.ts`), which preserves hue and
   saturation exactly. Lighting is budgeted as fractions of albedo, `LUX = π`.
   If you change lighting, change the budget, not individual lights.
+- **Additive layers share one clamped budget** (`FIRE_ADD_BUDGET`, `fireTint`).
+  A colour authored at full strength can arrive on screen at 46% of itself
+  because its declared share was set for an older, dimmer layer. If a light
+  source looks weak, check the arithmetic before you redraw the geometry.
+- **SwiftShader resolves depth ties consistently**, so z-fighting is
+  structurally invisible to this harness. It will still flicker on a real GPU.
+  The same goes for anything that depends on driver-specific blending.
 
-## 5. Open gaps, with numbers
+## 5. Open gaps
 
-Everything here is measured. Do not re-derive; do verify.
-
-**Closed by wave 2A — do not re-open, but do verify:**
-
-- The focus indicator (0.16% of frame, +10 luma, hidden under a bench) and the
-  silently-refused press (36% of presses emitted zero events) were both fixed;
-  station interaction went 62 → 79. There is now a grab input buffer
-  (`grabBufferSeconds: 0.15`, which deliberately does **not** decay while
-  stunned, because a bump is 160ms and a decaying 150ms buffer would eat every
-  post-bump press).
-- Lane length: the map was re-solved with `tools/mapsearch.mjs` and the median
-  open run went **1.137u → 3.129u**, against 0.68u to reach 90% of top speed.
-  That constraint is satisfied.
-
-**Still open, with numbers measured today:**
-
-- **Dead dashes.** `tools/feelcrit-lanes.mjs` currently reports lane-aligned
-  cardinal dashes with a **median gain of 0.036u and 57.3% dead** — the dash
-  button mostly does nothing, on a map that now has the room for it. A dash
-  should cover 1.92u. This is the highest-value single fix in the movement
-  piece and it is separate from the foot-slide gap above.
-- **The bots still barely need you.** Wave 2A improved them a lot (58 → 68) but
-  three bots close 98% of tickets alone. Keep using the diagnostic that found
-  this: *change the player's policy and see whether the kitchen's output
-  moves.* If a competent player is worth statistically zero dishes, the bots
-  are a solo script running next to you. Note also that `brain.ts`'s own header
-  claims +9.8% for the player and that no longer reproduces — fix the comment
-  when you fix the number.
-- **Audio has never been judged at all** (see the table above).
-
-**RECOMPOSE pass — two remaining measured constraints, to be satisfied
-together.** One pass, not two tickets, because fixing either alone breaks the
-other:
-
-1. **Bench raft.** 41% honey wood in the lower 45% of frame; reference is
-   18–23%. Also `p02`: benches at luma 133 / S 0.64 must separate from a floor
-   at 158 / S 0.55.
-2. **Back wall and portrait framing.** Ours spans 1.00 of frame width; the
-   reference spans 0.84, which is what gives it the angled side-wall wedges at
-   the extreme left and right. We lose them entirely. `shoot.mjs` emits this as
-   a camera assertion and populates `cameraFailures` in `report.json` — the
-   final run in `shots/handoff-final/` has **13 camera failures on iPhone
-   portrait and 0 on all three other profiles**, including `visibleDepthRatio
-   2.04–2.49 outside 1.75–1.81` and one frame where `room centre 0.71 past the
-   composition stop 0.68 — player would be off the picture`. Portrait is the
-   whole job here. Open
-   `shots/handoff-final/iphone-portrait/t0013s.jpg` next to
-   `shots/handoff-final/desktop/t0013s.jpg` and the difference is not subtle:
-   desktop is close to the bar, portrait wastes its entire lower half on empty
-   floor.
-
-**Wave 2B, not yet started:**
-
-- **p08 VFX & juice** — steam, fire, confetti, hitstop, screen shake. Subscribe
-  to `SimEvent`s; never drive juice off view state.
-- **p11 Order flow & difficulty** — score-attack pacing and the escalation
-  curve. Note the balance history: the game was once arithmetically unwinnable
-  (3 misses × 0.34 patience against a 1.0 meter over a 180s round; measured
-  across 14 bot-only runs that died at 118–164s and scripted-player runs that
-  died at 54–87s; not one reached the clock). It is now `patiencePerMiss: 0.16`.
+- **The bots barely need you.** Three bots close ~98% of tickets alone; a
+  competently-played fourth chef is worth statistically zero dishes. The
+  diagnostic that found this is the one to keep using: *change the player's
+  policy and see whether the kitchen's output moves.* `brain.ts`'s own header
+  still claims +9.8% for the player and that no longer reproduces — fix the
+  comment when you fix the number. This is the biggest open design problem in
+  the project.
+- **Audio has never been judged.** Not once, by anyone. `tools/audioprobe.mjs`
+  renders offline and reports a mix table, and it passes, but passing a mix
+  table is not the same as sounding good.
+- **The white haze on portrait → landscape rotate.** Reported from a real
+  device and explicitly parked by the user until they raise it again. Do not
+  spend a wave on it unprompted; do not forget it exists.
+- **iOS audio after backgrounding** was fixed against the spec and has never
+  been confirmed on real hardware.
+- **`tools/touchprobe.mjs` reports one ground-truth mismatch** on iPhone
+  portrait, ~8px above the action button's halo: `regionAt` predicts the pixel
+  steers and a real touch there does not. One sample of twelve, at a boundary.
+  It became visible when the button cluster shrank to a single disc; the
+  discrepancy is between the shipped predicate and the real touch path, and
+  neither has been read closely yet.
+- **Order flow and difficulty** have never had a dedicated pass. Balance
+  history worth knowing: the game was once arithmetically unwinnable (3 misses ×
+  0.34 patience against a 1.0 meter over a 180s round; measured across 14
+  bot-only runs that died at 118–164s and scripted-player runs that died at
+  54–87s; not one reached the clock). It is now `patiencePerMiss: 0.16`.
   **Re-verify with runs, not with reasoning, after any change to this.**
-- **p12 Onboarding & screens** — title, the first 30 seconds, results.
-- **p13 Performance** — was flagged urgent (under 2fps in the software
-  rasteriser, distorting the critic loop itself). **This is now stale**: the
-  final run measures 4.7ms/frame portrait, 5.5ms landscape, 6.2ms iPad,
-  6.9ms desktop, with zero console errors on all four profiles. Absolute fps
-  headless is not meaningful, but *relative* regression and
-  `report.json → perf.worstFrameMs` are, and there is no fire here any more.
-  Re-scope p13 to real-device testing and the 772kB (215kB gzipped) bundle.
+- **Onboarding** — title, the first 30 seconds, results screen.
+- **Real-device performance** and the 772kB (215kB gzipped) bundle. Headless
+  fps is not meaningful; relative regression is.
 
 ## 6. Running the loop
 
-Before you finish anything, always:
-
-```bash
-cd /home/claude/kitchen
-npx tsc --noEmit                                    # must be clean
-npx vite build                                      # must succeed
-node tools/shoot.mjs --out shots/<piece>-<round> --seconds 14
-```
-
-Then **open the JPEGs with the Read tool and look at them.** A change you have
-not seen rendered is a change you have not made.
+Before you finish anything, always run what `AGENTS.md` lists — typecheck,
+`npm test`, build, shoot, and **open the images and look at them**. A change you
+have not seen rendered is a change you have not made.
 
 ### Harness facts you would otherwise rediscover painfully
 
 - **Capture mode is the whole ballgame.** Measured on this box: render 3.8ms,
-  advancing one second of game time 71ms, capturing one frame **8,600ms**. Before
-  capture mode, 51% of all agent wall-clock in this project was screenshots
-  (159 runs, 606 of 1194 minutes). `?capture=1` + `advance()` + DPR 1 + raw CDP
-  `Page.captureScreenshot` (JPEG, `fromSurface: false`) fixed it. Never go back
-  to `page.screenshot()` — the wrapper waits on font loading and routes through
-  the surface compositor, and stalls past a 120s timeout.
-- Playwright 1.62.1 expects `chromium-1234`; this sandbox has **`chromium-1194`**.
-  Launch with an explicit
+  advancing one second of game time 71ms, capturing one frame **8,600ms**.
+  Before capture mode, 51% of all agent wall-clock in this project was
+  screenshots (159 runs, 606 of 1194 minutes). `?capture=1` + `advance()` +
+  DPR 1 + raw CDP `Page.captureScreenshot` (JPEG, `fromSurface: false`) fixed
+  it. Never go back to `page.screenshot()` — the wrapper waits on font loading
+  and routes through the surface compositor, and stalls past a 120s timeout.
+- Playwright expects a `chromium-1234` build; this sandbox has
+  **`chromium-1194`**. Launch with an explicit
   `executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'` plus
   `--no-sandbox --disable-dev-shm-usage`. Never run `playwright install`.
 - **Headless Chromium reports zero safe-area insets**, so nothing was ever
@@ -266,76 +232,56 @@ not seen rendered is a change you have not made.
   an explicit `timeout` (up to 600000ms).
 - **Reap orphaned Chromium, but check process age first.** Eleven accumulated
   once, ~4GB on a 2-core box. A *young* process tree is a live run — killing it
-  destroys work. `shoot.mjs` now tears the browser down on exit, SIGINT,
-  SIGTERM, `uncaughtException` and watchdog.
-- Use absolute paths, or `cd /home/claude/kitchen` explicitly, in every command.
-  Working-directory drift produced bogus `tsc`/`vite build` failures more than
-  once.
-
-### Workflow mechanics
-
-Fan-out is done with the `Workflow` tool, `pipeline()` by default so critics
-start on a finished piece while other pieces are still building. Structured
-output schemas on every agent, so verdicts come back as data.
-
-**Workflows stall roughly every two hours.** This happened three times in wave 1
-and once in wave 1.5. It is not fatal and it is not your fault. The recovery is:
-verify `npx tsc --noEmit` and `npx vite build` are clean, then relaunch with
-`Workflow({ scriptPath, resumeFromRunId })` — completed agents replay from
-cache and only the interrupted one re-runs. Scripts are persisted automatically
-under the session directory and the path comes back in the tool result.
-
-**Test liveness in this order** (I got this wrong three separate times):
-
-1. `TaskOutput` status.
-2. `find src tools -newermt "-25 minutes" -type f`
-3. journal entries.
-
-`shots/` mtime goes stale for an hour while work continues, because critics
-reuse directories. Journal age goes stale for 80+ minutes while an agent edits
-files continuously. Neither alone means anything.
-
-For long unattended stretches, schedule heartbeats back into your own session
-with `mcp__claude-code-remote__send_later`.
+  destroys work. `shoot.mjs` tears the browser down on exit, SIGINT, SIGTERM,
+  `uncaughtException` and watchdog.
+- **To see where an invisible thing goes, draw it in magenta at full opacity.**
+  The skillet's smoke was tuned three times against pictures that showed
+  nothing, on the assumption it was too faint. Painted opaque, it turned out to
+  be a plume twice the intended size, in the wrong place entirely. One
+  deliberately wrong render beats three rounds of guessing at a number.
+- **A sweeping regex across many files needs its diff read, not its exit code.**
+  Removing one key from 21 tool files silently glued a condition onto the line
+  above in one of them, turning a held button into a one-tick press inside the
+  rig whose entire job is replaying the screenshot driver's plan. It still ran,
+  still printed, still passed. A review bot caught it.
 
 ## 7. What the user asked for, in their words
 
-Keep these visible while you work:
-
+- "Utterly perfect, playful and gorgeous, with every single thing done at
+  Nintendo-quality — from touch controls to bot behavior to the feel of rushing
+  through a kitchen."
 - "Break the game into the smallest pieces that can be improved and judged on
   their own — you decide what the pieces are, not me."
-- "Fan out sub-agents and have sub-agents tackle each one individually."
-- A separate fresh-context sub-agent must "inspect the actual running game on
-  iPad, iPhone, and desktop — **never the builder's summary**."
-- The critic must be "a really harsh critic, and if it doesn't feel
-  Nintendo-quality, it should keep going."
-- "It should literally compare them side by side blind and say which one is
-  better, and when ours loses, name the single biggest gap and send the builder
-  back in. **No fixed number of rounds.**"
-- "Between major waves, spawn one fresh agent to play the whole game and smooth
-  everything into one coherent thing."
+- A fresh-context critic must "inspect the actual running game on iPad, iPhone,
+  and desktop — **never the builder's summary**", be "a really harsh critic",
+  compare "side by side blind", name the single biggest gap, and keep going with
+  **no fixed number of rounds**.
 - "Keep a simple live progress page updated as you work so I can watch it
   evolve."
+- "I want a gitlab actions setup that publishes the game to github pages and
+  link from README so I can play on my phone." — done; it is how every wave
+  since has been driven.
+- "We want to keep this game as simple as possible." Said of the dash, and
+  applied since to the pan mechanic, the plate stack and the burnt rasher.
+- "Write tests to catch future regressions." — `npm test`, and it gates the
+  deploy.
+- "You can't improve what you can't see." — `tools/scene.mjs`.
 - Cast: original mascot critters, no Nintendo IP. Structure: endless score
   attack, one kitchen, escalating pressure until you fail.
+- Pull requests: open them **ready for review, never as drafts**.
 
 ## 8. Suggested first moves
 
-1. `npm install`, then `npx tsc --noEmit && npx vite build` to confirm the
-   inherited tree is clean.
+1. `npm install`, then `npx tsc --noEmit && npm test && npx vite build` to
+   confirm the tree is clean.
 2. `node tools/shoot.mjs --out shots/inherit --insets --seconds 14` and open
-   every JPEG, all four profiles. Form your own opinion before trusting mine.
-3. **Fix p06 touch first.** It is the lowest score, it is a regression rather
-   than an absence, the fix is already specified, and it is the piece the user
-   physically holds. Bound the origin drag. Re-judge with a fresh critic that
-   has been told what r1 originally asked for.
-4. **Then RECOMPOSE** — one brief carrying both constraints in section 5 with
-   both bounds on each, aimed squarely at iPhone portrait. It unblocks p01,
-   p02 and p03 together, and the `cameraFailures` count in `report.json` is a
-   hard, automatic acceptance test: it must reach 0 on all four profiles.
-5. **Then p09 audio**, which has never had a pass, and the dead-dash number
-   under p05.
-6. Then wave 2B: p08 VFX, p11 order flow, p12 onboarding, p13 re-scoped.
-7. Then a fresh coherence agent playing the whole game end to end.
-8. Then critics again on everything. Keep going until a harsh critic with fresh
+   every JPEG, all four profiles. Then `node tools/scene.mjs --strip 5` and open
+   those. Form your own opinion before trusting mine.
+3. **Play it on a phone**, or get the user to. It is the highest-yield thing in
+   this document and it is not close.
+4. **Then the bots.** They are the biggest open design problem: a kitchen that
+   does not need its player is not a game, and no amount of art fixes it.
+5. **Then audio**, which has never had a pass at all.
+6. Then order flow and onboarding.
+7. Then critics again on everything. Keep going until a harsh critic with fresh
    context, looking at real pixels beside the reference, cannot name a gap.

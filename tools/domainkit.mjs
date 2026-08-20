@@ -82,7 +82,6 @@ export const NO_INPUT = {
   move: { x: 0, y: 0 },
   grabPressed: false,
   useHeld: false,
-  dashPressed: false,
 };
 
 /** Small assertion recorder so every probe reports the same way. */

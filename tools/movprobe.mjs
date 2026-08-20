@@ -6,18 +6,18 @@
  * Why this exists: nobody has ever judged how this kitchen FEELS, and the
  * things that decide that — time to top speed, coast distance, how much speed a
  * corner costs, whether the carry penalty is above the just-noticeable
- * difference, whether a dash is worth its cooldown, whether a chef slides off a
+ * difference, whether a chef slides off a
  * bench corner or welds himself to it — are all invisible in a screenshot and
  * trivial in a log.
  *
  *   node tools/movprobe.mjs                    # full report
  *   node tools/movprobe.mjs --json             # machine readable
- *   node tools/movprobe.mjs --only accel,dash  # accel reverse turn dash bump
+ *   node tools/movprobe.mjs --only accel,turn  # accel reverse turn bump
  *                                              # clip weave route lanes tuning
  *
  * TWO RIGS, ON PURPOSE.
  *
- * The MODEL measurements (accel, stop, reversal, turn, dash) run in a 61x61
+ * The MODEL measurements (accel, stop, reversal, turn) run in a 61x61
  * arena of bare floor built through the same `buildKitchen`, because in the
  * real 15x11 room a chef at 6.2 u/s hits the far wall in under two seconds and
  * every "top speed" you measure is a wall-stall. The first cut of this tool
@@ -68,7 +68,6 @@ const IN = (move = { x: 0, y: 0 }, o = {}) => ({
   move,
   grabPressed: !!o.grab,
   useHeld: !!o.use,
-  dashPressed: !!o.dash,
 });
 
 const N = 61;
@@ -214,50 +213,6 @@ function turn(deg, carry) {
     tHeadAligned: r3(headOk ? headOk.t : NaN),
     turnRadius: r3(swing),
     skidSeconds: r3(skid),
-  };
-}
-
-// --------------------------------------------------------------- 4. dash
-
-function dashProfile() {
-  const s = rig(MID, null, true);
-  drive(s, 90, () => IN({ x: 1, y: 0 }));
-  const x0 = s.chefs[0].pos.x;
-  const log = drive(s, 120, (t) => IN({ x: 1, y: 0 }, { dash: t === 0 }));
-  const peak = Math.max(...log.map((r) => r.sp));
-  const settleIdx = log.findIndex((r, i) => i > 3 && r.sp <= TUNING.moveSpeed * 1.02);
-  const settleT = (settleIdx + 1) * DT;
-  const gain = log[settleIdx].x - x0 - TUNING.moveSpeed * settleT;
-
-  // 20-unit straight race in the open arena: walk vs dash-the-moment-it's-back.
-  const race = (useDash) => {
-    const s2 = rig({ x: 4, y: MID.y }, null, true);
-    drive(s2, 90, () => IN({ x: 1, y: 0 }));
-    const start = s2.chefs[0].pos.x;
-    let ticks = 0;
-    for (let i = 0; i < 1200; i++) {
-      const cd = s2.dash[0].cooldown;
-      step(s2, [IN({ x: 1, y: 0 }, { dash: useDash && cd <= 0 })]);
-      s2.events.length = 0;
-      ticks++;
-      if (s2.chefs[0].pos.x - start >= 20) break;
-    }
-    return ticks * DT;
-  };
-  const walk = race(false);
-  const dash = race(true);
-  return {
-    peakSpeed: r3(peak),
-    burstDistance: r3(TUNING.dashSpeed * TUNING.dashSeconds),
-    tBackToCruise: r3(settleT),
-    unitsGainedPerDash: r3(gain),
-    cooldown: TUNING.dashCooldown,
-    /** the price of the button: how much of a cycle you spend NOT dashing */
-    dutyCyclePct: Math.round((TUNING.dashSeconds / TUNING.dashCooldown) * 100),
-    twentyUnitWalk: r3(walk),
-    twentyUnitDashSpam: r3(dash),
-    spamSpeed: r3(20 / dash),
-    spamAdvantagePct: Math.round((walk / dash - 1) * 100),
   };
 }
 
@@ -525,8 +480,8 @@ function bumpRate(seconds = 150, seeds = [3, 11, 29, 101, 555, 909]) {
 // -------------------------------------------------- 7d. throughput A/B
 
 /**
- * DOES THE TUNING COST THE KITCHEN ANYTHING? Slower carrying and a longer dash
- * cooldown both fall on the bots, who carry constantly and dash on every long
+ * DOES THE TUNING COST THE KITCHEN ANYTHING? Slower carrying falls on the
+ * bots, who carry constantly on every long
  * leg, so a movement pass that reads better and serves fewer dishes is a
  * regression wearing a nice coat.
  *
@@ -544,9 +499,6 @@ const PRE_PASS_TUNING = {
   decelTime: 0.11,
   turnRate: 18,
   cornerSlip: 0,
-  dashSpeed: 12.5,
-  dashSeconds: 0.18,
-  dashCooldown: 0.55,
   bumpClosingSpeed: -Infinity, // the old test was on |va-vb|, approximated below
   bumpKnockback: 0,
   stunDrag: 0.11,
@@ -735,7 +687,7 @@ function route(name, fromCell, toCell, carry = null, opts = {}) {
       wi = way.length;
       return IN();
     }
-    return IN({ x: tx / d, y: ty / d }, { dash: !!opts.dash && s.dash[0].cooldown <= 0 });
+    return IN({ x: tx / d, y: ty / d });
   });
   const ticks = done < 0 ? log.length : Math.round(done / DT);
   const used = log.slice(0, ticks);
@@ -796,7 +748,6 @@ if (want('lanes')) report.lanes = lanes();
 if (want('accel')) report.straight = [null, 'ingredient', 'plate'].map(straightProfile);
 if (want('reverse')) report.reversal = [null, 'plate'].map(reversal);
 if (want('turn')) report.turns = [45, 90, 135, 180].map((d) => turn(d, null));
-if (want('dash')) report.dash = dashProfile();
 if (want('bump')) report.bump = bumpProfile();
 if (want('clip')) report.corners = cornerClip();
 if (want('park')) {
@@ -825,7 +776,6 @@ if (want('route')) {
     route('greenserve->board (11,2)->(4,6)', [11, 2], [4, 6]),
     route('room diagonal CARRY', [1, 9], [13, 2], 'plate'),
     route('room width CARRY', [1, 8], [13, 8], 'plate'),
-    route('room diagonal DASHING', [1, 9], [13, 2], null, { dash: true }),
     route('room diagonal CUT CORNERS', [1, 9], [13, 2], null, { clearance: 0.22 }),
   ];
 }
@@ -860,10 +810,6 @@ if (asJson) {
     console.log('  deg   speed kept   vel aligned   head aligned   drift    skid');
     for (const p of report.turns)
       console.log(`  ${String(p.deg).padEnd(5)} ${(p.speedKeptPct + '%').padEnd(11)} ${(p.tVelAligned + 's').padEnd(13)} ${(p.tHeadAligned + 's').padEnd(14)} ${(p.turnRadius + 'u').padEnd(8)} ${p.skidSeconds}s`);
-  }
-  if (report.dash) {
-    head('DASH');
-    for (const [k, v] of Object.entries(report.dash)) line(k, v);
   }
   if (report.bump) {
     head('BUMP  (two chefs, head on, full speed)');

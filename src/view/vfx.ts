@@ -192,12 +192,6 @@ export class Vfx {
         this.burst(e.at, 0.7, 7, 'spark', 0xffffff, { speed: 2.4, life: 0.3, size: 0.07, up: 0.8 });
         onShake(0.1);
         break;
-      case 'dash':
-        this.burst(e.at, 0.15, 6, 'puff', 0xffffff, { speed: 1.2, life: 0.35, size: 0.12, gravity: -0.4, up: 0.3 });
-        break;
-      // Running into a bench. A small warm dust puff at ankle height and
-      // nothing else — no shake, no sparks: this happens far more often than a
-      // bump and must never read as a bigger event than one.
       case 'wallHit':
         this.burst(e.at, 0.22, 5, 'puff', 0xe0cfae, { speed: 0.9, life: 0.3, size: 0.09, gravity: -0.3, up: 0.4 });
         break;

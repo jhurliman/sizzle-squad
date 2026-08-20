@@ -46,6 +46,15 @@ const SECONDS = Number(argv.seconds ?? 180);
  * The floor is 10: comfortably under the worst honest run, comfortably over the
  * 7 the burnt-pan bug produced. A regression test that fires on ordinary
  * variance gets muted within a week, so the gap is the point.
+ *
+ * SINCE THE DASH WAS REMOVED the distribution sits a little lower and a little
+ * wider — 11 to 20, median 15 over 12 seeds — because bots dashed on every long
+ * leg and now walk them. That is the mechanic being gone, not the kitchen
+ * breaking, and the floor is deliberately left at 10 rather than re-baselined
+ * down to hug it: it still separates "a service happened" from "a service did
+ * not", which is the only thing it is for. Worth knowing that the worst seed is
+ * now one dish clear of it rather than three, so a genuinely marginal future
+ * regression will show up here as a flap before it shows up as a failure.
  */
 const SERVED_FLOOR = 10;
 

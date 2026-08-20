@@ -74,19 +74,6 @@ export interface Plate {
   id: number;
   contents: Ingredient[];
   dirty: boolean;
-  /**
-   * HOW MANY CLEAN PLATES CAME OFF THE DISPENSER IN THIS ARMFUL.
-   *
-   * Nobody walks a single plate across a kitchen. A chef at the plate stack
-   * scoops up a whole tottering pile, carries it to a bench, and the top one
-   * becomes the working plate. Only that top plate is ever modelled — contents,
-   * dirty and recipe matching are unchanged — but the count is real state, set
-   * when the armful is taken and reset to 1 the moment the pile is put down or
-   * anything lands on it. The view reads it to build the reference's single
-   * loudest silhouette: a tower of crockery taller than the character carrying
-   * it (`refs/dash-and-dine-02.jpeg`, bottom centre).
-   */
-  stack: number;
 }
 
 /** Anything a chef can be carrying in their single hand slot. */
@@ -261,15 +248,12 @@ export interface InputSnapshot {
   grabPressed: boolean;
   /** Held state of the secondary action (chop / wash / plate). */
   useHeld: boolean;
-  /** Rising edge of the dash. */
-  dashPressed: boolean;
 }
 
 export const NO_INPUT: InputSnapshot = {
   move: { x: 0, y: 0 },
   grabPressed: false,
   useHeld: false,
-  dashPressed: false,
 };
 
 // ---------------------------------------------------------------- kitchen
@@ -323,7 +307,6 @@ export type SimEvent =
    * audio and vfx can scale the response instead of playing one fixed knock.
    */
   | { t: 'wallHit'; chef: number; at: Vec2; speed: number }
-  | { t: 'dash'; chef: number; at: Vec2 }
   | { t: 'footstep'; chef: number; at: Vec2 }
   | { t: 'gameOver'; score: number };
 

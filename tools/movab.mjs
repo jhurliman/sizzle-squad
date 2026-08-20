@@ -10,7 +10,7 @@
  *
  *   node tools/movab.mjs                    # the shipped-vs-day-one race
  *   node tools/movab.mjs carry              # carry weight sweep
- *   node tools/movab.mjs turn coast bump dash
+ *   node tools/movab.mjs turn coast bump
  *   SEEDBASE=50021 SEEDSTEP=113 node tools/movab.mjs turn
  *
  * READ THE SEM COLUMN BEFORE BELIEVING A ROW. `served` is a chaotic function of
@@ -43,7 +43,7 @@ fs.rmSync(ENTRY, { force: true });
 fs.rmSync(OUT, { force: true });
 const { createSim, step, SIM_DT, TUNING, BotDirector, seedPans } = S;
 
-const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
 const RUNS = Number(process.env.RUNS ?? 40);
 const SECONDS = Number(process.env.SECONDS ?? 170);
 const SEEDS = [];
@@ -105,9 +105,6 @@ const DAY_ONE = {
   turnRate: 18,
   cornerSlip: 0,
   coastTurnSpeed: Infinity,
-  dashSpeed: 12.5,
-  dashSeconds: 0.18,
-  dashCooldown: 0.55,
   bumpKnockback: 0,
   bumpStun: 0.22,
 };
@@ -118,7 +115,6 @@ const SUITES = {
     ['day-one movement (see note)', DAY_ONE],
     ['shipped minus corner slip', { cornerSlip: 0 }],
     ['shipped minus carry weight', { carrySpeedMul: 0.9, carryAccelMul: 1 }],
-    ['shipped with the old dash', { dashSpeed: 12.5, dashSeconds: 0.18, dashCooldown: 0.55 }],
   ],
   carry: [
     ['carry 0.90 / accel 1.0', { carrySpeedMul: 0.9, carryAccelMul: 1 }],
@@ -156,12 +152,6 @@ const SUITES = {
     ['turn 12, coast skid60 (shipped)', {}],
     ['turn 10, coast off', { turnRate: 10, coastTurnSpeed: Infinity }],
     ['turn 10, coast skid60', { turnRate: 10 }],
-  ],
-  dash: [
-    ['12.5 / 0.18 / 0.55 (day one)', { dashSpeed: 12.5, dashSeconds: 0.18, dashCooldown: 0.55 }],
-    ['12.0 / 0.16 / 0.80', { dashCooldown: 0.8 }],
-    ['12.0 / 0.16 / 1.00 (shipped)', {}],
-    ['12.0 / 0.16 / 1.30', { dashCooldown: 1.3 }],
   ],
 };
 
