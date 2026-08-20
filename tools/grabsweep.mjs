@@ -40,7 +40,7 @@ fs.rmSync(ENTRY, { force: true });
 fs.rmSync(OUT, { force: true });
 const { createSim, step, SIM_DT, TUNING, seedPans, buildKitchen, stationCenter, isWalkable, buildFlow, flowDir } = S;
 
-const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
 const R = TUNING.chefRadius;
 const K0 = buildKitchen();
 

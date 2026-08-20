@@ -38,8 +38,8 @@ Requires Node 20+. Chromium is only needed for the screenshot harness.
 ## Controls
 
 - **Touch** — floating thumbstick anywhere on the left half; action buttons right.
-- **Keyboard** — WASD/arrows to move, Space to grab/drop, Shift to dash.
-- **Gamepad** — left stick, A to grab/drop, B to dash.
+- **Keyboard** — WASD/arrows to move, Space to grab/drop (hold to chop).
+- **Gamepad** — left stick, A to grab/drop.
 
 All four input paths (including the bots) converge on a single `InputSnapshot`
 struct, so nothing that plays the game can do anything the player cannot.

@@ -31,7 +31,7 @@ const S = await import(OUT);
 fs.rmSync(ENTRY, { force: true });
 fs.rmSync(OUT, { force: true });
 const { createSim, step, TUNING, buildKitchen } = S;
-const IN = (m = { x: 0, y: 0 }) => ({ move: m, grabPressed: false, useHeld: false, dashPressed: false });
+const IN = (m = { x: 0, y: 0 }) => ({ move: m, grabPressed: false, useHeld: false });
 
 const N = 61;
 const rows = [];

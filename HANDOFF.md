@@ -179,11 +179,10 @@ Everything here is measured. Do not re-derive; do verify.
 
 **Still open, with numbers measured today:**
 
-- **Dead dashes.** `tools/feelcrit-lanes.mjs` currently reports lane-aligned
-  cardinal dashes with a **median gain of 0.036u and 57.3% dead** — the dash
-  button mostly does nothing, on a map that now has the room for it. A dash
-  should cover 1.92u. This is the highest-value single fix in the movement
-  piece and it is separate from the foot-slide gap above.
+- **Dead dashes — RESOLVED by deletion.** `tools/feelcrit-lanes.mjs` used to
+  report lane-aligned cardinal dashes with a median gain of 0.036u and 57.3%
+  dead. The dash button mostly did nothing; it and the whole mechanic are now
+  gone, on request, along with the two tools that existed to tune it.
 - **The bots still barely need you.** Wave 2A improved them a lot (58 → 68) but
   three bots close 98% of tickets alone. Keep using the diagnostic that found
   this: *change the player's policy and see whether the kitchen's output
@@ -333,8 +332,7 @@ Keep these visible while you work:
    both bounds on each, aimed squarely at iPhone portrait. It unblocks p01,
    p02 and p03 together, and the `cameraFailures` count in `report.json` is a
    hard, automatic acceptance test: it must reach 0 on all four profiles.
-5. **Then p09 audio**, which has never had a pass, and the dead-dash number
-   under p05.
+5. **Then p09 audio**, which has never had a pass.
 6. Then wave 2B: p08 VFX, p11 order flow, p12 onboarding, p13 re-scoped.
 7. Then a fresh coherence agent playing the whole game end to end.
 8. Then critics again on everything. Keep going until a harsh critic with fresh

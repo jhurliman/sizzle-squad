@@ -672,7 +672,6 @@ document.addEventListener('visibilitychange', () => {
 });
 
 const btnGrab = document.getElementById('btnGrab')!;
-const btnDash = document.getElementById('btnDash')!;
 /**
  * ONE ACTION BUTTON. The press and the hold are the same finger.
  *
@@ -697,8 +696,8 @@ btnGrab.addEventListener('pointerdown', (e) => {
   // buzzed 8ms for grab and 5ms for use, and the note on the second one said
   // why: "a control that answers silently while its neighbours answer feels
   // broken, not quiet." Folding them into one button dropped both, which would
-  // have left the primary control the only silent disc in the cluster while
-  // dash still buzzed. 8ms, the grab value, because a press is a press.
+  // have left the primary control the only silent disc in the cluster. 8ms,
+  // the grab value, because a press is a press.
   haptic(8);
   e.preventDefault();
 });
@@ -706,14 +705,9 @@ for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) {
   btnGrab.addEventListener(ev, () => input.setUse(false));
 }
 
-btnDash.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  input.pressDash();
-  haptic(6);
-});
 
 // haptic() now lives in src/input/input.ts: navigator.vibrate does not exist
-// on iOS Safari at all, so every call site here — grab, dash, serve, burn —
+// on iOS Safari at all, so every call site here — grab, serve, burn —
 // was silent on the device most of these players are holding.
 
 // ------------------------------------------------------------------- loop
@@ -757,7 +751,7 @@ function frame(now: number) {
   const sampled = phase === 'playing' ? input.sample() : { ...NO_INPUT, move: { x: 0, y: 0 } };
   // A RISING EDGE HAS TO SURVIVE UNTIL A SIM STEP ACTUALLY EATS IT.
   //
-  // `input.sample()` clears its queued grab/dash on every call and this frame
+  // `input.sample()` clears its queued grab on every call and this frame
   // then dropped the edge on the floor, so a tap was silently deleted whenever
   // the frame it landed on did not run a tick. Three ways that happens, and two
   // of them are routine:
@@ -781,21 +775,17 @@ function frame(now: number) {
   // that consumed it. Held state (`useHeld`) needs none of this; it is a level,
   // not an edge.
   pendingGrab = pendingGrab || scriptedInput.grabPressed || sampled.grabPressed;
-  pendingDash = pendingDash || scriptedInput.dashPressed || sampled.dashPressed;
   if (phase !== 'playing') {
     pendingGrab = false;
-    pendingDash = false;
   }
   const playerInput: InputSnapshot = scriptedInput.enabled
     ? {
         move: { ...scriptedInput.move },
         grabPressed: pendingGrab,
         useHeld: scriptedInput.useHeld || sampled.useHeld,
-        dashPressed: pendingDash,
       }
-    : { ...sampled, grabPressed: pendingGrab, dashPressed: pendingDash };
+    : { ...sampled, grabPressed: pendingGrab };
   scriptedInput.grabPressed = false;
-  scriptedInput.dashPressed = false;
   frameCount++;
 
   if (phase === 'playing') {
@@ -819,9 +809,7 @@ function frame(now: number) {
         // the one place the latch above is allowed to clear, because it is the
         // only place the edge was actually delivered.
         pendingGrab = false;
-        pendingDash = false;
         playerInput.grabPressed = false;
-        playerInput.dashPressed = false;
       }
     }
 
@@ -1059,7 +1047,6 @@ requestAnimationFrame(frame);
     if (i.move) scriptedInput.move = { ...i.move };
     if (i.grabPressed !== undefined) scriptedInput.grabPressed = i.grabPressed;
     if (i.useHeld !== undefined) scriptedInput.useHeld = i.useHeld;
-    if (i.dashPressed !== undefined) scriptedInput.dashPressed = i.dashPressed;
     if (i.enabled !== undefined) scriptedInput.enabled = i.enabled;
   },
   /**
@@ -1102,6 +1089,8 @@ requestAnimationFrame(frame);
       at?: { x: number; y: number };
       facing?: { x: number; y: number };
       carrying?: { kind: string; state: string } | null;
+      /** Put a clean plate in their hands instead of an ingredient. */
+      plate?: boolean;
     };
     /** Park the bots so they cannot undo the scene before it is photographed. */
     freezeBots?: boolean;
@@ -1135,7 +1124,8 @@ requestAnimationFrame(frame);
       if (p) {
         if (spec.player.at) p.pos = { ...spec.player.at };
         if (spec.player.facing) p.heading = Math.atan2(spec.player.facing.y, spec.player.facing.x);
-        if (spec.player.carrying !== undefined)
+        if (spec.player.plate) p.carrying = { type: 'plate', plate: { id: sim.nextId++, contents: [], dirty: false } };
+        else if (spec.player.carrying !== undefined)
           p.carrying = spec.player.carrying ? { type: 'ingredient', ingredient: ing(spec.player.carrying) } : null;
         p.vel = { x: 0, y: 0 };
       }
@@ -1256,4 +1246,3 @@ const scriptedInput = { ...NO_INPUT, move: { x: 0, y: 0 }, enabled: false, freez
 let simFrozen = false;
 /** Rising edges waiting for a sim tick to consume them. See `frame()`. */
 let pendingGrab = false;
-let pendingDash = false;

@@ -49,7 +49,7 @@ fs.rmSync(ENTRY, { force: true });
 fs.rmSync(OUT, { force: true });
 const { createSim, step, SIM_DT, TUNING, seedPans, BotDirector, planGrab } = S;
 
-const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
 const boxDist = (st, x, y) =>
   Math.hypot(Math.max(st.cell.x - x, 0, x - (st.cell.x + 1)), Math.max(st.cell.y - y, 0, y - (st.cell.y + 1)));
 const DID = new Set(['pickup', 'place', 'trash', 'serve', 'serveWrong']);

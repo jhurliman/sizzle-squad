@@ -34,7 +34,7 @@ const S = await import(OUT);
 fs.rmSync(ENTRY, { force: true });
 fs.rmSync(OUT, { force: true });
 const { createSim, step, TUNING, isWalkable, buildFlow, flowDir, buildKitchen, KITCHEN_MAP } = S;
-const IN = (m) => ({ move: m, grabPressed: false, useHeld: false, dashPressed: false });
+const IN = (m) => ({ move: m, grabPressed: false, useHeld: false });
 
 const LEGACY = [
   '###############',

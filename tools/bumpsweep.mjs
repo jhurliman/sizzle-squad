@@ -31,7 +31,7 @@ const S = await import(OUT);
 fs.rmSync(ENTRY, { force: true });
 fs.rmSync(OUT, { force: true });
 const { createSim, step, SIM_DT, TUNING, BotDirector, seedPans } = S;
-const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
 const SWEEP = String(arg('--sweep', '0,0.2,0.35,0.5,0.7,1.0')).split(',').map(Number);

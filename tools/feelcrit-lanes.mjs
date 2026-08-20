@@ -8,7 +8,7 @@ export * from ${JSON.stringify(ROOT+'/src/domain/kitchen.ts')};`);
 await build({input:ENTRY,output:{file:OUT,format:'esm'},logLevel:'silent'});
 const S=await import(OUT); fs.rmSync(ENTRY,{force:true}); fs.rmSync(OUT,{force:true});
 const {createSim,step,TUNING,isWalkable}=S;
-const IN=(m={x:0,y:0},o={})=>({move:m,grabPressed:!!o.grab,useHeld:!!o.use,dashPressed:!!o.dash});
+const IN=(m={x:0,y:0},o={})=>({move:m,grabPressed:!!o.grab,useHeld:!!o.use});
 const q=(a,p)=>{const b=[...a].sort((x,y)=>x-y);return b[Math.min(b.length-1,Math.floor(p*b.length))];};
 const r3=n=>Math.round(n*1000)/1000;
 const s0=createSim({seed:5,botCount:0}); const k=s0.kitchen;
