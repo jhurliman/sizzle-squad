@@ -992,7 +992,13 @@ function harnessRig(seconds = 16) {
       inputs[0] = {
         move: d.move ?? { x: 0, y: 0 },
         grabPressed: !!d.grab && firstTick,
-        useHeld: !!d.use && firstTick,
+        // `useHeld` IS A LEVEL, NOT AN EDGE — it must stay true for the whole
+        // segment, exactly as shoot.mjs drives it, or this rig stops replaying
+        // the screenshot driver's plan and a held chop or wash is only ever
+        // one tick long. (Lost for one commit to a careless regex sweeping out
+        // `dashPressed: !!d.dash && firstTick` on the line below and gluing its
+        // condition onto this one.)
+        useHeld: !!d.use,
       };
       const before = chef.carrying;
       const beforeHold = s.kitchen.stations.map((x) => x.holding);
