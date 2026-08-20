@@ -109,15 +109,15 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
   player.vel = { x: 0, y: 0 };
   player.carrying = null;
 
-  const idle = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+  const idle = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
   const inputs = t.chefs.map(() => ({ ...idle, move: { x: 0, y: 0 } }));
   // One tap.
-  inputs[0] = { move: { x: 0, y: 0 }, grabPressed: true, useHeld: false, dashPressed: false };
+  inputs[0] = { move: { x: 0, y: 0 }, grabPressed: true, useHeld: false };
   step(t, inputs);
   const committed = player.working !== null;
   // ...and nothing else, ever again. Note move is a hard zero every tick: if
   // the chop only advanced while a button was held, this loop would never end.
-  inputs[0] = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+  inputs[0] = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
   let ticks = 0;
   while (ticks < 300 && board.holding?.ingredient?.state === 'raw') {
     step(t, inputs);
@@ -133,7 +133,7 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
   const released = player.working === null;
   const before = { x: player.pos.x, y: player.pos.y };
   const walk = t.chefs.map(() => ({ ...idle, move: { x: 0, y: 0 } }));
-  walk[0] = { move: { x: 0, y: 1 }, grabPressed: false, useHeld: false, dashPressed: false };
+  walk[0] = { move: { x: 0, y: 1 }, grabPressed: false, useHeld: false };
   for (let i = 0; i < 20; i++) step(t, walk);
   const moved = Math.hypot(player.pos.x - before.x, player.pos.y - before.y) > 0.2;
 
@@ -169,7 +169,7 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
   const stove = t.kitchen.stations.find((st) => st.kind === 'stove');
   stove.holding = { type: 'pan', pan: { contents: [], onHeat: false, fire: 0 } };
   stove.holding.pan.contents.push({ kind: 'bacon', state: 'raw', chop: 0, progress: 0, overcook: 0 });
-  const idle = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+  const idle = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
   const inputs = t.chefs.map(() => ({ ...idle, move: { x: 0, y: 0 } }));
 
   let sawCookRise = false, cookAtHalf = 0, ticks = 0;
@@ -233,9 +233,9 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
   // Running, not standing: straight out from the board at cruise.
   player.vel = { x: board.facing.x * 4, y: board.facing.y * 4 };
 
-  const idle = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+  const idle = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
   const inputs = t.chefs.map(() => ({ ...idle, move: { x: 0, y: 0 } }));
-  inputs[0] = { move: { x: 0, y: 0 }, grabPressed: true, useHeld: false, dashPressed: false };
+  inputs[0] = { move: { x: 0, y: 0 }, grabPressed: true, useHeld: false };
   step(t, inputs);
   inputs[0] = { ...idle, move: { x: 0, y: 0 } };
 
@@ -272,6 +272,11 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
  * toward a fire that never stops, with bots/brain.ts's own `rescue`-priority
  * "clear the burnt pan" job resolving to a press that does nothing. Two burners
  * lost that way and no cooked recipe is fillable for the rest of the service.
+ *
+ * The escape hatch has since shrunk twice — first from lifting the PAN to
+ * taking the ruined FOOD, then from taking it to scraping it out where you
+ * stand — but the invariant under all three versions is the same and is what
+ * this asserts: an empty-handed press at a ruined burner must DO something.
  */
 {
   const t = createSim({ seed: 313 });
@@ -289,7 +294,7 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
   console.log('\n=== the burner is not a one-way trip');
   for (const [label, ok, extra] of [
     ['a working pan stays put', good === 'none', ` (got '${good}')`],
-    ['a burnt pan can be lifted off', spoiled === 'take', ` (got '${spoiled}')`],
+    ['a burnt pan can be cleared where it stands', spoiled === 'discard', ` (got '${spoiled}')`],
   ]) {
     if (!ok) failed++;
     console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}${extra}`);
@@ -567,7 +572,13 @@ for (const [label, kindSpec, holding, carrying, expected] of CASES) {
   const pan = stove.holding?.pan;
   R.section('clearing a ruined pan');
   R.check('the pan stays on the burner', stove.holding?.type === 'pan', ` (station holds ${stove.holding?.type ?? 'nothing'})`);
-  R.check('you are handed the burnt food, not the pan', held?.type === 'ingredient' && held.ingredient.state === 'burnt', ` (got ${held?.type ?? 'nothing'})`);
+  // NOTHING ENDS UP IN YOUR HANDS. The ruined rasher used to be handed over to
+  // be walked to the bin, and it came back from play as an unidentifiable grey
+  // object ("it looks like I picked up a small pan/skillet"). One press now
+  // does the whole job on the spot, so the test of success is that the burner
+  // is clean AND the chef is still empty-handed.
+  R.check('the burnt food is gone from the pan', !!pan && !pan.contents.some((i) => i.state === 'burnt'), '');
+  R.check('your hands stay empty', !held, ` (got ${held?.type ?? 'nothing'})`);
   R.check('the good food is left alone', !!pan && pan.contents.length === 1 && pan.contents[0].state === 'cooked', '');
   R.check('and the fire goes out with the fuel', !!pan && pan.fire === 0, ` (fire ${pan?.fire})`);
   R.check('a pan is never a thing you can hold', held?.type !== 'pan', '');

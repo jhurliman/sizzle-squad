@@ -25,7 +25,7 @@ fs.rmSync(OUT, { force: true });
 const { createSim, step, SIM_DT, TUNING, buildKitchen, isWalkable } = S;
 const DT = SIM_DT;
 const IN = (move = { x: 0, y: 0 }, o = {}) => ({
-  move, grabPressed: !!o.grab, useHeld: !!o.use, dashPressed: !!o.dash,
+  move, grabPressed: !!o.grab, useHeld: !!o.use,
 });
 const r2 = (n) => Math.round(n * 100) / 100;
 const r3 = (n) => Math.round(n * 1000) / 1000;

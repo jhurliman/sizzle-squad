@@ -33,14 +33,6 @@
              colour illustration sitting on a flat disc, at a completely
              different drawing weight from everything else on screen. -->
         <div class="action-cluster">
-          <button id="btnDash" class="btn btn-dash" aria-label="Dash">
-            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-              <g fill="none" stroke="#fff" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 7l8 9-8 9" opacity=".55" />
-                <path d="M17 7l8 9-8 9" />
-              </g>
-            </svg>
-          </button>
           <!-- The chop disc is gone. One action button now drives both the press
                and the hold; see the wiring note in main.ts and the 'prep' plan
                in domain/sim.ts for why the two could not simply be pointed at
@@ -82,7 +74,7 @@
                  for chop that appeared nowhere else on screen, and a player on
                  desktop reported not being able to find the chop control at
                  all. One key, and the line says what holding it does. -->
-            <span class="k-desktop">WASD move · Space to use (hold to chop) · Shift dash</span>
+            <span class="k-desktop">WASD move · Space to use (hold to chop)</span>
             <!-- "Left thumb" was the old rule and it was also the old bug: the
                  stick only ever spawned on the left half, so 46.8% of the
                  screen was a place a thumb could press and nothing happened,
@@ -92,7 +84,7 @@
             <!-- The purple disc is on screen on exactly one platform and this
                  line is the only place it is ever named; the k-desktop line
                  above names all four verbs, so this one does too. -->
-            <span class="k-touch">Drag anywhere to run · gold does everything · purple dashes</span>
+            <span class="k-touch">Drag anywhere to run · gold does everything</span>
           </div>
         </div>
       </div>

@@ -98,7 +98,7 @@ if (argv.tune) {
 
 const K = buildKitchen();
 const R = TUNING.chefRadius;
-const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+const NO = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
 
 /** Same circle-vs-cell test the sim integrates against. */
 function collides(x, y) {
@@ -521,7 +521,7 @@ function acquireRig(carry = null) {
           const f = flowDir(flow, K, chef.pos);
           mv = Math.hypot(f.x, f.y) < 0.2 ? { x: dx / d, y: dy / d } : f;
         }
-        step(s, [{ move: mv, grabPressed: false, useHeld: false, dashPressed: false }]);
+        step(s, [{ move: mv, grabPressed: false, useHeld: false }]);
         s.events.length = 0;
         if (arriveT >= 0 && chef.focus === target.id) {
           acqT = (i - arriveT) / 60;
@@ -626,7 +626,7 @@ function serviceRig(runs = 6) {
       const dx = c.x - chef.pos.x;
       const dy = c.y - chef.pos.y;
       const d = Math.hypot(dx, dy);
-      const inp = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false };
+      const inp = { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false };
       if (d < 1.3) {
         dwell++;
         inp.move = { x: (dx / d) * 0.42, y: (dy / d) * 0.42 };
@@ -812,7 +812,7 @@ function forgivenessRig() {
     chef.pos.x = c.x + (st.facing.x || 0) * 0.9;
     chef.pos.y = c.y + (st.facing.y || 0) * 0.9;
     chef.heading = Math.atan2(c.y - chef.pos.y, c.x - chef.pos.x);
-    step(s, [{ move: { x: 0, y: 0 }, grabPressed: true, useHeld: false, dashPressed: false }]);
+    step(s, [{ move: { x: 0, y: 0 }, grabPressed: true, useHeld: false }]);
     s.events.length = 0;
   };
   const check = (name, fn) => {
@@ -857,7 +857,7 @@ function forgivenessRig() {
     chef.pos.y = c.y + (b.facing.y || 0) * 0.9;
     chef.heading = Math.atan2(c.y - chef.pos.y, c.x - chef.pos.x);
     for (let i = 0; i < 40; i++) {
-      step(s, [{ move: { x: 0, y: 0 }, grabPressed: false, useHeld: true, dashPressed: false }]);
+      step(s, [{ move: { x: 0, y: 0 }, grabPressed: false, useHeld: true }]);
       s.events.length = 0;
     }
     const mid = b.work;
@@ -992,8 +992,13 @@ function harnessRig(seconds = 16) {
       inputs[0] = {
         move: d.move ?? { x: 0, y: 0 },
         grabPressed: !!d.grab && firstTick,
+        // `useHeld` IS A LEVEL, NOT AN EDGE — it must stay true for the whole
+        // segment, exactly as shoot.mjs drives it, or this rig stops replaying
+        // the screenshot driver's plan and a held chop or wash is only ever
+        // one tick long. (Lost for one commit to a careless regex sweeping out
+        // `dashPressed: !!d.dash && firstTick` on the line below and gluing its
+        // condition onto this one.)
         useHeld: !!d.use,
-        dashPressed: !!d.dash && firstTick,
       };
       const before = chef.carrying;
       const beforeHold = s.kitchen.stations.map((x) => x.holding);

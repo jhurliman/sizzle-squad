@@ -4,8 +4,8 @@ import type { InputSnapshot, Vec2 } from '../domain/types';
  * One input abstraction, three device stories:
  *  - touch: floating thumbstick that spawns wherever the thumb lands, plus a
  *    three-disc action cluster in the bottom-right corner.
- *  - keyboard: WASD/arrows, Space (or E) = the one action button, Shift = dash.
- *  - gamepad: left stick, A = grab, X = use, B = dash.
+ *  - keyboard: WASD/arrows, Space (or E) = the one action button.
+ *  - gamepad: left stick, A = grab, X = use.
  * Everything converges on InputSnapshot so the sim never knows the difference.
  *
  * MEASURED, NOT GUESSED. tools/touchprobe.mjs drives real Chromium touch
@@ -204,7 +204,6 @@ export interface InputTraceRow {
   my: number;
   grab: boolean;
   use: boolean;
-  dash: boolean;
   pointers: number;
 }
 
@@ -304,7 +303,6 @@ export class InputManager {
   private keys = new Set<string>();
   private moveVec: Vec2 = { x: 0, y: 0 };
   private grabQueued = false;
-  private dashQueued = false;
   private stickPointer: number | null = null;
   /**
    * Every pointer that is down, outside the cluster, in the order it landed.
@@ -319,7 +317,7 @@ export class InputManager {
   private livePointers = new Set<number>();
   private useButton = false;
   private usePad = false;
-  private padPrev = { grab: false, dash: false };
+  private padPrev = { grab: false };
   private cancelAt = -1;
   private cancelVec: Vec2 = { x: 0, y: 0 };
   /** Last thumb position of the owning pointer, for the per-frame delta. */
@@ -358,7 +356,6 @@ export class InputManager {
       if (e.repeat) return;
       this.keys.add(e.code);
       if (e.code === 'Space' || e.code === 'KeyE') this.grabQueued = true;
-      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.dashQueued = true;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
       // First key press on a hybrid device flips us back to desktop chrome.
       if (this.device !== 'desktop' && !navigator.maxTouchPoints) {
@@ -634,9 +631,6 @@ export class InputManager {
   setUse(held: boolean) {
     this.useButton = held;
   }
-  pressDash() {
-    this.dashQueued = true;
-  }
 
   /** Consume a frame of input. Rising edges are cleared on read. */
   sample(): InputSnapshot {
@@ -684,11 +678,8 @@ export class InputManager {
       // sentinel that nothing on the release path ever cleared, so one press of
       // chop stayed held for the rest of the run.
       const a = !!pad.buttons[0]?.pressed;
-      const b = !!pad.buttons[1]?.pressed;
       if (a && !this.padPrev.grab) this.grabQueued = true;
-      if (b && !this.padPrev.dash) this.dashQueued = true;
       this.padPrev.grab = a;
-      this.padPrev.dash = b;
       if (pad.buttons[2]?.pressed) padUse = true;
     }
     this.usePad = padUse;
@@ -716,10 +707,8 @@ export class InputManager {
         this.keys.has('KeyE') ||
         this.keys.has('KeyJ') ||
         this.keys.has('KeyK'),
-      dashPressed: this.dashQueued,
     };
     this.grabQueued = false;
-    this.dashQueued = false;
     if (this.traceOn) {
       this.trace.push({
         t: performance.now(),
@@ -734,7 +723,6 @@ export class InputManager {
         my: +snap.move.y.toFixed(4),
         grab: snap.grabPressed,
         use: snap.useHeld,
-        dash: snap.dashPressed,
         pointers: this.livePointers.size,
       });
       if (this.trace.length > 4000) this.trace.shift();

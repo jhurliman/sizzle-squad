@@ -9,7 +9,7 @@ export * from ${JSON.stringify(ROOT+'/src/bots/brain.ts')};`);
 await build({input:E,output:{file:OUT,format:'esm'},logLevel:'silent'});
 const S=await import(OUT); fs.rmSync(E,{force:true}); fs.rmSync(OUT,{force:true});
 const {createSim,step,SIM_DT,TUNING}=S; const DT=SIM_DT;
-const IN=(m={x:0,y:0},o={})=>({move:m,grabPressed:!!o.grab,useHeld:!!o.use,dashPressed:!!o.dash});
+const IN=(m={x:0,y:0},o={})=>({move:m,grabPressed:!!o.grab,useHeld:!!o.use});
 const D=2*TUNING.chefRadius;
 let touching=0,near=0,tot=0, burst=0, burstLen=[], cur=0;
 let bumpsWithSamePartnerWithin1s=0, allB=0;

@@ -95,7 +95,7 @@ async function main() {
     p++;
     await page.evaluate(
       (v) => window.__game.setInput(v),
-      { move: d.move ?? { x: 0, y: 0 }, grabPressed: !!d.grab, useHeld: !!d.use, dashPressed: !!d.dash, enabled: true },
+      { move: d.move ?? { x: 0, y: 0 }, grabPressed: !!d.grab, useHeld: !!d.use, enabled: true },
     );
     let remaining = d.s ?? 0.4;
     while (remaining > 1e-4) {

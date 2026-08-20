@@ -16,7 +16,7 @@ const rows=await pg.evaluate(async()=>{
  const out=[];
  const plan=[[{x:0,y:1},1.2],[{x:-1,y:-0.4},1.2],[{x:1,y:0},1.0],[{x:0,y:0},0.5],[{x:-1,y:0.6},1.2],[{x:1,y:-0.8},1.0],[{x:0,y:0},0.6],[{x:0,y:-1},1.0]];
  for(const [mv,sec] of plan){
-  window.__game.setInput({move:mv,grabPressed:false,useHeld:false,dashPressed:false,enabled:true});
+  window.__game.setInput({move:mv,grabPressed:false,useHeld:false,enabled:true});
   for(let i=0;i<Math.round(sec/0.05);i++){ window.__game.advance(0.05); for(const r of window.__rig()) out.push(r); }
  }
  return out;});

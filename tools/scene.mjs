@@ -133,6 +133,16 @@ const SCENES = [
     span: 2.4,
   },
   {
+    name: 'plate-in-hand',
+    about: 'ONE plate, not the comedy tower — a plate pickup used to hand over an armful of up to eight',
+    scene: {
+      freeze: true,
+      player: { at: { x: 7.5, y: 5.5 }, facing: { x: 0, y: 1 }, carrying: null, plate: true },
+    },
+    look: { x: 7.5, y: 5.5, z: 1.05 },
+    span: 3.0,
+  },
+  {
     name: 'wall-clearance',
     about: 'the chef pressed into the left wall — the door and rubble used to cut through them',
     scene: {

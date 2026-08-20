@@ -654,7 +654,7 @@ const APRON_MAX_TALL = 0.0;
  * The old value lost the player outright in 16 of 375 standing positions, and
  * the widen is what covered it — WIDEN_TALL opens the lens 25% when he runs,
  * so the sweep at full widen reported a clean 0.880 and nobody looked at the
- * column the chef is actually in for the first moments of a dash. That is the
+ * column the chef is actually in for the first moments of a sprint. That is the
  * "almost out of frame going hard left" report, exactly: he outruns the widen.
  *
  * 4.60 is where the rest solve MEETS the widened one (hwWant 4.60 against the
@@ -993,7 +993,7 @@ const RESCUE_MAX_TALL = 0.68;
  * That report is the design working, not a defect — see the note above
  * `backWallFrac` in describe() for the two portrait warnings that are NOT.
  *
- * Not covered by any sweep: the widen EASES in, so a chef who dashes into a
+ * Not covered by any sweep: the widen EASES in, so a chef who runs into a
  * front corner faster than the frame opens is briefly in the rest column above.
  * That wants a trace.
  */

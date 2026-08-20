@@ -1493,40 +1493,29 @@ html[data-device='desktop'] .touch {
     0 3px 10px rgba(0, 0, 0, 0.34);
 }
 
-/* The three action discs.
+/* THE ACTION DISC. Singular, finally.
  *
- * They used to be laid out as a flex pair PLUS a third button absolutely
- * positioned against the viewport, which is a layout that can only agree with
- * itself at one aspect ratio: at iPad landscape the dash disc landed on top of
- * the chop disc and the whole cluster read as a pile dumped in the corner. One
- * grid, three fixed areas, sized off vmin so a 1194-wide tablet does not get
- * phone-sized thumb targets and a 393-wide phone does not lose a third of its
- * play area to them. Every cell still clears 44x44.
+ * There were three: grab, chop and dash. The chop disc went when one button
+ * took over both the press and the hold; the purple dash disc goes here with
+ * the mechanic it drove ("Remove the dash button and mechanic, we want to keep
+ * this game as simple as possible"). Its CSS outlived it by a wave, laying out
+ * a two-by-two grid for elements index.html no longer contained.
+ *
+ * So the cluster is one disc, and the whole of the rest of the corner goes back
+ * to the play area — on portrait, where the rig's entire pan budget is smaller
+ * than this cluster used to be, that is the cheapest frame the camera has been
+ * given all project: 66x66 against 126x123.5, 1.1% of the frame against 4.65%.
+ * Sized off vmin so a 1194-wide tablet does not get a phone-sized thumb target,
+ * and comfortably over the 44x44 floor everywhere.
  */
 .action-cluster {
   position: absolute;
   right: calc(var(--safe-r) + 18px);
   bottom: calc(var(--safe-b) + 22px);
   display: grid;
-  grid-template-areas:
-    '.   dash'
-    'use grab';
+  grid-template-areas: 'grab';
   align-items: end;
   justify-items: end;
-  column-gap: clamp(8px, 1.4vmin, 14px);
-  /* The dash disc's phone floor went 46 -> 52px (see .btn-dash), and the
-     cluster's painted footprint is a camera number that may not grow with it:
-     the rig's whole portrait pan budget is smaller than this cluster already.
-     Width is unaffected — dash shares its column with the 66px grab disc — so
-     the 6px is bought back out of the ROW gap alone. Bounds: at 8px the two
-     transparent halos meet exactly and no press is ambiguous; at 0 the discs
-     touch and read as one blob. 4px keeps 2px of halo each side and holds the
-     cluster at 126x123.5 against 126x120 before — 4.65% of a portrait frame
-     against 4.52%, and the WIDTH, which is the number the camera rig actually
-     fights, is unchanged at 126px. Measured, not assumed: on a 393px frame
-     1.4vmin is 5.5px, so the floor never binds and the real row gap went 8 ->
-     5.5. iPad and desktop never see this at all: 1.4vmin is 11.7px there. */
-  row-gap: clamp(4px, 1.4vmin, 14px);
   pointer-events: none;
 }
 
@@ -1568,8 +1557,7 @@ html[data-device='desktop'] .touch {
  * reachability is bought in transparent halo. Each disc claims the empty space
  * on the sides where it HAS no neighbour, and exactly half of the 8px gutter
  * where it does, so no two halos ever overlap and no press is ambiguous.
- * Effective hit boxes: grab 82x80, chop 68x76, dash 76x70 — an 11.3mm minimum
- * on all three. The halo also stops 10px clear of the home-indicator band and
+ * Effective hit box: grab 90x90 — a 14.9mm target. The halo also stops 10px clear of the home-indicator band and
  * sits inside the 14px no-steer margin in input.ts, so the ring around a disc
  * is a miss, never a sprint.
  */
@@ -1579,20 +1567,12 @@ html[data-device='desktop'] .touch {
   inset: -12px;
   border-radius: 50%;
 }
-/* The gutter each halo may claim is half the gap it sits in, and the phone row
-   gap is now 5.5px (see .action-cluster), so the two halos that face each other
-   across it take 2px, not 4. Scanned pixel by pixel with elementFromPoint down
-   the column: dash's halo, then exactly ONE row owned by nobody, then grab's.
-   No overlap, no ambiguous press, and probe `buttons` stays at zero on-disc
-   misses. */
+/* With nothing beside it there is no gutter to share: the halo takes the full
+   12px on every side. It still stops clear of the home-indicator band and sits
+   inside the 14px no-steer margin in input.ts, so the ring around the disc is a
+   miss, never a sprint. */
 .btn-grab::before {
-  inset: -2px -12px -12px -4px;
-}
-.btn-use::before {
-  inset: -12px -4px -12px -12px;
-}
-.btn-dash::before {
-  inset: -16px -12px -2px -12px;
+  inset: -12px;
 }
 
 .btn svg {
@@ -1622,36 +1602,20 @@ html[data-device='desktop'] .touch {
     0 2px 0 #c97c25,
     0 5px 12px rgba(0, 0, 0, 0.32);
 }
-.btn-use:active,
-.btn-use.pressing {
-  box-shadow:
-    inset 0 -2px 0 rgba(24, 88, 112, 0.35),
-    0 1px 0 #2f7796,
-    0 4px 10px rgba(0, 0, 0, 0.3);
-}
-.btn-dash:active,
-.btn-dash.pressing {
-  box-shadow:
-    inset 0 -2px 0 rgba(72, 48, 130, 0.35),
-    0 1px 0 #6a4ba8,
-    0 4px 10px rgba(0, 0, 0, 0.3);
-}
 
 /* THE FLOOR OF EACH CLAMP IS A CAMERA NUMBER, NOT A TASTE ONE.
  *
- * On a 393px phone the vmin term never binds, so these minima ARE the cluster
- * on the one profile with the least room for it: at 74/58/50 the cluster
- * measured 140px, i.e. 0.356 of the frame width, and the rig logged
+ * On a 393px phone the vmin term never binds, so this minimum IS the cluster
+ * on the one profile with the least room for it: at 74/58/50 the three-disc
+ * cluster measured 140px, i.e. 0.356 of the frame width, and the rig logged
  * `player at 0.68, 0.96 of frame — under the thumb cluster` on a late-service
  * portrait capture (shots/j-cam-r2f) — the player standing behind the blue
  * disc. The camera cannot dodge that on portrait: its whole pan budget is
  * 0.33 of a half-frame and the cluster is wider than that.
  *
- * 66/52/52 takes it to 0.32 of frame width, every target still over the 44px
- * floor AGENTS.md sets, and only phones are affected — iPad and desktop are
- * governed by the vmin term. (Dash was 46 here and is now 52: see the note on
- * .btn-dash. The cluster's WIDTH is unmoved by that — dash shares its column
- * with the 66px grab disc.) */
+ * A single 66px disc is 0.168 of frame width, well over the 44px floor
+ * AGENTS.md sets, and only phones are affected — iPad and desktop are governed
+ * by the vmin term. */
 .btn-grab {
   grid-area: grab;
   width: clamp(66px, 10.6vmin, 100px);
@@ -1661,38 +1625,6 @@ html[data-device='desktop'] .touch {
     inset 0 -5px 0 rgba(150, 88, 20, 0.35),
     0 6px 0 #c97c25,
     0 10px 20px rgba(0, 0, 0, 0.3);
-}
-
-.btn-use {
-  grid-area: use;
-  width: clamp(52px, 8.2vmin, 78px);
-  height: clamp(52px, 8.2vmin, 78px);
-  background: radial-gradient(120% 120% at 32% 22%, #d3f0f4, #4fa3c7 62%, #3d8fb3);
-  box-shadow:
-    inset 0 -4px 0 rgba(24, 88, 112, 0.35),
-    0 5px 0 #2f7796,
-    0 8px 16px rgba(0, 0, 0, 0.28);
-}
-
-/* THE RUNT. On every phone the vmin term is dead (7vmin = 27px on a 393px
- * frame) so this floor WAS the dash disc everywhere it matters: 46px = 7.6mm
- * painted, under the 9.2mm eyes-free thumb-landing figure the note at the top
- * of this section cites as the bound, on the disc that sits furthest from the
- * grip pivot (24.0mm against grab's 14.6mm) — the one target most likely to be
- * hit blind. Bounds: 44px is the hard floor AGENTS.md sets and 46 was already
- * only 2px clear of it; anything at or near grab's 66px flattens the hierarchy
- * that says grab is the verb you press twenty times a minute and dash is not.
- * 52px = 8.6mm makes the two secondaries equal and leaves the primary
- * dominant, and it costs the cluster nothing in width. */
-.btn-dash {
-  grid-area: dash;
-  width: clamp(52px, 7vmin, 66px);
-  height: clamp(52px, 7vmin, 66px);
-  background: radial-gradient(120% 120% at 32% 22%, #e0d2ff, #8f6fd0 62%, #7d5cc0);
-  box-shadow:
-    inset 0 -4px 0 rgba(72, 48, 130, 0.35),
-    0 5px 0 #6a4ba8,
-    0 8px 16px rgba(0, 0, 0, 0.28);
 }
 
 /* The pause chip is gone; see the note where it used to live in index.html.

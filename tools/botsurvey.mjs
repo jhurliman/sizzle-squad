@@ -100,7 +100,6 @@ for (let i = 0; i < RUNS; i++) {
             move: st.move ?? { x: 0, y: 0 },
             grabPressed: !!st.grab,
             useHeld: !!st.use,
-            dashPressed: !!st.dash,
             enabled: true,
           });
           window.__game.advance(st.s ?? 0.4);

@@ -51,7 +51,7 @@ for (let r = 0; r < RUNS; r++) {
   let i = 0;
   for (; i < SECONDS * 60; i++) {
     const map = dir.update(s, SIM_DT);
-    step(s, s.chefs.map((c) => map.get(c.id) ?? { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false, dashPressed: false }));
+    step(s, s.chefs.map((c) => map.get(c.id) ?? { move: { x: 0, y: 0 }, grabPressed: false, useHeld: false }));
     s.events.length = 0;
     if (s.over) break;
   }

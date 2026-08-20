@@ -47,8 +47,6 @@ export interface SimState {
   heat: number;
   rand: () => number;
   nextId: number;
-  /** Per-chef dash bookkeeping, parallel to chefs. */
-  dash: { timer: number; cooldown: number; recover: number; dir: Vec2 }[];
   /** Cosmetic: distance walked since last footstep, per chef. */
   stepAccum: number[];
   /**
@@ -145,7 +143,6 @@ export function createSim(opts: SimOptions = {}): SimState {
     heat: 0,
     rand,
     nextId: 1,
-    dash: chefs.map(() => ({ timer: 0, cooldown: 0, recover: 0, dir: { x: 0, y: 1 } })),
     stepAccum: chefs.map(() => 0),
     contactLock: new Array(chefs.length * chefs.length).fill(0),
   };
@@ -185,44 +182,24 @@ function mkIngredient(s: SimState, kind: Ingredient['kind']): Ingredient {
 }
 
 /**
- * A plate is taken as an ARMFUL. `stack` is how many came off the dispenser —
- * seeded, so the run stays deterministic — and it collapses to 1 the instant
- * the pile is set down or anything is put on it. Nothing downstream matches
- * recipes against it; it exists so the view can draw the comedy tower the
- * reference builds its best frame around.
- */
-/**
- * INTEGRATION — A GAG THAT HAPPENS EVERY TIME IS NOT A GAG, IT IS A COSTUME.
+ * A PLATE IS A PLATE.
  *
- * `stack` was 4-8 unconditionally, so EVERY chef who picked up a clean plate —
- * which is every chef, on the way to every single order — carried a white
- * column taller than himself until he put it down. The reference builds one
- * frame of two around the joke (refs/dash-and-dine-02.jpeg, one Toad, one
- * tower); we were running two and three at once in most late captures, e.g.
- * shots/INT-FINAL/desktop/t0082s.jpg, where the two tallest and two brightest
- * objects in the lower half of the frame are both stacks of empty crockery.
+ * This used to hand out an ARMFUL: a seeded `stack` of 4-8 that the view drew
+ * as the reference's comedy tower, taller than the chef carrying it. It was
+ * cosmetic-only — no recipe, bot plan or serve check ever read it — and that
+ * was exactly the problem, because a player cannot tell cosmetic-only by
+ * looking:
  *
- * Three costs, all of them visual and none of them intended. The tower is the
- * palest large mass in a room whose art direction reserves the top of the value
- * range for food (see PALETTE.plates); it is taller than a character in a set
- * whose whole camera argument is that nothing occludes a character; and it
- * makes the one piece of physical comedy in the game routine.
+ *   "When I pick up a plate I get a huge stack of plates. Cute, but this is
+ *    not how the gameplay works so we should cut it down to holding a single
+ *    plate"
  *
- * Now it is one plate in roughly four fifths of pickups and a real armful in
- * the rest. Same seeded rand, same single call, so the run is as deterministic
- * as it was; `stack` is still cosmetic-only and still collapses to 1 the moment
- * the pile is set down or anything is put on it, so no recipe, no bot plan and
- * no serve check can tell the difference.
+ * A prop that implies a mechanic the game does not have costs more than the
+ * joke earns. `stack` is gone from the type, from here, and from the five
+ * places that had to remember to reset it.
  */
 function mkPlate(s: SimState): Plate {
-  const r = s.rand();
-  const TOWER = 0.22;
-  return {
-    id: s.nextId++,
-    contents: [],
-    dirty: false,
-    stack: r < TOWER ? 4 + Math.floor((r / TOWER) * 5) : 1,
-  };
+  return { id: s.nextId++, contents: [], dirty: false };
 }
 
 function mkPan(s: SimState): Pan {
@@ -336,9 +313,6 @@ function cornerSlip(k: Kitchen, x: number, y: number, r: number, axis: 'x' | 'y'
 }
 
 function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
-  const d = s.dash[chef.id];
-  d.cooldown = Math.max(0, d.cooldown - dt);
-
   const load = carryLoad(chef);
   const carryMul = load.speed;
   const cruise = TUNING.moveSpeed * carryMul;
@@ -429,47 +403,26 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
       m = 1;
     }
 
-    if (input.dashPressed && d.cooldown <= 0 && (m > 0.2 || chef.carrying === null)) {
-      d.timer = TUNING.dashSeconds;
-      d.cooldown = TUNING.dashCooldown;
-      // NORMALISE OFF THE CLAMPED VECTOR. This used to divide the already
-      // clamped components by the PRE-clamp magnitude, so any input longer than
-      // unit produced a short dash direction — bots routinely emit ~1.45 (a unit
-      // seek plus a 1.05 avoidance term, see bots/brain.ts), which made every
-      // bot dash 12.5 * (1/1.45) = 8.6 u/s. Players never saw it because
-      // InputManager clamps to 1; bots ate it every time.
-      d.dir =
-        m > 0.2 ? { x: mx / m, y: my / m } : { x: Math.cos(chef.heading), y: Math.sin(chef.heading) };
-      emit(s, { t: 'dash', chef: chef.id, at: { ...chef.pos } });
-    }
-
-    if (d.timer > 0) {
-      d.timer -= dt;
-      // Dashing used to be a way to cancel the carry penalty outright — the
-      // burst wrote the raw dashSpeed whatever was in your arms, so the
-      // heaviest thing you could do was also the cheapest to sprint with.
-      chef.vel.x = d.dir.x * TUNING.dashSpeed * carryMul;
-      chef.vel.y = d.dir.y * TUNING.dashSpeed * carryMul;
-      // THE BURST NOW COSTS SOMETHING ON THE WAY OUT. See dashRecoverySeconds
-      // in content.ts: without this, mashing the button was strictly faster
-      // than walking with no downside at all, so the correct play was to hold
-      // it down for the whole service and the dash stopped being a dodge.
-      if (d.timer <= 0) d.recover = TUNING.dashRecoverySeconds;
-    } else {
-      d.recover = Math.max(0, d.recover - dt);
-      // A CEILING ON THE TARGET, NOT A CLAMP ON THE VELOCITY. Writing the
-      // speed directly would delete 7.7 u/s in one tick, a harder stop than
-      // running into a bench; lowering what the body is reaching for lets the
-      // existing accel curve carry it down and reads as a stumble out of the
-      // burst.
-      const ceiling = d.recover > 0 ? TUNING.dashRecoveryMul : 1;
-      const desiredX = mx * cruise * ceiling;
-      const desiredY = my * cruise * ceiling;
-      const rate = m > 0.05 ? TUNING.accelTime * load.accel : TUNING.decelTime;
-      const k = 1 - Math.exp(-dt / Math.max(0.0001, rate));
-      chef.vel.x += (desiredX - chef.vel.x) * k;
-      chef.vel.y += (desiredY - chef.vel.y) * k;
-    }
+    /**
+     * THERE IS NO DASH. Asked for directly: "Remove the dash button and
+     * mechanic, we want to keep this game as simple as possible."
+     *
+     * It was a 0.16s burst on a 1s cooldown with a 0.4s recovery tax, and the
+     * tax existed because without it mashing the button was strictly faster
+     * than walking, so the correct play was to hold it down all service. A
+     * mechanic that needs a penalty to stop being mandatory is a mechanic
+     * asking to be deleted — and on a phone it was a second thumb target
+     * competing with the one button that does everything.
+     *
+     * What is left is the same accel/decel curve every other frame already
+     * used, with the burst's recovery ceiling gone with it.
+     */
+    const desiredX = mx * cruise;
+    const desiredY = my * cruise;
+    const rate = m > 0.05 ? TUNING.accelTime * load.accel : TUNING.decelTime;
+    const k = 1 - Math.exp(-dt / Math.max(0.0001, rate));
+    chef.vel.x += (desiredX - chef.vel.x) * k;
+    chef.vel.y += (desiredY - chef.vel.y) * k;
 
     // THE BODY KEEPS TURNING WHILE IT IS STILL TRAVELLING.
     //
@@ -524,7 +477,7 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
   }
 
   // 0..1 against the chef's OWN cruise, so a laden chef still reads as flat out
-  // when they are flat out, and a dash cannot push it past 1.
+  // when they are flat out.
   const effortTarget = Math.min(1, speed / Math.max(0.001, cruise));
   chef.effort += (effortTarget - chef.effort) * (1 - Math.exp(-dt / 0.12));
 
@@ -948,18 +901,28 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
      *
      * They are right, and the answer is the simpler one they suggested. The
      * escape hatch never needed the PAN to move — it needed the ruined food to
-     * come out. So the food comes out and the pan stays where it belongs:
-     * empty-handed at a burner whose pan holds something burnt, the press
-     * hands you the burnt rasher, which you then walk to the bin like any
-     * other spoiled ingredient. Same rescue, one fewer concept, and nothing in
-     * the kitchen is ever picked up except food and plates.
+     * come out.
      *
-     * `doGrab` does the extraction; see `case 'take'`. Everything else about
+     * AND IT DOES NOT NEED TO COME OUT INTO YOUR HANDS EITHER. Handing over the
+     * burnt rasher bought a second errand (walk it to the bin) and an object
+     * nobody could identify, straight back from play:
+     *
+     *   "the burnt bacon is the same grey color as the pan so it looks like I
+     *    picked up a small pan/skillet and not burnt bacon. Honestly maybe the
+     *    burnt bacon should just disappear anyways"
+     *
+     * It should. Nothing downstream wants a ruined ingredient — the bin is its
+     * only destination and every route there is a chore — so the press does the
+     * whole job where you stand: the pan is scraped out, the fire goes out, and
+     * your hands stay empty. One press, one concept, and no grey lump to carry
+     * around being mistaken for cookware.
+     *
+     * `doGrab` does the scraping; see `case 'discard'`. Everything else about
      * the rule is unchanged: a pan doing its job stays put, and a plate still
      * comes to the pan rather than the other way round (the 'load' rung below).
      */
     if (st.kind === 'stove' && st.holding?.type === 'pan')
-      return st.holding.pan.contents.some((i) => i.state === 'burnt') ? 'take' : 'none';
+      return st.holding.pan.contents.some((i) => i.state === 'burnt') ? 'discard' : 'none';
     // See 'prep' above. Same conditions the `useHeld` gate in step() tests, and
     // the SAME chopSeconds test updateStations makes before it advances any
     // work — all three have to agree or the button lies.
@@ -1229,22 +1192,8 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       emit(s, { t: 'pickup', chef: chef.id, at });
       return true;
     case 'take': {
-      // THE ONE THING YOU TAKE OFF A BURNER IS THE RUINED FOOD, NOT THE PAN.
-      // See planGrab: this is the whole of the burnt-pan rescue now. The pan
-      // is a fixture and stays on the heat; the rasher comes out and goes in
-      // the bin. If more than one thing in there is ruined, one press gets one
-      // of them, which is the same rhythm as clearing anything else.
-      if (st.kind === 'stove' && st.holding?.type === 'pan') {
-        const pan = st.holding.pan;
-        const n = pan.contents.findIndex((i) => i.state === 'burnt');
-        if (n < 0) return false;
-        const [ruined] = pan.contents.splice(n, 1);
-        chef.carrying = { type: 'ingredient', ingredient: ruined };
-        // The fire goes out with the fuel: an empty pan is not still burning.
-        if (!pan.contents.some((i) => i.state === 'burnt')) pan.fire = 0;
-        emit(s, { t: 'pickup', chef: chef.id, at });
-        return true;
-      }
+      // Nothing is ever lifted off a burner — see planGrab. A burning pan is
+      // handled by 'discard' below, and the pan itself is a fixture.
       chef.carrying = st.holding;
       st.holding = null;
       st.work = 0;
@@ -1255,7 +1204,6 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       if (!held) return false;
       // The armful is down: the rest of the pile joins the bench, one plate
       // stays as the working plate. Stations only ever draw a single plate.
-      if (held.type === 'plate') held.plate.stack = 1;
       st.holding = held;
       // A HALF-CHOPPED TOMATO STAYS HALF CHOPPED. `work` used to be zeroed by
       // every place and every pickup, so lifting an ingredient off a board to
@@ -1269,7 +1217,6 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
     case 'combine':
       if (held?.type !== 'ingredient' || !st.holding) return false;
       if (st.holding.type === 'plate') {
-        st.holding.plate.stack = 1;
         st.holding.plate.contents.push(held.ingredient);
       } else if (st.holding.type === 'pan') {
         st.holding.pan.contents.push(held.ingredient);
@@ -1281,7 +1228,6 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       if (held?.type !== 'plate') return false;
       // Off a bench: the plate takes the whole item.
       if (st.holding?.type === 'ingredient') {
-        held.plate.stack = 1;
         held.plate.contents.push(st.holding.ingredient);
         st.holding = null;
         st.work = 0;
@@ -1292,7 +1238,6 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       if (st.holding?.type === 'pan') {
         const i = st.holding.pan.contents.findIndex((x) => x.state === 'cooked');
         if (i < 0) return false;
-        held.plate.stack = 1;
         held.plate.contents.push(st.holding.pan.contents.splice(i, 1)[0]);
         emit(s, { t: 'place', chef: chef.id, at });
         return true;
@@ -1302,7 +1247,6 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
     case 'swap': {
       if (!held || !st.holding) return false;
       const there = st.holding;
-      if (held.type === 'plate') held.plate.stack = 1;
       st.holding = held;
       st.work = held.type === 'ingredient' ? (held.ingredient.chop ?? 0) : 0;
       chef.carrying = there;
@@ -1326,6 +1270,25 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       chef.intent = 'working';
       return true;
     case 'discard':
+      /**
+       * EMPTY-HANDED AT A BURNING PAN: SCRAPE IT, DO NOT PICK IT UP.
+       *
+       * The only 'discard' that does not happen at the bin. Everything ruined
+       * goes at once rather than one rasher per press — the previous rhythm
+       * existed to match the bin's undo, and there is nothing to undo here: a
+       * burnt rasher has exactly one future wherever it is standing. The fire
+       * goes out with its fuel.
+       */
+      if (!held) {
+        if (st.kind !== 'stove' || st.holding?.type !== 'pan') return false;
+        const pan = st.holding.pan;
+        const keep = pan.contents.filter((i) => i.state !== 'burnt');
+        if (keep.length === pan.contents.length) return false;
+        pan.contents = keep;
+        pan.fire = 0;
+        emit(s, { t: 'trash', at });
+        return true;
+      }
       // ONE ITEM PER PRESS, NOT THE WHOLE PLATE. The bin used to empty a plate
       // outright, so a single wrong ingredient on a three-item order cost the
       // other two as well — the most expensive mis-press in the game, and the

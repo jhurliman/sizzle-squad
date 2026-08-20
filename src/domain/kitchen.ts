@@ -227,7 +227,9 @@ import type { CellKind, IngredientKind, Kitchen, Station, StationKind, Vec2 } fr
  * LIKE A MAZE. (Cross-piece edit: this file belongs to the level, but the
  * defect is a movement defect and the numbers below are movement numbers.)
  *
- * A chef needs 0.684u to reach 90% of cruise and a dash is a 1.92u burst.
+ * A chef needs 0.684u to reach 90% of cruise. (This was measured when a 1.92u
+ * dash burst also existed; the dash is gone, the corridor widths it argued for
+ * are not, because the accel curve that sets them is unchanged.)
  * Measured on the map above, tools/feelcrit-lanes.mjs:
  *
  *     median unobstructed cardinal run   1.137u   (p25 0.136, p75 3.129)
@@ -260,7 +262,7 @@ import type { CellKind, IngredientKind, Kitchen, Station, StationKind, Vec2 } fr
  *
  * SHIPPED, same tool: median run 3.129u (p25 1.137, p75 6.126), gap histogram
  * {2:23, 5:3, 7:1, 8:4, 13:6} — zero 1-wide gaps anywhere, minimum lane two
- * bodies wide. Dead dashes 80% -> 57%. Two 2-wide vertical highways at x4-5 and
+ * bodies wide. Dead sprints 80% -> 57%. Two 2-wide vertical highways at x4-5 and
  * x9-10 run the full depth of the room, and every horizontal lane (rows 2-3,
  * 5-6, 8-9) is open end to end.
  *

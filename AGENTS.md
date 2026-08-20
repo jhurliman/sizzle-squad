@@ -1,6 +1,7 @@
 # Working rules
 
-Project root: `/home/claude/kitchen`. Read `REFERENCE.md` before touching anything.
+Read `REFERENCE.md` before touching anything. Every command below runs from
+the repository root.
 
 ## Architecture
 
@@ -25,9 +26,8 @@ are high-traffic: additive changes only, never reorganise them.
 ## Before you finish, always
 
 ```
-cd /home/claude/kitchen
 npx tsc --noEmit          # must be clean
-npm test                  # must be green — ~3s, pure Node, no browser
+npm test                  # must be green — ~6s, pure Node, no browser
 npx vite build            # must succeed
 node tools/shoot.mjs --out shots/<your-piece>-<round> --seconds 14
 node tools/scene.mjs   # if you touched anything that is hard to catch in play

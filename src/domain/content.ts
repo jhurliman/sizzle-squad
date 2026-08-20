@@ -11,7 +11,7 @@ export const PLATE_CAPACITY = 4;
  * instrument is `tools/movprobe.mjs`, which bundles this pure domain with
  * rolldown and drives scripted routes through the real sim at the real 60Hz
  * tick — top speed, time to top speed, coast distance, turn cost, corner
- * behaviour, parking forgiveness, bump frequency, dash economics. Run it.
+ * behaviour, parking forgiveness, bump frequency. Run it.
  *
  * Where a number moved, the comment states the LOWER bound, the UPPER bound and
  * the target between them, because the history of this project is pieces that
@@ -49,7 +49,8 @@ export const PLATE_CAPACITY = 4;
  *
  * So every number below is justified on a DETERMINISTIC, low-noise measurement
  * — time to top speed, coast distance, corner behaviour, bump frequency, the
- * dash's own economics — and `served` is used for one thing only: confirming
+ * the movement tuning's own economics — and `served` is used for one thing
+ * only: confirming
  * the shipped set is not a regression. It is not. 8.03 +/- 0.29 against the
  * day-one 8.05 +/- 0.23 over the same forty seeds.
  */
@@ -429,69 +430,6 @@ export const TUNING = {
    * fair fight, not enough to hide.
    */
   focusOffLabelPenalty: 0.3,
-  /**
-   * DASH — WAS A TREADMILL, IS NOW A TOOL.
-   *
-   * Measured at 12.5 / 0.18 / 0.55: each press bought 1.63 units over walking
-   * and could be repeated every 0.55s, so mashing it gave an effective cruise
-   * of 9.16 u/s against 6.2 — a 48% speed increase for a button with no cost,
-   * no commitment worth the name and no cooldown you ever noticed. Optimal play
-   * was to hold it down for the entire service. A button whose correct usage is
-   * "always" is a tax, not a decision.
-   *
-   * Bounds: under ~10% advantage nobody presses it; over ~30% it is mandatory
-   * again. Target ~20-25%. 12.0 / 0.16 / 1.0 measures +23%, and a 1.0s cooldown
-   * against a 2s room crossing means two dashes a trip — enough to be a
-   * manoeuvre, not enough to be a walking speed.
-   *
-   * The burst is deliberately NOT weakened much (12.0 is still 1.94x cruise):
-   * the punch is the fun, the repeat rate was the problem.
-   */
-  dashSpeed: 12.0,
-  dashSeconds: 0.16,
-  dashCooldown: 1.0,
-  /**
-   * RECOVERY — WHY "23% ADVANTAGE" WAS STILL A TREADMILL.
-   *
-   * The block above prices the dash by its REPEAT RATE and stops there, and the
-   * arithmetic is right as far as it goes: 1.92u a press, one press a second.
-   * What it never charges for is the exit. tools/movprobe.mjs --only dash,
-   * shipped: a 20-unit race walking takes 3.233s and the same race mashing the
-   * button takes 2.600s — 7.692 u/s against 6.200, a 24% free win with no
-   * recovery whatever. A button that is strictly better than not pressing it,
-   * every single time, is not a decision; the comment above says so itself
-   * ("a button whose correct usage is 'always' is a tax") and then leaves the
-   * tax in place. It also means the dash cannot be a DODGE, because you are
-   * never not dashing.
-   *
-   * The fix is a short stumble out of the burst rather than a longer lockout:
-   * for `dashRecoverySeconds` the body reaches for only `dashRecoveryMul` of
-   * cruise. Both bounds were swept on movprobe's own race (tools/dashsweep.mjs,
-   * same 20-unit steady-state course), and the honest numbers are nothing like
-   * the back-of-envelope ones:
-   *
-   *     0.00 / any    +24%   the shipped defect: mashing is strictly optimal
-   *     0.30 / 0.70   +13%   still plainly worth mashing
-   *     0.40 / 0.60    +5%   <- target
-   *     0.50 / 0.60    +3%
-   *     0.70 / 0.55    -3%   dashing is now WORSE than walking; nobody ever
-   *                          presses it again, which is the opposite overshoot
-   *
-   * 0.40s at 0.60 is the first point at or under 5%. It is a bigger number than
-   * it looks like it should be because the burst leaves the body at 12 u/s and
-   * the 0.07s accel constant means most of a body length is coasted off before
-   * the ceiling bites — the recovery has to outlast that tail or it prices
-   * nothing.
-   *
-   * IT IS STILL NEVER A LOSS TO PRESS. Over the whole 0.56s episode (0.16s
-   * burst + 0.40s recovery) a dashing chef covers 3.67u against a walker's
-   * 3.47u, and 1.92u of that arrives in the first 0.16s. You are still ahead;
-   * you just cannot compound it. That is a dodge.
-   *
-   * The punch is untouched. Peak is still 12.0 u/s and the burst is still 1.92u.
-   */
-  dashRecoverySeconds: 0.4,
-  dashRecoveryMul: 0.6,
   /**
    * A BUMP FIRES ON CLOSING SPEED ALONG THE CONTACT NORMAL, NOT ON |va - vb|.
    *

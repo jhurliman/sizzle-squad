@@ -145,7 +145,7 @@ const TARGET = {
   serve: 0.5, fireStart: 0.5, gameOver: 0.5,
   chopDone: 0.28, cookDone: 0.28, serveWrong: 0.28, burn: 0.28,
   orderNew: 0.25, orderWarn: 0.25, orderExpired: 0.25, washDone: 0.22,
-  pickup: 0.2, place: 0.2, trash: 0.2, dash: 0.2, bump: 0.2,
+  pickup: 0.2, place: 0.2, trash: 0.2, bump: 0.2,
   chopTick: 0.11, footstep: 0.035,
 };
 if (!argv.quiet) console.log('\n=== MIX TABLE (target vs measured peak) ======================================');

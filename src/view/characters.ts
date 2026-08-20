@@ -567,14 +567,6 @@ const HEAD_CLEAR = 0.5;
 function headClearFor(mode: number): number {
   return mode === 2 ? 0.34 : mode === 3 ? 0.38 : HEAD_CLEAR;
 }
-/**
- * Lateral clearance the plate TOWER needs from the head, world units. Head
- * radius 0.225 plus a column half-width of 0.24 (a 0.3 plate at 1.0 lateral
- * scale, CHAR_SCALE 0.79) is 0.465; 0.42 lets the near edge of the stack shave
- * the cheek, which is exactly what the reference's Toad looks like — face
- * clear, column touching.
- */
-const TOWER_CLEAR = 0.42;
 /** Where the oven burns, in sim coords. The fallback thing to look at. */
 const OVEN = { x: 7.5, y: 1.1 };
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
@@ -736,74 +728,6 @@ const TAIL_LIMIT = 4;
 
 // ----------------------------------------------------------- plate tower
 //
-// THE ONE SILHOUETTE THE REFERENCE HAS AND WE DID NOT.
-//
-// `refs/dash-and-dine-02.jpeg` is built around it: a Toad walking a column of
-// crockery roughly twice his own height across the middle of the frame. It is
-// the best single read in either reference image — you know what he is doing,
-// where he is going and how much trouble he is in from a thumbnail, purely from
-// an outline. Ours shipped none of it: the header of this file promised a
-// tower, twenty-eight captured frames contained zero, and the comment at the
-// payload socket explained that the view "does not get to invent state".
-//
-// It doesn't have to. `Plate.stack` is now real domain state — how many plates
-// came off the dispenser in one armful — so the tower is a rendering of
-// something the sim actually models, and it collapses to a single plate the
-// moment the armful is set down or anything is put on it. Which is also the
-// gameplay read: a chef with a tower is FETCHING, a chef with a flat plate is
-// DELIVERING, and you can tell which from across the room.
-//
-// The rims are deliberately coloured. Look at the reference stack: it is not a
-// white cylinder, it is banded blue / green / red / cream, and those bands are
-// what stop a metre of crockery reading as one dead vertical bar. From the side
-// the only part of a plate you can see IS its rim, so tinting the whole disc is
-// the same picture for a third of the geometry.
-// FOOD STAYS THE MOST SATURATED THING ON SCREEN. The first cut of this banded
-// the stack in full-strength red, green and blue at the same disc thickness as
-// the white ones, and at iPad size the tower came out candy-striped — it beat
-// every tomato in the room for chroma, which is the one rule the reference's
-// whole composition rests on. The coloured plates are now PASTEL and rendered
-// half as thick as a white one, so they read as the thin painted rim lines on
-// the reference's stack rather than as sixteen coloured objects.
-const TOWER_RIMS = [
-  0xf7f2e6, 0xf7f2e6, 0xf7f2e6, 0x9ec9e4, 0xf7f2e6, 0xf7f2e6, 0xe9a49e, 0xf7f2e6,
-  0xf7f2e6, 0xa9d3a2, 0xf7f2e6, 0xf7f2e6, 0xf0d795, 0xf7f2e6,
-];
-/**
- * Vertical pitch per plate, and the plate is that thick, so the column is
- * SOLID — a stack with air between the discs reads as a pile of frisbees.
- *
- * FEWER, THICKER PLATES. The first cut drew two meshes per modelled plate at a
- * 0.072 pitch, i.e. up to 20 draw calls hanging off one chef's hand for a shape
- * whose entire job is an outline. Thirteen thicker discs give the identical
- * silhouette at a third less geometry.
- */
-const TOWER_PITCH = 0.078;
-
-function buildPlateTower(count: number): THREE.Group {
-  const g = new THREE.Group();
-  const geo = new THREE.CylinderGeometry(0.3, 0.272, 0.076, 18);
-  for (let i = 0; i < count; i++) {
-    const col = TOWER_RIMS[i % TOWER_RIMS.length];
-    const m = new THREE.Mesh(geo, toon(col));
-    // A drunken lean that grows with height, plus a per-plate jitter: a
-    // perfectly stacked cylinder reads as a prop, a leaning one reads as
-    // something about to go everywhere, which is the joke.
-    const t = i / Math.max(1, count - 1);
-    m.position.set(
-      Math.sin(i * 2.3) * 0.011 + t * t * 0.085,
-      i * TOWER_PITCH,
-      Math.cos(i * 1.7) * 0.011 + t * t * 0.025,
-    );
-    if (col !== 0xf7f2e6) m.scale.set(1.005, 0.5, 1.005);
-    m.rotation.z = -t * t * 0.11 + Math.sin(i * 3.1) * 0.014;
-    m.rotation.y = i * 0.9;
-    m.castShadow = i % 4 === 0;
-    g.add(m);
-  }
-  return g;
-}
-
 // ------------------------------------------------------------ stride wave
 //
 // THE BUG THE VERDICT CALLED "A DOLL STANDING STILL", WITH THE NUMBERS.
@@ -1065,9 +989,6 @@ export class ChefView {
 
   private carryKey = '';
   /** The comedy tower, when one is up, so it can sway on its own lag. */
-  private tower: THREE.Object3D | null = null;
-  private towerLean = 0;
-  private towerLeanV = 0;
   private phase = 0;
   private prevSpeed = 0;
   private accel = 0;
@@ -2652,28 +2573,34 @@ export class ChefView {
     this.recover = clamp(this.recover - dt * 2.6, 0, 1);
 
     // --- carry mode. 0 free, 1 produce out to the side, 2 plate flat out
-    //     front, 3 pan out to the side, 4 THE TOWER.
+    //     front, 3 pan out to the side.
     //
-    // Mode 4 is a plate whose `stack` says the chef scooped a whole armful off
-    // the dispenser. It is a completely different pose, a completely different
-    // outline and a completely different piece of information — fetching, not
-    // delivering — so it gets its own branch everywhere below rather than being
-    // a decoration bolted onto mode 2.
-    const stack = chef.carrying?.type === 'plate' ? (chef.carrying.plate.stack ?? 1) : 1;
+    // THERE USED TO BE A MODE 4: THE TOWER. A plate pickup sometimes handed the
+    // chef a seeded armful of 4-8 plates and the view drew the reference's
+    // comedy column, taller than the carrier. It was cosmetic — `stack` was
+    // never matched by a recipe, a bot plan or a serve check — and it read as a
+    // mechanic that was not there:
+    //
+    //   "When I pick up a plate I get a huge stack of plates. Cute, but this is
+    //    not how the gameplay works so we should cut it down to holding a
+    //    single plate"
+    //
+    // A joke that has to be explained as "ignore that, it does nothing" is not
+    // paying for itself, and it brought its own pose, its own inertia spring
+    // and its own head-clearance rule with it. All of it is gone, along with
+    // `Plate.stack` in the domain: one plate, mode 2, one silhouette.
     const mode = !chef.carrying
       ? 0
       : chef.carrying.type === 'ingredient'
         ? 1
         : chef.carrying.type === 'plate'
-          ? stack > 1
-            ? 4
-            : 2
+          ? 2
           : 3;
     // MODE 2 is the reference's loudest silhouette: Waluigi's plate out flat on
     // two straight arms, Shy Guy's the same, Toad's pancake tower hugged past
     // his chin. Everything the load does to the outline happens IN FRONT of the
     // body at chest height, never above the head.
-    const frontLoad = mode === 1 || mode === 2 || mode === 4;
+    const frontLoad = mode === 1 || mode === 2;
     this.carryBlend += ((mode ? 1 : 0) - this.carryBlend) * Math.min(1, dt * 9);
     // The arms no longer STRETCH. They used to scale to 2.1× along the limb so
     // a chibi shoulder could put a plate over its own crown — and because that
@@ -2702,9 +2629,6 @@ export class ChefView {
     // A load carried OUT IN FRONT pulls you back on your heels — the reference
     // Toad hauling the plate tower is visibly reclined under it.
     if (frontLoad) leanTarget -= 0.08 * this.carryBlend;
-    // A metre of crockery puts you right back on your heels, and the recline is
-    // half of why the reference's tower carry is funny.
-    if (mode === 4) leanTarget -= 0.16 * this.carryBlend;
     // A BUMP IS A STAGGER, NOT A KNOCKDOWN. −0.42 rad of recline is only 24°,
     // but the camera already looks DOWN at 22.5°, so the two add on screen and
     // in shots/mc-r6/ipad-landscape/t0010 bramble read as lying flat on its
@@ -2725,12 +2649,11 @@ export class ChefView {
     // Waluigi in `dash-and-dine-01.jpeg` is pitched about 15° into his run and
     // he holds it for the whole stride; the verdict asks for 12–18° permanently
     // at cruise. So the target gets a floor proportional to gait: a chef at
-    // full stride can never be asked for less than 0.245 rad (14°), a braking
-    // chef gives up to 0.26 rad of that back (so a hard skid still recedes to
-    // about −1°, visibly settling onto the heels without lying down), and the
-    // tower carry is exempt because its recline is the joke.
+    // full stride can never be asked for less than 0.245 rad (14°), and a
+    // braking chef gives up to 0.26 rad of that back (so a hard skid still
+    // recedes to about −1°, visibly settling onto the heels without lying down).
     if (!stunned && chef.intent !== 'working') {
-      const floor = (mode === 4 ? 0.05 : 0.245) * gait - 0.26 * this.brake;
+      const floor = 0.245 * gait - 0.26 * this.brake;
       if (leanTarget < floor) leanTarget = floor;
     }
     const leanK = stunned ? 240 : 150;
@@ -2762,19 +2685,6 @@ export class ChefView {
     this.bankV = SPRING_OUT.v;
     this.rig.rotation.z =
       this.bank + (stunned ? Math.sin(time * 38) * 0.2 * clamp(chef.stun / 0.22, 0, 1) : 0);
-
-    // --- the tower's own inertia. A soft, slow, badly-damped spring (k = 34
-    //     against the lean's 150) so it lags a long way behind the body: it
-    //     rocks BACK as the chef pulls away, pitches FORWARD into every stop,
-    //     and then keeps rocking for a beat afterwards. This is the difference
-    //     between a column glued to a chest and a load somebody is losing.
-    // Bounded at 0.26 rad, not 0.4: a metre of crockery at 25° past vertical
-    // stops reading as a wobble and starts reading as a stack that has already
-    // fallen over and is hanging in mid-air.
-    const towerTarget = mode === 4 ? clamp(-a * 0.24 + this.brake * 0.34, -0.26, 0.26) : 0;
-    springStep(this.towerLean, this.towerLeanV, towerTarget, 34, 0.06, dt, 0.4);
-    this.towerLean = SPRING_OUT.x;
-    this.towerLeanV = SPRING_OUT.v;
 
     // --- legs: contact / down / passing / up.
     const idle = 1 - Math.min(1, run * 6);
@@ -3149,30 +3059,6 @@ export class ChefView {
         setArm(this.armR, hack, 0.1, -0.6);
         setArm(this.armL, hack * 0.45 - 0.35, -0.28, -0.85);
       }
-    } else if (mode === 4) {
-      // THE TOWER — THE REFERENCE TOAD'S CARRY. Both arms come UP and IN, palms
-      // turned inward at chin height, hugging the column against the chest. The
-      // elbows are folded hard (−1.05) so the forearms are near vertical: that
-      // is what puts the hands high enough for the stack to start at the chin
-      // and rise past the hat, instead of starting at the belt where the body
-      // would swallow the bottom third of it.
-      //
-      // A load this tall also has to wobble as a POSE, not just as a mesh: the
-      // shoulders counter-rotate against the sway so the chef looks like it is
-      // fighting the thing, which is the whole gag.
-      //
-      // AND IT IS ASYMMETRIC, deliberately. A symmetric two-armed hug puts the
-      // column dead on the midline, and because the camera looks DOWN at 22.5°
-      // a load held forward projects UP the screen — so the stack landed
-      // squarely on the carrier's own head and pip vanished behind its own
-      // crockery in shots/mc-r3 and mc-r4 (desktop/01-opening). Look at what the
-      // reference actually does: the Toad's head is clearly visible to the LEFT
-      // of his tower. So the column rides on the RIGHT shoulder — right arm up
-      // and around it, left arm reaching ACROSS the chest to brace the bottom —
-      // and the head stays clear on the other side.
-      const w = Math.sin(p) * amp * 0.05;
-      setArm(this.armR, -1.24 - w + this.towerLean * 0.5, 0.54, -0.8);
-      setArm(this.armL, -1.4 + w + this.towerLean * 0.5, 0.34, -1.24);
     } else if (mode === 2) {
       // PLATE — THE WALUIGI CARRY. Both arms straight out FORWARD and flat, the
       // plate resting across both palms at chest height, the tower rising past
@@ -3448,9 +3334,8 @@ export class ChefView {
       idle * Math.sin(time * 1.05 + s.seed * 4) * 0.075 +
       this.fidgetNod +
       chop * 0.16 +
-      // Down over a load held out front — you watch what you are hauling. UP
-      // under the tower, because you cannot see over it and you are trying.
-      this.carryBlend * (mode === 4 ? 0.16 : frontLoad ? -0.13 : 0);
+      // Down over a load held out front — you watch what you are hauling.
+      this.carryBlend * (frontLoad ? -0.13 : 0);
     this.head.rotation.z = stunned
       ? Math.sin(time * 26) * 0.22
       : // dt-correct decay: a flat 0.86 per frame is a 60fps constant, and at
@@ -3568,57 +3453,11 @@ export class ChefView {
       this.hands.position.set(0, 0, 0);
     }
 
-    // `describe` does not know about the armful count, so the tower height goes
-    // into the key by hand — otherwise a plate that loses its stack keeps
-    // rendering as a column.
-    const key = `${describe(chef.carrying)}#${mode === 4 ? stack : 0}`;
+    const key = describe(chef.carrying);
     if (key !== this.carryKey) {
       this.carryKey = key;
       this.hands.clear();
-      this.tower = null;
-      if (mode === 4) {
-        // 10 to 14 plates. At 0.078 pitch and 1.28 scale that is 1.00 to 1.40
-        // rig units of crockery against a chef that stands about 1.0 — so the
-        // shortest armful still clears the hat and the biggest is half again
-        // taller than the character, which is the reference's joke. The RANGE is
-        // the point: every tower being identical would read as a prop rather
-        // than as somebody's bad decision.
-        const t = buildPlateTower(stack + 6);
-        // NARROWER, NOT SHORTER. At a uniform 1.28 the column came out 0.61
-        // world units across against a 0.45 head — the stack was wider than the
-        // chef's skull, so no lateral offset could ever clear a face without
-        // hanging the whole armful out in space. The reference's plates are
-        // about a head across and the tower's comedy is entirely in its HEIGHT,
-        // so the y scale keeps 1.3 and the diameter drops to 1.0.
-        t.scale.set(1.0, 1.3, 1.0);
-        // PLACED IN THE CHEF'S OWN FRAME, NOT THE PAW'S.
-        //
-        // `hands` is a child of the right hand, so an offset written there is in
-        // whatever frame the elbow happens to have left the wrist in — and with
-        // the shoulder pitched −1.24 that frame's +Z points back up at the
-        // CAMERA. Three rounds of nudging that offset moved the column sideways
-        // and towards the lens instead of forward, and the result was a stack
-        // standing between the viewer and the carrier's face: pip's toque was
-        // completely gone in shots/mc-r8 and mc-r9 (desktop/01-opening).
-        //
-        // The socket's rotation is now solved to world-vertical-plus-yaw, which
-        // means offsets applied to the TOWER are in the chef's own axes: +X is
-        // its right, +Z is the way it is facing (`buildHead` puts the eyes at
-        // z = +0.24). So the column is pushed 0.2 FORWARD — away from the camera
-        // for a chef seen from behind, so the head correctly draws in front of
-        // it — and dropped 0.3 so the hug lands round the middle of the stack
-        // and the base hangs at knee height, exactly as the reference Toad
-        // carries his.
-        // ...and 0.2 FORWARD was too much once the socket moved onto the paw:
-        // with the shoulder pitched −1.24 the hand is already well in front of
-        // the chest, so another 0.2 stood the column in clear air with floor
-        // visible between it and the body (the verdict: "bramble's plate tower
-        // floats to its right with stone visible between body and column").
-        // Held against the chest instead, riding on the right shoulder.
-        t.position.set(-0.1, -0.26, 0.02);
-        this.tower = t;
-        this.hands.add(t);
-      } else if (chef.carrying) {
+      if (chef.carrying) {
         const item = buildCarryable(chef.carrying);
         // SIZE IS THE WHOLE POINT. The skull is a 0.285 sphere, so a head is
         // ~0.57 across, and everything here used to be scaled DOWN below that:
@@ -3682,50 +3521,7 @@ export class ChefView {
       // Undo the arm chain so the load rides flat. The shoulder's Z is folded
       // in too, otherwise a plate tips off the palm every time the arm splays.
       const level = -(cArm.hip.rotation.x + cArm.knee.rotation.x) - this.lean;
-      if (mode === 4) {
-        // TOWER. The socket sits on the MIDLINE (a hand's width inboard of the
-        // right paw) and a touch forward, so the column rises up the front of
-        // the chest and past the ear rather than out of one fist. `level` puts
-        // it dead vertical whatever the arm is doing; `towerLean` then tips the
-        // whole thing on a lagging spring, so it sways INTO a stop and leans out
-        // of a turn like a real armful about to become an accident.
-        // OFF THE MIDLINE, ONTO THE SHOULDER. Dead centre (−0.26, the same
-        // place the flat plate rides) put the column directly in front of the
-        // chef's own skull: our camera looks down 22.5°, so a load held forward
-        // projects UP the screen, and in shots/mc-r3/desktop/01-opening pip's
-        // head was completely behind its own crockery. The reference does not
-        // make that mistake — its Toad's head is clearly visible to the LEFT of
-        // the stack (`dash-and-dine-02.jpeg`, bottom centre). −0.08 rests the
-        // column against the chef's right shoulder instead, which clears the
-        // head, still reads as a two-armed hug, and is a better joke besides.
-        // The socket itself sits ON the paw; all the placement lives on the
-        // tower, in the chef's frame, where it is predictable.
-        this.hands.position.set(0, -0.06, 0);
-        // SOLVE THE ORIENTATION, DO NOT GUESS IT.
-        //
-        // Every other mode levels its payload by subtracting the arm's X
-        // rotations — `level = -(shoulder.x + elbow.x)`. That identity only
-        // holds while the shoulder's Z is ~0, because the hand's orientation is
-        // Rx(shoulder.x)·Rz(shoulder.z)·Rx(elbow.x) and rotations do not
-        // commute: you cannot invert that product with a single (x, 0, z)
-        // Euler. The tower's shoulder is abducted 0.42 rad, and the guess put it
-        // 80° off vertical — shots/mc-r5/desktop/01-opening is a fan of plates
-        // lying sideways in mid-air, which is a considerably worse frame than
-        // the one it was meant to fix.
-        //
-        // So take the socket's actual world quaternion and multiply by the
-        // inverse. The column is then dead vertical in WORLD space for any arm
-        // pose whatsoever, and `towerLean` / `turn` tilt it from there
-        // deliberately rather than by accident. (`armR.hip.scale` is (1,1,1) —
-        // `reach` relaxes to 1 and nothing else touches it — so quaternion
-        // extraction off the world matrix is exact.)
-        socket.getWorldQuaternion(this.qA).invert();
-        this.eA.set(this.towerLean, this.rig.rotation.y, this.turn * 0.3);
-        this.hands.quaternion.copy(this.qA).multiply(this.qB.setFromEuler(this.eA));
-        // A second, faster jiggle on the column itself, so the top of the stack
-        // is never quite still even when the chef is.
-        if (this.tower) this.tower.rotation.z = Math.sin(time * 3.4 + s.seed * 5) * (0.018 + amp * 0.055);
-      } else if (mode === 2) {
+      if (mode === 2) {
         // THE PLATE IS SOLVED IN TORSO SPACE. THE HANDS ONLY GRIP IT.
         //
         // It used to be an offset in the HAND's frame — (−0.29, −0.24, 0.02),
@@ -3829,26 +3625,7 @@ export class ChefView {
         // about to erase a face.
         const dx = this.tmp3.x - this.tmp2.x;
         const lat = Math.abs(dx);
-        if (mode === 4) {
-          // THE TOWER GOES SIDEWAYS, NOT DOWN. A metre of crockery is a
-          // COLUMN: pushing its origin down-screen just slides the same column
-          // through the same skull, which is what shots/mc-w2-r3/ipad-landscape/
-          // 90-late shows on both pip and nori — two chefs completely erased by
-          // their own plates. The reference does not solve this vertically
-          // either; look at `dash-and-dine-02.jpeg`, bottom centre: the Toad's
-          // head is clearly visible to the LEFT of his stack. So the column is
-          // pushed along screen-RIGHT until the head is outside it, away from
-          // whichever side it already leans to, and the gag survives intact.
-          const dir = dx >= 0 ? 1 : -1;
-          const overLat = TOWER_CLEAR - lat;
-          this.tele.headClear = +Math.min(0, -overLat).toFixed(3);
-          if (overLat > 0) {
-            this.tmp2.set(dir * overLat, 0, 0);
-            socket.getWorldQuaternion(this.qA).invert();
-            this.tmp2.applyQuaternion(this.qA).multiplyScalar(1 / CHAR_SCALE);
-            this.hands.position.add(this.tmp2);
-          }
-        } else {
+        {
           const clr = headClearFor(mode);
           const need = lat >= clr ? 0 : Math.sqrt(clr * clr - lat * lat);
           const over = payUp - (headUp - need);
@@ -3874,10 +3651,8 @@ export class ChefView {
         //     frame, unless it is already a torso's width out to the side
         //     (which is exactly what the produce carry is for and must not be
         //     punished for). If it is, it gets pushed straight out along the
-        //     chef's forward axis until it clears. The tower is exempt: it is a
-        //     hug, it is SUPPOSED to touch the chest, and it solves its own
-        //     overlap laterally a few lines up.
-        if (mode !== 4) {
+        //     chef's forward axis until it clears.
+        {
           this.tmp.set(0, b.bodyY, 0);
           this.hips.updateWorldMatrix(true, false);
           this.tmp.applyMatrix4(this.hips.matrixWorld);
