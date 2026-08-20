@@ -1,41 +1,48 @@
 /**
- * DOES THE WHOLE MAP FIT ON A PORTRAIT SCREEN?
+ * DOES THE WHOLE LEVEL FIT ON A PORTRAIT SCREEN?
  *
  *   node tools/fitprobe.mjs
  *
  * Asked directly: "the entire playable game visible on screen in portrait with
  * no horizontal scrolling at all". That is a question about PIXELS, not about
- * camera constants, so this answers it in pixels: it projects the four floor
- * corners of the level through the live camera (`__game.project`) and reports
- * where each lands relative to the 393px frame.
+ * camera constants, so this answers it in pixels: it projects the corners of
+ * the level's floor through the live camera (`__game.project`) and reports
+ * where each lands relative to the frame.
  *
- * The reason it has to be all four and not just the back wall: a pitched
- * perspective camera turns a rectangular floor into a TRAPEZOID on screen. The
- * far edge is further from the lens, so the frame covers more world there; the
- * NEAR edge is the narrow end and is what actually gets cut. Every previous
- * measurement in this project used `backWallFrac`, which is the wide end, and
- * so could never see the crop that matters.
+ * WHY ALL FOUR CORNERS AND NOT THE BACK WALL. A pitched perspective camera
+ * projects a rectangular floor as a TRAPEZOID. The far edge is further from the
+ * lens, so the frame covers more world there; the NEAR edge is the narrow end
+ * and is what actually gets cut. Every portrait measurement in this project has
+ * used `backWallFrac`, which is the WIDE end, so the edge that binds has been
+ * invisible the whole time.
  *
- * MEASURED ON THE SHIPPED CAMERA (iPhone portrait, 393x852, real insets):
+ * MEASURED ON THE SHIPPED CAMERA (iPhone portrait, 393x852, real insets, at the
+ * settled pose — see SETTLE below):
  *
- *   far  edge   595px of a 393px frame   151%
- *   near edge  2274px of a 393px frame   578%
- *   trapezoid  3.82x
+ *                     far edge      near edge     trapezoid
+ *   room shell        593px 151%    3126px 795%     5.27x
+ *   walkable floor    555px 141%    1525px 388%     2.75x
  *
- * That 3.82 is the whole answer to "why will it not zoom out far enough". The
- * binding edge is 5.8x too wide, not 1.1x, and no setting of HALF_WIDTH_MIN,
- * HALF_SPAN_TALL or the room's wall height addresses it — they all buy width at
- * the FAR end. What does address it is PITCH, because steepening collapses the
- * trapezoid toward 1.0 and a steeper camera fits the same floor from closer:
+ * Reproducible to the pixel across runs; if these drift, the camera moved.
  *
- *   pitch      22.5    35      50      65      90
- *   trapezoid  3.82    3.81    3.80    3.79    1.00   (at the shipped framing)
- *   ...and with the camera pulled back until every corner is inside the frame,
- *   all five fit; 50-65 deg uses the frame best, 22.5 deg leaves the room a
- *   wedge in the top third, 90 deg is a flat floor plan with no wall art at all.
+ * The binding edge is nearly EIGHT times too wide, not 1.1x. That is why
+ * raising HALF_WIDTH_MIN to 8.2 solved to 5.1 and did nothing, why raising the
+ * room's wall height stopped helping at halfWidth 6.62, and why HALF_WIDTH_MAX
+ * at 8.95 was never reached: all three buy width at the FAR end.
  *
- * The cost at any of them is character size: the chef lands near 3% of frame
- * height against the reference's 15-19.5%.
+ * What does address it is PITCH, because steepening collapses the trapezoid and
+ * a steeper camera fits the same floor from closer. Swept with the rig bypassed
+ * and the camera pulled back until every corner is inside the frame, 22.5 / 35
+ * / 50 / 65 / 90 degrees all fit; 50-65 uses the frame best, 22.5 leaves the
+ * room a wedge in the top third, and 90 is a flat floor plan with no wall art
+ * at all. The cost at every one of them is character size — the chef lands near
+ * 3% of frame height against the reference's 15-19.5%.
+ *
+ * REPORTS, DOES NOT GATE. The shipped camera deliberately does not fit the whole
+ * level on a phone — it frames the play, and the level is bigger than the frame
+ * by design. So "part of the level is off screen" is the correct answer for the
+ * game as it stands, and exiting non-zero on it would wire a permanent red light
+ * into the tree for a decision nobody has made. Exit 0 and print the numbers.
  */
 import { chromium } from 'playwright';
 import http from 'node:http';
@@ -45,7 +52,56 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
-const W = 393, H = 852;
+const W = 393;
+const H = 852;
+
+/**
+ * THE LEVEL'S OWN BOUNDS, READ OFF THE AUTHORITATIVE MAP.
+ *
+ * The first cut asked `snapshot()` for `kitchen.width/height` and fell back to
+ * a hardcoded 15x10 when that came back undefined — which it always did, since
+ * the snapshot has no `kitchen` key at all. So every number this printed was
+ * measured against a guess, and the guess was WRONG: KITCHEN_MAP is 11 rows,
+ * not 10, so the "front" corner was projected one row short of the level and
+ * the trapezoid was understated (5.27x, not the 3.81x first reported). A probe
+ * whose headline measurement is taken against a fallback constant is worse than
+ * no probe. tools/camsync.mjs already parses this file for the same reason.
+ */
+function kitchenBounds() {
+  const rows = fs
+    .readFileSync(path.join(ROOT, 'src/domain/kitchen.ts'), 'utf8')
+    .match(/export const KITCHEN_MAP = \[([\s\S]*?)\];/)[1]
+    .split('\n')
+    .map((l) => l.trim().replace(/^'|',?$/g, ''))
+    .filter((l) => l.length > 0 && !l.startsWith('//'));
+  const width = rows[0].length;
+  const height = rows.length;
+  // ...and the WALKABLE extent as well as the shell. "The entire playable game"
+  // is a claim about where a chef can go and what they can reach, which is the
+  // interior, not the wall ring around it. Both are reported because they are
+  // different questions and the answer differs by a third.
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  rows.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      if (ch === '#') return;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x + 1);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y + 1);
+    });
+  });
+  return { width, height, play: { minX, maxX, minY, maxY } };
+}
+
+const K = kitchenBounds();
+
+if (!fs.existsSync(path.join(DIST, 'index.html'))) {
+  console.error('dist/ is missing — run `npx vite build` first.');
+  process.exit(1);
+}
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = http.createServer((req, res) => {
@@ -60,64 +116,84 @@ const port = server.address().port;
 const PINNED = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const browser = await chromium.launch({
   executablePath: fs.existsSync(PINNED) ? PINNED : undefined,
-  args: ['--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader', '--hide-scrollbars'],
+  args: [
+    '--no-sandbox',
+    '--disable-dev-shm-usage',
+    '--enable-unsafe-swiftshader',
+    '--use-gl=angle',
+    '--use-angle=swiftshader',
+    '--hide-scrollbars',
+  ],
 });
-const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
-// Real notch/home-indicator insets, the same ones shoot.mjs injects — without
+
+// Real notch/home-indicator insets, the same ones shoot.mjs injects. Without
 // them this measures a frame no phone has.
-await page.addStyleTag({ content: ':root{--safe-t:59px !important;--safe-b:34px !important;--safe-l:0px !important;--safe-r:0px !important}' }).catch(() => {});
+const INSETS = ':root{--safe-t:59px !important;--safe-b:34px !important;--safe-l:0px !important;--safe-r:0px !important}';
+const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
 await page.goto(`http://localhost:${port}/`);
+await page.addStyleTag({ content: INSETS });
 await page.waitForFunction(() => window.__game);
-await page.addStyleTag({ content: ':root{--safe-t:59px !important;--safe-b:34px !important;--safe-l:0px !important;--safe-r:0px !important}' });
 await page.evaluate(() => window.__game.start());
-await page.evaluate(() => window.__game.warp(6));
-await page.waitForTimeout(600);
 
-const r = await page.evaluate(({ w, h }) => {
-  const g = window.__game;
-  const s = g.snapshot();
-  const KW = s.kitchen?.width ?? 15;
-  const KH = s.kitchen?.height ?? 10;
-  const P = (x, y, z = 0) => g.project({ x, y, z });
-  const corners = {
-    backLeft: P(0, 0), backRight: P(KW, 0),
-    frontLeft: P(0, KH), frontRight: P(KW, KH),
-  };
-  const cam = g.snapshot().camera ?? null;
-  return { KW, KH, corners, w, h, cam };
-}, { w: W, h: H });
-
-const inX = (p) => p.x >= 0 && p.x <= W;
-console.log(`\nmap ${r.KW} x ${r.KH}   frame ${W}x${H}\n`);
-const rows = [
-  ['back  left ', r.corners.backLeft],
-  ['back  right', r.corners.backRight],
-  ['front left ', r.corners.frontLeft],
-  ['front right', r.corners.frontRight],
-];
-for (const [name, p] of rows) {
-  const off = p.x < 0 ? `${(-p.x).toFixed(0)}px OFF the left` : p.x > W ? `${(p.x - W).toFixed(0)}px OFF the right` : 'inside';
-  console.log(`  ${name}  x ${p.x.toFixed(0).padStart(6)}  y ${p.y.toFixed(0).padStart(5)}   ${off}`);
-}
-const backSpan = r.corners.backRight.x - r.corners.backLeft.x;
-const frontSpan = r.corners.frontRight.x - r.corners.frontLeft.x;
-console.log(`\n  far  edge spans ${backSpan.toFixed(0)}px of a ${W}px frame  (${((backSpan / W) * 100).toFixed(0)}%)`);
-console.log(`  near edge spans ${frontSpan.toFixed(0)}px of a ${W}px frame  (${((frontSpan / W) * 100).toFixed(0)}%)`);
-console.log(`  the near edge is ${(frontSpan / backSpan).toFixed(2)}x the far edge — that ratio is the trapezoid,`);
-console.log(`  and it is why containing the near edge means overshooting the far one.\n`);
-const allIn = rows.every(([, p]) => inX(p));
 /**
- * REPORTS, DOES NOT GATE. The shipped camera deliberately does not fit the
- * whole level on a phone — it frames the play, and the level is bigger than the
- * frame by design. So "part of the map is off screen" is the correct answer for
- * the game as it stands, and exiting non-zero on it would wire a permanent red
- * light into the tree for a decision nobody has made. Exit 0 and print the
- * numbers; whoever is asking the question can read them.
+ * SETTLE ON A DEFINED POSE, DO NOT SAMPLE A TRANSIENT ONE.
+ *
+ * Two reasons the first cut's "wait 600ms and measure" was not reproducible.
+ * `beginRun()` starts a 1.1-second push-in, so 600ms lands mid-move. And the
+ * requestAnimationFrame loop does not reliably drive this page headlessly at
+ * all — which is the entire reason capture mode exists (see README) and is why
+ * an earlier experiment here appeared to do nothing: the camera override ran
+ * zero times because `frame()` was never called.
+ *
+ * So take the clock, warp past the push-in, and advance a FIXED number of
+ * seconds. The pose is then a function of the build and nothing else.
  */
+await page.evaluate(() => window.__game.setCapture(true));
+await page.evaluate(() => window.__game.warp(20));
+await page.evaluate(() => window.__game.advance(2));
+
+const r = await page.evaluate((k) => {
+  const P = (x, y) => window.__game.project({ x, y, z: 0 });
+  const box = (minX, maxX, minY, maxY) => ({
+    farL: P(minX, minY),
+    farR: P(maxX, minY),
+    nearL: P(minX, maxY),
+    nearR: P(maxX, maxY),
+  });
+  return {
+    shell: box(0, k.width, 0, k.height),
+    play: box(k.play.minX, k.play.maxX, k.play.minY, k.play.maxY),
+  };
+}, K);
+
+const side = (p) => (p.x < 0 ? `${(-p.x).toFixed(0)}px OFF left` : p.x > W ? `${(p.x - W).toFixed(0)}px OFF right` : 'inside');
+
+console.log(`\nlevel ${K.width} x ${K.height} cells   walkable x ${K.play.minX}..${K.play.maxX}, y ${K.play.minY}..${K.play.maxY}   frame ${W}x${H}\n`);
+
+let allIn = true;
+for (const [label, b] of [
+  ['room shell    ', r.shell],
+  ['walkable floor', r.play],
+]) {
+  const far = b.farR.x - b.farL.x;
+  const near = b.nearR.x - b.nearL.x;
+  const fits = [b.farL, b.farR, b.nearL, b.nearR].every((p) => p.x >= -1 && p.x <= W + 1);
+  allIn = allIn && fits;
+  console.log(`  ${label}`);
+  console.log(`    far  corners  ${b.farL.x.toFixed(0).padStart(7)} ${b.farR.x.toFixed(0).padStart(7)}   ${side(b.farL)} / ${side(b.farR)}`);
+  console.log(`    near corners  ${b.nearL.x.toFixed(0).padStart(7)} ${b.nearR.x.toFixed(0).padStart(7)}   ${side(b.nearL)} / ${side(b.nearR)}`);
+  console.log(
+    `    far edge ${far.toFixed(0)}px (${((far / W) * 100).toFixed(0)}%)   ` +
+      `near edge ${near.toFixed(0)}px (${((near / W) * 100).toFixed(0)}%)   ` +
+      `trapezoid ${(near / far).toFixed(2)}x\n`,
+  );
+}
+
 console.log(
   allIn
-    ? '  the whole map is on screen.\n'
-    : '  part of the map is off screen — which is the shipped camera working as designed.\n',
+    ? '  the whole level is on screen.\n'
+    : '  part of the level is off screen — which is the shipped camera working as designed.\n' +
+        '  The near edge is the binding one; see the header for why pitch, not zoom, is the lever.\n',
 );
 
 await browser.close();

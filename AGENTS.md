@@ -111,7 +111,8 @@ Three things it will tell you that are easy to miss:
 
 **A pitched camera frames a trapezoid, not a rectangle** — `tools/fitprobe.mjs`
 projects the level's four floor corners and prints where each lands. On the
-shipped portrait camera the near edge of the floor is 3.8x the far edge, so the
+shipped portrait camera the near edge of the room is 5.3x the far edge (2.8x for
+the walkable floor alone), so the
 edge that gets cut is the one no camera measurement in this project had ever
 looked at: `backWallFrac` measures the wide end. If you are ever asked how much
 more of the level could be shown, run this before touching a constant.
