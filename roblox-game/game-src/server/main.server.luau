@@ -56,7 +56,38 @@ remotes.ShopAction.OnServerEvent:Connect(function(player, action)
 	progression:shopAction(player, action)
 end)
 
+-- The Roblox avatar never appears in the kitchen: the chef IS the player's
+-- body. The character still spawns (the platform's control scripts need a
+-- live humanoid to route thumbstick/WASD input) but it lives anchored,
+-- invisible and collisionless in a vault far below the floor.
+local function vaultCharacter(character: Model)
+	task.defer(function()
+		local root = character:WaitForChild("HumanoidRootPart", 5) :: BasePart?
+		if root == nil then
+			return
+		end
+		character:PivotTo(CFrame.new(0, -120, 0))
+		root.Anchored = true
+		for _, d in character:GetDescendants() do
+			if d:IsA("BasePart") or d:IsA("Decal") then
+				(d :: any).Transparency = 1
+				if d:IsA("BasePart") then
+					d.CanCollide = false
+					d.CastShadow = false
+				end
+			elseif d:IsA("Humanoid") then
+				d.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+				d.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+			end
+		end
+	end)
+end
+
 Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(vaultCharacter)
+	if player.Character ~= nil then
+		vaultCharacter(player.Character)
+	end
 	progression:playerAdded(player)
 	crew:playerAdded(player)
 	director:broadcastPhase()

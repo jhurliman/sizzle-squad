@@ -148,7 +148,9 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 		entry.carryModel = item
 	end
 	if entry.carryModel ~= nil then
-		entry.carryModel:PivotTo(base * CFrame.new(0, CHEF_HEIGHT * 0.95 + hop, -CHEF_HEIGHT * 0.45))
+		-- Held out FRONT: the rigs face +Z in model space (verified from the
+		-- captured head/snout geometry), so the offset is +Z, chest height.
+		entry.carryModel:PivotTo(base * CFrame.new(0, CHEF_HEIGHT * 0.62 + hop, CHEF_HEIGHT * 0.5))
 	end
 end
 

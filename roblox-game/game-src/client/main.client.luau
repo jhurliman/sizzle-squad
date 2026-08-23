@@ -414,7 +414,7 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 
 	-- HUD
-	hud:updateOrders(state.orders, serveAnchors)
+	hud:updateOrders(state.orders)
 	firstShift:update(state, (state.myChefId ~= nil and state.flags[state.myChefId]) or 0)
 	if state.phase.phase == "round" then
 		hud:updateTimer(shared.TUNING.roundSeconds - (state.score.time or 0))

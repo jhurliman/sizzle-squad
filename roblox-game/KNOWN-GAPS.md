@@ -15,6 +15,7 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   equipped hat/palette/kitchen skin changes nothing on screen — `ChefVisuals`
   and the kitchen never read `profile.equipped`. Needs: hat models attached to
   rig heads, palette recolor of rig parts, plate/pan/bell swaps.
+- 🟢 **Ticket icons render via runtime EditableImage** (no upload needed) with a colored-chip fallback if the API is unavailable on some platform — verify on device.
 - 🔴 **Daily challenges have no UI.** They replicate in the `Progress` payload
   and pay out (auto-claim, no celebration), but no panel shows them — players
   can't see goals or progress. The streak number in the bottom-left strip is
@@ -35,8 +36,6 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟡 **Food is spheres.** ItemViz communicates kind/state (color, chopped
   halves, browning) but nothing is shaped — no lettuce leaves, bacon rashers,
   seeded buns, no comedy plate-stack tower.
-- 🟡 **Ticket chips are colored circles + emoji** (🔪/🔥) pending the icon
-  spritesheet upload (README launch step 4).
 - 🟡 **Silent**: all SFX ids empty (README step 2); no adaptive music at all
   (stems render + volume-mix layer unbuilt).
 - 🟡 **VFX minimal**: fire + floating labels only. No chop bits, steam,

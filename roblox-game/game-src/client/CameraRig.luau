@@ -24,6 +24,10 @@ end
 
 function CameraRig:update()
 	local camera = self.camera
+	-- Character respawns can hand the camera back to the default scripts.
+	if camera.CameraType ~= Enum.CameraType.Scriptable then
+		camera.CameraType = Enum.CameraType.Scriptable
+	end
 	local vp = camera.ViewportSize
 	local aspect = math.max(0.4, vp.X / math.max(1, vp.Y))
 	local vfov = math.rad(camera.FieldOfView)

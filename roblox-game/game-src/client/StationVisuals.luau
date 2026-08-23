@@ -19,12 +19,24 @@ function StationVisuals.new(parent: Instance)
 	return self
 end
 
-local function topOf(model: Model?, cell: any): Vector3
-	if model ~= nil then
-		local cf, size = model:GetBoundingBox()
-		return Vector3.new(cf.Position.X, cf.Position.Y + size.Y / 2 + 0.5, cf.Position.Z)
-	end
-	return Vector3.new((cell.x + 0.5) * SCALE, 1.1 * SCALE, (cell.y + 0.5) * SCALE)
+-- Work-surface heights in sim units, from the web game's proportions
+-- (COUNTER_H 0.86, TABLE_H 0.38 + plank, HEARTH_TOP 0.61). Bounding boxes
+-- are useless here: station models include tall dressing (plate stacks, the
+-- serve counters' Toad figures), which floated items a full counter too high.
+local SURFACE_H: { [string]: number } = {
+	serve = 0.92,
+	plates = 0.92,
+	counter = 0.92,
+	stove = 0.66,
+	bin = 0.78,
+	crate = 0.85,
+	board = 0.55,
+	sink = 0.6,
+}
+
+local function topOf(kind: string?, cell: any): Vector3
+	local h = SURFACE_H[kind or ""] or 0.8
+	return Vector3.new((cell.x + 0.5) * SCALE, h * SCALE, (cell.y + 0.5) * SCALE)
 end
 
 function StationVisuals:ensure(id: number, anchor: Vector3): any
@@ -70,7 +82,7 @@ end
 --- stations: the mirrored station table; models: station id -> kitchen Model
 function StationVisuals:update(stations: { [number]: any }, models: { [number]: Model })
 	for id, st in stations do
-		local anchor = topOf(models[id], st.cell or { x = 7, y = 5 })
+		local anchor = topOf(st.kind, st.cell or { x = 7, y = 5 })
 		local e = self:ensure(id, anchor)
 
 		-- held item

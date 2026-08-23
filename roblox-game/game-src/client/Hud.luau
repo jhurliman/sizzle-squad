@@ -144,9 +144,20 @@ function Hud.new(catalog: any)
 		Text = "",
 	}, gui)
 
-	-- ticket rail container is world-space; billboards created on demand
+	-- screen-space ticket rail, top center under the timer (world billboards
+	-- proved unframeable across aspect ratios — the camera never saw them)
+	self.ticketRail = mk("Frame", {
+		Size = UDim2.new(1, -40, 0, 96),
+		Position = UDim2.new(0, 20, 0, 64),
+		BackgroundTransparency = 1,
+	}, gui)
+	mk("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 8),
+	}, self.ticketRail)
 	self.tickets = {} :: { [number]: any }
-	self.ticketAnchors = {} :: { [number]: any }
 
 	-- floating labels pool
 	self.labelPool = {} :: { any }
@@ -156,66 +167,64 @@ end
 
 -- ------------------------------------------------------------------ tickets
 
-function Hud:setTicketAnchor(orderIndex: number, worldPos: Vector3) end
-
---- Rebuild ticket billboards from the replicated order list. Tickets hang
---- over the serve counters, spread horizontally.
-function Hud:updateOrders(orders: { any }, serveAnchors: { Vector3 })
-	-- remove stale
+--- Rebuild the ticket rail from the replicated order list.
+function Hud:updateOrders(orders: { any })
+	local IconViz = require(script.Parent.IconViz) :: any
 	local live = {}
 	for i, o in orders do
 		live[o.id] = true
 		local t = self.tickets[o.id]
 		if t == nil then
-			local anchor = serveAnchors[(i - 1) % math.max(1, #serveAnchors) + 1]
-				or Vector3.new(7.5 * SCALE, 6 * SCALE, 1 * SCALE)
-			local part = mk("Part", {
-				Name = `Ticket_{o.id}`,
-				Anchored = true,
-				CanCollide = false,
-				Transparency = 1,
-				Size = Vector3.one,
-				CFrame = CFrame.new(anchor + Vector3.new(((i - 1) - (#orders - 1) / 2) * 7, 10 + (i % 2) * 3, 0)),
-			}, workspace)
-			local bb = mk("BillboardGui", {
-				Size = UDim2.fromOffset(120, 84),
-				AlwaysOnTop = true,
-				MaxDistance = 500,
-			}, part)
 			local card = mk("Frame", {
-				Size = UDim2.fromScale(1, 1),
+				Size = UDim2.fromOffset(20 + math.max(2, #o.components) * 34, 92),
 				BackgroundColor3 = Color3.fromRGB(255, 248, 235),
-			}, bb)
-			mk("UICorner", { CornerRadius = UDim.new(0, 10) }, card)
+				LayoutOrder = o.id,
+			}, self.ticketRail)
+			mk("UICorner", { CornerRadius = UDim.new(0, 12) }, card)
 			mk("TextLabel", {
-				Size = UDim2.new(1, 0, 0, 24),
+				Size = UDim2.new(1, 0, 0, 22),
 				BackgroundTransparency = 1,
 				TextColor3 = Color3.fromRGB(58, 32, 19),
 				TextSize = 15,
 				Font = Enum.Font.FredokaOne,
 				Text = o.name,
 			}, card)
-			local row = mk("Frame", { Size = UDim2.new(1, -12, 0, 30), Position = UDim2.new(0, 6, 0, 26), BackgroundTransparency = 1 }, card)
+			local row = mk("Frame", {
+				Size = UDim2.new(1, -12, 0, 40),
+				Position = UDim2.new(0, 6, 0, 24),
+				BackgroundTransparency = 1,
+			}, card)
 			mk("UIListLayout", {
 				FillDirection = Enum.FillDirection.Horizontal,
 				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				Padding = UDim.new(0, 4),
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				Padding = UDim.new(0, 3),
 			}, row)
 			for _, c in o.components do
-				local chip = mk("Frame", {
-					Size = UDim2.fromOffset(24, 24),
-					BackgroundColor3 = INGREDIENT_COLORS[c.kind] or Color3.fromRGB(150, 150, 150),
-				}, row)
-				mk("UICorner", { CornerRadius = UDim.new(1, 0) }, chip)
-				if c.state ~= "raw" then
-					mk("TextLabel", {
-						Size = UDim2.fromScale(1, 1),
+				local content = IconViz.content(c.kind, c.state)
+				if content ~= nil then
+					mk("ImageLabel", {
+						Size = UDim2.fromOffset(32, 32),
 						BackgroundTransparency = 1,
-						TextColor3 = Color3.new(1, 1, 1),
-						TextSize = 12,
-						Font = Enum.Font.GothamBold,
-						Text = if c.state == "cooked" then "🔥" else "🔪",
-					}, chip)
+						ImageContent = content,
+					}, row)
+				else
+					-- fallback: colored chip + state glyph
+					local chip = mk("Frame", {
+						Size = UDim2.fromOffset(26, 26),
+						BackgroundColor3 = INGREDIENT_COLORS[c.kind] or Color3.fromRGB(150, 150, 150),
+					}, row)
+					mk("UICorner", { CornerRadius = UDim.new(1, 0) }, chip)
+					if c.state ~= "raw" then
+						mk("TextLabel", {
+							Size = UDim2.fromScale(1, 1),
+							BackgroundTransparency = 1,
+							TextColor3 = Color3.new(1, 1, 1),
+							TextSize = 12,
+							Font = Enum.Font.GothamBold,
+							Text = if c.state == "cooked" then "🔥" else "🔪",
+						}, chip)
+					end
 				end
 			end
 			local bar = mk("Frame", {
@@ -226,7 +235,7 @@ function Hud:updateOrders(orders: { any }, serveAnchors: { Vector3 })
 			mk("UICorner", { CornerRadius = UDim.new(0, 4) }, bar)
 			local fill = mk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(120, 200, 80) }, bar)
 			mk("UICorner", { CornerRadius = UDim.new(0, 4) }, fill)
-			t = { part = part, fill = fill }
+			t = { card = card, fill = fill }
 			self.tickets[o.id] = t
 		end
 		local f = math.clamp(o.remaining / math.max(1, o.total), 0, 1)
@@ -239,7 +248,7 @@ function Hud:updateOrders(orders: { any }, serveAnchors: { Vector3 })
 	end
 	for id, t in self.tickets do
 		if not live[id] then
-			t.part:Destroy()
+			t.card:Destroy()
 			self.tickets[id] = nil
 		end
 	end
