@@ -1,4 +1,5 @@
 import type { CellKind, IngredientKind, Kitchen, Station, StationKind, Vec2 } from './types';
+import { filled } from './portable';
 
 /**
  * The score-attack kitchen, laid out the way Dash and Dine lays out its room:
@@ -389,8 +390,8 @@ export function inOvenSpan(cell: Vec2, map: string[] = KITCHEN_MAP): boolean {
 export function buildKitchen(map: string[] = KITCHEN_MAP): Kitchen {
   const height = map.length;
   const width = map[0].length;
-  const cells: CellKind[] = new Array(width * height).fill('floor');
-  const stationAt = new Int32Array(width * height).fill(-1);
+  const cells: CellKind[] = filled<CellKind>(width * height, 'floor');
+  const stationAt: number[] = filled(width * height, -1);
   const stations: Station[] = [];
   let nextId = 1;
 

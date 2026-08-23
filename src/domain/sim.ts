@@ -16,16 +16,29 @@ import type {
   Vec2,
 } from './types';
 import { NO_INPUT } from './types';
+import { filled, hypot } from './portable';
 
 // --------------------------------------------------------------------- rng
+
+/**
+ * 32-bit multiply, low word — `Math.imul` spelled in plain arithmetic and
+ * bitwise ops. Both factors stay under 2^49 so the f64 products are exact,
+ * and every intermediate is reduced mod 2^32 by the trailing `| 0`, so this
+ * returns bit-identical results to `Math.imul` in V8 and in bit32-compiled
+ * Luau alike (signed/unsigned representation differs only by multiples of
+ * 2^32, which the reductions erase).
+ */
+function imul(a: number, b: number): number {
+  return ((a & 0xffff) * b + ((((a >>> 16) * b) & 0xffff) << 16)) | 0;
+}
 
 /** Deterministic PRNG so a seed reproduces an entire run exactly. */
 export function mulberry32(seed: number) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    let t = imul(a ^ (a >>> 15), 1 | a);
+    t = (t + imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
@@ -45,7 +58,7 @@ export interface SimState {
   nextOrderIn: number;
   /** 0..1 ramp of how hard the run currently is. */
   heat: number;
-  rand: () => number;
+  rand: (this: void) => number;
   nextId: number;
   /** Cosmetic: distance walked since last footstep, per chef. */
   stepAccum: number[];
@@ -144,7 +157,7 @@ export function createSim(opts: SimOptions = {}): SimState {
     rand,
     nextId: 1,
     stepAccum: chefs.map(() => 0),
-    contactLock: new Array(chefs.length * chefs.length).fill(0),
+    contactLock: filled(chefs.length * chefs.length, 0),
   };
   seedOrders(state);
   return state;
@@ -211,7 +224,7 @@ function emit(s: SimState, e: SimEvent) {
 }
 
 function len(v: Vec2) {
-  return Math.hypot(v.x, v.y);
+  return hypot(v.x, v.y);
 }
 
 function angleDelta(a: number, b: number) {
@@ -381,7 +394,7 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
     if (ws) {
       let ax = ws.cell.x + 0.5 - chef.pos.x;
       let ay = ws.cell.y + 0.5 - chef.pos.y;
-      const a = Math.hypot(ax, ay);
+      const a = hypot(ax, ay);
       if (a > 1e-4) {
         ax /= a;
         ay /= a;
@@ -396,7 +409,7 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
   } else {
     mx = input.move.x;
     my = input.move.y;
-    m = Math.hypot(mx, my);
+    m = hypot(mx, my);
     if (m > 1) {
       mx /= m;
       my /= m;
@@ -435,7 +448,7 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
     // there is no stick to aim at, so we aim at where the body is actually
     // going, which is both what the eye expects and what the station in front
     // of you needs.
-    const vmag = Math.hypot(chef.vel.x, chef.vel.y);
+    const vmag = hypot(chef.vel.x, chef.vel.y);
     const maxTurn = TUNING.turnRate * load.turn * dt;
     if (m > 0.05) {
       const dd = angleDelta(chef.heading, Math.atan2(my, mx));
@@ -500,7 +513,7 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
     const out = safeSpawn(k, chef.pos);
     const ox = out.x - chef.pos.x;
     const oy = out.y - chef.pos.y;
-    const od = Math.hypot(ox, oy);
+    const od = hypot(ox, oy);
     if (od > 0) {
       const stepOut = Math.min(od, TUNING.moveSpeed * dt);
       chef.pos.x += (ox / od) * stepOut;
@@ -617,7 +630,7 @@ function resolveChefCollisions(s: SimState, dt: number) {
       const b = s.chefs[j];
       const dx = b.pos.x - a.pos.x;
       const dy = b.pos.y - a.pos.y;
-      const dist = Math.hypot(dx, dy);
+      const dist = hypot(dx, dy);
       const min = r * 2;
       if (dist === 0) continue;
       if (dist >= min) {
@@ -757,7 +770,7 @@ function resolveChefCollisions(s: SimState, dt: number) {
 function boxDist(st: Station, x: number, y: number): number {
   const dx = Math.max(st.cell.x - x, 0, x - (st.cell.x + 1));
   const dy = Math.max(st.cell.y - y, 0, y - (st.cell.y + 1));
-  return Math.hypot(dx, dy);
+  return hypot(dx, dy);
 }
 
 /**
@@ -1101,8 +1114,8 @@ function gateFocus(s: SimState, chef: Chef): Station | null {
    * Only the ANGLE is wound back. `reach` is about where the arms are now.
    */
   const v = chef.vel;
-  const ax = chef.pos.x - (v ? v.x : 0) * TUNING.focusLead;
-  const ay = chef.pos.y - (v ? v.y : 0) * TUNING.focusLead;
+  const ax = chef.pos.x - (v !== undefined ? v.x : 0) * TUNING.focusLead;
+  const ay = chef.pos.y - (v !== undefined ? v.y : 0) * TUNING.focusLead;
   for (const st of s.kitchen.stations) {
     const held = st.id === chef.focus;
     const bd = boxDist(st, chef.pos.x, chef.pos.y);
@@ -1110,7 +1123,7 @@ function gateFocus(s: SimState, chef: Chef): Station | null {
     const c = stationCenter(st);
     const dx = c.x - ax;
     const dy = c.y - ay;
-    const dist = Math.hypot(dx, dy);
+    const dist = hypot(dx, dy);
     const dot = (dx * hx + dy * hy) / (dist || 1);
     const ang = Math.acos(Math.max(-1, Math.min(1, dot)));
     if (ang > TUNING.reachCone + (held ? TUNING.focusKeepCone : 0)) continue;
@@ -1574,6 +1587,34 @@ function updateOrders(s: SimState, dt: number) {
  * Advance the sim exactly one fixed tick. `inputs` is indexed by chef id.
  * Callers must drain `state.events` after each step.
  */
+/**
+ * THE FOUR PHASES OF A TICK, EXPORTED SEPARATELY.
+ *
+ * `step()` below is still the only sanctioned way to advance a whole sim, and
+ * its behaviour is unchanged. The phases exist as named exports because the
+ * Roblox port splits authority down exactly these seams: a client integrates
+ * `movePhase` for its own chef (zero-latency feel), while the server owns
+ * collisions, interaction, stations and orders. Keeping the seams here — in
+ * the file that defines the ordering — is what stops the two halves from
+ * drifting apart.
+ */
+
+/** Integrate one chef's movement. Phase 1 of a tick. */
+export function movePhase(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
+  moveChef(s, chef, input, dt);
+}
+
+/** Chef-vs-chef separation, bumps, knockback. Phase 2 of a tick. */
+export function collidePhase(s: SimState, dt: number) {
+  resolveChefCollisions(s, dt);
+}
+
+/** Stations advance work/cook/burn; orders spawn, expire, and end the round. Phase 4. */
+export function stationPhase(s: SimState, dt: number) {
+  updateStations(s, dt);
+  updateOrders(s, dt);
+}
+
 export function step(s: SimState, inputs: InputSnapshot[]) {
   if (s.over) return;
   const dt = SIM_DT;
@@ -1582,12 +1623,25 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
 
   for (const chef of s.chefs) {
     const input = inputs[chef.id] ?? NO_INPUT;
-    moveChef(s, chef, input, dt);
+    movePhase(s, chef, input, dt);
   }
-  resolveChefCollisions(s, dt);
+  collidePhase(s, dt);
 
   for (const chef of s.chefs) {
     const input = inputs[chef.id] ?? NO_INPUT;
+    interactPhase(s, chef, input, dt);
+  }
+
+  stationPhase(s, dt);
+}
+
+/**
+ * Focus, the grab buffer, and the committed job — one chef's interaction
+ * slice of a tick. Phase 3. Order inside this function is load-bearing;
+ * every block below carries the comment explaining why.
+ */
+export function interactPhase(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
+  {
     /**
      * Gate first, coyote second, and the coyote timer is spent HERE so that
      * `findFocus` stays a pure question anyone can ask. A tick the gate wins
@@ -1614,7 +1668,7 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
       chef.working = null;
       chef.grabBuffer = 0;
       if (chef.intent === 'working') chef.intent = 'idle';
-      continue;
+      return;
     }
 
     /**
@@ -1639,7 +1693,7 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
       // is merely early.
       if (chef.grabBuffer === 0) emit(s, { t: 'grabMiss', chef: chef.id, at: { x: chef.pos.x, y: chef.pos.y } });
     }
-    if (chef.stun > 0) continue;
+    if (chef.stun > 0) return;
     if (chef.grabBuffer > 0) {
       if (doGrab(s, chef, st)) chef.grabBuffer = 0;
       else if (input.grabPressed && len(chef.vel) < TUNING.grabBufferMinSpeed) {
@@ -1713,9 +1767,6 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
       }
     }
   }
-
-  updateStations(s, dt);
-  updateOrders(s, dt);
 }
 
 /** Seed the kitchen with the pans the run starts with. */

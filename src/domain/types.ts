@@ -267,7 +267,7 @@ export interface Kitchen {
   cells: CellKind[];
   stations: Station[];
   /** Cell -> station id, -1 for none. */
-  stationAt: Int32Array;
+  stationAt: number[];
 }
 
 // ---------------------------------------------------------------- events

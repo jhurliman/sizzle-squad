@@ -1,5 +1,6 @@
 import { INGREDIENT_DEFS, PLATE_CAPACITY } from '../domain/content';
 import { isWalkable, stationCenter } from '../domain/kitchen';
+import { hypot } from '../domain/portable';
 import { buildFlow, distanceTo, flowDir, sample, type FlowField } from '../domain/nav';
 import { SIM_DT, mulberry32, plateKey, recipeKey, step, type SimState } from '../domain/sim';
 import {
@@ -763,7 +764,7 @@ class Telemetry {
       for (let j = i + 1; j < s.chefs.length; j++) {
         const a = s.chefs[i];
         const b = s.chefs[j];
-        const d = Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y);
+        const d = hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y);
         const key = `${a.id}:${b.id}`;
         if (d < 0.78) {
           this.contactTicks++;
@@ -781,10 +782,10 @@ class Telemetry {
     let sum = 0;
     for (let i = 0; i < s.chefs.length; i++)
       for (let j = i + 1; j < s.chefs.length; j++) {
-        sum += Math.hypot(s.chefs[i].pos.x - s.chefs[j].pos.x, s.chefs[i].pos.y - s.chefs[j].pos.y);
+        sum += hypot(s.chefs[i].pos.x - s.chefs[j].pos.x, s.chefs[i].pos.y - s.chefs[j].pos.y);
         pairs++;
       }
-    this.spreadSum += pairs ? sum / pairs : 0;
+    this.spreadSum += pairs > 0 ? sum / pairs : 0;
     // ONE HALF OF THE ROOM EMPTY IS A FRAMING DEFECT AS WELL AS A FEEL ONE: the
     // camera is low and frontal and shows the whole width, so every tick with
     // the whole cast on one side of the oven is a frame with a dead half.
@@ -794,7 +795,7 @@ class Telemetry {
     if (left === 0 || right === 0) this.onesideTicks++;
     for (const a of s.chefs) {
       let near = 0;
-      for (const b of s.chefs) if (Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y) < 2) near++;
+      for (const b of s.chefs) if (hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y) < 2) near++;
       if (near >= 3) {
         this.clotTicks++;
         break;
@@ -817,6 +818,13 @@ class Telemetry {
 
   /** Plain JSON for the Playwright bridge. */
   report() {
+    // Manual record build (not Object.fromEntries) so this file stays inside
+    // the subset of JS that compiles for the Roblox port.
+    const sortedRecord = (m: Map<string, number>) => {
+      const out: Record<string, number> = {};
+      for (const [k, v] of [...m].sort((a, b) => b[1] - a[1])) out[k] = v;
+      return out;
+    };
     const bots: Record<string, unknown> = {};
     for (const [id, t] of this.tracks) {
       bots[id] = {
@@ -834,8 +842,8 @@ class Telemetry {
         yields: t.yields,
         metres: +t.metres.toFixed(0),
         home: `${(t.posX / Math.max(1, t.posN)).toFixed(1)},${(t.posY / Math.max(1, t.posN)).toFixed(1)}`,
-        why: Object.fromEntries([...t.why].sort((a, b) => b[1] - a[1])),
-        nullWhy: Object.fromEntries([...t.nullWhy].sort((a, b) => b[1] - a[1])),
+        why: sortedRecord(t.why),
+        nullWhy: sortedRecord(t.nullWhy),
       };
     }
     const n = Math.max(1, this.samples);
@@ -1054,7 +1062,7 @@ export class BotDirector {
         }
         const vx = target.x - player.pos.x;
         const vy = target.y - player.pos.y;
-        const d = Math.hypot(vx, vy) || 1;
+        const d = hypot(vx, vy) || 1;
         grabIn -= SIM_DT;
         const grab = grabIn <= 0;
         if (grab) grabIn = 0.7 + rand() * 1.3;
@@ -1121,7 +1129,7 @@ export class BotDirector {
   private updateBot(s: SimState, bot: Chef, dt: number): InputSnapshot {
     const m = this.memFor(bot);
     const tel = this.tele.track(bot.id);
-    tel.metres += Math.hypot(bot.pos.x - m.lastPos.x, bot.pos.y - m.lastPos.y);
+    tel.metres += hypot(bot.pos.x - m.lastPos.x, bot.pos.y - m.lastPos.y);
     tel.posX += bot.pos.x;
     tel.posY += bot.pos.y;
     tel.posN++;
@@ -1288,7 +1296,7 @@ export class BotDirector {
           : m.home.x;
       const hx = homeX - bot.pos.x;
       const hy = m.home.y - bot.pos.y;
-      const hd = Math.hypot(hx, hy);
+      const hd = hypot(hx, hy);
       m.wanderPhase += dt * 0.9;
       if (hd > 1.1) {
         input.move.x = (hx / hd) * 0.8;
@@ -1319,7 +1327,7 @@ export class BotDirector {
     const c = stationCenter(st);
     const dx = c.x - bot.pos.x;
     const dy = c.y - bot.pos.y;
-    const dist = Math.hypot(dx, dy);
+    const dist = hypot(dx, dy);
 
     let travelling = false;
 
@@ -1416,7 +1424,7 @@ export class BotDirector {
       // handed back (-0.03, -0.01) while the bot was still 1.1 units short.
       // A near-zero flow is not "you have arrived", it is "the field has no
       // opinion here": steer straight at the station instead.
-      if (Math.hypot(d.x, d.y) < 0.3) {
+      if (hypot(d.x, d.y) < 0.3) {
         input.move.x = dx / dist;
         input.move.y = dy / dist;
       } else {
@@ -1440,7 +1448,7 @@ export class BotDirector {
       // route (monotone, but quantised to whole cells) or metres closed in a
       // straight line (continuous, but wrong when the route bends). See
       // BotMemory.bestFlow.
-      const fd = m.flow ? distanceTo(m.flow, bot.pos) : Number.MAX_SAFE_INTEGER;
+      const fd = m.flow !== null ? distanceTo(m.flow, bot.pos) : Number.MAX_SAFE_INTEGER;
       if (fd < m.bestFlow || dist < m.bestDist - 0.12) {
         m.bestFlow = Math.min(m.bestFlow, fd);
         m.bestDist = Math.min(m.bestDist, dist);
@@ -1522,7 +1530,7 @@ export class BotDirector {
     let best = Infinity;
     for (const st of s.kitchen.stations) {
       if (st.kind !== 'crate' || st.id === crate.id || !st.dispenses) continue;
-      const d = Math.hypot(st.cell.x - crate.cell.x, st.cell.y - crate.cell.y);
+      const d = hypot(st.cell.x - crate.cell.x, st.cell.y - crate.cell.y);
       if (d < best) {
         best = d;
         wrong = st;
@@ -1565,7 +1573,7 @@ export class BotDirector {
     // ALREADY THERE IS ALREADY THERE. A bot parked at the bench with its hand
     // out is one frame from finishing; walking away from that is not courtesy,
     // it is the plan thrash this file spent two rounds removing.
-    if (Math.hypot(c.x - bot.pos.x, c.y - bot.pos.y) < 1.3) return false;
+    if (hypot(c.x - bot.pos.x, c.y - bot.pos.y) < 1.3) return false;
     for (const other of s.chefs) {
       if (!other.isPlayer || other.id === bot.id) continue;
       // HANDS FULL IS NOT COMPETITION. A chef already carrying something cannot
@@ -1578,10 +1586,10 @@ export class BotDirector {
       if (other.carrying) continue;
       const px = c.x - other.pos.x;
       const py = c.y - other.pos.y;
-      const pd = Math.hypot(px, py);
+      const pd = hypot(px, py);
       if (pd > YIELD_RADIUS) continue;
-      if (pd > Math.hypot(c.x - bot.pos.x, c.y - bot.pos.y)) continue;
-      const sp = Math.hypot(other.vel.x, other.vel.y);
+      if (pd > hypot(c.x - bot.pos.x, c.y - bot.pos.y)) continue;
+      const sp = hypot(other.vel.x, other.vel.y);
       if (sp < 1.2) continue;
       if ((other.vel.x * px + other.vel.y * py) / (sp * Math.max(0.001, pd)) < YIELD_CONE) continue;
       m.lagTimer = YIELD_BEAT;
@@ -1638,11 +1646,11 @@ export class BotDirector {
       sy += (oy / d) * f;
       // Tangential: swing around the neighbour rather than backing away from
       // it. Sign is fixed by id order so the pair always rotates the same way.
-      const turn = other.isPlayer ? (bot.id % 2 ? 1 : -1) : other.id > bot.id ? 1 : -1;
+      const turn = other.isPlayer ? (bot.id % 2 === 1 ? 1 : -1) : other.id > bot.id ? 1 : -1;
       sx += (-oy / d) * f * 0.55 * turn;
       sy += (ox / d) * f * 0.55 * turn;
     }
-    const mag = Math.hypot(sx, sy);
+    const mag = hypot(sx, sy);
     if (mag < 1e-5) return;
     const k = (Math.min(mag, SEPARATION_MAX) / mag) * weight;
     input.move.x += sx * k;
@@ -1671,7 +1679,7 @@ export class BotDirector {
         if (owner === bot.id || id === st.id) continue;
         const other = stations.find((x) => x.id === id);
         if (!other) continue;
-        if (Math.hypot(other.cell.x - st.cell.x, other.cell.y - st.cell.y) < 1.1) return true;
+        if (hypot(other.cell.x - st.cell.x, other.cell.y - st.cell.y) < 1.1) return true;
       }
       return false;
     };
@@ -1734,7 +1742,7 @@ export class BotDirector {
       }
       return walk(st) * (m.role.kind[st.kind] ?? 1) + (depth + side) * HOME_BIAS + offstage;
     };
-    const pick = (list: Station[]) => (list.length ? list.sort((a, b) => cost(a) - cost(b))[0] : null);
+    const pick = (list: Station[]) => (list.length > 0 ? list.sort((a, b) => cost(a) - cost(b))[0] : null);
     /**
      * AFTER YOU.
      *
@@ -1767,7 +1775,7 @@ export class BotDirector {
         if (usable.some((st) => !free(st))) this.tele.track(bot.id).yields++;
         return second;
       }
-      return pick(usable.filter(mine)) ?? pick(usable);
+      return pick(usable.filter((st) => mine(st))) ?? pick(usable);
     };
 
     /**
@@ -1786,7 +1794,7 @@ export class BotDirector {
     const findAny = (pred: (st: Station) => boolean) => {
       const clean = pick(stations.filter((st) => pred(st) && !m.sour.has(st.id)));
       if (clean) return clean;
-      const any = pick(stations.filter(pred));
+      const any = pick(stations.filter((st) => pred(st)));
       if (any) m.sour.delete(any.id);
       return any;
     };
@@ -1821,7 +1829,7 @@ export class BotDirector {
     const why = !held
       ? this.emptyHandedNull
       : held.type === 'plate'
-        ? held.plate.contents.length
+        ? held.plate.contents.length > 0
           ? 'stuck: part-built plate'
           : 'stuck: empty plate'
         : held.type === 'pan'
@@ -1853,7 +1861,7 @@ export class BotDirector {
    */
   private planPlate(s: SimState, bot: Chef, plate: Plate, find: Finder, findAny: Finder): Job | null {
     // 1. It matches a live ticket. Take it to the window.
-    if (plate.contents.length) {
+    if (plate.contents.length > 0) {
       const key = plateKey(plate);
       if (s.orders.some((o) => recipeKey(o.recipe) === key)) {
         const serve = find((st) => st.kind === 'serve') ?? findAny((st) => st.kind === 'serve');
@@ -1932,7 +1940,7 @@ export class BotDirector {
     // 6. Any flat surface at all, then the bin. One of these always exists.
     const surface = find((st) => (st.kind === 'counter' || st.kind === 'board' || st.kind === 'sink') && !st.holding);
     if (surface) return { station: surface.id, action: 'grab', why: 'set the plate down', prio: P.tidy };
-    if (plate.contents.length) {
+    if (plate.contents.length > 0) {
       const bin = findAny((st) => st.kind === 'bin');
       if (bin) return { station: bin.id, action: 'grab', why: 'scrape the plate', prio: P.tidy };
     }
@@ -2493,7 +2501,7 @@ function isSubset(contents: Ingredient[], order: Order): boolean {
 
 /** Never longer than `max`. Direction preserved. */
 function clampMove(input: InputSnapshot, max: number) {
-  const m = Math.hypot(input.move.x, input.move.y);
+  const m = hypot(input.move.x, input.move.y);
   if (m <= max || m < 1e-6) return;
   input.move.x = (input.move.x / m) * max;
   input.move.y = (input.move.y / m) * max;
