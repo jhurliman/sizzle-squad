@@ -70,6 +70,11 @@ for (let s = 0; s < SKINS.length; s++) {
   for (const t of v.tail ?? []) nameGroup(t, 'Tail');
   for (const e of v.ears ?? []) nameGroup(e, 'Ears');
 
+  // Settle the rig: rest rotations for ears/crests/bandana tails and the
+  // tail-spring are applied during update(), not at construction — capturing
+  // the raw constructed pose is exactly the "red candle growing out of the
+  // bear's head" bug the web game once shipped.
+  for (let i = 0; i < 30; i++) view.update(1 / 60, i / 60);
   view.root.updateMatrixWorld(true);
 
   // Joint origins (bind pose, model space) — the animator rotates each group
@@ -109,6 +114,13 @@ for (let s = 0; s < SKINS.length; s++) {
         group = n;
         break;
       }
+    }
+    // The species' built-in hat (bandana/toque/boater/crest-band) is colored
+    // with the skin's hatA/hatB — split it into its own group so equipping a
+    // cosmetic hat can hide it, and so hat-attach height ignores it.
+    if (group === 'Head' && mat.color) {
+      const hex = mat.color.getHex();
+      if (hex === v.skin.hatA || hex === v.skin.hatB) group = 'BuiltinHat';
     }
     const M = new THREE.Matrix4().multiplyMatrices(mesh.matrixWorld, r.mat);
     const pos = new THREE.Vector3();

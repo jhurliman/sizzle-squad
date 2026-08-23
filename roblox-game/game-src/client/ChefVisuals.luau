@@ -100,6 +100,7 @@ function ChefVisuals:ensure(id: number, skin: string): any
 		animBind = {} :: { CFrame },
 		animGroup = {} :: { string },
 		animCFrames = {} :: { CFrame },
+		builtinHatParts = {} :: { BasePart },
 		joints = {} :: { [string]: Vector3 },
 		headAttach = Vector3.new(0, CHEF_HEIGHT, 0),
 		headAnchor = nil :: BasePart?,
@@ -126,6 +127,9 @@ function ChefVisuals:ensure(id: number, skin: string): any
 						table.insert(entry.animGroup, group.Name)
 						table.insert(entry.animCFrames, p.CFrame)
 						rigTop = math.max(rigTop, p.CFrame.Y + p.Size.Y / 2)
+						if group.Name == "BuiltinHat" then
+							table.insert(entry.builtinHatParts, p)
+						end
 						if group.Name == "Head" then
 							headTop = math.max(headTop, p.CFrame.Y + p.Size.Y / 2)
 							local vol = p.Size.X * p.Size.Y * p.Size.Z
@@ -158,6 +162,11 @@ function ChefVisuals:ensure(id: number, skin: string): any
 				bestN = b.n
 				entry.coatColor = b.c
 			end
+		end
+
+		-- the species' built-in hat rides the head's animation
+		if entry.joints.Head ~= nil and entry.joints.BuiltinHat == nil then
+			entry.joints.BuiltinHat = entry.joints.Head
 		end
 
 		entry.headAnchor = skull
@@ -275,7 +284,9 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 		set("ArmL", armPitchL, 0, -flail)
 		set("ArmR", armPitchR, 0, flail)
 		set("Torso", torsoPitch, torsoYaw, 0)
-		set("Head", -torsoPitch * 0.6 + (if stunned then math.sin(self.time * 20) * 0.15 else 0), 0, 0)
+		local headPitch = -torsoPitch * 0.6 + (if stunned then math.sin(self.time * 20) * 0.15 else 0)
+		set("Head", headPitch, 0, 0)
+		set("BuiltinHat", headPitch, 0, 0)
 		set("Tail", 0, math.sin(entry.phase * math.pi - 1.1) * 0.45 * moveBlend + math.sin(self.time * 1.7) * 0.08, 0)
 		set(
 			"Ears",
@@ -305,6 +316,10 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 	-- ---- hat ---------------------------------------------------------------
 	if hat ~= entry.hatId then
 		entry.hatId = hat
+		-- a cosmetic hat replaces the species' built-in one
+		for _, p in entry.builtinHatParts do
+			p.Transparency = if hat ~= nil then 1 else 0
+		end
 		if entry.hatModel ~= nil then
 			entry.hatModel:Destroy()
 			entry.hatModel = nil

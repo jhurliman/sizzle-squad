@@ -943,6 +943,17 @@ function affordance(chef: Chef, st: Station, plan: GrabKind): 0 | 1 | 2 {
   return 0;
 }
 
+/**
+ * A plate only takes food in a state some recipe could want. Raw tomato or
+ * lettuce (choppable) and raw bacon (cookable) junk the plate — reported
+ * from the Roblox playtest: 'i should not be allowed to plate any unprepped
+ * ingredients'. Raw bun (nothing to prep) stays plateable.
+ */
+function plateable(ing: Ingredient): boolean {
+  const def = INGREDIENT_DEFS[ing.kind];
+  return !(ing.state === 'raw' && (def.chopSeconds > 0 || def.cookSeconds > 0));
+}
+
 export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind {
   if (!st) return 'none';
   const held = chef.carrying;
@@ -1102,7 +1113,12 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
       return 'none';
     default: {
       if (!st.holding) return 'place';
-      if (st.holding.type === 'plate' && held.type === 'ingredient' && st.holding.plate.contents.length < PLATE_CAPACITY)
+      if (
+        st.holding.type === 'plate' &&
+        held.type === 'ingredient' &&
+        plateable(held.ingredient) &&
+        st.holding.plate.contents.length < PLATE_CAPACITY
+      )
         return 'combine';
       if (
         st.holding.type === 'pan' &&
@@ -1111,7 +1127,12 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
         st.holding.pan.contents.length < 3
       )
         return 'combine';
-      if (held.type === 'plate' && st.holding.type === 'ingredient' && held.plate.contents.length < PLATE_CAPACITY)
+      if (
+        held.type === 'plate' &&
+        st.holding.type === 'ingredient' &&
+        plateable(st.holding.ingredient) &&
+        held.plate.contents.length < PLATE_CAPACITY
+      )
         return 'load';
       // Same rule as the stove above, for a pan parked on a bench: a plate takes
       // cooked food off ANY pan, wherever it is standing. Without this the same

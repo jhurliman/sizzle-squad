@@ -19,6 +19,27 @@ function Input.new()
 	self.useHeld = false
 	self.moveVector = Vector2.zero
 	self.controlModule = nil
+	-- Roblox's default control module maps Left/Right arrows to CAMERA
+	-- rotation (dead under a scriptable camera) — only Up/Down move. Track
+	-- the horizontal arrows ourselves and merge them into the move vector.
+	self.arrowX = 0
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if processed then
+			return
+		end
+		if input.KeyCode == Enum.KeyCode.Left then
+			self.arrowX = -1
+		elseif input.KeyCode == Enum.KeyCode.Right then
+			self.arrowX = 1
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.KeyCode == Enum.KeyCode.Left and self.arrowX < 0 then
+			self.arrowX = 0
+		elseif input.KeyCode == Enum.KeyCode.Right and self.arrowX > 0 then
+			self.arrowX = 0
+		end
+	end)
 
 	-- PlayerModule's ControlModule unifies WASD/thumbstick/gamepad.
 	task.spawn(function()
@@ -84,7 +105,7 @@ function Input:move(): { x: number, y: number }
 			mv = v
 		end
 	end
-	local m = { x = mv.X, y = mv.Z }
+	local m = { x = mv.X + self.arrowX, y = mv.Z }
 	local len = math.sqrt(m.x * m.x + m.y * m.y)
 	if len > 1 then
 		m.x /= len

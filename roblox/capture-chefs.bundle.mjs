@@ -19543,6 +19543,7 @@ for (let s = 0; s < SKINS2.length; s++) {
   }
   for (const t of v.tail ?? []) nameGroup(t, "Tail");
   for (const e of v.ears ?? []) nameGroup(e, "Ears");
+  for (let i = 0; i < 30; i++) view.update(1 / 60, i / 60);
   view.root.updateMatrixWorld(true);
   const joints = {};
   const jointOf = (obj, name) => {
@@ -19576,6 +19577,10 @@ for (let s = 0; s < SKINS2.length; s++) {
         group = n;
         break;
       }
+    }
+    if (group === "Head" && mat.color) {
+      const hex = mat.color.getHex();
+      if (hex === v.skin.hatA || hex === v.skin.hatB) group = "BuiltinHat";
     }
     const M = new Matrix4().multiplyMatrices(mesh.matrixWorld, r2.mat);
     const pos = new Vector3();

@@ -30,7 +30,9 @@ local function defaultProfile(): any
 		totalDishes = 0,
 		bestRound = 0,
 		owned = { hat_paper = true },
-		equipped = { hat = "hat_paper" },
+		-- no cosmetic hat by default: the species' built-in hats show until the
+		-- player equips one (playtest: paper hat on top of built-in hats = jank)
+		equipped = {},
 		daily = { day = "", progress = {}, claimed = {} },
 		streak = { lastDay = "", count = 0, graceUsedWeek = "" },
 	}
@@ -287,7 +289,12 @@ function Progression:shopAction(player: any, action: any)
 		if not profile.owned[item.id] then
 			return
 		end
-		profile.equipped[item.kind] = item.id
+		-- equip toggles: equipping the equipped item takes it off
+		if profile.equipped[item.kind] == item.id then
+			profile.equipped[item.kind] = nil
+		else
+			profile.equipped[item.kind] = item.id
+		end
 		self.dirty[player] = true
 	end
 	self:push(player)
