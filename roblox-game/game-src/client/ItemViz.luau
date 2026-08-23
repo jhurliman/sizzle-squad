@@ -142,15 +142,29 @@ local function buildFromTemplates(summary: any): Model?
 		end
 		plate.Parent = wrapper
 		plate:PivotTo(CFrame.new())
+		-- Stacking measured off the web's own plate_full composition: items
+		-- climb ~0.17 studs per layer from just above the plate, spread ±0.4.
 		for i, c in summary.contents or {} do
 			addIngredient(
 				c.kind,
 				c.state,
-				CFrame.new(((i - 1) % 2 - 0.5) * 0.45, 0.22 + (i - 1) * 0.32, (math.floor((i - 1) / 2) - 0.5) * 0.3)
+				CFrame.new(((i - 1) % 2 - 0.5) * 0.5, 0.45 + (i - 1) * 0.17, (math.floor((i - 1) / 2) - 0.5) * 0.45)
 			)
 		end
 		return wrapper
 	elseif summary.type == "pan" then
+		-- Single-content pans use the web's own whole-composition capture, so
+		-- the food sits exactly where the original renders it (a lone cooked
+		-- rasher otherwise hides inside the pan's silhouette).
+		local contents = summary.contents or {}
+		if #contents == 1 then
+			local whole = cloneTemplate(`pan_{contents[1].kind}_{contents[1].state}`)
+			if whole ~= nil then
+				whole.Parent = wrapper
+				whole:PivotTo(CFrame.new())
+				return wrapper
+			end
+		end
 		local pan = cloneTemplate("pan")
 		if pan == nil then
 			wrapper:Destroy()
@@ -158,8 +172,9 @@ local function buildFromTemplates(summary: any): Model?
 		end
 		pan.Parent = wrapper
 		pan:PivotTo(CFrame.new())
-		for i, c in summary.contents or {} do
-			addIngredient(c.kind, c.state, CFrame.new(((i - 1) % 2 - 0.5) * 0.4, 0.25, (math.floor((i - 1) / 2) - 0.5) * 0.35))
+		for i, c in contents do
+			-- raised well above the rim so composed contents always read
+			addIngredient(c.kind, c.state, CFrame.new(((i - 1) % 2 - 0.5) * 0.5, 0.55 + (i - 1) * 0.2, (math.floor((i - 1) / 2) - 0.5) * 0.4))
 		end
 		return wrapper
 	end

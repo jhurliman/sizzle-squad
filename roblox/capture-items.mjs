@@ -39,6 +39,11 @@ const CASES = [
     },
   ],
   ['pan', { type: 'pan', pan: { id: 920, contents: [], onHeat: false, fire: 0 } }],
+  // Whole pan+content compositions: the web's own layout, so a cooked rasher
+  // sits visibly IN the pan instead of hidden inside its silhouette.
+  ['pan_bacon_raw', { type: 'pan', pan: { id: 921, contents: [{ id: 930, kind: 'bacon', state: 'raw', progress: 0, overcook: 0 }], onHeat: true, fire: 0 } }],
+  ['pan_bacon_cooked', { type: 'pan', pan: { id: 922, contents: [{ id: 931, kind: 'bacon', state: 'cooked', progress: 0, overcook: 0 }], onHeat: true, fire: 0 } }],
+  ['pan_bacon_burnt', { type: 'pan', pan: { id: 923, contents: [{ id: 932, kind: 'bacon', state: 'burnt', progress: 0, overcook: 0 }], onHeat: true, fire: 0 } }],
 ];
 
 const sim = createSim({ seed: 1, botCount: 3 });

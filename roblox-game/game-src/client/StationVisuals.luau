@@ -36,6 +36,12 @@ local SURFACE_H: { [string]: number } = {
 
 local function topOf(kind: string?, cell: any): Vector3
 	local h = SURFACE_H[kind or ""] or 0.8
+	-- Counters exist in two heights: the tall fixed ones along the back wall
+	-- (row 1) and the knee-height prep benches out on the floor. Same station
+	-- kind, very different surface.
+	if kind == "counter" and cell.y > 1 then
+		h = 0.55
+	end
 	return Vector3.new((cell.x + 0.5) * SCALE, h * SCALE, (cell.y + 0.5) * SCALE)
 end
 
