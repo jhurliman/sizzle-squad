@@ -212,6 +212,15 @@ remotes.CarryDeltas.OnClientEvent:Connect(function(carries)
 	end
 end)
 
+remotes.EquipDeltas.OnClientEvent:Connect(function(list)
+	table.clear(state.hats)
+	table.clear(state.names)
+	for _, e in list do
+		state.hats[e.chefId] = e.hat
+		state.names[e.chefId] = e.name
+	end
+end)
+
 remotes.OrdersDelta.OnClientEvent:Connect(function(msg)
 	state.orders = msg.orders
 end)
@@ -385,13 +394,13 @@ RunService.RenderStepped:Connect(function(dt)
 			heading = m.heading,
 			effort = math.clamp(speed / 6.2, 0, 1),
 			stun = m.stun,
-		}, state.flags[state.myChefId] or 0, dt, state.carrying[state.myChefId])
+		}, state.flags[state.myChefId] or 0, dt, state.carrying[state.myChefId], state.hats[state.myChefId], nil)
 	end
 	for id, skin in state.skins do
 		if id ~= state.myChefId then
 			local pose = state:remotePose(id)
 			if pose ~= nil and state.clock - (state.lastSeen[id] or -10) < 2 then
-				visuals:update(id, skin, pose, state.flags[id] or 0, dt, state.carrying[id])
+				visuals:update(id, skin, pose, state.flags[id] or 0, dt, state.carrying[id], state.hats[id], state.names[id])
 			elseif visuals.chefs[id] ~= nil then
 				-- parked / departed chefs stop streaming: clear their body
 				visuals:remove(id)

@@ -11,10 +11,9 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 
 ## A. Built but invisible — systems that persist state with no presentation
 
-- 🔴 **Cosmetics don't render.** Shop buy/equip works and persists, but an
-  equipped hat/palette/kitchen skin changes nothing on screen — `ChefVisuals`
-  and the kitchen never read `profile.equipped`. Needs: hat models attached to
-  rig heads, palette recolor of rig parts, plate/pan/bell swaps.
+- 🟡 **Hats render (procedural models for all 12); palettes and kitchen
+  cosmetics still don't** — palette recolor needs coat-part tagging in the
+  rig capture; plate/pan/bell swaps unbuilt. Nametags render for humans.
 - 🟢 **Ticket icons render via runtime EditableImage** (no upload needed) with a colored-chip fallback if the API is unavailable on some platform — verify on device.
 - 🔴 **Daily challenges have no UI.** They replicate in the `Progress` payload
   and pay out (auto-claim, no celebration), but no panel shows them — players
@@ -28,11 +27,10 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 
 ## B. Placeholder presentation
 
-- 🔴 **Chef limbs don't articulate.** Rigs move as one body (pivot + hop/rock/
-  wobble); arms/legs/tail/ears/eyes are frozen in bind pose. The web game's
-  full procedural rig (limb walk cycle, carry poses, blink, mouth) is the
-  single biggest remaining art-feel gap. Skeleton groups are already captured
-  per body part, so the Motor6D/per-group-offset layer has its data.
+- 🟡 **Limb articulation is first-pass procedural** (gait swings around
+  captured joints, carry/chop poses, torso lean, tail/ear secondary motion,
+  stun flail via BulkMoveTo). Not yet ported: knee/foot two-segment bend,
+  blink/mouth, bank-into-turn, per-species gait personality.
 - 🟢 **Food art is the web game's captured meshes** (tomatoes with stalks,
   leafy lettuce, bacon rashers, lathed plates/pans) with a primitive-sphere
   fallback; plate/pan content stacking offsets are hand-tuned, not captured —

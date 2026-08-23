@@ -1,6 +1,9 @@
 -- chef-parts.json -> ../roblox-game/assets/chef-rigs.rbxm
 -- A Folder "Rigs" holding one Model per species; parts grouped in sub-Models
--- by skeleton part, all anchored (the client animates via PivotTo/offsets).
+-- by skeleton part. Each group Model carries a "Joint" Vector3 attribute
+-- (bind-pose pivot, model space, studs) — the client animator rotates the
+-- group's parts around it. All parts anchored; the client drives them with
+-- BulkMoveTo.
 local fs = require("@lune/fs")
 local serde = require("@lune/serde")
 local roblox = require("@lune/roblox")
@@ -22,7 +25,10 @@ local SHAPE = {
 	Cylinder = Enum.PartType.Cylinder,
 }
 
-for skin, parts in data.skins do
+local total = 0
+for skin, entry in data.skins do
+	local parts = entry.parts
+	local joints = entry.joints or {}
 	local model = Instance.new("Model")
 	model.Name = skin
 	local rootPart = Instance.new("Part")
@@ -43,6 +49,10 @@ for skin, parts in data.skins do
 			g = Instance.new("Model")
 			g.Name = p.group
 			g.Parent = model
+			local j = joints[p.group]
+			if j ~= nil then
+				g:SetAttribute("Joint", Vector3.new(j[1], j[2], j[3]))
+			end
 			groups[p.group] = g
 		end
 		counters[p.group] = (counters[p.group] or 0) + 1
@@ -71,8 +81,8 @@ for skin, parts in data.skins do
 			part.Shape = SHAPE[p.shape] or Enum.PartType.Block
 		end
 		part.Parent = g
+		total += 1
 	end
-	folder.Parent = nil
 	model.Parent = folder
 end
 
@@ -80,10 +90,4 @@ pcall(function()
 	fs.writeDir("../roblox-game/assets")
 end)
 fs.writeFile("../roblox-game/assets/chef-rigs.rbxm", roblox.serializeModel({ folder }))
-local total = 0
-for _, d in folder:GetDescendants() do
-	if d:IsA("BasePart") then
-		total += 1
-	end
-end
-print(`wrote chef-rigs.rbxm ({total} parts across 4 species)`)
+print(`wrote chef-rigs.rbxm ({total} parts, joint attributes on groups)`)

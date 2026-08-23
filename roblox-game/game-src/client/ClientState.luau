@@ -25,6 +25,8 @@ function ClientState.new(shared: any, net: any)
 	self.skins = {} :: { [number]: string }
 	self.carrying = {} :: { [number]: any }
 	self.lastSeen = {} :: { [number]: number }
+	self.hats = {} :: { [number]: string? }
+	self.names = {} :: { [number]: string? }
 	self.stations = {} :: { [number]: any }
 	self.orders = {} :: { any }
 	self.score = { coins = 0, served = 0, missed = 0, combo = 0, bestCombo = 0, patience = 1, time = 0 }

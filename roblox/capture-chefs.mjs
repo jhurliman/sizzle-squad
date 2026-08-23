@@ -72,6 +72,27 @@ for (let s = 0; s < SKINS.length; s++) {
 
   view.root.updateMatrixWorld(true);
 
+  // Joint origins (bind pose, model space) — the animator rotates each group
+  // around these. Limbs use their hip (shoulder for arms); hips/torso/head
+  // use their own group origin; tail/ears use the first segment's origin.
+  const joints = {};
+  const jointOf = (obj, name) => {
+    if (!obj || !obj.isObject3D || joints[name]) return;
+    const p = new THREE.Vector3();
+    obj.getWorldPosition(p);
+    joints[name] = [p.x, p.y, p.z];
+  };
+  jointOf(v.hips, 'Hips');
+  jointOf(v.torso, 'Torso');
+  jointOf(v.head, 'Head');
+  jointOf(v.hands, 'Hands');
+  jointOf(v.legL?.hip, 'LegL');
+  jointOf(v.legR?.hip, 'LegR');
+  jointOf(v.armL?.hip, 'ArmL');
+  jointOf(v.armR?.hip, 'ArmR');
+  jointOf((v.tail ?? [])[0], 'Tail');
+  jointOf((v.ears ?? [])[0], 'Ears');
+
   const prims = [];
   view.root.traverse((obj) => {
     if (!obj.isMesh) return;
@@ -105,8 +126,8 @@ for (let s = 0; s < SKINS.length; s++) {
       frames: frames(r.stack).slice(0, 4),
     });
   });
-  dump.skins[skin] = prims;
-  console.error(`${skin}: ${prims.length} prims`);
+  dump.skins[skin] = { prims, joints };
+  console.error(`${skin}: ${prims.length} prims, ${Object.keys(joints).length} joints`);
 }
 
 fs.writeFileSync(new URL('./chefdump.json', import.meta.url).pathname, JSON.stringify(dump));

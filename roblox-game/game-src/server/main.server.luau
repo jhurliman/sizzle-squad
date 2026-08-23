@@ -52,8 +52,24 @@ remotes.Emote.OnServerEvent:Connect(function(player, emote)
 	end
 end)
 
+-- Everyone sees everyone's hat + name: broadcast the seat -> cosmetics map
+-- whenever it could have changed (join, leave, equip, reseat).
+local function broadcastEquips()
+	local list = {}
+	for player, seat in crew.seats do
+		local profile = progression.profiles[player]
+		table.insert(list, {
+			chefId = seat.chefId,
+			hat = profile and profile.equipped and profile.equipped.hat or nil,
+			name = player.DisplayName or player.Name,
+		})
+	end
+	remotes.EquipDeltas:FireAllClients(list)
+end
+
 remotes.ShopAction.OnServerEvent:Connect(function(player, action)
 	progression:shopAction(player, action)
+	broadcastEquips()
 end)
 
 -- The Roblox avatar never appears in the kitchen: the chef IS the player's
@@ -92,11 +108,26 @@ Players.PlayerAdded:Connect(function(player)
 	crew:playerAdded(player)
 	director:broadcastPhase()
 	leaderboards:pushTo(player)
+	broadcastEquips()
 end)
 
 Players.PlayerRemoving:Connect(function(player)
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
+	broadcastEquips()
+end)
+
+-- Reseats (new round) reshuffle chef ids; refresh the cosmetics map when the
+-- round counter moves.
+task.spawn(function()
+	local last = -1
+	while true do
+		task.wait(2)
+		if director.round ~= last then
+			last = director.round
+			broadcastEquips()
+		end
+	end
 end)
 
 RunService.Heartbeat:Connect(function(dt)

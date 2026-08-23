@@ -10,7 +10,9 @@ const dump = JSON.parse(fs.readFileSync(new URL('./chefdump.json', import.meta.u
 
 const out = { scale: S, skins: {} };
 
-for (const [skin, prims] of Object.entries(dump.skins)) {
+for (const [skin, entry] of Object.entries(dump.skins)) {
+  const prims = entry.prims ?? entry;
+  const joints = entry.joints ?? {};
   const parts = [];
   const emit = (group, shape, size, M, color) => {
     const pos = new THREE.Vector3();
@@ -102,7 +104,9 @@ for (const [skin, prims] of Object.entries(dump.skins)) {
       emit(p.group, 'Block', [2 * r * sx, (len + 2 * r) * sy, 2 * r * sz], M, color);
     }
   }
-  out.skins[skin] = parts;
+  const scaledJoints = {};
+  for (const [g, p] of Object.entries(joints)) scaledJoints[g] = [p[0] * S, p[1] * S, p[2] * S];
+  out.skins[skin] = { parts, joints: scaledJoints };
   console.error(`${skin}: ${parts.length} parts`);
 }
 
