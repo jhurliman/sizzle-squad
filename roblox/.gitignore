@@ -1,0 +1,7 @@
+node_modules/
+capture.bundle.mjs
+primdump.json
+parts.json
+viewer.bundle.js
+viewer.html
+render-*.png
