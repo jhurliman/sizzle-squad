@@ -100,7 +100,7 @@ function FirstShift:update(state: any, flags: number)
 			tip = "Carrying a plate: scoop cooked food off pans, then take it to a serve window!"
 		end
 	elseif cookedInPan and not carrying then
-		tip = "Cooked food never leaves a pan by hand — grab a PLATE, then press at the pan."
+		tip = "Food's ready! Press at the pan to take it — or scoop straight onto a plate."
 	elseif carrying then
 		tip = "Take it to a glowing station — chop raw veggies at a board, cook bacon in a pan."
 	elseif #state.orders > 0 then

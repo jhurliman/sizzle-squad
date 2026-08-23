@@ -106,4 +106,23 @@ for (const [skin, prims] of Object.entries(dump)) {
   console.error(`${skin}: ${parts.length} parts`);
 }
 
+// ---- richer cooked/burnt bacon: same pile as raw, browned/charred ----------
+const browning = (c, target, f) => [
+  Math.round(c[0] + (target[0] - c[0]) * f),
+  Math.round(c[1] + (target[1] - c[1]) * f),
+  Math.round(c[2] + (target[2] - c[2]) * f),
+];
+const recolorPile = (source, target, f) =>
+  source.map((p) => ({ ...p, color: p.color[0] > 110 ? browning(p.color, target, f) : p.color }));
+const COOKED = [125, 74, 36];
+const BURNT = [40, 32, 26];
+if (out.items.ing_bacon_raw) {
+  out.items.ing_bacon_cooked = recolorPile(out.items.ing_bacon_raw, COOKED, 0.55);
+  out.items.ing_bacon_burnt = recolorPile(out.items.ing_bacon_raw, BURNT, 0.85);
+}
+if (out.items.pan_bacon_raw) {
+  out.items.pan_bacon_cooked = recolorPile(out.items.pan_bacon_raw, COOKED, 0.55);
+  out.items.pan_bacon_burnt = recolorPile(out.items.pan_bacon_raw, BURNT, 0.85);
+}
+
 fs.writeFileSync(new URL('./item-parts.json', import.meta.url).pathname, JSON.stringify(out));

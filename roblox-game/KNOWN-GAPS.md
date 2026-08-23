@@ -32,8 +32,9 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   leafy lettuce, bacon rashers, lathed plates/pans) with a primitive-sphere
   fallback; plate/pan content stacking offsets are hand-tuned, not captured —
   verify the composed look in Studio.
-- 🟡 **Silent**: all SFX ids empty (README step 2); no adaptive music at all
-  (stems render + volume-mix layer unbuilt).
+- 🟡 **Silent until upload**: all 55 SFX WAVs are RENDERED (roblox/audio-out,
+  the real synth through OfflineAudioContext) — awaiting user upload + ids in
+  Sfx.luau. Adaptive music still unbuilt (stems + volume-mix layer).
 - 🟡 **VFX minimal**: fire + floating labels only. No chop bits, steam,
   coin burst, dust puffs, bump stars; no screenshake; no haptics.
 - 🟢 **Photo moment is just a camera push-in** — no team pose at the pass, no
@@ -52,8 +53,8 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟡 **Solo/duo pacing is machine-validated only** (bot proxy survives
   comfortably) — needs human feel validation; expect to retune
   `Config.PACING[1..2]`.
-- 🟢 **Superlatives**: "Firefighter" card from the plan is missing (no
-  extinguish tracking); current set is serves/chops/cooks/washes/trashes.
+- 🟢 **Superlatives**: "Firefighter" DROPPED by design decision (the
+  fire-scrape mechanic stays simple); set is serves/chops/cooks/washes/trashes.
 - 🟢 **AFK stage 2 missing**: 20s → bot/park coverage works, but "two idle
   rounds → non-ready spectator" isn't implemented (Roblox's 20-min kick is
   the only backstop).

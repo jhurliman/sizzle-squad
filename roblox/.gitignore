@@ -5,3 +5,5 @@ parts.json
 viewer.bundle.js
 viewer.html
 render-*.png
+.audio-render/
+sizzle-sfx-pack.zip

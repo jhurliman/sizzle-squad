@@ -870,6 +870,10 @@ export type GrabKind =
   | 'return' // put it back where you found it
   | 'serve'
   | 'discard'
+  /** Empty-handed at a pan with cooked food: take the food itself. Asked for
+   * in playtest twice — the plate-scoop stays the fast path, but a bare hand
+   * must never watch dinner burn. */
+  | 'unload'
   /**
    * HOLD THIS ONE — it is what makes a single action button possible.
    *
@@ -981,8 +985,13 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
      * the rule is unchanged: a pan doing its job stays put, and a plate still
      * comes to the pan rather than the other way round (the 'load' rung below).
      */
-    if (st.kind === 'stove' && st.holding?.type === 'pan')
-      return st.holding.pan.contents.some((i) => i.state === 'burnt') ? 'discard' : 'none';
+    if (st.kind === 'stove' && st.holding?.type === 'pan') {
+      if (st.holding.pan.contents.some((i) => i.state === 'burnt')) return 'discard';
+      // Cooked food comes out into a bare hand too ('unload'). The plate
+      // scoop ('load' below) is still the efficient path — this is the rescue.
+      if (st.holding.pan.contents.some((i) => i.state === 'cooked')) return 'unload';
+      return 'none';
+    }
     // See 'prep' above. Same conditions the `useHeld` gate in step() tests, and
     // the SAME chopSeconds test updateStations makes before it advances any
     // work — all three have to agree or the button lies.
@@ -1351,6 +1360,15 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       chef.working = st.id;
       chef.intent = 'working';
       return true;
+    case 'unload': {
+      // One cooked item out of the pan, into the empty hand.
+      if (held || st.holding?.type !== 'pan') return false;
+      const cookedIdx = st.holding.pan.contents.findIndex((x) => x.state === 'cooked');
+      if (cookedIdx < 0) return false;
+      chef.carrying = { type: 'ingredient', ingredient: st.holding.pan.contents.splice(cookedIdx, 1)[0] };
+      emit(s, { t: 'pickup', chef: chef.id, at });
+      return true;
+    }
     case 'discard':
       /**
        * EMPTY-HANDED AT A BURNING PAN: SCRAPE IT, DO NOT PICK IT UP.

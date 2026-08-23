@@ -53,3 +53,21 @@ if not got then
 	error("FAIL: plate did not scoop the cooked bacon")
 end
 print("PASS: plate scoops cooked bacon off the stove pan")
+
+-- bare-hand rescue: empty hand at the same stove takes the cooked item
+table.insert(stove.holding.pan.contents, { id = 1000, kind = "bacon", state = "cooked", progress = 0, overcook = 0 })
+chef.carrying = nil
+for _ = 1, 10 do
+	inputs[chef.id + 1] = shared.NO_INPUT
+	shared.step(sim, inputs)
+	sim.events = {}
+end
+print("bare-hand action:", chef.focusAction)
+inputs[chef.id + 1] = { move = { x = 0, y = 0 }, grabPressed = true, useHeld = false }
+shared.step(sim, inputs)
+sim.events = {}
+local c = chef.carrying
+if c == nil or c.type ~= "ingredient" or c.ingredient.kind ~= "bacon" or c.ingredient.state ~= "cooked" then
+	error("FAIL: bare hand did not take the cooked bacon")
+end
+print("PASS: bare hand takes cooked bacon (unload)")
