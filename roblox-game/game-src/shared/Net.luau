@@ -32,6 +32,7 @@ Net.REMOTES = {
 	Emote = "RemoteEvent", -- both ways: { chefId, emote } speech-bubble pings
 	Progress = "RemoteEvent", -- server -> client: { xp, level, coins, unlocks, challenges }
 	ShopAction = "RemoteEvent", -- client -> server: { action = "buy"|"equip", id }
+	Leaderboards = "RemoteEvent", -- server -> client: { weekly, allTime, dishes }
 }
 
 local POS_MIN, POS_MAX = -2, 30

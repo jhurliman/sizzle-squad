@@ -23,7 +23,7 @@ local SKIN_COLORS: { [string]: Color3 } = {
 function ChefVisuals.new(parent: Instance)
 	local self = setmetatable({}, ChefVisuals)
 	self.parent = parent
-	self.rigsFolder = ReplicatedStorage:FindFirstChild("Game") and ReplicatedStorage.Game:FindFirstChild("Rigs")
+	self.rigsFolder = ReplicatedStorage:FindFirstChild("Rigs")
 	self.chefs = {} :: { [number]: any }
 	self.time = 0
 	return self

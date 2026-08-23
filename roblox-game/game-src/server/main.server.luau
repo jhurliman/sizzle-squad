@@ -14,6 +14,8 @@ local Replicator = require(script.Parent.Replicator) :: any
 local CrewManager = require(script.Parent.CrewManager) :: any
 local RoundDirector = require(script.Parent.RoundDirector) :: any
 local Progression = require(script.Parent.Progression) :: any
+local Leaderboards = require(script.Parent.Leaderboards) :: any
+local Badges = require(script.Parent.Badges) :: any
 
 local remotes = Net.server(ReplicatedStorage)
 
@@ -24,12 +26,16 @@ end)
 local crew = CrewManager.new(simService, Net, remotes, replicator, os.clock)
 local progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("Catalog")))
 
+local leaderboards = Leaderboards.new(progression, remotes)
+local badges = Badges.new()
+
 local director = RoundDirector.new(shared, Config, simService, crew, replicator, remotes, {
 	assistFn = function()
 		return progression:crewQualifiesForAssist(crew)
 	end,
 	onRoundEnd = function(results)
 		progression:awardRound(crew, results)
+		badges:onRoundEnd(crew, progression, results)
 	end,
 })
 
@@ -52,6 +58,7 @@ Players.PlayerAdded:Connect(function(player)
 	progression:playerAdded(player)
 	crew:playerAdded(player)
 	director:broadcastPhase()
+	leaderboards:pushTo(player)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
@@ -62,6 +69,7 @@ end)
 RunService.Heartbeat:Connect(function(dt)
 	crew:heartbeat()
 	director:heartbeat(dt)
+	leaderboards:heartbeat(os.clock())
 end)
 
 print("[sizzle] server up — kitchen open")

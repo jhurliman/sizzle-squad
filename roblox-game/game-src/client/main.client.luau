@@ -15,6 +15,8 @@ local Input = require(script.Parent.Input) :: any
 local ChefVisuals = require(script.Parent.ChefVisuals) :: any
 local CameraRig = require(script.Parent.CameraRig) :: any
 local Hud = require(script.Parent.Hud) :: any
+local FirstShift = require(script.Parent.FirstShift) :: any
+local Sfx = require(script.Parent.Sfx) :: any
 
 local SCALE = 5
 local remotes = Net.client(ReplicatedStorage)
@@ -26,6 +28,70 @@ visualsFolder.Parent = Workspace
 local visuals = ChefVisuals.new(visualsFolder)
 local cameraRig = CameraRig.new(Workspace.CurrentCamera :: Camera)
 local hud = Hud.new(Catalog)
+local firstShift = FirstShift.new(hud.gui)
+local sfx = Sfx.new()
+
+-- Invite friends (intermission) — free private servers + party joins are the
+-- other two "play together" paths; this is the in-game nudge.
+local inviteButton = Instance.new("TextButton")
+inviteButton.Size = UDim2.fromOffset(150, 40)
+inviteButton.Position = UDim2.new(0.5, 76, 0.82, 0)
+inviteButton.BackgroundColor3 = Color3.fromRGB(70, 130, 200)
+inviteButton.TextColor3 = Color3.new(1, 1, 1)
+inviteButton.TextSize = 18
+inviteButton.Font = Enum.Font.FredokaOne
+inviteButton.Text = "INVITE FRIENDS"
+inviteButton.Visible = false
+inviteButton.Parent = hud.gui
+do
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = inviteButton
+end
+inviteButton.Activated:Connect(function()
+	pcall(function()
+		local SocialService = game:GetService("SocialService")
+		SocialService:PromptGameInvite(Players.LocalPlayer)
+	end)
+end)
+
+-- Leaderboards panel (intermission)
+local boardsButton = Instance.new("TextButton")
+boardsButton.Size = UDim2.fromOffset(110, 40)
+boardsButton.Position = UDim2.new(0.5, -180, 0.82, 0)
+boardsButton.BackgroundColor3 = Color3.fromRGB(160, 120, 60)
+boardsButton.TextColor3 = Color3.new(1, 1, 1)
+boardsButton.TextSize = 18
+boardsButton.Font = Enum.Font.FredokaOne
+boardsButton.Text = "RANKS"
+boardsButton.Visible = false
+boardsButton.Parent = hud.gui
+do
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = boardsButton
+end
+local boardsPanel = Instance.new("TextLabel")
+boardsPanel.Size = UDim2.fromOffset(340, 360)
+boardsPanel.Position = UDim2.new(0.5, -170, 0.5, -200)
+boardsPanel.BackgroundColor3 = Color3.fromRGB(40, 24, 12)
+boardsPanel.BackgroundTransparency = 0.05
+boardsPanel.TextColor3 = Color3.fromRGB(255, 244, 221)
+boardsPanel.TextSize = 15
+boardsPanel.Font = Enum.Font.Code
+boardsPanel.TextYAlignment = Enum.TextYAlignment.Top
+boardsPanel.TextXAlignment = Enum.TextXAlignment.Left
+boardsPanel.Text = "No rankings yet — cook something!"
+boardsPanel.Visible = false
+boardsPanel.Parent = hud.gui
+do
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 14)
+	corner.Parent = boardsPanel
+end
+boardsButton.Activated:Connect(function()
+	boardsPanel.Visible = not boardsPanel.Visible
+end)
 
 -- ---------------------------------------------------------- station lookup
 
@@ -87,7 +153,10 @@ local function speechBubble(chefId: number, text: string)
 	if entry == nil then
 		return
 	end
-	local head = entry.model:FindFirstChild("Head") or entry.model.PrimaryPart
+	local head: any = entry.model:FindFirstChild("Head") or entry.model.PrimaryPart
+	if head ~= nil and head:IsA("Model") then
+		head = head:FindFirstChildWhichIsA("BasePart")
+	end
 	if head == nil then
 		return
 	end
@@ -144,13 +213,55 @@ remotes.ScoreDelta.OnClientEvent:Connect(function(score)
 	hud:updateScore(score)
 end)
 
+local lastPhase = ""
 remotes.RoundPhase.OnClientEvent:Connect(function(phase)
 	state.phase = phase
 	hud:updatePhase(phase, phase.results and phase.results.cards)
+	inviteButton.Visible = phase.phase == "intermission"
+	boardsButton.Visible = phase.phase == "intermission"
+	if phase.phase ~= "intermission" then
+		boardsPanel.Visible = false
+	end
+	-- Photo moment: a 3-star finish gets a celebratory push-in on the pass.
+	if phase.phase == "results" and lastPhase ~= "results" and phase.results ~= nil and phase.results.stars >= 3 then
+		local camera = Workspace.CurrentCamera :: Camera
+		local focus = Vector3.new(7.5 * SCALE, 1.2 * SCALE, 1.5 * SCALE)
+		local from = camera.CFrame
+		local to = CFrame.lookAt(focus + Vector3.new(0, 4 * SCALE, 7 * SCALE), focus)
+		local t0 = os.clock()
+		local conn
+		conn = RunService.RenderStepped:Connect(function()
+			local f = math.clamp((os.clock() - t0) / 1.2, 0, 1)
+			camera.CFrame = from:Lerp(to, 1 - (1 - f) ^ 3)
+			if os.clock() - t0 > 4 then
+				conn:Disconnect()
+			end
+		end)
+	end
+	lastPhase = phase.phase
+end)
+
+remotes.Leaderboards.OnClientEvent:Connect(function(boards)
+	local lines = { "═══ WEEKLY BEST ═══" }
+	for _, e in boards.weekly or {} do
+		table.insert(lines, string.format("%2d. %-18s %6d", e.rank, e.key, e.value))
+	end
+	table.insert(lines, "")
+	table.insert(lines, "═══ ALL-TIME ═══")
+	for _, e in boards.allTime or {} do
+		table.insert(lines, string.format("%2d. %-18s %6d", e.rank, e.key, e.value))
+	end
+	table.insert(lines, "")
+	table.insert(lines, "═══ CAREER DISHES ═══")
+	for _, e in boards.dishes or {} do
+		table.insert(lines, string.format("%2d. %-18s %6d", e.rank, e.key, e.value))
+	end
+	boardsPanel.Text = table.concat(lines, "\n")
 end)
 
 remotes.Progress.OnClientEvent:Connect(function(progress)
 	hud:updateProgress(progress)
+	firstShift:setEligible(progress)
 	hud:updateShop(progress, function(action, id)
 		remotes.ShopAction:FireServer({ action = action, id = id })
 	end)
@@ -169,6 +280,7 @@ end)
 
 remotes.SimEvents.OnClientEvent:Connect(function(events)
 	for _, ev in events do
+		sfx:handle(ev)
 		if ev.t == "serve" then
 			hud:worldLabel(
 				Vector3.new(ev.at.x * SCALE, 1.2 * SCALE, ev.at.y * SCALE),
@@ -289,6 +401,7 @@ RunService.RenderStepped:Connect(function(dt)
 
 	-- HUD
 	hud:updateOrders(state.orders, serveAnchors)
+	firstShift:update(state, (state.myChefId ~= nil and state.flags[state.myChefId]) or 0)
 	if state.phase.phase == "round" then
 		hud:updateTimer(shared.TUNING.roundSeconds - (state.score.time or 0))
 	else
