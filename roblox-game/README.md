@@ -4,22 +4,10 @@ The web game's simulation is the server: `src/domain` + `src/bots` (the
 deterministic 60 Hz sim and the bot AI) compile to a single Luau module via
 [TypeScriptToLua](https://typescripttolua.github.io/), so the Roblox game runs
 **literally the same code** the web game ships, and the two builds are proven
-tick-identical (see Parity below).
+tick-identical (see Parity below). On top of that shared core sits a full
+co-op game: 1–4 players in one kitchen, bots covering every empty chef slot.
 
-```
-roblox-game/
-  sync-shared.mjs        copies ../src/domain + ../src/bots into src/shared/ (CI: --check)
-  src/shared/index.ts    barrel: the API surface compiled for Roblox
-  tstl-bit32.cjs         TSTL plugin: JS bitwise ops -> Luau bit32.* calls
-  out/shared-bundle.lua  compiled, self-contained (generated)
-  game-src/server        Luau shell: runs the sim on Heartbeat (P1: bots-only smoke)
-  game-src/client        Luau shell: fixed camera (P1 stub)
-  assets/kitchen.rbxm    environment, emitted by ../roblox/ capture pipeline
-  tools/                 smoke + parity harness (Lune + Node)
-  default.project.json   Rojo tree -> SizzleSquad.rbxl
-```
-
-## Build
+## Build & play
 
 ```sh
 npm ci                                   # in this directory
@@ -27,47 +15,74 @@ rokit install                            # rojo 7.7.0 + lune 0.10.5 (or install 
 npm run build                            # sync -> tstl -> rojo build -> SizzleSquad.rbxl
 ```
 
-Open `SizzleSquad.rbxl` in Studio and press Play: the kitchen runs a full
-bot-only service on the server (watch the output log), framed by the game's
-fixed camera. Regenerate `assets/kitchen.rbxm` any time the web environment
-changes: `cd ../roblox && npm run generate`.
+Open `SizzleSquad.rbxl` in Studio and press Play. Test multiplayer with
+*Clients and Servers → Start Local Server* (2–4 players).
 
-## Why TSTL (and not roblox-ts or a hand port)
+## What's implemented
 
-- A hand port of ~5.9k LOC of tuned, comment-load-bearing sim code would drift
-  from the web game. Sharing the source verbatim keeps one truth.
-- roblox-ts was spiked first and rejected: it replaces the JS standard library
-  (`.length` → `.size()`, boolean sort comparators, no `Math`), and its `Map`
-  does not preserve insertion order — which the bot planner and replay
-  determinism depend on. TSTL implements real JS semantics (ordered maps,
-  JS sorts, `Math.*`) on stock Lua.
-- TSTL's Lua 5.1 target is Luau-compatible (no `goto`, no bitwise operator
-  syntax); the one gap — bitwise operators in the PRNG — is closed by the
-  ~50-line `tstl-bit32.cjs` plugin, which emits `bit32.*` calls (operands are
-  integer by construction; see the plugin header for the exact contract).
+**Round loop** — countdown → 180s round → results ceremony (stars, positive-
+only superlative cards) → intermission-in-the-kitchen (ready-up, shop, ranks,
+invites, emotes; chefs still walk around) → next round.
 
-A handful of upstream changes made the domain compile cleanly for both
-runtimes (portable `imul`/`hypot`/`filled` in `src/domain/portable.ts`, plain
-arrays instead of `Int32Array`, explicit `> 0` where a `0` would be truthy in
-Lua, `this: void` on `SimState.rand`). The web build is unchanged in behavior:
-`npm run check` + `node tools/planprobe.mjs` + `node tools/soak.mjs` all pass,
-including the bit-exact same-seed determinism suite.
+**Multiplayer** — 4-player servers; joiners take over a bot chef mid-round
+(held item and all); leavers/AFK players (20s) hand back to the bot, any
+input resumes instantly. Own-chef movement runs the real `movePhase` locally
+(zero latency); the server validates displacement + walkability and owns
+collisions, interactions, stations, orders, and scoring. Transforms stream as
+packed buffers (20 Hz down / 30 Hz up); everything else diffs on change.
 
-## Parity
+**Difficulty** — human-count pacing table + an invisible pressure director
+(±20% order-gap rubber band) + auto assist mode for new crews (gentler
+timers, recipe depth cap), all through `DirectorKnobs` the sim exposes with
+shipped-behavior defaults. Bot-plated dishes pay 60% (leaderboard integrity).
 
-`npm run parity` runs 3 seeded bot-only rounds (10,800 ticks each) under Node
-and under Lune (compiled bundle) and compares per-tick digests:
+**Meta** — DataStore profiles; XP/levels with milestone cosmetic grants;
+career coins; daily challenges + streaks (weekly grace token); ~30-item
+cosmetics catalog (hats, species palettes, emotes, kitchen items) with shop
+buy/equip; OrderedDataStore weekly/all-time/career boards; badge sweep;
+First Shift contextual onboarding; emote pings + speech bubbles; 3-star
+photo moment.
 
-- discrete state (coins/served/missed/combo, order count, every station's
-  contents) matches **exactly, every tick**;
-- chef positions/velocities agree within `8e-11` (Luau vs V8 `exp` ulp noise —
-  it has never flipped a decision in the corpus).
+**Characters** — the four procedural species captured from `ChefView` in bind
+pose with skeleton-group attribution (`../roblox/capture-chefs.mjs`) into
+part-rigs (`assets/chef-rigs.rbxm`, ~70 parts each), animated procedurally
+client-side (walk/hop/squash/stun/carry). See `../roblox/chefs-preview.png`.
 
-Perf under Lune: ~6,200 ticks/s single-threaded (~0.16 ms per tick with 4
-chefs + full bot AI) — comfortably inside the 60 Hz server budget.
+## Verification (all headless, no Studio needed)
 
-## Next (P2 — see the port plan)
+| Command | What it proves |
+|---|---|
+| `npm run parity` | TS and Luau builds tick-identical (3 seeds × 10,800 ticks: discrete state exact, floats ≤ 8e-11) |
+| `lune run tools/server-harness.luau` | Full server stack end-to-end: round loop, drop-in/AFK, pacing, progression, shop, replication (22 checks) |
+| `lune run tools/client-harness.luau` | Mirror movement + working-freeze, interpolation, verb prompt, delta mirroring |
+| `lune run tools/check-luau.luau` | Syntax gate over all Luau sources |
+| `lune run tools/smoke.luau` | A full bot round in Luau (~6,200 ticks/s) |
+| `node tools/smoke-ts.mjs` | The same round under Node — outputs match |
 
-Server `simService`/`botService`/`replicator`, client-authoritative own-chef
-movement via the exported `movePhase`, packed transform replication, captured
-chef rigs + procedural animator, HUD/tickets, audio events.
+Root-level `npm run check` + `node tools/planprobe.mjs` + `node tools/soak.mjs`
+still guard the shared sim (including bit-exact determinism).
+
+## Toolchain notes
+
+- **Why TSTL, not roblox-ts**: roblox-ts replaces the JS stdlib (`.length` →
+  `.size()`, boolean sort comparators, no `Math`) and its `Map` drops
+  insertion order — which bot-planner determinism depends on. TSTL implements
+  real JS semantics on stock Lua. Its 5.1 target is Luau-compatible except
+  bitwise operators; `tstl-bit32.cjs` (~50 lines) closes that by emitting
+  `bit32.*` calls (see the plugin header for the integer-operand contract).
+- `sync-shared.mjs` mirrors `../src/domain` + `../src/bots` into `src/shared/`
+  (CI guard: `npm run sync:check`).
+
+## Remaining (user-gated) launch steps
+
+1. **Publish** the place to a universe (Studio → File → Publish), set
+   `MaxPlayers = 4`, enable **free private servers**, enable Studio API
+   access for DataStores.
+2. **Audio**: offline-render the WebAudio synth (`src/audio/audio.ts`) to
+   .ogg via node-web-audio-api, upload via Open Cloud, fill the ids in
+   `game-src/client/Sfx.luau` (categories are already mapped to events).
+3. **Badges**: create on the Creator Dashboard, fill `Badges.IDS`.
+4. **Icon spritesheet**: render `src/ui/icons.ts` to a PNG, upload, swap the
+   ticket chips from colored circles to ImageLabels.
+5. **Playtests** (plan P6–P8): friends & family via private links, then soft
+   launch against the metric gates (D1 ≥ 25%, session ≥ 12 min, rounds ≥ 3).
