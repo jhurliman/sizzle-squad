@@ -215,10 +215,22 @@ end)
 remotes.EquipDeltas.OnClientEvent:Connect(function(list)
 	table.clear(state.hats)
 	table.clear(state.names)
+	table.clear(state.palettes)
 	for _, e in list do
 		state.hats[e.chefId] = e.hat
 		state.names[e.chefId] = e.name
+		state.palettes[e.chefId] = e.palette
+		if e.skin ~= nil then
+			state.skins[e.chefId] = e.skin
+		end
 	end
+	if state.myChefId ~= nil then
+		hud:setSpecies(state.skins[state.myChefId])
+	end
+end)
+
+hud:bindSpecies(function(species)
+	remotes.PickSpecies:FireServer(species)
 end)
 
 remotes.OrdersDelta.OnClientEvent:Connect(function(msg)
@@ -285,10 +297,7 @@ remotes.Progress.OnClientEvent:Connect(function(progress)
 end)
 
 remotes.Correction.OnClientEvent:Connect(function(msg)
-	if state.mirror ~= nil then
-		state.mirror.pos.x, state.mirror.pos.y = msg.x, msg.y
-		state.mirror.vel.x, state.mirror.vel.y = 0, 0
-	end
+	state:applyCorrection(msg)
 end)
 
 remotes.Emote.OnClientEvent:Connect(function(msg)
@@ -389,18 +398,19 @@ RunService.RenderStepped:Connect(function(dt)
 		local m = state.mirror
 		local speed = math.sqrt(m.vel.x ^ 2 + m.vel.y ^ 2)
 		visuals:update(state.myChefId, state.skins[state.myChefId] or "bramble", {
-			x = m.pos.x,
-			y = m.pos.y,
+			x = m.pos.x + state.visOffset.x,
+			y = m.pos.y + state.visOffset.y,
 			heading = m.heading,
 			effort = math.clamp(speed / 6.2, 0, 1),
 			stun = m.stun,
-		}, state.flags[state.myChefId] or 0, dt, state.carrying[state.myChefId], state.hats[state.myChefId], nil)
+		}, state.flags[state.myChefId] or 0, dt, state.carrying[state.myChefId], state.hats[state.myChefId], nil, state.palettes[state.myChefId])
 	end
+	hud:setSpectating(state.myChefId == nil and state.phase.phase == "round")
 	for id, skin in state.skins do
 		if id ~= state.myChefId then
 			local pose = state:remotePose(id)
 			if pose ~= nil and state.clock - (state.lastSeen[id] or -10) < 2 then
-				visuals:update(id, skin, pose, state.flags[id] or 0, dt, state.carrying[id], state.hats[id], state.names[id])
+				visuals:update(id, skin, pose, state.flags[id] or 0, dt, state.carrying[id], state.hats[id], state.names[id], state.palettes[id])
 			elseif visuals.chefs[id] ~= nil then
 				-- parked / departed chefs stop streaming: clear their body
 				visuals:remove(id)

@@ -11,17 +11,14 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 
 ## A. Built but invisible — systems that persist state with no presentation
 
-- 🟡 **Hats render (procedural models for all 12); palettes and kitchen
-  cosmetics still don't** — palette recolor needs coat-part tagging in the
-  rig capture; plate/pan/bell swaps unbuilt. Nametags render for humans.
+- 🟡 **Hats + palettes render; kitchen cosmetics still don't** (plate/pan/
+  bell swaps unbuilt). Palette retint uses dominant-color matching — verify
+  per species in Studio.
 - 🟢 **Ticket icons render via runtime EditableImage** (no upload needed) with a colored-chip fallback if the API is unavailable on some platform — verify on device.
-- 🔴 **Daily challenges have no UI.** They replicate in the `Progress` payload
-  and pay out (auto-claim, no celebration), but no panel shows them — players
-  can't see goals or progress. The streak number in the bottom-left strip is
-  the only visible trace.
-- 🟡 **Species picker missing.** Skin is assigned by chef slot; the plan's
-  pick-during-countdown overlay doesn't exist. With bots off, solo players
-  always get the same species.
+- 🟢 **Dailies panel live** (intermission "Today's Goals" + completion
+  toasts); rewards still auto-claim rather than a claim ceremony.
+- 🟢 **Species picker live** (countdown + intermission row, persisted to the
+  profile) — duplicates allowed by design; nametags differentiate.
 - 🟡 **Supporter Pass / monetization not implemented at all** (no gamepass
   check, no +10% XP hook, no bundles). Plan §2.5; deliberately last.
 
@@ -50,8 +47,8 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   not the plan's scripted first-three-tickets with a demonstrating sous-chef.
   (The demonstration concept needs rethinking anyway now that bots are off by
   default.)
-- 🟡 **Late-join hold is unwired**: `Config.LATE_JOIN_CUTOFF` exists but
-  joiners drop in even with <15s left; no kitchen-cam hold until results.
+- 🟢 **Late-join hold live**: joiners with <15s left spectate with a notice
+  and seat at the next phase change.
 - 🟡 **Solo/duo pacing is machine-validated only** (bot proxy survives
   comfortably) — needs human feel validation; expect to retune
   `Config.PACING[1..2]`.
@@ -72,8 +69,7 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 
 ## D. Robustness / tech debt
 
-- 🟡 **Corrections hard-snap the mirror** (no client-side smoothing/deadband);
-  rare after the envelope rework, but visible when they happen.
+- 🟢 **Corrections glide** (snap absorbed into a decaying visual offset).
 - 🟢 No packet-loss extrapolation beyond hold-last-sample for remote chefs.
 - 🟢 No DataStore retry/backoff beyond pcall, no session locking (same-player
   two-server race), no autosave on server shutdown (BindToClose).

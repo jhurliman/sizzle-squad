@@ -16,13 +16,21 @@ export type Seat = {
 	afk: boolean,
 }
 
-function CrewManager.new(simService: any, net: any, remotes: { [string]: any }, replicator: any, now: () -> number)
+function CrewManager.new(
+	simService: any,
+	net: any,
+	remotes: { [string]: any },
+	replicator: any,
+	now: () -> number,
+	skinFor: ((any) -> string?)?
+)
 	local self = setmetatable({}, CrewManager)
 	self.simService = simService
 	self.net = net
 	self.remotes = remotes
 	self.replicator = replicator
 	self.now = now
+	self.skinFor = skinFor
 	self.seats = {} :: { [any]: Seat } -- keyed by Player
 	self.byChef = {} :: { [number]: Seat }
 
@@ -67,6 +75,10 @@ function CrewManager:playerAdded(player: any)
 		return nil
 	end
 	local chef = self.simService:setHuman(chefId, true)
+	local want = self.skinFor and self.skinFor(player)
+	if chef ~= nil and want ~= nil then
+		chef.skin = want
+	end
 	local seat: Seat = { player = player, chefId = chefId, lastInputAt = self.now(), afk = false }
 	self.seats[player] = seat
 	self.byChef[chefId] = seat
@@ -127,6 +139,10 @@ function CrewManager:reseat()
 		local chefId = self.simService:freeChef()
 		if chefId ~= nil then
 			local chef = self.simService:setHuman(chefId, true)
+			local want = self.skinFor and self.skinFor(player)
+			if chef ~= nil and want ~= nil then
+				chef.skin = want
+			end
 			seat.chefId = chefId
 			self.byChef[chefId] = seat
 			self.remotes.ChefAssign:FireClient(player, {

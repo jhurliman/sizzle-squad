@@ -25,8 +25,12 @@ local replicator = Replicator.new(shared, Net, remotes, function(chef)
 end, function(chef)
 	return simService:isActive(chef)
 end)
-local crew = CrewManager.new(simService, Net, remotes, replicator, os.clock)
-local progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("Catalog")))
+local progression
+local crew = CrewManager.new(simService, Net, remotes, replicator, os.clock, function(player)
+	local profile = progression and progression.profiles[player]
+	return profile and profile.species or nil
+end)
+progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("Catalog")))
 
 local leaderboards = Leaderboards.new(progression, remotes)
 local badges = Badges.new()
@@ -58,14 +62,37 @@ local function broadcastEquips()
 	local list = {}
 	for player, seat in crew.seats do
 		local profile = progression.profiles[player]
+		local skin = nil
+		for _, chef in simService.sim.chefs do
+			if chef.id == seat.chefId then
+				skin = chef.skin
+			end
+		end
 		table.insert(list, {
 			chefId = seat.chefId,
 			hat = profile and profile.equipped and profile.equipped.hat or nil,
+			palette = profile and profile.equipped and profile.equipped.palette or nil,
+			skin = skin,
 			name = player.DisplayName or player.Name,
 		})
 	end
 	remotes.EquipDeltas:FireAllClients(list)
 end
+
+remotes.PickSpecies.OnServerEvent:Connect(function(player, species)
+	if not progression:setSpecies(player, species) then
+		return
+	end
+	local seat = crew.seats[player]
+	if seat ~= nil then
+		for _, chef in simService.sim.chefs do
+			if chef.id == seat.chefId then
+				chef.skin = species
+			end
+		end
+	end
+	broadcastEquips()
+end)
 
 remotes.ShopAction.OnServerEvent:Connect(function(player, action)
 	progression:shopAction(player, action)
@@ -99,19 +126,42 @@ local function vaultCharacter(character: Model)
 	end)
 end
 
+-- Late-join hold (plan §2.1): with under LATE_JOIN_CUTOFF seconds left in a
+-- round, hold the joiner as a spectator (they get the snapshot and watch the
+-- kitchen) and seat them at the next phase change instead.
+local pendingJoins: { [any]: boolean } = {}
+
+local function roundRemaining(): number
+	return shared.TUNING.roundSeconds - simService.sim.time
+end
+
+local function seatPending()
+	for player in pendingJoins do
+		pendingJoins[player] = nil
+		crew:playerAdded(player)
+	end
+	broadcastEquips()
+end
+
 Players.PlayerAdded:Connect(function(player)
 	player.CharacterAdded:Connect(vaultCharacter)
 	if player.Character ~= nil then
 		vaultCharacter(player.Character)
 	end
 	progression:playerAdded(player)
-	crew:playerAdded(player)
+	if director.phase == "round" and roundRemaining() < Config.LATE_JOIN_CUTOFF then
+		pendingJoins[player] = true
+		remotes.Snapshot:FireClient(player, replicator:snapshotFor(simService.sim))
+	else
+		crew:playerAdded(player)
+	end
 	director:broadcastPhase()
 	leaderboards:pushTo(player)
 	broadcastEquips()
 end)
 
 Players.PlayerRemoving:Connect(function(player)
+	pendingJoins[player] = nil
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
 	broadcastEquips()
@@ -126,6 +176,9 @@ task.spawn(function()
 		if director.round ~= last then
 			last = director.round
 			broadcastEquips()
+		end
+		if next(pendingJoins) ~= nil and director.phase ~= "round" then
+			seatPending()
 		end
 	end
 end)

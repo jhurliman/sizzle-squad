@@ -27,6 +27,9 @@ function ClientState.new(shared: any, net: any)
 	self.lastSeen = {} :: { [number]: number }
 	self.hats = {} :: { [number]: string? }
 	self.names = {} :: { [number]: string? }
+	self.palettes = {} :: { [number]: string? }
+	-- visual offset absorbing correction snaps (decays to zero)
+	self.visOffset = { x = 0, y = 0 }
 	self.stations = {} :: { [number]: any }
 	self.orders = {} :: { any }
 	self.score = { coins = 0, served = 0, missed = 0, combo = 0, bestCombo = 0, patience = 1, time = 0 }
@@ -114,6 +117,9 @@ function ClientState:stepOwn(input: any, dt: number)
 	-- exactly like the sim would (movePhase itself decays stun).
 	self.shared.movePhase(self.mirrorSim, mirror, input, dt)
 	self.mirrorSim.events = {}
+	local decay = math.exp(-dt * 7)
+	self.visOffset.x *= decay
+	self.visOffset.y *= decay
 	return mirror
 end
 
@@ -197,6 +203,20 @@ function ClientState:rebuildCarryable(summary: any): any
 		return { type = "pan", pan = { id = 0, contents = contents, onHeat = true, fire = summary.fire or 0 } }
 	end
 	return nil
+end
+
+--- Server correction: snap the SIMULATED position (authority) but park the
+--- visual difference in a decaying offset so the body glides instead of
+--- teleporting.
+function ClientState:applyCorrection(msg: any)
+	local mirror = self.mirror
+	if mirror == nil then
+		return
+	end
+	self.visOffset.x += mirror.pos.x - msg.x
+	self.visOffset.y += mirror.pos.y - msg.y
+	mirror.pos.x, mirror.pos.y = msg.x, msg.y
+	mirror.vel.x, mirror.vel.y = 0, 0
 end
 
 --- Apply a server bump verdict to the own-chef mirror so client and server

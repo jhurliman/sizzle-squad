@@ -159,10 +159,146 @@ function Hud.new(catalog: any)
 	}, self.ticketRail)
 	self.tickets = {} :: { [number]: any }
 
+	-- species picker (countdown + intermission)
+	self.speciesRow = mk("Frame", {
+		Size = UDim2.fromOffset(4 * 96 + 24, 44),
+		Position = UDim2.new(0.5, -(4 * 96 + 24) / 2, 0.62, 0),
+		BackgroundTransparency = 1,
+		Visible = false,
+	}, gui)
+	mk("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		Padding = UDim.new(0, 8),
+	}, self.speciesRow)
+	self.speciesButtons = {} :: { [string]: any }
+	local SPECIES_LABELS = { { "bramble", "🐻 Bramble" }, { "pip", "🐸 Pip" }, { "nori", "🐱 Nori" }, { "mochi", "🐤 Mochi" } }
+	for _, def in SPECIES_LABELS do
+		local id, text = def[1], def[2]
+		local btn = mk("TextButton", {
+			Size = UDim2.fromOffset(96, 40),
+			BackgroundColor3 = Color3.fromRGB(58, 32, 19),
+			BackgroundTransparency = 0.2,
+			TextColor3 = Color3.fromRGB(255, 244, 221),
+			TextSize = 16,
+			Font = Enum.Font.FredokaOne,
+			Text = text,
+		}, self.speciesRow)
+		mk("UICorner", { CornerRadius = UDim.new(0, 10) }, btn)
+		self.speciesButtons[id] = btn
+	end
+
+	-- daily goals panel (intermission, left side)
+	self.dailiesPanel = mk("Frame", {
+		Size = UDim2.fromOffset(230, 150),
+		Position = UDim2.new(0, 12, 0, 64),
+		BackgroundColor3 = Color3.fromRGB(40, 24, 12),
+		BackgroundTransparency = 0.15,
+		Visible = false,
+	}, gui)
+	mk("UICorner", { CornerRadius = UDim.new(0, 12) }, self.dailiesPanel)
+	mk("TextLabel", {
+		Size = UDim2.new(1, 0, 0, 26),
+		BackgroundTransparency = 1,
+		TextColor3 = Color3.fromRGB(255, 224, 102),
+		TextSize = 16,
+		Font = Enum.Font.FredokaOne,
+		Text = "TODAY'S GOALS",
+	}, self.dailiesPanel)
+	self.dailyRows = {}
+	for i = 1, 3 do
+		local row = mk("TextLabel", {
+			Size = UDim2.new(1, -16, 0, 34),
+			Position = UDim2.new(0, 10, 0, 26 + (i - 1) * 38),
+			BackgroundTransparency = 1,
+			TextColor3 = Color3.fromRGB(255, 244, 221),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextSize = 14,
+			Font = Enum.Font.GothamMedium,
+			TextWrapped = true,
+			Text = "",
+		}, self.dailiesPanel)
+		self.dailyRows[i] = row
+	end
+	self.claimedDailies = {} :: { [string]: boolean }
+
+	-- spectator notice (late join during a round)
+	self.spectateLabel = mk("TextLabel", {
+		Size = UDim2.new(0, 320, 0, 30),
+		Position = UDim2.new(0.5, -160, 0, 160),
+		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
+		BackgroundTransparency = 0.2,
+		TextColor3 = Color3.fromRGB(255, 244, 221),
+		TextSize = 16,
+		Font = Enum.Font.FredokaOne,
+		Text = "You're up next round — watch the kitchen!",
+		Visible = false,
+	}, gui)
+	mk("UICorner", { CornerRadius = UDim.new(0, 10) }, self.spectateLabel)
+
 	-- floating labels pool
 	self.labelPool = {} :: { any }
 
 	return self
+end
+
+--- Wire the species buttons and highlight the current pick.
+function Hud:bindSpecies(onPick: (string) -> ())
+	for id, btn in self.speciesButtons do
+		btn.Activated:Connect(function()
+			onPick(id)
+		end)
+	end
+end
+
+function Hud:setSpecies(current: string?)
+	for id, btn in self.speciesButtons do
+		btn.BackgroundColor3 = if id == current then Color3.fromRGB(92, 174, 64) else Color3.fromRGB(58, 32, 19)
+	end
+end
+
+function Hud:setSpectating(on: boolean)
+	self.spectateLabel.Visible = on
+end
+
+--- Daily goals rows + a toast when one completes.
+function Hud:updateDailies(dailies: { any }?)
+	if dailies == nil then
+		return
+	end
+	for i = 1, 3 do
+		local d = dailies[i]
+		local row = self.dailyRows[i]
+		if d == nil then
+			row.Text = ""
+		elseif d.claimed then
+			row.Text = `✅ {d.name}  (+{d.coins}c)`
+			row.TextColor3 = Color3.fromRGB(150, 210, 120)
+			if not self.claimedDailies[d.id] then
+				self.claimedDailies[d.id] = true
+				self:toast(`Daily complete: {d.name}  +{d.coins}c`)
+			end
+		else
+			row.Text = `▫️ {d.name}  ({math.min(d.progress, d.goal)}/{d.goal})`
+			row.TextColor3 = Color3.fromRGB(255, 244, 221)
+		end
+	end
+end
+
+function Hud:toast(text: string)
+	local label = mk("TextLabel", {
+		Size = UDim2.new(0, 360, 0, 40),
+		Position = UDim2.new(0.5, -180, 0, 170),
+		BackgroundColor3 = Color3.fromRGB(92, 174, 64),
+		TextColor3 = Color3.new(1, 1, 1),
+		TextSize = 18,
+		Font = Enum.Font.FredokaOne,
+		Text = text,
+	}, self.gui)
+	mk("UICorner", { CornerRadius = UDim.new(0, 12) }, label)
+	task.delay(2.5, function()
+		label:Destroy()
+	end)
 end
 
 -- ------------------------------------------------------------------ tickets
@@ -338,6 +474,8 @@ function Hud:updatePhase(phase: any, cards: any?)
 	self.readyButton.Visible = p == "intermission"
 	self.shopButton.Visible = p == "intermission"
 	self.shopPanel.Visible = self.shopPanel.Visible and p == "intermission"
+	self.speciesRow.Visible = p == "intermission" or p == "countdown"
+	self.dailiesPanel.Visible = p == "intermission"
 	if p == "countdown" then
 		self.overlay.Visible = true
 		if phase.waiting then
@@ -384,6 +522,7 @@ end
 
 function Hud:updateProgress(progress: any)
 	self.progressLabel.Text = `Lv {progress.level}  ·  {progress.coins} coins  ·  🔥{progress.streak}`
+	self:updateDailies(progress.dailies)
 end
 
 --- Floating world-space label (serve values, "+12", grab misses).

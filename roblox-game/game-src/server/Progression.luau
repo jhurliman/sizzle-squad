@@ -293,6 +293,20 @@ function Progression:shopAction(player: any, action: any)
 	self:push(player)
 end
 
+-- ----------------------------------------------------------------- species
+
+local SPECIES = { bramble = true, pip = true, nori = true, mochi = true }
+
+function Progression:setSpecies(player: any, species: any): boolean
+	local profile = self.profiles[player]
+	if profile == nil or typeof(species) ~= "string" or not SPECIES[species] then
+		return false
+	end
+	profile.species = species
+	self.dirty[player] = true
+	return true
+end
+
 -- ------------------------------------------------------------------ assist
 
 function Progression:crewQualifiesForAssist(crew: any): boolean

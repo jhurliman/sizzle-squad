@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ItemViz = require(script.Parent.ItemViz) :: any
 local Hats = require(script.Parent.Hats) :: any
+local Catalog = require(ReplicatedStorage:WaitForChild("Game"):WaitForChild("Catalog")) :: any
 
 local ChefVisuals = {}
 ChefVisuals.__index = ChefVisuals
@@ -81,6 +82,10 @@ function ChefVisuals:ensure(id: number, skin: string): any
 	entry = {
 		model = model,
 		isRig = isRig,
+		skin = skin,
+		paletteApplied = "-",
+		origColors = {} :: { Color3 },
+		coatColor = nil :: Color3?,
 		phase = 0,
 		smSpeed = 0,
 		carryBlend = 0,
@@ -133,6 +138,28 @@ function ChefVisuals:ensure(id: number, skin: string): any
 				end
 			end
 		end
+		-- palette support: remember every part's authored color and find the
+		-- coat (the most common color by rough bucket) to retint later
+		local buckets: { [string]: { n: number, c: Color3 } } = {}
+		for _, part2 in entry.animParts do
+			table.insert(entry.origColors, part2.Color)
+			local c = part2.Color
+			local key = `{math.floor(c.R * 12)}:{math.floor(c.G * 12)}:{math.floor(c.B * 12)}`
+			local b = buckets[key]
+			if b == nil then
+				buckets[key] = { n = 1, c = c }
+			else
+				b.n += 1
+			end
+		end
+		local bestN = 0
+		for _, b in buckets do
+			if b.n > bestN then
+				bestN = b.n
+				entry.coatColor = b.c
+			end
+		end
+
 		entry.headAnchor = skull
 		entry.rigHeight = math.max(rigTop, CHEF_HEIGHT)
 		if skull ~= nil then
@@ -154,10 +181,37 @@ local function around(joint: Vector3, rx: number, ry: number, rz: number): CFram
 	return CFrame.new(joint) * CFrame.Angles(rx, ry, rz) * CFrame.new(-joint)
 end
 
+--- Retint the coat-colored parts toward an equipped palette (or restore).
+function ChefVisuals:applyPalette(entry: any, paletteId: string?)
+	local key = paletteId or "-"
+	if entry.paletteApplied == key or not entry.isRig or entry.coatColor == nil then
+		return
+	end
+	entry.paletteApplied = key
+	local item = paletteId ~= nil and Catalog.byId[paletteId] or nil
+	local target: Color3? = nil
+	if item ~= nil and item.kind == "palette" and item.species == entry.skin and item.color ~= nil then
+		target = Color3.fromRGB(item.color[1], item.color[2], item.color[3])
+	end
+	local coat = entry.coatColor :: Color3
+	for i, part in entry.animParts do
+		local orig = entry.origColors[i]
+		local d = math.abs(orig.R - coat.R) + math.abs(orig.G - coat.G) + math.abs(orig.B - coat.B)
+		if d < 0.22 then
+			part.Color = if target ~= nil then orig:Lerp(target, 0.8) else orig
+		end
+	end
+end
+
 --- pose: { x, y (kitchen cells), heading, effort, stun }
---- extras: { carrying, hat, label, working }
-function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, dt: number, carrying: any, hat: string?, label: string?)
+function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, dt: number, carrying: any, hat: string?, label: string?, palette: string?)
+	-- species swap: rebuild the body, keep the slot
+	local existing = self.chefs[id]
+	if existing ~= nil and existing.skin ~= skin then
+		self:remove(id)
+	end
 	local entry = self:ensure(id, skin)
+	self:applyPalette(entry, palette)
 	self.time += dt
 	dt = math.max(dt, 1e-3)
 
