@@ -117,6 +117,12 @@ function blackHoles(s) {
     null,
     { type: 'ingredient', ingredient: { kind: 'tomato', state: 'raw', chop: 0 } },
     { type: 'ingredient', ingredient: { kind: 'tomato', state: 'prepped', chop: 1 } },
+    // A COOKABLE hand. Pans rightly refuse non-cookables now (a raw tomato
+    // in a pan could never cook and never leave — found in the Roblox port
+    // playtest), so a stove's pan is only reachable with something the heat
+    // can actually work on. Without bacon here every stove read as a black
+    // hole the moment the tomato loophole closed.
+    { type: 'ingredient', ingredient: { kind: 'bacon', state: 'raw', chop: 0 } },
     { type: 'plate', plate: { contents: [], dirty: false } },
     { type: 'plate', plate: { contents: [], dirty: true } },
     { type: 'pan', pan: { contents: [], onHeat: false, fire: 0 } },

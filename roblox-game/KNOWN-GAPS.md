@@ -33,9 +33,10 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   full procedural rig (limb walk cycle, carry poses, blink, mouth) is the
   single biggest remaining art-feel gap. Skeleton groups are already captured
   per body part, so the Motor6D/per-group-offset layer has its data.
-- 🟡 **Food is spheres.** ItemViz communicates kind/state (color, chopped
-  halves, browning) but nothing is shaped — no lettuce leaves, bacon rashers,
-  seeded buns, no comedy plate-stack tower.
+- 🟢 **Food art is the web game's captured meshes** (tomatoes with stalks,
+  leafy lettuce, bacon rashers, lathed plates/pans) with a primitive-sphere
+  fallback; plate/pan content stacking offsets are hand-tuned, not captured —
+  verify the composed look in Studio.
 - 🟡 **Silent**: all SFX ids empty (README step 2); no adaptive music at all
   (stems render + volume-mix layer unbuilt).
 - 🟡 **VFX minimal**: fire + floating labels only. No chop bits, steam,

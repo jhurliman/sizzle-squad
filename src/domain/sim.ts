@@ -1038,7 +1038,20 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
     case 'plates':
       return held.type === 'plate' && !held.plate.dirty && held.plate.contents.length === 0 ? 'return' : 'none';
     case 'stove':
-      if (st.holding?.type === 'pan' && held.type === 'ingredient' && st.holding.pan.contents.length < 3) return 'combine';
+      /**
+       * A PAN ONLY TAKES FOOD THAT CAN COOK. Found in the Roblox port
+       * playtest and true here too: a raw tomato (cookSeconds 0) dropped in a
+       * pan never advances, and `load` only extracts cooked items, so it was
+       * stuck in the pan forever. Same rule as the sink below: a station must
+       * not advertise an action worth nothing.
+       */
+      if (
+        st.holding?.type === 'pan' &&
+        held.type === 'ingredient' &&
+        INGREDIENT_DEFS[held.ingredient.kind].cookSeconds > 0 &&
+        st.holding.pan.contents.length < 3
+      )
+        return 'combine';
       /**
        * BOTS PIECE, MINIMAL FIX — COOKED FOOD COULD NOT LEAVE THE PAN.
        *
@@ -1082,7 +1095,13 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
       if (!st.holding) return 'place';
       if (st.holding.type === 'plate' && held.type === 'ingredient' && st.holding.plate.contents.length < PLATE_CAPACITY)
         return 'combine';
-      if (st.holding.type === 'pan' && held.type === 'ingredient' && st.holding.pan.contents.length < 3) return 'combine';
+      if (
+        st.holding.type === 'pan' &&
+        held.type === 'ingredient' &&
+        INGREDIENT_DEFS[held.ingredient.kind].cookSeconds > 0 &&
+        st.holding.pan.contents.length < 3
+      )
+        return 'combine';
       if (held.type === 'plate' && st.holding.type === 'ingredient' && held.plate.contents.length < PLATE_CAPACITY)
         return 'load';
       // Same rule as the stove above, for a pan parked on a bench: a plate takes

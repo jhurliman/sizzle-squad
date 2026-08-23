@@ -3,9 +3,27 @@
 -- plate/pan) so held items and station contents actually read as food, not
 -- colored cubes. Models are cached by key and repositioned externally.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local ItemViz = {}
 
 local SCALE = 5
+
+-- Captured item art from the web game (roblox/capture-items.mjs). When a
+-- template exists it's cloned; the primitive-sphere path below is the
+-- fallback for anything uncaptured.
+local templatesFolder: Instance? = ReplicatedStorage:FindFirstChild("Items")
+
+local function cloneTemplate(name: string): Model?
+	if templatesFolder == nil then
+		return nil
+	end
+	local t = templatesFolder:FindFirstChild(name)
+	if t ~= nil and t:IsA("Model") then
+		return t:Clone()
+	end
+	return nil
+end
 
 local KIND_COLORS: { [string]: Color3 } = {
 	tomato = Color3.fromRGB(230, 28, 10),
@@ -89,10 +107,74 @@ local function ingredientParts(parent: Instance, kind: string, state: string, s:
 	end
 end
 
+--- Assemble a template-based model for the summary, or nil if templates are
+--- unavailable (caller falls through to the primitive path).
+local function buildFromTemplates(summary: any): Model?
+	if templatesFolder == nil then
+		return nil
+	end
+	local wrapper = Instance.new("Model")
+	wrapper.Name = "Item"
+	local root = part({ Transparency = 1, Size = Vector3.one * 0.2, CFrame = CFrame.new(), Name = "Root" }, wrapper)
+	wrapper.PrimaryPart = root
+
+	local function addIngredient(kind: string, state: string, offset: CFrame): boolean
+		local t = cloneTemplate(`ing_{kind}_{state}`) or cloneTemplate(`ing_{kind}_raw`)
+		if t == nil then
+			return false
+		end
+		t.Parent = wrapper
+		t:PivotTo(offset)
+		return true
+	end
+
+	if summary.type == "ingredient" then
+		if not addIngredient(summary.kind, summary.state, CFrame.new()) then
+			wrapper:Destroy()
+			return nil
+		end
+		return wrapper
+	elseif summary.type == "plate" then
+		local plate = cloneTemplate(if summary.dirty then "plate_dirty" else "plate")
+		if plate == nil then
+			wrapper:Destroy()
+			return nil
+		end
+		plate.Parent = wrapper
+		plate:PivotTo(CFrame.new())
+		for i, c in summary.contents or {} do
+			addIngredient(
+				c.kind,
+				c.state,
+				CFrame.new(((i - 1) % 2 - 0.5) * 0.45, 0.22 + (i - 1) * 0.32, (math.floor((i - 1) / 2) - 0.5) * 0.3)
+			)
+		end
+		return wrapper
+	elseif summary.type == "pan" then
+		local pan = cloneTemplate("pan")
+		if pan == nil then
+			wrapper:Destroy()
+			return nil
+		end
+		pan.Parent = wrapper
+		pan:PivotTo(CFrame.new())
+		for i, c in summary.contents or {} do
+			addIngredient(c.kind, c.state, CFrame.new(((i - 1) % 2 - 0.5) * 0.4, 0.25, (math.floor((i - 1) / 2) - 0.5) * 0.35))
+		end
+		return wrapper
+	end
+	wrapper:Destroy()
+	return nil
+end
+
 --- Build a fresh model for the summary (positioned by the caller via PivotTo).
 function ItemViz.build(summary: any): Model?
 	if summary == nil then
 		return nil
+	end
+	local fromTemplates = buildFromTemplates(summary)
+	if fromTemplates ~= nil then
+		return fromTemplates
 	end
 	local model = Instance.new("Model")
 	model.Name = "Item"

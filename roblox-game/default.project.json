@@ -10,7 +10,8 @@
       "$className": "ReplicatedStorage",
       "Shared": { "$path": "out/shared-bundle.lua" },
       "Game": { "$path": "game-src/shared" },
-      "Rigs": { "$path": "assets/chef-rigs.rbxm" }
+      "Rigs": { "$path": "assets/chef-rigs.rbxm" },
+      "Items": { "$path": "assets/item-viz.rbxm" }
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",

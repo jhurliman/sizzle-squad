@@ -74,11 +74,33 @@ function FirstShift:update(state: any, flags: number)
 	local carrying = bit32.band(flags, 4) ~= 0
 	local tier = bit32.band(bit32.rshift(flags, 3), 3)
 	local working = bit32.band(flags, 2) ~= 0
+
+	-- Is something sitting cooked in a pan right now? The plate-scoop is the
+	-- game's least discoverable move; it gets its own dedicated coaching.
+	local cookedInPan = false
+	for _, st in state.stations do
+		local h = st.holding
+		if h ~= nil and h.type == "pan" then
+			for _, c in h.contents or {} do
+				if c.state == "cooked" then
+					cookedInPan = true
+					break
+				end
+			end
+		end
+	end
+
 	local tip: string
 	if working then
 		tip = "Working! Stay put — or press again to stop."
 	elseif carrying and tier == 2 then
-		tip = "Carrying a plate: load cooked food, then take it to a serve window!"
+		if cookedInPan then
+			tip = "Food's ready! Press at the pan to scoop it onto your plate."
+		else
+			tip = "Carrying a plate: scoop cooked food off pans, then take it to a serve window!"
+		end
+	elseif cookedInPan and not carrying then
+		tip = "Cooked food never leaves a pan by hand — grab a PLATE, then press at the pan."
 	elseif carrying then
 		tip = "Take it to a glowing station — chop raw veggies at a board, cook bacon in a pan."
 	elseif #state.orders > 0 then
