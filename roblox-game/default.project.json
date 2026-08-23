@@ -1,0 +1,33 @@
+{
+  "name": "sizzle-squad",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "SizzleSquad": { "$path": "game-src/server" }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": { "$path": "out/shared-bundle.lua" }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "SizzleSquad": { "$path": "game-src/client" }
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "Kitchen": { "$path": "assets/kitchen.rbxm" }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": "Voxel",
+        "ClockTime": 14.5,
+        "Brightness": 2
+      }
+    }
+  }
+}

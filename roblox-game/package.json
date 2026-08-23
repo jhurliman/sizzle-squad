@@ -1,0 +1,20 @@
+{
+  "name": "sizzle-squad-roblox",
+  "private": true,
+  "type": "module",
+  "description": "Roblox port of Sizzle Squad — compiles the web game's domain sim + bots to Luau via TypeScriptToLua",
+  "scripts": {
+    "sync": "node sync-shared.mjs",
+    "sync:check": "node sync-shared.mjs --check",
+    "build": "npm run sync && tstl && rojo build -o SizzleSquad.rbxl",
+    "watch": "tstl --watch",
+    "smoke": "lune run tools/smoke.luau",
+    "smoke:ts": "node tools/smoke-ts.mjs",
+    "parity": "node tools/parity-ts.mjs && lune run tools/parity.luau && node tools/parity-compare.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "6.0.2",
+    "typescript-to-lua": "^1.37.1"
+  }
+}

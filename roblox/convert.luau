@@ -143,3 +143,12 @@ end
 local place = roblox.serializePlace(game)
 fs.writeFile("sizzle-squad.rbxl", place)
 print("wrote sizzle-squad.rbxl with " .. count .. " parts")
+
+-- Also emit the kitchen as a model file for the Rojo-built place
+-- (roblox-game/default.project.json mounts it under Workspace).
+pcall(function()
+	fs.writeDir("../roblox-game/assets")
+end)
+local model = roblox.serializeModel({ rootModel })
+fs.writeFile("../roblox-game/assets/kitchen.rbxm", model)
+print("wrote ../roblox-game/assets/kitchen.rbxm")
