@@ -11,6 +11,8 @@ export {
   collidePhase,
   interactPhase,
   stationPhase,
+  planGrab,
+  findFocus,
 } from './domain/sim';
 export type { SimState, SimOptions } from './domain/sim';
 export { buildKitchen, isWalkable, KITCHEN_MAP, stationCenter } from './domain/kitchen';

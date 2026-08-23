@@ -90,13 +90,23 @@ function CrewManager:playerRemoving(player: any)
 end
 
 --- Called each heartbeat: AFK chefs fall back to bot control (silently;
---- resuming is instant on any input via touch()).
+--- resuming is instant on any input via touch()), and any chef the server
+--- had to overrule this tick gets snapped back authoritatively.
 function CrewManager:heartbeat()
 	local t = self.now()
 	for _, seat in self.seats do
 		if not seat.afk and t - seat.lastInputAt > AFK_SECONDS then
 			seat.afk = true
 			self.simService:setHuman(seat.chefId, false)
+		end
+		local slot = self.simService.humans[seat.chefId]
+		if slot ~= nil and slot.corrected then
+			slot.corrected = false
+			for _, chef in self.simService.sim.chefs do
+				if chef.id == seat.chefId then
+					self.remotes.Correction:FireClient(seat.player, { x = chef.pos.x, y = chef.pos.y })
+				end
+			end
 		end
 	end
 end

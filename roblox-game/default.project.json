@@ -8,7 +8,8 @@
     },
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
-      "Shared": { "$path": "out/shared-bundle.lua" }
+      "Shared": { "$path": "out/shared-bundle.lua" },
+      "Game": { "$path": "game-src/shared" }
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",
