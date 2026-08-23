@@ -74,6 +74,9 @@ export interface Plate {
   id: number;
   contents: Ingredient[];
   dirty: boolean;
+  /** True if a bot did any of the plating — the port pays bot-assembled
+   * dishes at a reduced rate for leaderboard integrity (DirectorKnobs). */
+  botMade?: boolean;
 }
 
 /** Anything a chef can be carrying in their single hand slot. */

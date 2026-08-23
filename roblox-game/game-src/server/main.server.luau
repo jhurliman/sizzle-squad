@@ -1,37 +1,67 @@
 --!strict
--- P1 smoke shell: run the shared sim with 3 bots on the server so a Studio
--- playtest shows a living kitchen. Replaced by simService/botService/
--- replicator in P2 (see the port plan).
+-- Composition root: wires the pure-logic services to Roblox.
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local shared = require(ReplicatedStorage:WaitForChild("Shared")) :: any
+local gameShared = ReplicatedStorage:WaitForChild("Game")
+local Net = require(gameShared:WaitForChild("Net")) :: any
+local Config = require(gameShared:WaitForChild("Config")) :: any
 
-local sim = shared.createSim({ seed = os.time() % 2 ^ 31, botCount = 3 })
-shared.seedPans(sim)
-local bots = shared.makeBotDirector()
+local SimService = require(script.Parent.SimService) :: any
+local Replicator = require(script.Parent.Replicator) :: any
+local CrewManager = require(script.Parent.CrewManager) :: any
+local RoundDirector = require(script.Parent.RoundDirector) :: any
+local Progression = require(script.Parent.Progression) :: any
 
-local acc = 0
-local reported = 0
-local conn
-conn = RunService.Heartbeat:Connect(function(dt: number)
-	acc = math.min(acc + dt, 0.25)
-	while acc >= shared.SIM_DT and not sim.over do
-		acc -= shared.SIM_DT
-		local botInputs = bots:update(sim, shared.SIM_DT)
-		local inputs = {}
-		for _, chef in sim.chefs do
-			inputs[chef.id + 1] = botInputs:get(chef.id) or shared.NO_INPUT
-		end
-		shared.step(sim, inputs)
-		sim.events = {}
-	end
-	if sim.time - reported >= 10 then
-		reported = sim.time
-		print(`[sizzle] t={math.floor(sim.time)}s coins={sim.score.coins} served={sim.score.served}`)
-	end
-	if sim.over then
-		print(`[sizzle] round over: coins={sim.score.coins} served={sim.score.served} missed={sim.score.missed}`)
-		conn:Disconnect()
+local remotes = Net.server(ReplicatedStorage)
+
+local simService = SimService.new(shared, { seed = os.time() % 2 ^ 31 })
+local replicator = Replicator.new(shared, Net, remotes, function(chef)
+	return simService:chefFlags(chef)
+end)
+local crew = CrewManager.new(simService, Net, remotes, replicator, os.clock)
+local progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("Catalog")))
+
+local director = RoundDirector.new(shared, Config, simService, crew, replicator, remotes, {
+	assistFn = function()
+		return progression:crewQualifiesForAssist(crew)
+	end,
+	onRoundEnd = function(results)
+		progression:awardRound(crew, results)
+	end,
+})
+
+remotes.ReadyUp.OnServerEvent:Connect(function(player, on)
+	director:setReady(player, on == true)
+end)
+
+remotes.Emote.OnServerEvent:Connect(function(player, emote)
+	local seat = crew.seats[player]
+	if seat ~= nil and typeof(emote) == "string" and #emote <= 24 then
+		remotes.Emote:FireAllClients({ chefId = seat.chefId, emote = emote })
 	end
 end)
+
+remotes.ShopAction.OnServerEvent:Connect(function(player, action)
+	progression:shopAction(player, action)
+end)
+
+Players.PlayerAdded:Connect(function(player)
+	progression:playerAdded(player)
+	crew:playerAdded(player)
+	director:broadcastPhase()
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	crew:playerRemoving(player)
+	progression:playerRemoving(player)
+end)
+
+RunService.Heartbeat:Connect(function(dt)
+	crew:heartbeat()
+	director:heartbeat(dt)
+end)
+
+print("[sizzle] server up — kitchen open")

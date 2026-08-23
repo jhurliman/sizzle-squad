@@ -13,7 +13,7 @@ export {
   stationPhase,
 } from './domain/sim';
 export type { SimState, SimOptions } from './domain/sim';
-export { buildKitchen, KITCHEN_MAP, stationCenter } from './domain/kitchen';
+export { buildKitchen, isWalkable, KITCHEN_MAP, stationCenter } from './domain/kitchen';
 export { TUNING, RECIPES, INGREDIENT_DEFS } from './domain/content';
 export { NO_INPUT } from './domain/types';
 export type { Chef, InputSnapshot, Kitchen, SimEvent, Station } from './domain/types';

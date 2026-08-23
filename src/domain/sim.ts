@@ -43,6 +43,50 @@ export function mulberry32(seed: number) {
   };
 }
 
+// ---------------------------------------------------------------- director
+
+/**
+ * LIVE-DIRECTOR KNOBS.
+ *
+ * The multiplayer port scales pacing by human count and skill — more humans
+ * means faster tickets, brand-new players get gentler timers — WITHOUT
+ * retuning the sim itself. Every knob defaults to exactly the shipped
+ * single-player behavior; a sim that never touches `director` plays
+ * identically to one built before this existed (the seeded-replay suite
+ * enforces that). The knobs are re-read live, so an external director may
+ * adjust them between ticks (the port's pressure director rubber-bands
+ * `orderGapMul` a few percent every second).
+ */
+export interface DirectorKnobs {
+  /** Scales the gap between order spawns. <1 = faster kitchen. */
+  orderGapMul: number;
+  /** Added to the concurrent-ticket cap. */
+  maxOrdersBonus: number;
+  /** Scales each NEW ticket's timer (existing tickets are untouched). */
+  ticketTimeMul: number;
+  /** Scales the patience cost of an expired ticket. */
+  patienceMissMul: number;
+  /** Scales how long cooked food sits before burning (assist: >1 is kinder). */
+  burnTimeMul: number;
+  /** Max recipe size (component count) the board may ask for. Infinity = all. */
+  recipeDepthCap: number;
+  /**
+   * Coin multiplier for a dish whose plating was done by a bot chef —
+   * leaderboard integrity in the port ("bots take a cut"). 1 = off.
+   */
+  botServeValueMul: number;
+}
+
+export const DEFAULT_DIRECTOR: DirectorKnobs = {
+  orderGapMul: 1,
+  maxOrdersBonus: 0,
+  ticketTimeMul: 1,
+  patienceMissMul: 1,
+  burnTimeMul: 1,
+  recipeDepthCap: Infinity,
+  botServeValueMul: 1,
+};
+
 // ------------------------------------------------------------------- state
 
 export interface SimState {
@@ -60,6 +104,8 @@ export interface SimState {
   heat: number;
   rand: (this: void) => number;
   nextId: number;
+  /** Pacing knobs, all defaulted to shipped behavior. See DirectorKnobs. */
+  director: DirectorKnobs;
   /** Cosmetic: distance walked since last footstep, per chef. */
   stepAccum: number[];
   /**
@@ -156,6 +202,7 @@ export function createSim(opts: SimOptions = {}): SimState {
     heat: 0,
     rand,
     nextId: 1,
+    director: { ...DEFAULT_DIRECTOR },
     stepAccum: chefs.map(() => 0),
     contactLock: filled(chefs.length * chefs.length, 0),
   };
@@ -1231,6 +1278,7 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       if (held?.type !== 'ingredient' || !st.holding) return false;
       if (st.holding.type === 'plate') {
         st.holding.plate.contents.push(held.ingredient);
+        if (!chef.isPlayer) st.holding.plate.botMade = true;
       } else if (st.holding.type === 'pan') {
         st.holding.pan.contents.push(held.ingredient);
       }
@@ -1242,6 +1290,7 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       // Off a bench: the plate takes the whole item.
       if (st.holding?.type === 'ingredient') {
         held.plate.contents.push(st.holding.ingredient);
+        if (!chef.isPlayer) held.plate.botMade = true;
         st.holding = null;
         st.work = 0;
         emit(s, { t: 'place', chef: chef.id, at });
@@ -1252,6 +1301,7 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
         const i = st.holding.pan.contents.findIndex((x) => x.state === 'cooked');
         if (i < 0) return false;
         held.plate.contents.push(st.holding.pan.contents.splice(i, 1)[0]);
+        if (!chef.isPlayer) held.plate.botMade = true;
         emit(s, { t: 'place', chef: chef.id, at });
         return true;
       }
@@ -1373,7 +1423,7 @@ function trySer(s: SimState, chef: Chef, plate: Plate, at: Vec2) {
   // Fresher tickets tip better; combos multiply. Rewards flow, not hoarding.
   const freshness = 0.6 + 0.4 * (order.remaining / order.total);
   const comboMul = 1 + Math.min(1.5, (s.score.combo - 1) * 0.15);
-  const value = Math.round(order.recipe.baseValue * freshness * comboMul);
+  const value = Math.round(order.recipe.baseValue * freshness * comboMul * (plate.botMade === true ? s.director.botServeValueMul : 1));
   s.score.coins += value;
   s.score.patience = Math.min(1, s.score.patience + TUNING.patiencePerServe);
   chef.carrying = null;
@@ -1446,7 +1496,7 @@ function updateStations(s: SimState, dt: number) {
           cooking = true;
           minCook = Math.min(minCook, ing.progress);
         } else if (ing.state === 'cooked' && Number.isFinite(def.burnSeconds)) {
-          maxBurn = Math.max(maxBurn, Math.min(1, ing.overcook / def.burnSeconds));
+          maxBurn = Math.max(maxBurn, Math.min(1, ing.overcook / (def.burnSeconds * s.director.burnTimeMul)));
         } else if (ing.state === 'burnt') {
           maxBurn = 1;
         }
@@ -1465,7 +1515,7 @@ function updateStations(s: SimState, dt: number) {
           }
         } else if (ing.state === 'cooked' && Number.isFinite(def.burnSeconds)) {
           ing.overcook += dt;
-          if (ing.overcook >= def.burnSeconds) {
+          if (ing.overcook >= def.burnSeconds * s.director.burnTimeMul) {
             ing.state = 'burnt';
             emit(s, { t: 'burn', at });
           }
@@ -1493,8 +1543,14 @@ function updateStations(s: SimState, dt: number) {
 function pickRecipe(s: SimState): Recipe {
   // Unlock deeper recipes as heat rises so minute one is always fair.
     const unlocked = Math.max(2, Math.min(RECIPES.length, 2 + Math.floor(s.heat * (RECIPES.length - 2) + 0.5)));
-  const i = Math.floor(s.rand() * unlocked);
-  const pick = RECIPES[Math.min(i, unlocked - 1)];
+  // Assist gating (DirectorKnobs.recipeDepthCap): while a crew is learning,
+  // the board never asks for a recipe bigger than the cap. At the default
+  // (Infinity) the pool is exactly the unlocked prefix and every draw below
+  // is bit-identical to the pre-knob code — same rand() count, same indices.
+  let pool = RECIPES.slice(0, unlocked).filter((r) => r.components.length <= s.director.recipeDepthCap);
+  if (pool.length === 0) pool = RECIPES.slice(0, 2);
+  const i = Math.floor(s.rand() * pool.length);
+  const pick = pool[Math.min(i, pool.length - 1)];
   // NEVER TWO IDENTICAL TICKETS ON THE BOARD.
   //
   // The reference's two balloons are always visibly different, and that
@@ -1505,8 +1561,8 @@ function pickRecipe(s: SimState): Recipe {
   // recipe nobody is already waiting on; if every unlocked recipe is live,
   // fall through and accept the duplicate rather than starve the board.
   if (s.orders.some((o) => o.recipe.id === pick.id)) {
-    for (let k = 1; k < unlocked; k++) {
-      const alt = RECIPES[(Math.min(i, unlocked - 1) + k) % unlocked];
+    for (let k = 1; k < pool.length; k++) {
+      const alt = pool[(Math.min(i, pool.length - 1) + k) % pool.length];
       if (!s.orders.some((o) => o.recipe.id === alt.id)) return alt;
     }
   }
@@ -1519,8 +1575,8 @@ function addOrder(s: SimState, recipe: Recipe) {
   const order: Order = {
     id: s.nextId++,
     recipe,
-    remaining: recipe.baseSeconds * timeScale,
-    total: recipe.baseSeconds * timeScale,
+    remaining: recipe.baseSeconds * timeScale * s.director.ticketTimeMul,
+    total: recipe.baseSeconds * timeScale * s.director.ticketTimeMul,
     createdTick: s.tick,
   };
   s.orders.push(order);
@@ -1554,11 +1610,11 @@ function updateOrders(s: SimState, dt: number) {
   s.heat = Math.min(1, s.time / 240);
 
   s.nextOrderIn -= dt;
-  const maxOrders = 3 + Math.floor(s.heat * 2);
+  const maxOrders = 3 + Math.floor(s.heat * 2) + s.director.maxOrdersBonus;
   if (s.nextOrderIn <= 0 && s.orders.length < maxOrders && s.time < TUNING.roundSeconds) {
     addOrder(s, pickRecipe(s));
     const gap = 9.5 - 5.0 * s.heat;
-    s.nextOrderIn = gap * (0.8 + s.rand() * 0.4);
+    s.nextOrderIn = gap * s.director.orderGapMul * (0.8 + s.rand() * 0.4);
   }
 
   for (let i = s.orders.length - 1; i >= 0; i--) {
@@ -1568,7 +1624,7 @@ function updateOrders(s: SimState, dt: number) {
       s.orders.splice(i, 1);
       s.score.missed += 1;
       s.score.combo = 0;
-      s.score.patience = Math.max(0, s.score.patience - TUNING.patiencePerMiss);
+      s.score.patience = Math.max(0, s.score.patience - TUNING.patiencePerMiss * s.director.patienceMissMul);
       emit(s, { t: 'orderExpired', orderId: o.id });
     }
   }
