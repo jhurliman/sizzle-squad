@@ -24,8 +24,9 @@ local WHITE = Color3.fromRGB(245, 240, 230)
 
 local BUILDERS: { [string]: (Model) -> () } = {
 	hat_paper = function(m)
-		part({ Size = Vector3.new(1.5, 0.55, 1.5), Color = WHITE, CFrame = CFrame.new(0, 0.28, 0) }, m)
-		part({ Size = Vector3.new(1.1, 0.35, 1.1), Color = Color3.fromRGB(230, 224, 210), CFrame = CFrame.new(0, 0.7, 0) }, m)
+		-- folded paper cook's hat: snug band, slightly puffed crown
+		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.45, 1.35, 1.35), Color = WHITE, CFrame = CFrame.new(0, 0.2, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.5, 1.1, 1.1), Color = Color3.fromRGB(232, 226, 212), CFrame = CFrame.new(0, 0.62, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
 	end,
 	hat_toque = function(m)
 		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.9, 1.3, 1.3), Color = WHITE, CFrame = CFrame.new(0, 0.45, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)

@@ -102,7 +102,12 @@ function ChefVisuals:ensure(id: number, skin: string): any
 
 	if isRig then
 		local headTop = 0
-		local headCx, headCz, headN = 0, 0, 0
+		local rigTop = 0
+		-- The hat anchors to the SKULL — the largest head part — not the mean
+		-- of the head group: snouts drag a mean forward, ears drag it up, and
+		-- the hat ends up floating in front of the face.
+		local skull: BasePart? = nil
+		local skullVolume = 0
 		for _, group in model:GetChildren() do
 			if group:IsA("Model") then
 				local joint = group:GetAttribute("Joint")
@@ -115,21 +120,30 @@ function ChefVisuals:ensure(id: number, skin: string): any
 						table.insert(entry.animBind, p.CFrame)
 						table.insert(entry.animGroup, group.Name)
 						table.insert(entry.animCFrames, p.CFrame)
+						rigTop = math.max(rigTop, p.CFrame.Y + p.Size.Y / 2)
 						if group.Name == "Head" then
 							headTop = math.max(headTop, p.CFrame.Y + p.Size.Y / 2)
-							headCx += p.CFrame.X
-							headCz += p.CFrame.Z
-							headN += 1
-							entry.headAnchor = entry.headAnchor or p
+							local vol = p.Size.X * p.Size.Y * p.Size.Z
+							if vol > skullVolume then
+								skullVolume = vol
+								skull = p
+							end
 						end
 					end
 				end
 			end
 		end
-		if headN > 0 then
-			entry.headAttach = Vector3.new(headCx / headN, headTop - 0.2, headCz / headN)
+		entry.headAnchor = skull
+		entry.rigHeight = math.max(rigTop, CHEF_HEIGHT)
+		if skull ~= nil then
+			entry.headAttach = Vector3.new(skull.CFrame.X, math.max(headTop - 0.25, skull.CFrame.Y + skull.Size.Y * 0.3), skull.CFrame.Z)
+			-- hats fit the SKULL, not the body: pip is tall but small-headed
+			entry.hatScale = math.max(skull.Size.X, skull.Size.Z) / 1.55
 		end
+	else
+		entry.rigHeight = CHEF_HEIGHT
 	end
+	entry.hatScale = entry.hatScale or 1
 
 	self.chefs[id] = entry
 	return entry
@@ -243,6 +257,9 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 		end
 		local hatModel = Hats.build(hat)
 		if hatModel ~= nil then
+			pcall(function()
+				(hatModel :: any):ScaleTo(entry.hatScale)
+			end)
 			hatModel.Parent = model
 		end
 		entry.hatModel = hatModel
@@ -299,7 +316,11 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 		entry.carryModel = item
 	end
 	if entry.carryModel ~= nil then
-		entry.carryModel:PivotTo(baseCF * CFrame.new(0, CHEF_HEIGHT * 0.62, CHEF_HEIGHT * 0.5))
+		-- chest height on the MEASURED rig (the species stand ~1.0 world unit
+		-- tall, not the sim's 0.72 collision height — using the constant put
+		-- items at the hips)
+		local h = entry.rigHeight
+		entry.carryModel:PivotTo(baseCF * CFrame.new(0, h * 0.52, h * 0.38))
 	end
 end
 
