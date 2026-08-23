@@ -12,15 +12,25 @@ Replicator.__index = Replicator
 local TRANSFORM_HZ = 20
 local DIFF_HZ = 10
 
-function Replicator.new(shared: any, net: any, remotes: { [string]: any }, chefFlags: (any) -> number)
+function Replicator.new(
+	shared: any,
+	net: any,
+	remotes: { [string]: any },
+	chefFlags: (any) -> number,
+	isActive: ((any) -> boolean)?
+)
 	local self = setmetatable({}, Replicator)
 	self.shared = shared
 	self.net = net
 	self.remotes = remotes
 	self.chefFlags = chefFlags
+	self.isActive = isActive or function()
+		return true
+	end
 	self.transformAcc = 0
 	self.diffAcc = 0
 	self.stationCache = {} :: { [number]: string }
+	self.carryCache = {} :: { [number]: string }
 	self.orderCache = ""
 	self.scoreCache = ""
 	return self
@@ -94,6 +104,9 @@ function Replicator:snapshotFor(sim: any): any
 	end
 	local chefs = {}
 	for _, chef in sim.chefs do
+		if not self.isActive(chef) then
+			continue
+		end
 		table.insert(chefs, {
 			id = chef.id,
 			skin = chef.skin,
@@ -153,6 +166,9 @@ function Replicator:flush(sim: any, events: { any }, dt: number, carryingChanged
 		self.transformAcc = 0
 		local transforms = {}
 		for _, chef in sim.chefs do
+			if not self.isActive(chef) then
+				continue
+			end
 			table.insert(transforms, {
 				id = chef.id,
 				px = chef.pos.x,
@@ -190,6 +206,34 @@ function Replicator:flush(sim: any, events: { any }, dt: number, carryingChanged
 		if #deltas > 0 then
 			remotes.StationDeltas:FireAllClients(deltas)
 		end
+		-- carried items (what's visibly in each chef's hands)
+		local carries = {}
+		for _, chef in sim.chefs do
+			if not self.isActive(chef) then
+				continue
+			end
+			local c = chef.carrying
+			local key = "-"
+			if c ~= nil then
+				if c.type == "ingredient" then
+					key = `i:{c.ingredient.kind}:{c.ingredient.state}`
+				elseif c.type == "plate" then
+					key = `p:{#c.plate.contents}:{if c.plate.dirty then "d" else "c"}`
+					for _, item in c.plate.contents do
+						key ..= `:{item.kind}.{item.state}`
+					end
+				elseif c.type == "pan" then
+					key = `n:{#c.pan.contents}`
+				end
+			end
+			if self.carryCache[chef.id] ~= key then
+				self.carryCache[chef.id] = key
+				table.insert(carries, { chefId = chef.id, carrying = holdingSummary(c) })
+			end
+		end
+		if #carries > 0 then
+			remotes.CarryDeltas:FireAllClients(carries)
+		end
 		-- orders
 		local orderIds = {}
 		for _, o in sim.orders do
@@ -216,6 +260,7 @@ end
 
 function Replicator:resetCaches()
 	table.clear(self.stationCache)
+	table.clear(self.carryCache)
 	self.orderCache = ""
 	self.scoreCache = ""
 end

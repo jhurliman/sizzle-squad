@@ -59,6 +59,7 @@ function RoundDirector:broadcastPhase()
 		phase = self.phase,
 		timer = self.timer,
 		round = self.round,
+		waiting = not self.simService.botFill and self.crew:humanCount() == 0,
 		results = if self.phase == "results" or self.phase == "intermission" then self.lastResults else nil,
 	})
 end
@@ -66,18 +67,19 @@ end
 function RoundDirector:applyPacing()
 	local sim = self.simService.sim
 	local humans = math.clamp(self.crew:humanCount(), 0, 4)
-	local row = self.config.PACING[humans]
+	local pacing = if self.simService.botFill then self.config.PACING_BOTFILL else self.config.PACING
+	local row = pacing[humans]
 	local knobs = sim.director
 	knobs.orderGapMul = row.orderGapMul
 	knobs.maxOrdersBonus = row.maxOrdersBonus
 	knobs.patienceMissMul = row.patienceMissMul
-	knobs.ticketTimeMul = 1
+	knobs.ticketTimeMul = row.ticketTimeMul or 1
 	knobs.burnTimeMul = 1
 	knobs.recipeDepthCap = math.huge
 	knobs.botServeValueMul = self.config.BOT_SERVE_VALUE_MUL
 	if self.assistFn() then
 		local a = self.config.ASSIST
-		knobs.ticketTimeMul = a.ticketTimeMul
+		knobs.ticketTimeMul *= a.ticketTimeMul
 		knobs.patienceMissMul *= a.patienceMissMul
 		knobs.burnTimeMul = a.burnTimeMul
 		knobs.recipeDepthCap = a.recipeDepthCap
@@ -249,6 +251,16 @@ function RoundDirector:heartbeat(dt: number)
 	if self.phase == "results" or self.phase == "intermission" then
 		self.simService:tickMovementOnly(dt)
 		self.replicator:flush(self.simService.sim, {}, dt)
+	end
+
+	-- Without bot fill an empty kitchen has no reason to start a round:
+	-- hold the pre-round timers until a human is present.
+	if
+		not self.simService.botFill
+		and self.crew:humanCount() == 0
+		and (self.phase == "countdown" or self.phase == "intermission")
+	then
+		return
 	end
 
 	-- countdown / results / intermission all just run their timers.

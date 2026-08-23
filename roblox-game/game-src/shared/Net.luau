@@ -33,6 +33,7 @@ Net.REMOTES = {
 	Progress = "RemoteEvent", -- server -> client: { xp, level, coins, unlocks, challenges }
 	ShopAction = "RemoteEvent", -- client -> server: { action = "buy"|"equip", id }
 	Leaderboards = "RemoteEvent", -- server -> client: { weekly, allTime, dishes }
+	CarryDeltas = "RemoteEvent", -- server -> client: { {chefId, carrying-summary}, ... }
 }
 
 local POS_MIN, POS_MAX = -2, 30

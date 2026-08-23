@@ -220,7 +220,7 @@ export function createSim(opts: SimOptions = {}): SimState {
  *
  * Deterministic: fixed ring order, no rand, same map gives the same answer.
  */
-function safeSpawn(k: Kitchen, want: Vec2): Vec2 {
+export function safeSpawn(k: Kitchen, want: Vec2): Vec2 {
   const r = TUNING.chefRadius;
   if (!collides(k, want.x, want.y, r)) return { ...want };
   for (let ring = 1; ring <= 6; ring++) {

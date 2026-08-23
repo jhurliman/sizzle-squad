@@ -331,8 +331,13 @@ function Hud:updatePhase(phase: any, cards: any?)
 	self.shopPanel.Visible = self.shopPanel.Visible and p == "intermission"
 	if p == "countdown" then
 		self.overlay.Visible = true
-		self.overlayTitle.Text = `Shift starts in {math.max(0, math.ceil(phase.timer))}…`
-		self.overlayBody.Text = "One button does everything: walk up to a glowing station and press it."
+		if phase.waiting then
+			self.overlayTitle.Text = "Kitchen's open!"
+			self.overlayBody.Text = "The shift starts as soon as a chef arrives."
+		else
+			self.overlayTitle.Text = `Shift starts in {math.max(0, math.ceil(phase.timer))}…`
+			self.overlayBody.Text = "One button does everything: walk up to a glowing station and press it."
+		end
 	elseif p == "results" and phase.results ~= nil then
 		local r = phase.results
 		self.overlay.Visible = true

@@ -62,7 +62,7 @@ local pkt2 = Net.packTransforms({
 	{ id = 1, px = 4, py = 3, vx = 0, vy = 0, heading = 0, flags = 0, effort = 0.5, stun = 0 },
 })
 state:applyTransforms(pkt2)
-state.clock = 10.18 -- target = 10.06 -> 60% between packets
+state.clock = 10.24 -- target = 10.06 -> 60% between packets (INTERP_DELAY 0.18)
 local pose = state:remotePose(1)
 check(pose ~= nil and pose.x > 3.3 and pose.x < 3.9, `remote interpolates between packets (x={pose and pose.x})`)
 

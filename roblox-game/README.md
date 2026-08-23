@@ -5,7 +5,7 @@ deterministic 60 Hz sim and the bot AI) compile to a single Luau module via
 [TypeScriptToLua](https://typescripttolua.github.io/), so the Roblox game runs
 **literally the same code** the web game ships, and the two builds are proven
 tick-identical (see Parity below). On top of that shared core sits a full
-co-op game: 1–4 players in one kitchen, bots covering every empty chef slot.
+co-op game: 1–4 players in one kitchen. (Bot backfill exists but is OPT-IN via Config.BOT_FILL — playtesting showed bots playing the game for you kills the fun of learning it.)
 
 ## Build & play
 
@@ -24,8 +24,7 @@ Open `SizzleSquad.rbxl` in Studio and press Play. Test multiplayer with
 only superlative cards) → intermission-in-the-kitchen (ready-up, shop, ranks,
 invites, emotes; chefs still walk around) → next round.
 
-**Multiplayer** — 4-player servers; joiners take over a bot chef mid-round
-(held item and all); leavers/AFK players (20s) hand back to the bot, any
+**Multiplayer** — 4-player servers; joiners drop straight in mid-round (held item and all); leavers/AFK players (20s) hand back to the bot, any
 input resumes instantly. Own-chef movement runs the real `movePhase` locally
 (zero latency); the server validates displacement + walkability and owns
 collisions, interactions, stations, orders, and scoring. Transforms stream as

@@ -19,9 +19,11 @@ local Badges = require(script.Parent.Badges) :: any
 
 local remotes = Net.server(ReplicatedStorage)
 
-local simService = SimService.new(shared, { seed = os.time() % 2 ^ 31 })
+local simService = SimService.new(shared, { seed = os.time() % 2 ^ 31, botFill = Config.BOT_FILL })
 local replicator = Replicator.new(shared, Net, remotes, function(chef)
 	return simService:chefFlags(chef)
+end, function(chef)
+	return simService:isActive(chef)
 end)
 local crew = CrewManager.new(simService, Net, remotes, replicator, os.clock)
 local progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("Catalog")))

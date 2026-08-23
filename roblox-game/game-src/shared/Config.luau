@@ -12,14 +12,29 @@ Config.RESULTS = 12
 Config.INTERMISSION = 25
 Config.LATE_JOIN_CUTOFF = 15 -- <15s left: hold joiner in kitchen-cam until results
 
--- Difficulty by (non-AFK) human count — the director table from plan §2.3.
--- Baseline (1 human) is exactly the shipped web tuning.
+-- Bots are OPT-IN (playtest verdict: watching bots efficiently play the game
+-- for you kills the fun of learning it). The brain stays in the codebase —
+-- flip this on for bot-backfilled kitchens, or wire it to a lobby vote later.
+Config.BOT_FILL = false
+
+-- Difficulty by (non-AFK) human count — the director table from plan §2.3,
+-- retuned for HUMAN-ONLY crews: the web baseline assumed 3 bots closing ~90%
+-- of tickets, so a solo human needs a far gentler order clock. (Solo pacing
+-- validated by tools/solo-pacing-harness.luau with a bot as human proxy.)
 Config.PACING = {
-	[0] = { orderGapMul = 1.0, maxOrdersBonus = 0, patienceMissMul = 1.0 }, -- bots-only attract mode
-	[1] = { orderGapMul = 1.0, maxOrdersBonus = 0, patienceMissMul = 1.0 },
-	[2] = { orderGapMul = 0.9, maxOrdersBonus = 1, patienceMissMul = 1.0 },
-	[3] = { orderGapMul = 0.8, maxOrdersBonus = 1, patienceMissMul = 1.05 },
-	[4] = { orderGapMul = 0.7, maxOrdersBonus = 2, patienceMissMul = 1.1 },
+	[0] = { orderGapMul = 3.0, maxOrdersBonus = -1, ticketTimeMul = 1.5, patienceMissMul = 0.5 }, -- idle kitchen
+	[1] = { orderGapMul = 2.4, maxOrdersBonus = -1, ticketTimeMul = 1.5, patienceMissMul = 0.7 },
+	[2] = { orderGapMul = 1.5, maxOrdersBonus = -1, ticketTimeMul = 1.25, patienceMissMul = 0.85 },
+	[3] = { orderGapMul = 1.05, maxOrdersBonus = 0, ticketTimeMul = 1.1, patienceMissMul = 0.95 },
+	[4] = { orderGapMul = 0.85, maxOrdersBonus = 0, ticketTimeMul = 1.0, patienceMissMul = 1.0 },
+}
+-- Bot-filled kitchens (BOT_FILL = true) use the original table:
+Config.PACING_BOTFILL = {
+	[0] = { orderGapMul = 1.0, maxOrdersBonus = 0, ticketTimeMul = 1.0, patienceMissMul = 1.0 },
+	[1] = { orderGapMul = 1.0, maxOrdersBonus = 0, ticketTimeMul = 1.0, patienceMissMul = 1.0 },
+	[2] = { orderGapMul = 0.9, maxOrdersBonus = 1, ticketTimeMul = 1.0, patienceMissMul = 1.0 },
+	[3] = { orderGapMul = 0.8, maxOrdersBonus = 1, ticketTimeMul = 1.0, patienceMissMul = 1.05 },
+	[4] = { orderGapMul = 0.7, maxOrdersBonus = 2, ticketTimeMul = 1.0, patienceMissMul = 1.1 },
 }
 
 -- Invisible pressure director: hold open/max tickets inside this band by

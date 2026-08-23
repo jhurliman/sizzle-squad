@@ -1,0 +1,131 @@
+--!strict
+-- World-space station state: renders each station's held item (via ItemViz)
+-- on top of the station model, plus a progress bar (chop/wash green, cook
+-- amber shading to red as burn rises) and a persistent fire while a pan is
+-- fully burnt. Data comes from the client's mirrored station table.
+
+local StationVisuals = {}
+StationVisuals.__index = StationVisuals
+
+local ItemViz = require(script.Parent.ItemViz) :: any
+
+local SCALE = 5
+
+function StationVisuals.new(parent: Instance)
+	local self = setmetatable({}, StationVisuals)
+	self.parent = parent
+	self.entries = {} :: { [number]: any }
+	self.version = -1
+	return self
+end
+
+local function topOf(model: Model?, cell: any): Vector3
+	if model ~= nil then
+		local cf, size = model:GetBoundingBox()
+		return Vector3.new(cf.Position.X, cf.Position.Y + size.Y / 2 + 0.5, cf.Position.Z)
+	end
+	return Vector3.new((cell.x + 0.5) * SCALE, 1.1 * SCALE, (cell.y + 0.5) * SCALE)
+end
+
+function StationVisuals:ensure(id: number, anchor: Vector3): any
+	local e = self.entries[id]
+	if e ~= nil then
+		return e
+	end
+	local holder = Instance.new("Part")
+	holder.Name = `Station_{id}`
+	holder.Anchored = true
+	holder.CanCollide = false
+	holder.Transparency = 1
+	holder.Size = Vector3.one * 0.2
+	holder.CFrame = CFrame.new(anchor)
+	holder.Parent = self.parent
+	local bb = Instance.new("BillboardGui")
+	bb.Size = UDim2.fromOffset(56, 8)
+	bb.StudsOffset = Vector3.new(0, 2.4, 0)
+	bb.AlwaysOnTop = true
+	bb.Enabled = false
+	bb.Parent = holder
+	local track = Instance.new("Frame")
+	track.Size = UDim2.fromScale(1, 1)
+	track.BackgroundColor3 = Color3.fromRGB(40, 24, 12)
+	track.BorderSizePixel = 0
+	track.Parent = bb
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 4)
+	corner.Parent = track
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.fromScale(0, 1)
+	fill.BackgroundColor3 = Color3.fromRGB(120, 200, 80)
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(0, 4)
+	fillCorner.Parent = fill
+	e = { holder = holder, bb = bb, fill = fill, itemKey = "-", item = nil, fire = nil, anchor = anchor }
+	self.entries[id] = e
+	return e
+end
+
+--- stations: the mirrored station table; models: station id -> kitchen Model
+function StationVisuals:update(stations: { [number]: any }, models: { [number]: Model })
+	for id, st in stations do
+		local anchor = topOf(models[id], st.cell or { x = 7, y = 5 })
+		local e = self:ensure(id, anchor)
+
+		-- held item
+		local key = ItemViz.key(st.holding)
+		if key ~= e.itemKey then
+			e.itemKey = key
+			if e.item ~= nil then
+				e.item:Destroy()
+				e.item = nil
+			end
+			local model = ItemViz.build(st.holding)
+			if model ~= nil then
+				model.Parent = e.holder
+				model:PivotTo(CFrame.new(e.anchor + Vector3.new(0, 0.35, 0)))
+			end
+			e.item = model
+		end
+
+		-- progress bar: prefer cook (with burn shading), else work
+		local cook = st.cook or 0
+		local work = st.work or 0
+		local burn = st.burn or 0
+		local value = 0
+		local color = Color3.fromRGB(120, 200, 80)
+		if cook > 0.01 then
+			value = cook
+			color = Color3.fromRGB(240, 170, 60):Lerp(Color3.fromRGB(230, 60, 40), math.clamp(burn, 0, 1))
+		elseif burn > 0.01 then
+			value = burn
+			color = Color3.fromRGB(230, 60, 40)
+		elseif work > 0.01 then
+			value = work
+		end
+		if value > 0.01 and value < 0.995 then
+			e.bb.Enabled = true
+			e.fill.Size = UDim2.fromScale(math.clamp(value, 0, 1), 1)
+			e.fill.BackgroundColor3 = color
+		else
+			e.bb.Enabled = false
+		end
+
+		-- fire while fully burnt
+		if burn >= 0.99 and st.holding ~= nil and st.holding.type == "pan" then
+			if e.fire == nil then
+				local fire = Instance.new("Fire")
+				fire.Size = 5
+				fire.Heat = 9
+				fire.Parent = e.holder
+				e.fire = fire
+			end
+		elseif e.fire ~= nil then
+			e.fire:Destroy()
+			e.fire = nil
+		end
+	end
+end
+
+return StationVisuals

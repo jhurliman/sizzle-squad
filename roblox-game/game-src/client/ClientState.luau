@@ -6,7 +6,7 @@
 local ClientState = {}
 ClientState.__index = ClientState
 
-local INTERP_DELAY = 0.12 -- render remotes this far in the past
+local INTERP_DELAY = 0.18 -- render remotes this far in the past (>2 packet intervals)
 
 function ClientState.new(shared: any, net: any)
 	local self = setmetatable({}, ClientState)
@@ -23,6 +23,8 @@ function ClientState.new(shared: any, net: any)
 	self.flags = {} :: { [number]: number }
 	self.effort = {} :: { [number]: number }
 	self.skins = {} :: { [number]: string }
+	self.carrying = {} :: { [number]: any }
+	self.lastSeen = {} :: { [number]: number }
 	self.stations = {} :: { [number]: any }
 	self.orders = {} :: { any }
 	self.score = { coins = 0, served = 0, missed = 0, combo = 0, bestCombo = 0, patience = 1, time = 0 }
@@ -48,6 +50,7 @@ function ClientState:applySnapshot(snap: any)
 	self.score = snap.score
 	for _, chef in snap.chefs do
 		self.skins[chef.id] = chef.skin
+		self.carrying[chef.id] = chef.carrying
 		if self.mirror ~= nil and chef.id == self.myChefId then
 			self.mirror.pos.x, self.mirror.pos.y = chef.pos.x, chef.pos.y
 			self.mirror.vel.x, self.mirror.vel.y = 0, 0
@@ -60,6 +63,7 @@ function ClientState:applyTransforms(b: buffer)
 	for _, t in list do
 		self.flags[t.id] = t.flags
 		self.effort[t.id] = t.effort
+		self.lastSeen[t.id] = self.clock
 		if t.id == self.myChefId then
 			-- Server's word on working/stun state; position stays client-side.
 			self.working = bit32.band(t.flags, self.net.FLAG_WORKING) ~= 0
@@ -68,7 +72,11 @@ function ClientState:applyTransforms(b: buffer)
 				-- The freeze brakes toward the committed station, so the id
 				-- must be real: use the chef's current local focus.
 				self.mirror.working = if self.working then self.lastFocus else nil
-				self.mirror.stun = t.stun
+				-- Raise-only: the local bump application already runs the
+				-- stun down; a late packet must not revive an expired one.
+				if t.stun > (self.mirror.stun or 0) then
+					self.mirror.stun = t.stun
+				end
 			end
 		else
 			local buf = self.buffers[t.id]
@@ -100,14 +108,10 @@ function ClientState:stepOwn(input: any, dt: number)
 	if mirror == nil then
 		return nil
 	end
-	local shared = self.shared
 	-- Movement locks are legible: committed work and stuns freeze the mirror
-	-- exactly like the sim would.
+	-- exactly like the sim would (movePhase itself decays stun).
 	self.shared.movePhase(self.mirrorSim, mirror, input, dt)
 	self.mirrorSim.events = {}
-	if mirror.stun ~= nil and mirror.stun > 0 then
-		mirror.stun = math.max(0, mirror.stun - dt)
-	end
 	return mirror
 end
 
@@ -191,6 +195,29 @@ function ClientState:rebuildCarryable(summary: any): any
 		return { type = "pan", pan = { id = 0, contents = contents, onHeat = true, fire = summary.fire or 0 } }
 	end
 	return nil
+end
+
+--- Apply a server bump verdict to the own-chef mirror so client and server
+--- knock back together — without this every bump starts a divergence fight.
+function ClientState:applyBump(ev: any)
+	local mirror = self.mirror
+	if mirror == nil or self.myChefId == nil then
+		return
+	end
+	if ev.a ~= self.myChefId and ev.b ~= self.myChefId then
+		return
+	end
+	local TUNING = self.shared.TUNING
+	mirror.stun = TUNING.bumpStun or 0.16
+	local dx = mirror.pos.x - (ev.at and ev.at.x or mirror.pos.x)
+	local dy = mirror.pos.y - (ev.at and ev.at.y or mirror.pos.y)
+	local d = math.sqrt(dx * dx + dy * dy)
+	if d < 1e-3 then
+		dx, dy, d = 1, 0, 1
+	end
+	local k = (TUNING.bumpKnockback or 4.2) / d
+	mirror.vel.x = dx * k
+	mirror.vel.y = dy * k
 end
 
 --- Local focus + verb prompt: run the REAL gate + plan over the mirror.

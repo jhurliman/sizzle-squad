@@ -1,18 +1,22 @@
 --!strict
--- Chef bodies + procedural animation. If captured species rigs exist under
--- ReplicatedStorage.Game.Rigs they are used (Motor6D pose mapping, task-9
--- pipeline); otherwise stylized capsule placeholders so the game is playable
--- the moment the place builds. All animation is client-side, driven by the
--- same signals the web game's ChefView reads: speed, heading, effort, stun,
--- carry tier.
+-- Chef bodies + procedural animation. Captured species rigs from
+-- ReplicatedStorage.Rigs when present, capsule placeholders otherwise.
+--
+-- Animation signals are derived HERE from rendered positions (not from
+-- network-quantized velocities, which jitter): speed comes from frame-to-
+-- frame displacement, smoothed, and the stride runs at a footstep-plausible
+-- cadence (~4.5 steps/s at full sprint) instead of a vibration.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local ItemViz = require(script.Parent.ItemViz) :: any
 
 local ChefVisuals = {}
 ChefVisuals.__index = ChefVisuals
 
 local SCALE = 5
 local CHEF_HEIGHT = 0.72 * SCALE
+local MAX_SPEED = 6.2
 local SKIN_COLORS: { [string]: Color3 } = {
 	bramble = Color3.fromRGB(160, 82, 45),
 	pip = Color3.fromRGB(106, 190, 48),
@@ -40,7 +44,6 @@ function ChefVisuals:ensure(id: number, skin: string): any
 	if rigTemplate ~= nil then
 		model = (rigTemplate :: Model):Clone()
 	else
-		-- Placeholder: capsule body + ball head + cap, tinted per species.
 		model = Instance.new("Model")
 		local color = SKIN_COLORS[skin] or Color3.fromRGB(200, 200, 200)
 		local body = Instance.new("Part")
@@ -51,7 +54,6 @@ function ChefVisuals:ensure(id: number, skin: string): any
 		body.Material = Enum.Material.SmoothPlastic
 		body.Anchored = true
 		body.CanCollide = false
-		body.CastShadow = true
 		body.Parent = model
 		local head = Instance.new("Part")
 		head.Name = "Head"
@@ -62,103 +64,91 @@ function ChefVisuals:ensure(id: number, skin: string): any
 		head.Anchored = true
 		head.CanCollide = false
 		head.Parent = model
-		local hat = Instance.new("Part")
-		hat.Name = "Hat"
-		hat.Shape = Enum.PartType.Cylinder
-		hat.Size = Vector3.new(CHEF_HEIGHT * 0.18, CHEF_HEIGHT * 0.34, CHEF_HEIGHT * 0.34)
-		hat.Color = Color3.fromRGB(245, 240, 230)
-		hat.Material = Enum.Material.SmoothPlastic
-		hat.Anchored = true
-		hat.CanCollide = false
-		hat.Parent = model
-		local nose = Instance.new("Part")
-		nose.Name = "Nose"
-		nose.Shape = Enum.PartType.Ball
-		nose.Size = Vector3.one * CHEF_HEIGHT * 0.12
-		nose.Color = Color3.fromRGB(60, 40, 30)
-		nose.Material = Enum.Material.SmoothPlastic
-		nose.Anchored = true
-		nose.CanCollide = false
-		nose.Parent = model
 		model.PrimaryPart = body
 	end
 	model.Name = `Chef_{id}_{skin}`
-
-	-- carried-item prop (simple colored block/plate swapped by carry tier)
-	local carry = Instance.new("Part")
-	carry.Name = "Carry"
-	carry.Anchored = true
-	carry.CanCollide = false
-	carry.Transparency = 1
-	carry.Size = Vector3.new(1.4, 0.5, 1.4)
-	carry.Material = Enum.Material.SmoothPlastic
-	carry.Parent = model
-
 	model.Parent = self.parent
-	entry = { model = model, isRig = rigTemplate ~= nil, phase = 0, squash = 0 }
+	entry = {
+		model = model,
+		isRig = rigTemplate ~= nil,
+		phase = 0,
+		squash = 0,
+		smSpeed = 0,
+		lastPos = nil :: Vector2?,
+		carryKey = "-",
+		carryModel = nil :: Model?,
+	}
 	self.chefs[id] = entry
 	return entry
 end
 
---- pose: { x, y (kitchen cells), heading, effort, stun, speed?, flags? }
-function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, dt: number)
+--- pose: { x, y (kitchen cells), heading, effort, stun }
+function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, dt: number, carrying: any)
 	local entry = self:ensure(id, skin)
 	self.time += dt
+	dt = math.max(dt, 1e-3)
 
-	local speed = pose.speed or 0
-	entry.phase += dt * (4 + speed * 2.2)
-	local walk = math.sin(entry.phase * 6) * math.min(1, speed / 4)
-	local hop = math.abs(walk) * 0.35 * SCALE * 0.12
-	local squashTarget = math.clamp((pose.effort or 0) * 0.12, 0, 0.12)
-	entry.squash += (squashTarget - entry.squash) * math.min(1, dt * 10)
+	-- speed from rendered displacement, smoothed hard: quantized network
+	-- velocity is what made everyone vibrate.
+	local p = Vector2.new(pose.x, pose.y)
+	local rawSpeed = 0
+	if entry.lastPos ~= nil then
+		rawSpeed = math.min((p - entry.lastPos).Magnitude / dt, MAX_SPEED * 1.3)
+	end
+	entry.lastPos = p
+	entry.smSpeed += (rawSpeed - entry.smSpeed) * math.min(1, dt * 8)
+	local speed = entry.smSpeed
+	local moveBlend = math.clamp((speed - 0.25) / 2.2, 0, 1)
+
+	-- stride: ~1.5 steps/s ambling, ~4.5 at full sprint
+	if moveBlend > 0 then
+		entry.phase += dt * (1.2 + speed * 0.55)
+	end
+	local hop = math.abs(math.sin(entry.phase * math.pi)) * moveBlend * CHEF_HEIGHT * 0.07
+	local rock = math.sin(entry.phase * math.pi * 2) * 0.06 * moveBlend
+
+	local squashTarget = math.clamp((pose.effort or 0) * 0.1, 0, 0.1)
+	entry.squash += (squashTarget - entry.squash) * math.min(1, dt * 8)
+	local sq = 1 - entry.squash
 
 	local stunned = (pose.stun or 0) > 0
-	local wobble = if stunned then math.sin(self.time * 30) * 0.12 else 0
+	local wobble = if stunned then math.sin(self.time * 24) * 0.1 else 0
 
 	local base = CFrame.new(pose.x * SCALE, 0, pose.y * SCALE) * CFrame.Angles(0, -pose.heading + math.pi / 2, 0)
 
 	local model = entry.model :: Model
 	if entry.isRig and model.PrimaryPart ~= nil then
-		-- Captured rig: root the whole model; Motor6D pose layer comes from
-		-- the animator signals (kept minimal until the art pass).
-		model:PivotTo(base * CFrame.new(0, CHEF_HEIGHT * 0.5 + hop, 0) * CFrame.Angles(wobble, 0, walk * 0.08))
+		model:PivotTo(base * CFrame.new(0, hop - CHEF_HEIGHT * entry.squash * 0.3, 0) * CFrame.Angles(wobble, 0, rock))
 	else
 		local body = model:FindFirstChild("Body") :: Part?
 		local head = model:FindFirstChild("Head") :: Part?
-		local hat = model:FindFirstChild("Hat") :: Part?
-		local nose = model:FindFirstChild("Nose") :: Part?
-		local sq = 1 - entry.squash
 		if body ~= nil then
 			body.CFrame = base
 				* CFrame.new(0, CHEF_HEIGHT * 0.33 * sq + hop, 0)
 				* CFrame.Angles(0, 0, math.pi / 2)
-				* CFrame.Angles(wobble + walk * 0.1, 0, 0)
+				* CFrame.Angles(wobble + rock, 0, 0)
 		end
 		if head ~= nil then
 			head.CFrame = base * CFrame.new(0, CHEF_HEIGHT * 0.72 * sq + hop * 1.15, 0) * CFrame.Angles(wobble, 0, 0)
 		end
-		if hat ~= nil then
-			hat.CFrame = base
-				* CFrame.new(0, CHEF_HEIGHT * (0.72 + 0.24) * sq + hop * 1.2, 0)
-				* CFrame.Angles(0, 0, math.pi / 2)
-		end
-		if nose ~= nil then
-			nose.CFrame = base * CFrame.new(0, CHEF_HEIGHT * 0.7 * sq + hop * 1.15, -CHEF_HEIGHT * 0.24)
-		end
 	end
 
-	-- carried item indicator by tier bits (Net flags 3-4)
-	local carry = model:FindFirstChild("Carry") :: Part?
-	if carry ~= nil then
-		local tier = bit32.band(bit32.rshift(flags, 3), 3)
-		if tier == 0 then
-			carry.Transparency = 1
-		else
-			carry.Transparency = 0
-			carry.Color = if tier == 2 then Color3.fromRGB(220, 207, 178) else Color3.fromRGB(230, 90, 70)
-			carry.Size = if tier == 2 then Vector3.new(1.6, 0.35, 1.6) else Vector3.new(1.1, 1.1, 1.1)
-			carry.CFrame = base * CFrame.new(0, CHEF_HEIGHT * 0.95, -CHEF_HEIGHT * 0.4)
+	-- carried item: a real ItemViz model riding the hands
+	local key = ItemViz.key(carrying)
+	if key ~= entry.carryKey then
+		entry.carryKey = key
+		if entry.carryModel ~= nil then
+			entry.carryModel:Destroy()
+			entry.carryModel = nil
 		end
+		local item = ItemViz.build(carrying)
+		if item ~= nil then
+			item.Parent = entry.model
+		end
+		entry.carryModel = item
+	end
+	if entry.carryModel ~= nil then
+		entry.carryModel:PivotTo(base * CFrame.new(0, CHEF_HEIGHT * 0.95 + hop, -CHEF_HEIGHT * 0.45))
 	end
 end
 

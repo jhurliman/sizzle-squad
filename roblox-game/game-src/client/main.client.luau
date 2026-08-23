@@ -17,6 +17,7 @@ local CameraRig = require(script.Parent.CameraRig) :: any
 local Hud = require(script.Parent.Hud) :: any
 local FirstShift = require(script.Parent.FirstShift) :: any
 local Sfx = require(script.Parent.Sfx) :: any
+local StationVisuals = require(script.Parent.StationVisuals) :: any
 
 local SCALE = 5
 local remotes = Net.client(ReplicatedStorage)
@@ -26,6 +27,7 @@ local visualsFolder = Instance.new("Folder")
 visualsFolder.Name = "Chefs"
 visualsFolder.Parent = Workspace
 local visuals = ChefVisuals.new(visualsFolder)
+local stationViz = StationVisuals.new(visualsFolder)
 local cameraRig = CameraRig.new(Workspace.CurrentCamera :: Camera)
 local hud = Hud.new(Catalog)
 local firstShift = FirstShift.new(hud.gui)
@@ -204,6 +206,12 @@ remotes.StationDeltas.OnClientEvent:Connect(function(deltas)
 	state:applyStationDeltas(deltas)
 end)
 
+remotes.CarryDeltas.OnClientEvent:Connect(function(carries)
+	for _, c in carries do
+		state.carrying[c.chefId] = c.carrying
+	end
+end)
+
 remotes.OrdersDelta.OnClientEvent:Connect(function(msg)
 	state.orders = msg.orders
 end)
@@ -281,7 +289,9 @@ end)
 remotes.SimEvents.OnClientEvent:Connect(function(events)
 	for _, ev in events do
 		sfx:handle(ev)
-		if ev.t == "serve" then
+		if ev.t == "bump" then
+			state:applyBump(ev)
+		elseif ev.t == "serve" then
 			hud:worldLabel(
 				Vector3.new(ev.at.x * SCALE, 1.2 * SCALE, ev.at.y * SCALE),
 				`+{ev.value}`,
@@ -375,18 +385,22 @@ RunService.RenderStepped:Connect(function(dt)
 			heading = m.heading,
 			effort = math.clamp(speed / 6.2, 0, 1),
 			stun = m.stun,
-			speed = speed,
-		}, state.flags[state.myChefId] or 0, dt)
+		}, state.flags[state.myChefId] or 0, dt, state.carrying[state.myChefId])
 	end
 	for id, skin in state.skins do
 		if id ~= state.myChefId then
 			local pose = state:remotePose(id)
-			if pose ~= nil then
-				pose.speed = math.sqrt((pose.effort or 0)) * 6.2
-				visuals:update(id, skin, pose, state.flags[id] or 0, dt)
+			if pose ~= nil and state.clock - (state.lastSeen[id] or -10) < 2 then
+				visuals:update(id, skin, pose, state.flags[id] or 0, dt, state.carrying[id])
+			elseif visuals.chefs[id] ~= nil then
+				-- parked / departed chefs stop streaming: clear their body
+				visuals:remove(id)
 			end
 		end
 	end
+
+	-- station contents + progress bars
+	stationViz:update(state.stations, stationModels)
 
 	-- focus highlight + verb chip (local planGrab over mirrored state)
 	local focusId, action = state:focusPrompt()

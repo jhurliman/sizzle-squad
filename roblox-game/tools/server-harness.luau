@@ -68,7 +68,7 @@ local playerA = { UserId = 1001, Name = "Alice" }
 
 -- ---------------------------------------------------------------- stack
 
-local simService = SimService.new(shared, { seed = 4242 })
+local simService = SimService.new(shared, { seed = 4242, botFill = true })
 local replicator = Replicator.new(shared, Net, remotes, function(chef)
 	return simService:chefFlags(chef)
 end)
@@ -233,3 +233,36 @@ if failures > 0 then
 	error(`{failures} checks failed`)
 end
 print("PASS: server stack end-to-end")
+
+-- ---------------------------------------------------------- bots-off checks
+
+local svc2 = SimService.new(shared, { seed = 7, botFill = false })
+local allParked = true
+for _, chef in svc2.sim.chefs do
+	if chef.pos.y < 11 then
+		allParked = false
+	end
+end
+check(allParked, "bots-off: fresh server parks every chef outside the kitchen")
+svc2:setHuman(0, true)
+local activeCount = 0
+local humanChef = nil
+for _, chef in svc2.sim.chefs do
+	if svc2:isActive(chef) then
+		activeCount += 1
+		humanChef = chef
+	end
+end
+check(activeCount == 1, "bots-off: exactly the seated human is active")
+check(
+	humanChef ~= nil and shared.isWalkable(svc2.sim.kitchen, math.floor(humanChef.pos.x), math.floor(humanChef.pos.y)),
+	"bots-off: human spawned on a walkable cell"
+)
+svc2.sim.events = {}
+local batch2 = svc2:tick(0.1, 0)
+check(true, "bots-off: sim ticks without a bot director")
+
+print(if failures > 0 then `{failures} FAILURES` else "PASS: bots-off mode")
+if failures > 0 then
+	error(`{failures} checks failed`)
+end
