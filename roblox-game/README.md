@@ -72,6 +72,13 @@ still guard the shared sim (including bit-exact determinism).
 - `sync-shared.mjs` mirrors `../src/domain` + `../src/bots` into `src/shared/`
   (CI guard: `npm run sync:check`).
 
+## What's NOT done
+
+**[KNOWN-GAPS.md](KNOWN-GAPS.md) is the canonical ledger** of every stub,
+placeholder, and simplification — checked before trusting any feature as
+"done". Highlights: cosmetics don't render yet, chef limbs don't articulate,
+dailies have no UI, food is spheres, everything is silent.
+
 ## Remaining (user-gated) launch steps
 
 1. **Publish** the place to a universe (Studio → File → Publish), set
