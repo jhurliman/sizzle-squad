@@ -29,23 +29,57 @@ function rotatePart(p, yaw, dx) {
   };
 }
 
-// paper hat parts mirroring Hats.luau hat_paper + ChefVisuals attach math
-function paperHatParts(parts) {
+// paper hat parts mirroring Hats.luau hat_paper (pleated) + ChefVisuals
+// attach math incl. per-species HAT_TILT
+const HAT_TILT = {
+  bramble: [5, 4],
+  mochi: [10, 0],
+};
+function paperHatParts(parts, skin) {
   const head = parts.filter((p) => p.group === 'Head');
   if (head.length === 0) return [];
   let skull = head[0];
   for (const p of head) {
     if (p.size[0] * p.size[1] * p.size[2] > skull.size[0] * skull.size[1] * skull.size[2]) skull = p;
   }
-  const ax = skull.cf[0];
-  const ay = skull.cf[1] + skull.size[1] * 0.42; // skull top, slightly sunk
-  const az = skull.cf[2];
   const s = Math.max(skull.size[0], skull.size[2]) / 1.55;
-  const RZ90 = [0, -1, 0, 1, 0, 0, 0, 0, 1];
-  return [
-    { group: 'PaperHat', shape: 'Cylinder', size: [0.45 * s, 1.35 * s, 1.35 * s], cf: [ax, ay + 0.2 * s, az, ...RZ90], color: [245, 240, 230] },
-    { group: 'PaperHat', shape: 'Cylinder', size: [0.5 * s, 1.1 * s, 1.1 * s], cf: [ax, ay + 0.62 * s, az, ...RZ90], color: [232, 226, 212] },
-  ];
+  const [tx, tz] = HAT_TILT[skin] ?? [0, 0];
+  const attach = new THREE.Matrix4()
+    .makeTranslation(skull.cf[0], skull.cf[1] + skull.size[1] * 0.42, skull.cf[2])
+    .multiply(new THREE.Matrix4().makeRotationX((tx * Math.PI) / 180))
+    .multiply(new THREE.Matrix4().makeRotationZ((tz * Math.PI) / 180))
+    .multiply(new THREE.Matrix4().makeRotationX((4 * Math.PI) / 180))
+    .multiply(new THREE.Matrix4().makeRotationZ((6 * Math.PI) / 180));
+  const out = [];
+  const add = (shape, size, x, y, z, color, cylinder) => {
+    const M = attach.clone().multiply(new THREE.Matrix4().makeTranslation(x * s, y * s, z * s));
+    if (cylinder) M.multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+    const e = M.elements;
+    out.push({
+      group: 'PaperHat',
+      shape,
+      size: size.map((v) => v * s),
+      cf: [e[12], e[13], e[14], e[0], e[4], e[8], e[1], e[5], e[9], e[2], e[6], e[10]],
+      color,
+    });
+  };
+  add('Cylinder', [0.4, 1.42, 1.42], 0, 0.18, 0, [245, 240, 230], true);
+  add('Cylinder', [0.07, 1.46, 1.46], 0, 0.38, 0, [226, 219, 203], true);
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    add(
+      'Cylinder',
+      [0.68, 0.3, 0.3],
+      Math.cos(a) * 0.56,
+      0.72,
+      Math.sin(a) * 0.56,
+      i % 2 === 0 ? [245, 240, 230] : [233, 227, 213],
+      true,
+    );
+  }
+  add('SphereMesh', [1.5, 0.78, 1.5], 0, 1.02, 0, [245, 240, 230], false);
+  add('SphereMesh', [1.1, 0.55, 1.1], 0.1, 1.22, 0.05, [250, 246, 238], false);
+  return out;
 }
 
 const viewer = fs.readFileSync(path.join(DIR, 'sheet-viewer.js'), 'utf8');
@@ -59,7 +93,7 @@ for (const hatState of ['builtin', 'paper']) {
   for (const skin of SPECIES) {
     let parts = data.skins[skin].parts;
     if (hatState === 'paper') {
-      parts = parts.filter((p) => p.group !== 'BuiltinHat').concat(paperHatParts(parts));
+      parts = parts.filter((p) => p.group !== 'BuiltinHat').concat(paperHatParts(parts, skin));
     }
     const all = [];
     ANGLES.forEach((yaw, ai) => {

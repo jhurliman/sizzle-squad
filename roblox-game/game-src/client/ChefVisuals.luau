@@ -21,6 +21,13 @@ ChefVisuals.__index = ChefVisuals
 local SCALE = 5
 local CHEF_HEIGHT = 0.72 * SCALE
 local MAX_SPEED = 6.2
+-- Cosmetic hats match each species' head attitude (owner: "the bear's chef
+-- hat should be tilted just a bit to match the tilt of his head").
+local HAT_TILT: { [string]: CFrame } = {
+	bramble = CFrame.Angles(math.rad(5), 0, math.rad(4)),
+	mochi = CFrame.Angles(math.rad(10), 0, 0),
+}
+
 local SKIN_COLORS: { [string]: Color3 } = {
 	bramble = Color3.fromRGB(160, 82, 45),
 	pip = Color3.fromRGB(106, 190, 48),
@@ -350,7 +357,8 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 				headPose = around(j, -0.1 * moveBlend, 0, 0)
 			end
 		end
-		entry.hatModel:PivotTo(baseCF * headPose * CFrame.new(entry.headAttach))
+		local tilt = HAT_TILT[entry.skin] or CFrame.new()
+		entry.hatModel:PivotTo(baseCF * headPose * CFrame.new(entry.headAttach) * tilt)
 	end
 
 	-- ---- nametag -----------------------------------------------------------

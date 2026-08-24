@@ -24,9 +24,27 @@ local WHITE = Color3.fromRGB(245, 240, 230)
 
 local BUILDERS: { [string]: (Model) -> () } = {
 	hat_paper = function(m)
-		-- folded paper cook's hat: snug band, slightly puffed crown
-		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.45, 1.35, 1.35), Color = WHITE, CFrame = CFrame.new(0, 0.2, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
-		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.5, 1.1, 1.1), Color = Color3.fromRGB(232, 226, 212), CFrame = CFrame.new(0, 0.62, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+		-- Folded paper cook's hat, earned-asset grade: creased band, ring of
+		-- alternating pleat columns, puffed dome, jaunty roll.
+		local tilt = CFrame.Angles(math.rad(4), 0, math.rad(6))
+		local base = tilt
+		-- band with crease line
+		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 1.42, 1.42), Color = WHITE, CFrame = base * CFrame.new(0, 0.18, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.07, 1.46, 1.46), Color = Color3.fromRGB(226, 219, 203), CFrame = base * CFrame.new(0, 0.38, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+		-- pleated crown: alternating light/shadow columns around the rim
+		for i = 0, 9 do
+			local a = (i / 10) * math.pi * 2
+			local shade = if i % 2 == 0 then WHITE else Color3.fromRGB(233, 227, 213)
+			part({
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.68, 0.30, 0.30),
+				Color = shade,
+				CFrame = base * CFrame.new(math.cos(a) * 0.56, 0.72, math.sin(a) * 0.56) * CFrame.Angles(0, 0, math.rad(90)),
+			}, m)
+		end
+		-- puffed dome with a soft overhang past the pleats
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.5, 0.78, 1.5), Color = WHITE, CFrame = base * CFrame.new(0, 1.02, 0) }, m)
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.1, 0.55, 1.1), Color = Color3.fromRGB(250, 246, 238), CFrame = base * CFrame.new(0.1, 1.22, 0.05) }, m)
 	end,
 	hat_toque = function(m)
 		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.9, 1.3, 1.3), Color = WHITE, CFrame = CFrame.new(0, 0.45, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)

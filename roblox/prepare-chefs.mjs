@@ -191,9 +191,14 @@ for (const [skin, entry] of Object.entries(dump.skins)) {
       if (p.group === 'Ears' && p.cf[2] < -1.0) parts.splice(i, 1);
     }
     // the (now correctly horizontal) band sat across his eyes like a
-    // blindfold — raise band + knot to the forehead
+    // blindfold — raise band + knot to the forehead, and group them as the
+    // built-in hat so cosmetic hats replace them (band segments sit below
+    // the generic promotion height gate)
     for (const p of parts) {
-      if (p.color[0] === 163 && p.color[1] === 35) p.cf[1] += 0.45;
+      if (p.color[0] === 163 && p.color[1] === 35) {
+        p.cf[1] += 0.45;
+        p.group = 'BuiltinHat';
+      }
     }
     for (const p of parts) {
       if (p.group === 'Head' && p.shape === 'Cylinder' && p.color[0] === 51 && p.cf[1] < 7 && p.cf[2] > 1.3) {
@@ -216,11 +221,41 @@ for (const [skin, entry] of Object.entries(dump.skins)) {
     for (let i = parts.length - 1; i >= 0; i--) {
       if (parts[i].group === 'Ears') parts.splice(i, 1);
     }
-    for (const p of parts) {
-      if (p.group === 'BuiltinHat') {
-        p.cf[2] += 0.28;
-        p.cf[1] += 0.1;
+    // tilt the cap forward and seat it on the sphere of the head (owner)
+    const cap = parts.filter((p) => p.group === 'BuiltinHat');
+    if (cap.length > 0) {
+      const c = [0, 0, 0];
+      for (const p of cap) for (let a = 0; a < 3; a++) c[a] += p.cf[a] / cap.length;
+      const R = new THREE.Matrix4().makeRotationX(0.24);
+      for (const p of cap) {
+        const M0 = new THREE.Matrix4().set(
+          p.cf[3], p.cf[4], p.cf[5], p.cf[0] - c[0],
+          p.cf[6], p.cf[7], p.cf[8], p.cf[1] - c[1],
+          p.cf[9], p.cf[10], p.cf[11], p.cf[2] - c[2],
+          0, 0, 0, 1,
+        );
+        const M2 = R.clone().multiply(M0);
+        const e = M2.elements;
+        p.cf = [e[12] + c[0] + 0.12, e[13] + c[1] - 0.18, e[14] + c[2] + 0.3, e[0], e[4], e[8], e[1], e[5], e[9], e[2], e[6], e[10]];
       }
+    }
+  } else if (skin === 'nori') {
+    // the central ear lives inside any equipped hat — move it to BuiltinHat
+    // so it hides with the beanie when a cosmetic hat goes on (owner)
+    const ears = parts.filter((p) => p.group === 'Ears');
+    if (ears.length > 0) {
+      const meanX = ears.reduce((s, p) => s + p.cf[0], 0) / ears.length;
+      const left = ears.filter((p) => p.cf[0] < meanX);
+      const right = ears.filter((p) => p.cf[0] >= meanX);
+      // the occluded ear is the UPRIGHT one — it stands tallest, straight
+      // into hat-space (x-distance picked the wrong ear: the flared wedge's
+      // base is nearer the skull center than the vertical spike's)
+      const topOfCluster = (c) => Math.max(...c.map((p) => p.cf[1] + p.size[1] / 2));
+      for (const p of topOfCluster(left) > topOfCluster(right) ? left : right) p.group = 'BuiltinHat';
+    }
+    // stray beanie segments below the promotion gate (teal hatA)
+    for (const p of parts) {
+      if (p.group === 'Head' && p.color[0] === 63 && p.color[1] === 201) p.group = 'BuiltinHat';
     }
   }
 
