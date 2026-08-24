@@ -12,11 +12,9 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 ## A. Built but invisible — systems that persist state with no presentation
 
 - 🟡 **Hats + palettes render; kitchen cosmetics still don't** (plate/pan/
-  bell swaps unbuilt). Per-(hat x species) FIT is tuned in Studio via FitLab
-  -> hat-fits.json: bramble/nori/mochi x 12 hats DONE; pip's 12 pending a
-  retune pass (the frog-hat leftover-geometry + floating bug is now fixed —
-  the built-in hat is captured structurally as one unit). Palette retint
-  uses dominant-color matching — verify per species.
+  bell swaps unbuilt). All 12 hats x 4 species are hand-tuned in
+  hat-fits.json via FitLab (offset/tilt/scale/hideEars); verify new hats in
+  hats-on-<species>.png. Palette retint uses dominant-color matching.
 - 🟢 **Ticket icons render via runtime EditableImage** (no upload needed) with a colored-chip fallback if the API is unavailable on some platform — verify on device.
 - 🟢 **Dailies panel live** (intermission "Today's Goals" + completion
   toasts); rewards still auto-claim rather than a claim ceremony.
