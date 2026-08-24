@@ -19545,11 +19545,14 @@ for (let s = 0; s < SKINS2.length; s++) {
   for (const e of v.ears ?? []) nameGroup(e, "Ears");
   for (let i = 0; i < 30; i++) view.update(1 / 60, i / 60);
   view.root.updateMatrixWorld(true);
+  const refNode = v.rig ?? view.root;
+  const refInv = refNode.matrixWorld.clone().invert();
   const joints = {};
   const jointOf = (obj, name) => {
     if (!obj || !obj.isObject3D || joints[name]) return;
     const p = new Vector3();
     obj.getWorldPosition(p);
+    p.applyMatrix4(refInv);
     joints[name] = [p.x, p.y, p.z];
   };
   jointOf(v.hips, "Hips");
@@ -19562,9 +19565,13 @@ for (let s = 0; s < SKINS2.length; s++) {
   jointOf(v.armR?.hip, "ArmR");
   jointOf((v.tail ?? [])[0], "Tail");
   jointOf((v.ears ?? [])[0], "Ears");
+  const skip = /* @__PURE__ */ new Set();
+  const markSkip = (obj) => obj && obj.isObject3D && obj.traverse((o) => skip.add(o));
+  markSkip(v.mouthCav);
   const prims = [];
   view.root.traverse((obj) => {
     if (!obj.isMesh) return;
+    if (skip.has(obj)) return;
     const mesh = obj;
     const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
     if (!mat || mat.transparent === true || (mat.opacity ?? 1) < 1) return;
@@ -19582,11 +19589,15 @@ for (let s = 0; s < SKINS2.length; s++) {
       const hex = mat.color.getHex();
       if (hex === v.skin.hatA || hex === v.skin.hatB) group = "BuiltinHat";
     }
-    const M = new Matrix4().multiplyMatrices(mesh.matrixWorld, r2.mat);
+    const M = new Matrix4().multiplyMatrices(refInv, new Matrix4().multiplyMatrices(mesh.matrixWorld, r2.mat));
     const pos = new Vector3();
     const quat = new Quaternion();
     const scl = new Vector3();
     M.decompose(pos, quat, scl);
+    if (Math.max(scl.x, scl.y, scl.z) > 4) {
+      console.error(`  SKIP runaway-scale prim in ${skin} (${scl.x.toFixed(1)})`);
+      return;
+    }
     prims.push({
       kind: r2.kind,
       args: jsonSafe(r2.args),

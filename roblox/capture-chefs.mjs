@@ -77,6 +77,12 @@ for (let s = 0; s < SKINS.length; s++) {
   for (let i = 0; i < 30; i++) view.update(1 / 60, i / 60);
   view.root.updateMatrixWorld(true);
 
+  // Capture RELATIVE to the rig node: update() bakes heading/idle root
+  // motion into world matrices (the whole cast faced sideways), while the
+  // rest rotations we settled for live INSIDE the rig and survive.
+  const refNode = v.rig ?? view.root;
+  const refInv = refNode.matrixWorld.clone().invert();
+
   // Joint origins (bind pose, model space) — the animator rotates each group
   // around these. Limbs use their hip (shoulder for arms); hips/torso/head
   // use their own group origin; tail/ears use the first segment's origin.
@@ -85,6 +91,7 @@ for (let s = 0; s < SKINS.length; s++) {
     if (!obj || !obj.isObject3D || joints[name]) return;
     const p = new THREE.Vector3();
     obj.getWorldPosition(p);
+    p.applyMatrix4(refInv);
     joints[name] = [p.x, p.y, p.z];
   };
   jointOf(v.hips, 'Hips');
@@ -98,9 +105,18 @@ for (let s = 0; s < SKINS.length; s++) {
   jointOf((v.tail ?? [])[0], 'Tail');
   jointOf((v.ears ?? [])[0], 'Ears');
 
+  // Interior helper geometry that must not be captured: the mouth CAVITY is
+  // a dark mask sphere hidden inside the head whose scale is driven live by
+  // update() — captured post-settle it becomes a 10-stud ball swallowing the
+  // whole chef (every species except the beak-hinged bird).
+  const skip = new Set();
+  const markSkip = (obj) => obj && obj.isObject3D && obj.traverse((o) => skip.add(o));
+  markSkip(v.mouthCav);
+
   const prims = [];
   view.root.traverse((obj) => {
     if (!obj.isMesh) return;
+    if (skip.has(obj)) return;
     const mesh = obj;
     const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
     if (!mat || mat.transparent === true || (mat.opacity ?? 1) < 1) return; // shadow blob etc.
@@ -122,11 +138,16 @@ for (let s = 0; s < SKINS.length; s++) {
       const hex = mat.color.getHex();
       if (hex === v.skin.hatA || hex === v.skin.hatB) group = 'BuiltinHat';
     }
-    const M = new THREE.Matrix4().multiplyMatrices(mesh.matrixWorld, r.mat);
+    const M = new THREE.Matrix4().multiplyMatrices(refInv, new THREE.Matrix4().multiplyMatrices(mesh.matrixWorld, r.mat));
     const pos = new THREE.Vector3();
     const quat = new THREE.Quaternion();
     const scl = new THREE.Vector3();
     M.decompose(pos, quat, scl);
+    // safety net: any animation-driven runaway scale is a capture bug, not art
+    if (Math.max(scl.x, scl.y, scl.z) > 4) {
+      console.error(`  SKIP runaway-scale prim in ${skin} (${scl.x.toFixed(1)})`);
+      return;
+    }
     prims.push({
       kind: r.kind,
       args: jsonSafe(r.args),
