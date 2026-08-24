@@ -18,6 +18,7 @@ local Hud = require(script.Parent.Hud) :: any
 local FirstShift = require(script.Parent.FirstShift) :: any
 local Sfx = require(script.Parent.Sfx) :: any
 local StationVisuals = require(script.Parent.StationVisuals) :: any
+local Vfx = require(script.Parent.Vfx) :: any
 
 local SCALE = 5
 local remotes = Net.client(ReplicatedStorage)
@@ -32,6 +33,12 @@ local cameraRig = CameraRig.new(Workspace.CurrentCamera :: Camera)
 local hud = Hud.new(Catalog)
 local firstShift = FirstShift.new(hud.gui)
 local sfx = Sfx.new()
+local vfxFolder = Instance.new("Folder")
+vfxFolder.Name = "Vfx"
+vfxFolder.Parent = Workspace
+local vfx = Vfx.new(vfxFolder, function(n)
+	cameraRig:addShake(n)
+end)
 
 -- Invite friends (intermission) — free private servers + party joins are the
 -- other two "play together" paths; this is the in-game nudge.
@@ -307,6 +314,7 @@ end)
 remotes.SimEvents.OnClientEvent:Connect(function(events)
 	for _, ev in events do
 		sfx:handle(ev)
+		vfx:handle(ev)
 		if ev.t == "bump" then
 			state:applyBump(ev)
 		elseif ev.t == "serve" then
@@ -315,8 +323,17 @@ remotes.SimEvents.OnClientEvent:Connect(function(events)
 				`+{ev.value}`,
 				Color3.fromRGB(255, 224, 102)
 			)
+			if (ev.combo or 1) > 1 then
+				hud:worldLabel(
+					Vector3.new(ev.at.x * SCALE, 1.6 * SCALE, ev.at.y * SCALE),
+					`{ev.combo}x`,
+					Color3.fromRGB(255, 170, 90)
+				)
+			end
 		elseif ev.t == "serveWrong" then
 			hud:worldLabel(Vector3.new(ev.at.x * SCALE, 1.2 * SCALE, ev.at.y * SCALE), "✗", Color3.fromRGB(230, 80, 60))
+		elseif ev.t == "burn" then
+			hud:worldLabel(Vector3.new(ev.at.x * SCALE, 1.5 * SCALE, ev.at.y * SCALE), "Burnt!", Color3.fromRGB(230, 120, 70))
 		elseif ev.t == "fireStart" then
 			-- find the nearest station model and set it alight briefly
 			local bestModel, bestD = nil, math.huge
@@ -360,7 +377,8 @@ local seq = 0
 
 RunService.RenderStepped:Connect(function(dt)
 	state.clock += dt
-	cameraRig:update()
+	cameraRig:update(dt)
+	vfx:tick(dt)
 
 	-- fixed-step the own-chef mirror
 	acc = math.min(acc + dt, 0.25)

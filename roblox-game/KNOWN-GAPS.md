@@ -36,10 +36,23 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 **SFX wired**: 50 uploaded sounds (3 variants/event, rotated at random;
   serve combo-tiered) live in Sfx.luau; asset ids recorded in
   roblox/audio-out/asset-ids.csv. Only washDone lacks a dedicated upload
-  (falls back to the chopDone chime). Adaptive MUSIC still unbuilt (stems +
-  volume-mix layer).
-- 🟡 **VFX minimal**: fire + floating labels only. No chop bits, steam,
-  coin burst, dust puffs, bump stars; no screenshake; no haptics.
+  (falls back to the chopDone chime).
+- 🟡 **TODO — adaptive background music unbuilt.** The web game's
+  `src/audio/audio.ts` has an adaptive score (`tickMusic(heat, tension)`):
+  a base bed plus intensity layers keyed to the round's heat ramp and the
+  patience meter. Port: offline-render the score as time-aligned looped
+  stems (base + N intensity layers), upload, start all Sounds together and
+  cross-fade their `Volume` by heat/patience. Sim already replicates
+  heat+patience to the client.
+- 🟢 **VFX pass done** (Vfx.luau): the web game's full effect map ported —
+  chop confetti/sparks, cook bursts, burn smoke, fire puffs, serve confetti
+  (3 hues), grab-miss/place puffs, wash sparkles, bump/wall sparks — pooled
+  ParticleEmitters driven by SimEvents, plus screenshake (serve/bump/fire/
+  order-expiry) in CameraRig and floating +value/combo/Burnt! labels.
+  Particle textures use built-in rbxasset (no uploads). Remaining: no
+  HAPTICS (Roblox has no reliable phone-vibration API; gamepad-only via
+  HapticService is possible later), and particle art is built-in textures
+  rather than custom sprites.
 - 🟢 **Photo moment is just a camera push-in** — no team pose at the pass, no
   confetti, no framed score layout.
 - 🟢 **Emote row, not wheel**: four fixed ping buttons; owned emote cosmetics
