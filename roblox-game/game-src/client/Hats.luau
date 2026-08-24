@@ -43,29 +43,30 @@ end
 
 local BUILDERS: { [string]: (Model) -> () } = {
 	hat_paper = function(m)
-		-- Folded paper cook's hat, earned-asset grade: creased band, ring of
-		-- alternating pleat columns, puffed dome, jaunty roll.
-		local tilt = CFrame.Angles(math.rad(4), 0, math.rad(6))
-		local base = tilt
-		-- band with crease line
-		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 1.42, 1.42), Color = WHITE, CFrame = base * CFrame.new(0, 0.18, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
-		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.07, 1.46, 1.46), Color = Color3.fromRGB(226, 219, 203), CFrame = base * CFrame.new(0, 0.38, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
-		-- pleated crown: alternating light/shadow columns around the rim
-		for i = 0, 9 do
-			local a = (i / 10) * math.pi * 2
-			local shade = if i % 2 == 0 then WHITE else Color3.fromRGB(233, 227, 213)
+		-- Folded paper cook's toque: a headband, a SHORT pleated crown drum
+		-- (pleats are shallow ribs half-buried in the drum, not free-standing
+		-- pillars), and a big overhanging puff that dominates the silhouette.
+		local cream = WHITE
+		local shade = Color3.fromRGB(228, 221, 206)
+		local base = CFrame.Angles(math.rad(3), 0, math.rad(5))
+		-- headband + crease
+		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.34, 1.46, 1.46), Color = cream, CFrame = base * CFrame.new(0, 0.16, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.06, 1.5, 1.5), Color = shade, CFrame = base * CFrame.new(0, 0.33, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+		-- solid flared crown drum the ribs live on
+		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.46, 1.3, 1.3), Color = cream, CFrame = base * CFrame.new(0, 0.5, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+		-- shallow vertical rib lines, embedded in the drum surface (fold lines,
+		-- not pillars)
+		for i = 0, 11 do
+			local a = (i / 12) * math.pi * 2
 			part({
-				Shape = Enum.PartType.Cylinder,
-				Size = Vector3.new(0.68, 0.30, 0.30),
+				Size = Vector3.new(0.05, 0.44, 0.1),
 				Color = shade,
-				CFrame = base * CFrame.new(math.cos(a) * 0.56, 0.72, math.sin(a) * 0.56) * CFrame.Angles(0, 0, math.rad(90)),
+				CFrame = base * CFrame.new(math.cos(a) * 0.64, 0.5, math.sin(a) * 0.64) * CFrame.Angles(0, -a, 0),
 			}, m)
 		end
-		-- one puffed top: a wide dome overhanging the pleats, capped by a small
-		-- centered crown button so it reads as a single soft puff (the old
-		-- build stacked two offset spheres and looked like a snowman head)
-		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.62, 0.82, 1.62), Color = WHITE, CFrame = base * CFrame.new(0, 1.0, 0) }, m)
-		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(0.5, 0.34, 0.5), Color = WHITE, CFrame = base * CFrame.new(0, 1.34, 0) }, m)
+		-- the big overhanging puff (dominant crown) + a soft pinch on top
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.74, 1.02, 1.74), Color = cream, CFrame = base * CFrame.new(0, 0.94, 0) }, m)
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(0.8, 0.4, 0.8), Color = cream, CFrame = base * CFrame.new(0, 1.36, 0) }, m)
 	end,
 	hat_toque = function(m)
 		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.9, 1.3, 1.3), Color = WHITE, CFrame = CFrame.new(0, 0.45, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
@@ -136,15 +137,17 @@ local BUILDERS: { [string]: (Model) -> () } = {
 		-- a real RING with a hole: a torus faked from segments around a circle,
 		-- floating flat above the head (Roblox has no torus primitive)
 		local gold = Color3.fromRGB(255, 226, 120)
-		local R, tube, N = 0.62, 0.14, 20
+		-- overlapping spheres around a horizontal circle: a smooth ring with a
+		-- clear hole, no harsh flat cylinder end-caps (Roblox has no torus)
+		local R, tube, N = 0.72, 0.19, 42
 		for i = 0, N - 1 do
 			local a = (i / N) * math.pi * 2
 			part({
-				Shape = Enum.PartType.Cylinder,
-				Size = Vector3.new((2 * math.pi * R / N) * 1.25, tube * 2, tube * 2),
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(tube, tube * 0.85, tube),
 				Color = gold,
 				Material = Enum.Material.Neon,
-				CFrame = CFrame.new(math.cos(a) * R, 0.9, math.sin(a) * R) * CFrame.Angles(0, -a + math.pi / 2, 0) * CFrame.Angles(0, 0, math.rad(90)),
+				CFrame = CFrame.new(math.cos(a) * R, 0.9, math.sin(a) * R),
 			}, m)
 		end
 	end,
