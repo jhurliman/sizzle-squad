@@ -69,6 +69,12 @@ for (let s = 0; s < SKINS.length; s++) {
   }
   for (const t of v.tail ?? []) nameGroup(t, 'Tail');
   for (const e of v.ears ?? []) nameGroup(e, 'Ears');
+  // The built-in hat is one structural unit (characters.ts hatGroup). Naming
+  // it makes the nearest-named-ancestor walk assign EVERY hat part —
+  // including shaded pleats that no longer match hatA/hatB — to BuiltinHat.
+  // This replaces the fragile colour-match promotion that left pip's toque
+  // pleats visible in the Head group.
+  nameGroup(v.hatGroup, 'BuiltinHat');
 
   // Settle the rig: rest rotations for ears/crests/bandana tails and the
   // tail-spring are applied during update(), not at construction — capturing

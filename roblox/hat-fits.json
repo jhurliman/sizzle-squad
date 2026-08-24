@@ -1,18 +1,693 @@
 {
   "COMMENT": "Per-(hat x species) fit registry — single source of truth. gen-hatfits.mjs emits HatFits.luau for the client; chef-sheet.mjs reads this file directly, so the review sheets always match the game. Resolution: defaults <- species.default <- species[hatId]. offset is studs in head space (x right, y up, z forward), tilt is degrees [pitch, roll], scale multiplies the skull-width base scale, hideEars hides the Ears group while the hat is worn (the built-in hat always hides).",
-  "defaults": { "scale": 1, "offset": [0, 0, 0], "tilt": [0, 0], "hideEars": false },
+  "defaults": {
+    "scale": 1,
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "tilt": [
+      0,
+      0
+    ],
+    "hideEars": false
+  },
   "species": {
     "bramble": {
-      "default": { "tilt": [5, 4], "scale": 1.22, "hideEars": true, "offset": [0, -0.12, 0] }
+      "default": {
+        "tilt": [
+          5,
+          4
+        ],
+        "scale": 1.22,
+        "hideEars": true,
+        "offset": [
+          0,
+          -0.12,
+          0
+        ]
+      },
+      "hat_halo": {
+        "offset": [
+          -0.19,
+          -0.73,
+          -0.05
+        ],
+        "tilt": [
+          5,
+          14.06,
+          0
+        ],
+        "scale": 8.48
+      },
+      "hat_tophat": {
+        "offset": [
+          -0.26,
+          -0.14,
+          0
+        ],
+        "tilt": [
+          5,
+          7.1,
+          0
+        ],
+        "scale": 1.66
+      },
+      "hat_colander": {
+        "offset": [
+          0,
+          -0.12,
+          0
+        ],
+        "tilt": [
+          5,
+          4,
+          0
+        ],
+        "scale": 1.11
+      },
+      "hat_bandana_green": {
+        "offset": [
+          -0.23,
+          -0.32,
+          -0.02
+        ],
+        "tilt": [
+          5,
+          15.35,
+          0
+        ],
+        "scale": 1.22
+      },
+      "hat_paperboat": {
+        "offset": [
+          -0.2,
+          -0.42,
+          0.02
+        ],
+        "tilt": [
+          5,
+          9.72,
+          0
+        ],
+        "scale": 1.4
+      },
+      "hat_toque": {
+        "offset": [
+          -0.09,
+          -0.62,
+          -0.04
+        ],
+        "tilt": [
+          5,
+          4,
+          0
+        ],
+        "scale": 1.06
+      },
+      "hat_paper": {
+        "offset": [
+          -0.18,
+          -0.46,
+          0.07
+        ],
+        "tilt": [
+          5,
+          4,
+          0
+        ],
+        "scale": 1.04
+      },
+      "hat_pan": {
+        "offset": [
+          -0.2,
+          -0.13,
+          0
+        ],
+        "tilt": [
+          5,
+          4,
+          0
+        ],
+        "scale": 5.58
+      },
+      "hat_mushroom": {
+        "offset": [
+          0,
+          -0.12,
+          0
+        ],
+        "tilt": [
+          5,
+          4,
+          0
+        ],
+        "scale": 0.75
+      },
+      "hat_beret": {
+        "offset": [
+          0,
+          -0.12,
+          0
+        ],
+        "tilt": [
+          5,
+          4,
+          0
+        ],
+        "scale": 0.41
+      },
+      "hat_bandana_red": {
+        "offset": [
+          -0.11,
+          -0.28,
+          -0.01
+        ],
+        "tilt": [
+          5,
+          17.27,
+          0
+        ],
+        "scale": 1.22
+      },
+      "hat_crown": {
+        "offset": [
+          -0.16,
+          -0.13,
+          0
+        ],
+        "tilt": [
+          5,
+          4,
+          0
+        ],
+        "scale": 1.22
+      }
     },
     "pip": {
-      "default": { "offset": [0, 0.2, -0.42], "tilt": [-5, 0], "scale": 0.95 }
+      "default": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0
+        ],
+        "scale": 0.95
+      },
+      "hat_halo": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 7.13
+      },
+      "hat_tophat": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 1.29
+      },
+      "hat_colander": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 0.87
+      },
+      "hat_bandana_green": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 0.95
+      },
+      "hat_paperboat": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 0.95
+      },
+      "hat_toque": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 0.82
+      },
+      "hat_paper": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 0.81
+      },
+      "hat_pan": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 4.34
+      },
+      "hat_mushroom": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 0.59
+      },
+      "hat_beret": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 0.32
+      },
+      "hat_bandana_red": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 0.95
+      },
+      "hat_crown": {
+        "offset": [
+          0,
+          0.2,
+          -0.42
+        ],
+        "tilt": [
+          -5,
+          0,
+          0
+        ],
+        "scale": 0.95
+      }
     },
     "nori": {
-      "default": { "offset": [0, 0.05, -0.08] }
+      "default": {
+        "offset": [
+          0,
+          0.05,
+          -0.08
+        ]
+      },
+      "hat_halo": {
+        "offset": [
+          0.09,
+          -0.83,
+          -0.08
+        ],
+        "tilt": [
+          0,
+          29.89,
+          0
+        ],
+        "scale": 7.5
+      },
+      "hat_tophat": {
+        "offset": [
+          0.25,
+          -0.17,
+          -0.08
+        ],
+        "tilt": [
+          0,
+          -13.13,
+          0
+        ],
+        "scale": 1.36
+      },
+      "hat_colander": {
+        "offset": [
+          -0.53,
+          0.05,
+          0.22
+        ],
+        "tilt": [
+          -180,
+          -180,
+          -35.71
+        ],
+        "scale": 0.91
+      },
+      "hat_bandana_green": {
+        "offset": [
+          -0.08,
+          -0.23,
+          -0.08
+        ],
+        "tilt": [
+          0,
+          12.65,
+          0
+        ],
+        "scale": 1
+      },
+      "hat_paperboat": {
+        "offset": [
+          -0.16,
+          -0.21,
+          0.04
+        ],
+        "tilt": [
+          0,
+          18.72,
+          0
+        ],
+        "scale": 1.25
+      },
+      "hat_toque": {
+        "offset": [
+          -0.6,
+          -0.23,
+          -0.08
+        ],
+        "tilt": [
+          0,
+          38.5,
+          0
+        ],
+        "scale": 0.8
+      },
+      "hat_paper": {
+        "offset": [
+          -0.55,
+          -0.09,
+          -0.08
+        ],
+        "tilt": [
+          0,
+          25.79,
+          0
+        ],
+        "scale": 0.85
+      },
+      "hat_pan": {
+        "offset": [
+          -0.27,
+          0.16,
+          -0.08
+        ],
+        "tilt": [
+          0,
+          36.81,
+          0
+        ],
+        "scale": 4.57
+      },
+      "hat_mushroom": {
+        "offset": [
+          -0.45,
+          -0.07,
+          -0.08
+        ],
+        "tilt": [
+          0,
+          40.25,
+          0
+        ],
+        "scale": 0.62
+      },
+      "hat_beret": {
+        "offset": [
+          -1.01,
+          -0.29,
+          0.55
+        ],
+        "tilt": [
+          0,
+          18.46,
+          0
+        ],
+        "scale": 0.55
+      },
+      "hat_bandana_red": {
+        "offset": [
+          -0.08,
+          -0.26,
+          -0.08
+        ],
+        "tilt": [
+          0,
+          14.78,
+          0
+        ],
+        "scale": 1
+      },
+      "hat_crown": {
+        "offset": [
+          -0.11,
+          -0.23,
+          -0.08
+        ],
+        "tilt": [
+          0,
+          6.98,
+          0
+        ],
+        "scale": 1.4
+      }
     },
     "mochi": {
-      "default": { "tilt": [10, 0], "offset": [0, 0, 0.08] }
+      "default": {
+        "tilt": [
+          10,
+          0
+        ],
+        "offset": [
+          0,
+          0,
+          0.08
+        ]
+      },
+      "hat_halo": {
+        "offset": [
+          0,
+          -0.66,
+          -0.04
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 7.5
+      },
+      "hat_tophat": {
+        "offset": [
+          0,
+          -0.24,
+          0.04
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 1.36
+      },
+      "hat_colander": {
+        "offset": [
+          0,
+          0,
+          0.08
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 0.91
+      },
+      "hat_bandana_green": {
+        "offset": [
+          0,
+          0,
+          0.08
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 1
+      },
+      "hat_paperboat": {
+        "offset": [
+          0,
+          -0.12,
+          0.06
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 1
+      },
+      "hat_toque": {
+        "offset": [
+          0,
+          0,
+          0.08
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 0.87
+      },
+      "hat_paper": {
+        "offset": [
+          0,
+          0,
+          0.08
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 0.85
+      },
+      "hat_pan": {
+        "offset": [
+          0,
+          -0.27,
+          0.03
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 4.57
+      },
+      "hat_mushroom": {
+        "offset": [
+          0,
+          -0.15,
+          0.05
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 0.62
+      },
+      "hat_beret": {
+        "offset": [
+          0,
+          0,
+          0.08
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 0.33
+      },
+      "hat_bandana_red": {
+        "offset": [
+          0,
+          0,
+          0.08
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 1
+      },
+      "hat_crown": {
+        "offset": [
+          0,
+          -0.26,
+          0.03
+        ],
+        "tilt": [
+          10,
+          0,
+          0
+        ],
+        "scale": 1
+      }
     }
   }
 }

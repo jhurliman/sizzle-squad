@@ -17846,6 +17846,14 @@ var ChefView = class {
   hips = new Group();
   torso = new Group();
   head = new Group();
+  /**
+   * The built-in hat, in its own group. Transform-neutral (origin, no
+   * rotation), so this is behaviourally identical to adding the hat parts
+   * straight to `head` — it exists only so tooling has a structural handle on
+   * the hat, exactly as `ears`/`tail`/`eyes` do. Populated by the `s.hat`
+   * switch in `buildHead` via a scoped `head` redirect.
+   */
+  hatGroup = new Group();
   legL;
   legR;
   armL;
@@ -18562,6 +18570,9 @@ var ChefView = class {
         break;
       }
     }
+    this.head.add(this.hatGroup);
+    const realHead = this.head;
+    this.head = this.hatGroup;
     switch (s.hat) {
       case "bandana": {
         const band = new Mesh(new TorusGeometry2(0.268, 0.055, 8, 22), toon2(s.hatA));
@@ -18665,6 +18676,7 @@ var ChefView = class {
         break;
       }
     }
+    this.head = realHead;
   }
   buildArms() {
     const s = this.skin;
@@ -19543,6 +19555,7 @@ for (let s = 0; s < SKINS2.length; s++) {
   }
   for (const t of v.tail ?? []) nameGroup(t, "Tail");
   for (const e of v.ears ?? []) nameGroup(e, "Ears");
+  nameGroup(v.hatGroup, "BuiltinHat");
   for (let i = 0; i < 12; i++) view.update(1 / 60, i / 60);
   for (const limb of [v.legL, v.legR]) {
     if (limb) {

@@ -50,12 +50,13 @@ function paperHatParts(parts, skin) {
   const fit = resolveFit(skin, 'hat_paper');
   const s = (Math.max(skull.size[0], skull.size[2]) / 1.55) * fit.scale;
   const [tx, tz, ty = 0] = fit.tilt;
+  // Anchor identical to ChefVisuals + FitLab: max(headTop-0.25, skull+0.3),
+  // headTop over Head-group parts only (the built-in hat is BuiltinHat now,
+  // so it no longer inflates this — the whole pip floating-hat bug).
+  const headTop = Math.max(...head.map((p) => p.cf[1] + p.size[1] / 2));
+  const anchorY = Math.max(headTop - 0.25, skull.cf[1] + skull.size[1] * 0.3);
   const attach = new THREE.Matrix4()
-    .makeTranslation(
-      skull.cf[0] + fit.offset[0],
-      skull.cf[1] + skull.size[1] * 0.42 + fit.offset[1],
-      skull.cf[2] + fit.offset[2],
-    )
+    .makeTranslation(skull.cf[0] + fit.offset[0], anchorY + fit.offset[1], skull.cf[2] + fit.offset[2])
     .multiply(new THREE.Matrix4().makeRotationX((tx * Math.PI) / 180))
     .multiply(new THREE.Matrix4().makeRotationY((ty * Math.PI) / 180))
     .multiply(new THREE.Matrix4().makeRotationZ((tz * Math.PI) / 180))

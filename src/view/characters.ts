@@ -953,6 +953,14 @@ export class ChefView {
   private hips = new THREE.Group();
   private torso = new THREE.Group();
   private head = new THREE.Group();
+  /**
+   * The built-in hat, in its own group. Transform-neutral (origin, no
+   * rotation), so this is behaviourally identical to adding the hat parts
+   * straight to `head` — it exists only so tooling has a structural handle on
+   * the hat, exactly as `ears`/`tail`/`eyes` do. Populated by the `s.hat`
+   * switch in `buildHead` via a scoped `head` redirect.
+   */
+  readonly hatGroup = new THREE.Group();
   private legL!: Limb;
   private legR!: Limb;
   private armL!: Limb;
@@ -2015,6 +2023,15 @@ export class ChefView {
 
     // ---- hats: four different shapes, four different colours, and every one
     //      of them now carries something on the BACK of the skull.
+    //
+    // The whole switch adds to `hatGroup` instead of `head` directly, so the
+    // built-in hat is one structural unit (tooling hides/repositions it as a
+    // whole). `hatGroup` sits at head origin with no transform, so every
+    // `this.head.add(...)` below lands in exactly the same world place it did
+    // before — this redirect is a no-op for rendering.
+    this.head.add(this.hatGroup);
+    const realHead = this.head;
+    this.head = this.hatGroup;
     switch (s.hat) {
       case 'bandana': {
         const band = new THREE.Mesh(new THREE.TorusGeometry(0.268, 0.055, 8, 22), toon(s.hatA));
@@ -2217,6 +2234,7 @@ export class ChefView {
         break;
       }
     }
+    this.head = realHead;
   }
 
   private buildArms() {
