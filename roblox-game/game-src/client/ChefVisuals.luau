@@ -235,11 +235,17 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 	local speed = entry.smSpeed
 	local moveBlend = math.clamp((speed - 0.25) / 2.2, 0, 1)
 
+	-- nori is ON ROLLER SKATES (the ankle wheels — playtest: "this is
+	-- fantastic as long as his animations match"): long glides instead of
+	-- steps, no bounce, side-to-side carve instead of walk-rock.
+	local skating = skin == "nori"
 	if moveBlend > 0.01 then
-		entry.phase += dt * (1.2 + speed * 0.55) -- ~4.5 steps/s at sprint
+		entry.phase += dt * (if skating then 0.6 + speed * 0.28 else 1.2 + speed * 0.55)
 	end
-	local stepSin = math.sin(entry.phase * math.pi) -- alternates each step
-	local hop = math.abs(stepSin) * moveBlend * CHEF_HEIGHT * 0.06
+	local stepSin = math.sin(entry.phase * math.pi) -- alternates each step/stride
+	local hop = if skating
+		then math.abs(stepSin) * moveBlend * CHEF_HEIGHT * 0.012 -- glide: barely any bob
+		else math.abs(stepSin) * moveBlend * CHEF_HEIGHT * 0.06
 
 	local carryingNow = bit32.band(flags, 4) ~= 0
 	entry.carryBlend += ((if carryingNow then 1 else 0) - entry.carryBlend) * math.min(1, dt * 10)
@@ -247,7 +253,8 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 	local working = bit32.band(flags, 2) ~= 0
 	local stunned = (pose.stun or 0) > 0
 	local wobble = if stunned then math.sin(self.time * 24) * 0.12 else 0
-	local rock = stepSin * 0.05 * moveBlend
+	-- skate carve: a deeper, slower roll; walkers get the usual step rock
+	local rock = if skating then stepSin * 0.11 * moveBlend else stepSin * 0.05 * moveBlend
 
 	local base = CFrame.new(pose.x * SCALE, 0, pose.y * SCALE) * CFrame.Angles(0, -pose.heading + math.pi / 2, 0)
 	local baseCF = base * CFrame.new(0, hop, 0) * CFrame.Angles(wobble, 0, rock)
@@ -255,11 +262,12 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 	local model = entry.model :: Model
 	if entry.isRig and #entry.animParts > 0 then
 		-- ---- group poses ---------------------------------------------------
-		local legAmp = 0.85 * moveBlend
-		local armAmp = 0.55 * moveBlend * (1 - carryBlend)
+		-- skaters scissor gently and crouch; walkers swing
+		local legAmp = (if skating then 0.22 else 0.85) * moveBlend
+		local armAmp = (if skating then 0.3 else 0.55) * moveBlend * (1 - carryBlend)
 		local legSwing = stepSin * legAmp
 		local armSwing = -stepSin * armAmp
-		local torsoPitch = 0.1 * moveBlend
+		local torsoPitch = (if skating then 0.2 else 0.1) * moveBlend
 		local torsoYaw = math.sin(entry.phase * math.pi * 2) * 0.045 * moveBlend
 		local flail = if stunned then 0.9 else 0
 

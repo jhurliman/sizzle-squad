@@ -108,8 +108,21 @@ for (const [skin, entry] of Object.entries(dump.skins)) {
       const M2 = M.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, -PLANE_T / 2)).multiply(ROT_Y90);
       emit(p.group, 'Cylinder', [PLANE_T, 2 * ro * sx, 2 * ro * sy], M2, color);
     } else if (p.kind === 'torus') {
-      const [r = 0.1, tube = 0.03] = p.args;
-      emit(p.group, 'Cylinder', [tube * 2 * sy, 2 * (r + tube) * sx, 2 * (r + tube) * sz], M.clone().multiply(ROT_Z90), color);
+      // A REAL RING, not a filled disc: a disc read as a gaping mouth where
+      // the web draws a thin lip arc (pip), and as a tiara where it draws a
+      // headband (bramble). Segments lie in the torus's local XY plane,
+      // tangent-oriented; the torus hole runs along local Z.
+      // args[4] is the ARC: mouths are ~half-circle smiles, bands are full
+      // rings — a full ring where the web draws a smile is a wreath.
+      const [r = 0.1, tube = 0.03, , , arc = Math.PI * 2] = p.args;
+      const N = Math.max(4, Math.round(10 * (arc / (Math.PI * 2))) + 2);
+      for (let k = 0; k < N; k++) {
+        const ang = ((k + 0.5) / N) * arc;
+        const seg = M.clone()
+          .multiply(new THREE.Matrix4().makeTranslation(r * Math.cos(ang) * sx, r * Math.sin(ang) * sy, 0))
+          .multiply(new THREE.Matrix4().makeRotationZ(ang + Math.PI / 2));
+        emit(p.group, 'Cylinder', [((arc * r) / N) * 1.2 * sx, tube * 2 * sz, tube * 2 * sz], seg, color);
+      }
     } else if (p.kind === 'capsule') {
       const [r = 0.1, len = 0.1] = p.args;
       emit(p.group, 'Block', [2 * r * sx, (len + 2 * r) * sy, 2 * r * sz], M, color);
@@ -164,6 +177,51 @@ for (const [skin, entry] of Object.entries(dump.skins)) {
   {
     const minY = Math.min(...parts.map((p) => p.cf[1] - halfY(p)));
     if (minY < -0.02) for (const p of parts) p.cf[1] -= minY;
+  }
+
+  // ---- art direction (playtest, owner) ------------------------------------
+  // bramble: drop the rear bandana tails + drawstring cords ('can't tell
+  // what it is'), tuck the tongue back to half its protrusion.
+  // pip: drop the two chest strap rectangles ('noise').
+  // mochi: drop the crest feathers (hat clearance), nudge the cap forward
+  // so its back edge stops cutting through the skull.
+  if (skin === 'bramble') {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      if (p.group === 'Ears' && p.cf[2] < -1.0) parts.splice(i, 1);
+    }
+    // the (now correctly horizontal) band sat across his eyes like a
+    // blindfold — raise band + knot to the forehead
+    for (const p of parts) {
+      if (p.color[0] === 163 && p.color[1] === 35) p.cf[1] += 0.45;
+    }
+    for (const p of parts) {
+      if (p.group === 'Head' && p.shape === 'Cylinder' && p.color[0] === 51 && p.cf[1] < 7 && p.cf[2] > 1.3) {
+        p.cf[2] = 1.16 + (p.cf[2] - 1.16) * 0.5;
+      }
+    }
+  } else if (skin === 'pip') {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      if (
+        p.group === 'Torso' &&
+        p.shape === 'Block' &&
+        p.color[0] === 236 &&
+        p.size[1] > 1.2 &&
+        p.size[0] < 0.5
+      )
+        parts.splice(i, 1);
+    }
+  } else if (skin === 'mochi') {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      if (parts[i].group === 'Ears') parts.splice(i, 1);
+    }
+    for (const p of parts) {
+      if (p.group === 'BuiltinHat') {
+        p.cf[2] += 0.28;
+        p.cf[1] += 0.1;
+      }
+    }
   }
 
   const scaledJoints = {};
