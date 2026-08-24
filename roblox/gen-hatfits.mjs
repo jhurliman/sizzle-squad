@@ -45,7 +45,7 @@ function HatFits.resolve(skin: string, hatId: string): Fit
 	return {
 		scale = merged.scale,
 		offset = Vector3.new(merged.offset[1], merged.offset[2], merged.offset[3]),
-		tilt = CFrame.Angles(math.rad(merged.tilt[1]), 0, math.rad(merged.tilt[2])),
+		tilt = CFrame.Angles(math.rad(merged.tilt[1]), math.rad(merged.tilt[3] or 0), math.rad(merged.tilt[2])),
 		hideEars = merged.hideEars == true,
 	}
 end

@@ -49,7 +49,7 @@ function paperHatParts(parts, skin) {
   }
   const fit = resolveFit(skin, 'hat_paper');
   const s = (Math.max(skull.size[0], skull.size[2]) / 1.55) * fit.scale;
-  const [tx, tz] = fit.tilt;
+  const [tx, tz, ty = 0] = fit.tilt;
   const attach = new THREE.Matrix4()
     .makeTranslation(
       skull.cf[0] + fit.offset[0],
@@ -57,6 +57,7 @@ function paperHatParts(parts, skin) {
       skull.cf[2] + fit.offset[2],
     )
     .multiply(new THREE.Matrix4().makeRotationX((tx * Math.PI) / 180))
+    .multiply(new THREE.Matrix4().makeRotationY((ty * Math.PI) / 180))
     .multiply(new THREE.Matrix4().makeRotationZ((tz * Math.PI) / 180))
     .multiply(new THREE.Matrix4().makeRotationX((4 * Math.PI) / 180))
     .multiply(new THREE.Matrix4().makeRotationZ((6 * Math.PI) / 180));

@@ -257,6 +257,20 @@ for (const [skin, entry] of Object.entries(dump.skins)) {
     for (const p of parts) {
       if (p.group === 'Head' && p.color[0] === 63 && p.color[1] === 201) p.group = 'BuiltinHat';
     }
+    // INLINE SKATES (owner: 'fully leaning into the roller blades'): the
+    // cream paw is the boot; add a dark frame + three wheels under each,
+    // grounded, in the leg group so they ride the skating gait.
+    for (const legGroup of ['LegL', 'LegR']) {
+      const pad = parts.find((p) => p.group === legGroup && p.color[0] === 228 && p.color[1] === 220);
+      if (!pad) continue;
+      const [px, py, pz] = pad.cf;
+      const ID = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+      parts.push({ group: legGroup, shape: 'Block', size: [0.24, 0.34, 1.5], cf: [px, py - 0.34, pz + 0.08, ...ID], color: [46, 58, 84] });
+      for (const dz of [-0.5, 0, 0.5]) {
+        parts.push({ group: legGroup, shape: 'Cylinder', size: [0.26, 0.56, 0.56], cf: [px, 0.29, pz + 0.08 + dz, ...ID], color: [233, 84, 120] });
+        parts.push({ group: legGroup, shape: 'Cylinder', size: [0.3, 0.18, 0.18], cf: [px, 0.29, pz + 0.08 + dz, ...ID], color: [220, 224, 232] });
+      }
+    }
   }
 
   const scaledJoints = {};
