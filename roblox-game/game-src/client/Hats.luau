@@ -22,6 +22,25 @@ end
 
 local WHITE = Color3.fromRGB(245, 240, 230)
 
+-- A tied headscarf: cloth dome over the crown, a rolled brow band, a knot at
+-- the back and two trailing tails. `light`/`dark` are the two cloth shades.
+local function bandana(m: Model, light: Color3, dark: Color3)
+	-- cloth over the skull crown
+	part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.62, 0.9, 1.62), Color = light, CFrame = CFrame.new(0, 0.12, 0) }, m)
+	-- rolled brow band (a squashed torus-ish ring, faked as a fat flat ring)
+	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.28, 1.66, 1.66), Color = dark, CFrame = CFrame.new(0, -0.08, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+	-- knot at the back
+	part({ Shape = Enum.PartType.Ball, Size = Vector3.new(0.42, 0.42, 0.42), Color = dark, CFrame = CFrame.new(0, 0.02, -0.82) }, m)
+	-- two trailing tails
+	for _, side in { -1, 1 } do
+		part({
+			Size = Vector3.new(0.16, 0.5, 0.14),
+			Color = light,
+			CFrame = CFrame.new(0.14 * side, -0.12, -0.9) * CFrame.Angles(math.rad(28), math.rad(10 * side), 0),
+		}, m)
+	end
+end
+
 local BUILDERS: { [string]: (Model) -> () } = {
 	hat_paper = function(m)
 		-- Folded paper cook's hat, earned-asset grade: creased band, ring of
@@ -42,21 +61,21 @@ local BUILDERS: { [string]: (Model) -> () } = {
 				CFrame = base * CFrame.new(math.cos(a) * 0.56, 0.72, math.sin(a) * 0.56) * CFrame.Angles(0, 0, math.rad(90)),
 			}, m)
 		end
-		-- puffed dome with a soft overhang past the pleats
-		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.5, 0.78, 1.5), Color = WHITE, CFrame = base * CFrame.new(0, 1.02, 0) }, m)
-		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.1, 0.55, 1.1), Color = Color3.fromRGB(250, 246, 238), CFrame = base * CFrame.new(0.1, 1.22, 0.05) }, m)
+		-- one puffed top: a wide dome overhanging the pleats, capped by a small
+		-- centered crown button so it reads as a single soft puff (the old
+		-- build stacked two offset spheres and looked like a snowman head)
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.62, 0.82, 1.62), Color = WHITE, CFrame = base * CFrame.new(0, 1.0, 0) }, m)
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(0.5, 0.34, 0.5), Color = WHITE, CFrame = base * CFrame.new(0, 1.34, 0) }, m)
 	end,
 	hat_toque = function(m)
 		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.9, 1.3, 1.3), Color = WHITE, CFrame = CFrame.new(0, 0.45, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
 		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.5, 0.9, 1.5), Color = WHITE, CFrame = CFrame.new(0, 1.05, 0) }, m)
 	end,
 	hat_bandana_red = function(m)
-		part({ Size = Vector3.new(1.6, 0.35, 1.6), Color = Color3.fromRGB(204, 60, 50), CFrame = CFrame.new(0, 0.1, 0) }, m)
-		part({ Size = Vector3.new(0.4, 0.5, 0.25), Color = Color3.fromRGB(178, 46, 38), CFrame = CFrame.new(0.55, -0.15, -0.6) * CFrame.Angles(math.rad(25), 0, 0) }, m)
+		bandana(m, Color3.fromRGB(204, 60, 50), Color3.fromRGB(168, 42, 34))
 	end,
 	hat_bandana_green = function(m)
-		part({ Size = Vector3.new(1.6, 0.35, 1.6), Color = Color3.fromRGB(84, 160, 60), CFrame = CFrame.new(0, 0.1, 0) }, m)
-		part({ Size = Vector3.new(0.4, 0.5, 0.25), Color = Color3.fromRGB(66, 130, 46), CFrame = CFrame.new(0.55, -0.15, -0.6) * CFrame.Angles(math.rad(25), 0, 0) }, m)
+		bandana(m, Color3.fromRGB(84, 160, 60), Color3.fromRGB(60, 122, 42))
 	end,
 	hat_beret = function(m)
 		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.7, 0.5, 1.7), Color = Color3.fromRGB(60, 60, 130), CFrame = CFrame.new(0.15, 0.2, 0) * CFrame.Angles(0, 0, math.rad(-8)) }, m)
@@ -67,8 +86,29 @@ local BUILDERS: { [string]: (Model) -> () } = {
 		part({ Size = Vector3.new(1.1, 0.4, 0.12), Color = Color3.fromRGB(232, 226, 212), CFrame = CFrame.new(0, 0.6, 0) }, m)
 	end,
 	hat_colander = function(m)
-		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.7, 1.0, 1.7), Color = Color3.fromRGB(160, 165, 172), Material = Enum.Material.Metal, CFrame = CFrame.new(0, 0.3, 0) }, m)
-		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.12, 0.5, 0.5), Color = Color3.fromRGB(140, 145, 152), Material = Enum.Material.Metal, CFrame = CFrame.new(0.95, 0.25, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+		local steel = Color3.fromRGB(170, 174, 180)
+		local dark = Color3.fromRGB(70, 72, 78)
+		-- the inverted bowl
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.72, 1.06, 1.72), Color = steel, Material = Enum.Material.Metal, CFrame = CFrame.new(0, 0.2, 0) }, m)
+		-- rolled rim
+		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.14, 1.78, 1.78), Color = steel, Material = Enum.Material.Metal, CFrame = CFrame.new(0, 0.02, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+		-- drainage holes: two concentric rings of dark pits punched into the dome
+		for _, ring in { { r = 0.62, y = 0.42, n = 10, tilt = 0.5 }, { r = 0.32, y = 0.6, n = 6, tilt = 0.9 } } do
+			for i = 0, ring.n - 1 do
+				local a = (i / ring.n) * math.pi * 2
+				part({
+					Shape = Enum.PartType.Cylinder,
+					Size = Vector3.new(0.12, 0.16, 0.16),
+					Color = dark,
+					Material = Enum.Material.Metal,
+					CFrame = CFrame.new(math.cos(a) * ring.r, ring.y, math.sin(a) * ring.r)
+						* CFrame.Angles(ring.tilt * math.cos(a), 0, -ring.tilt * math.sin(a))
+						* CFrame.Angles(0, 0, math.rad(90)),
+				}, m)
+			end
+		end
+		-- one loop handle, attached at the rim (not floating)
+		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 0.36, 0.36), Color = dark, Material = Enum.Material.Metal, CFrame = CFrame.new(0.9, 0.06, 0) * CFrame.Angles(0, math.rad(90), 0) }, m)
 	end,
 	hat_tophat = function(m)
 		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.18, 1.9, 1.9), Color = Color3.fromRGB(35, 32, 30), CFrame = CFrame.new(0, 0.09, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
@@ -93,7 +133,20 @@ local BUILDERS: { [string]: (Model) -> () } = {
 		end
 	end,
 	hat_halo = function(m)
-		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.12, 1.5, 1.5), Color = Color3.fromRGB(255, 226, 120), Material = Enum.Material.Neon, CFrame = CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0, math.rad(90)) }, m)
+		-- a real RING with a hole: a torus faked from segments around a circle,
+		-- floating flat above the head (Roblox has no torus primitive)
+		local gold = Color3.fromRGB(255, 226, 120)
+		local R, tube, N = 0.62, 0.14, 20
+		for i = 0, N - 1 do
+			local a = (i / N) * math.pi * 2
+			part({
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new((2 * math.pi * R / N) * 1.25, tube * 2, tube * 2),
+				Color = gold,
+				Material = Enum.Material.Neon,
+				CFrame = CFrame.new(math.cos(a) * R, 0.9, math.sin(a) * R) * CFrame.Angles(0, -a + math.pi / 2, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			}, m)
+		end
 	end,
 }
 
