@@ -142,18 +142,35 @@ for row, skin in SPECIES do
 						math.rad(fit.tilt[3] or 0),
 						math.rad(fit.tilt[2] or 0)
 					)
-				local minX, maxX = math.huge, -math.huge
+				-- Rotation-AWARE world AABB, so BuiltExtentDiag matches Studio's
+				-- GetExtentsSize().Magnitude used at export time. The old
+				-- Size.X-only box ignored rotation, so rotated-cylinder hats
+				-- (halo, pan) mismatched and their scale compounded every
+				-- export. Diagonal (all axes) is robust to thin-in-one-axis
+				-- shapes like the flat halo ring.
+				local lo = Vector3.new(math.huge, math.huge, math.huge)
+				local hi = Vector3.new(-math.huge, -math.huge, -math.huge)
 				for _, d in hat:GetDescendants() do
 					if d:IsA("BasePart") then
 						local cf = d.CFrame
 						d.Size = d.Size * s
 						d.CFrame = attachCF * (CFrame.new(cf.Position * s) * cf.Rotation)
-						minX = math.min(minX, d.CFrame.X - d.Size.X / 2)
-						maxX = math.max(maxX, d.CFrame.X + d.Size.X / 2)
+						local ncf, sz = d.CFrame, d.Size
+						local hx = math.abs(ncf.RightVector.X) * sz.X / 2
+							+ math.abs(ncf.UpVector.X) * sz.Y / 2
+							+ math.abs(ncf.LookVector.X) * sz.Z / 2
+						local hy = math.abs(ncf.RightVector.Y) * sz.X / 2
+							+ math.abs(ncf.UpVector.Y) * sz.Y / 2
+							+ math.abs(ncf.LookVector.Y) * sz.Z / 2
+						local hz = math.abs(ncf.RightVector.Z) * sz.X / 2
+							+ math.abs(ncf.UpVector.Z) * sz.Y / 2
+							+ math.abs(ncf.LookVector.Z) * sz.Z / 2
+						lo = Vector3.new(math.min(lo.X, ncf.X - hx), math.min(lo.Y, ncf.Y - hy), math.min(lo.Z, ncf.Z - hz))
+						hi = Vector3.new(math.max(hi.X, ncf.X + hx), math.max(hi.Y, ncf.Y + hy), math.max(hi.Z, ncf.Z + hz))
 					end
 				end
 				hat:SetAttribute("BuiltScale", fit.scale)
-				hat:SetAttribute("BuiltExtentX", math.max(0.1, maxX - minX))
+				hat:SetAttribute("BuiltExtentDiag", math.max(0.1, (hi - lo).Magnitude))
 				hat.Parent = slot
 			end
 

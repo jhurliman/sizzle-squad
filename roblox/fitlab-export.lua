@@ -12,8 +12,12 @@ for _, slot in workspace.FitLab:GetChildren() do
 		if hat and ref then
 			local rel = ref.CFrame:Inverse() * hat:GetPivot()
 			local rx, ry, rz = rel:ToEulerAnglesXYZ()
+			-- Diagonal magnitude of the true oriented bounding box, matching
+			-- the rotation-aware BuiltExtentDiag stored at build. Untouched
+			-- hats therefore export scale == BuiltScale (ratio 1); rotated
+			-- shapes no longer compound.
 			local ext = hat:GetExtentsSize()
-			local scale = hat:GetAttribute("BuiltScale") * (ext.X / hat:GetAttribute("BuiltExtentX"))
+			local scale = hat:GetAttribute("BuiltScale") * (ext.Magnitude / hat:GetAttribute("BuiltExtentDiag"))
 			out[species] = out[species] or {}
 			out[species][hatId] = {
 				offset = { r(rel.X), r(rel.Y), r(rel.Z) },
