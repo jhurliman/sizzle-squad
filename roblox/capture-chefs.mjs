@@ -74,7 +74,20 @@ for (let s = 0; s < SKINS.length; s++) {
   // tail-spring are applied during update(), not at construction — capturing
   // the raw constructed pose is exactly the "red candle growing out of the
   // bear's head" bug the web game once shipped.
-  for (let i = 0; i < 30; i++) view.update(1 / 60, i / 60);
+  // 3 ticks: rests are assigned every frame (1 is enough) and the tail
+  // spring starts at rest — while 30 ticks let the IDLE GESTURE animation
+  // walk the limbs out of neutral (a raised cat leg, exposed ankle caps).
+  for (let i = 0; i < 12; i++) view.update(1 / 60, i / 60);
+  // Legs settle into a mid-stride split; the animator swings around the bind
+  // pose, so a split bind skews the whole gait. Zero the leg pivots (ears/
+  // tail rests stay — those are what the settle was for).
+  for (const limb of [v.legL, v.legR]) {
+    if (limb) {
+      for (const node of [limb.hip, limb.knee, limb.foot]) {
+        if (node && node.rotation) node.rotation.set(0, 0, 0);
+      }
+    }
+  }
   view.root.updateMatrixWorld(true);
 
   // Capture RELATIVE to the rig node: update() bakes heading/idle root
@@ -113,6 +126,11 @@ for (let s = 0; s < SKINS.length; s++) {
   const markSkip = (obj) => obj && obj.isObject3D && obj.traverse((o) => skip.add(o));
   markSkip(v.mouthCav);
 
+  // Eyes are structurally known (v.eyes) — never hat candidates, no matter
+  // how white they are (pip's eye whites ARE his hat color).
+  const eyeSet = new Set();
+  for (const e of v.eyes ?? []) e.traverse && e.traverse((o) => eyeSet.add(o));
+
   const prims = [];
   view.root.traverse((obj) => {
     if (!obj.isMesh) return;
@@ -131,13 +149,14 @@ for (let s = 0; s < SKINS.length; s++) {
         break;
       }
     }
-    // The species' built-in hat (bandana/toque/boater/crest-band) is colored
-    // with the skin's hatA/hatB — split it into its own group so equipping a
-    // cosmetic hat can hide it, and so hat-attach height ignores it.
-    if (group === 'Head' && mat.color) {
-      const hex = mat.color.getHex();
-      if (hex === v.skin.hatA || hex === v.skin.hatB) group = 'BuiltinHat';
-    }
+    // Hat-COLORED head parts are only candidates — pip's hat is white, and so
+    // are his eye whites. prepare-chefs.mjs promotes candidates to the
+    // BuiltinHat group only if they sit near/above the skull top.
+    const hatColor =
+      group === 'Head' &&
+      !eyeSet.has(mesh) &&
+      mat.color &&
+      (mat.color.getHex() === v.skin.hatA || mat.color.getHex() === v.skin.hatB);
     const M = new THREE.Matrix4().multiplyMatrices(refInv, new THREE.Matrix4().multiplyMatrices(mesh.matrixWorld, r.mat));
     const pos = new THREE.Vector3();
     const quat = new THREE.Quaternion();
@@ -155,6 +174,7 @@ for (let s = 0; s < SKINS.length; s++) {
       quat: [quat.x, quat.y, quat.z, quat.w],
       scale: [scl.x, scl.y, scl.z],
       group,
+      hatColor: hatColor === true,
       color: mat.color ? mat.color.getHexString() : 'ffffff',
       frames: frames(r.stack).slice(0, 4),
     });

@@ -32,6 +32,7 @@ for (const [skin, entry] of Object.entries(dump.skins)) {
   const ROT_Y90 = new THREE.Matrix4().makeRotationY(Math.PI / 2);
 
   for (const p of prims) {
+    const markStart = parts.length;
     const M = new THREE.Matrix4().compose(
       new THREE.Vector3(...p.pos),
       new THREE.Quaternion(...p.quat),
@@ -55,18 +56,28 @@ for (const [skin, entry] of Object.entries(dump.skins)) {
       const uniform = Math.abs(sx - sy) < 1e-6 && Math.abs(sy - sz) < 1e-6;
       emit(p.group, uniform ? 'Ball' : 'SphereMesh', [2 * r * sx, 2 * r * sy, 2 * r * sz], M, color);
     } else if (p.kind === 'cone') {
+      // fine slices with a merged tip: coarse steps read as antenna towers
       const [r = 1, h = 1] = p.args;
-      for (let i = 0; i < 3; i++) {
-        const rMid = r * (1 - (i + 0.5) / 3);
-        const yC = -h / 2 + ((i + 0.5) / 3) * h;
+      const N = 8;
+      for (let i = 0; i < N - 1; i++) {
+        const rMid = r * (1 - (i + 0.5) / N);
+        const yC = -h / 2 + ((i + 0.5) / N) * h;
         emit(
           p.group,
           'Cylinder',
-          [(h / 3) * sy, 2 * rMid * sx, 2 * rMid * sz],
+          [(h / N) * sy, 2 * rMid * sx, 2 * rMid * sz],
           M.clone().multiply(new THREE.Matrix4().makeTranslation(0, yC * sy, 0)).multiply(ROT_Z90),
           color,
         );
       }
+      // tip: a ball instead of a needle-thin cylinder
+      emit(
+        p.group,
+        'Ball',
+        [(2 * r / N) * sx * 1.4, (h / N) * sy * 1.6, (2 * r / N) * sz * 1.4],
+        M.clone().multiply(new THREE.Matrix4().makeTranslation(0, (h / 2 - h / (N * 1.6)) * sy, 0)),
+        color,
+      );
     } else if (p.kind === 'lathe') {
       const pts = p.args[0];
       for (let i = 0; i + 1 < pts.length; i++) {
@@ -103,7 +114,58 @@ for (const [skin, entry] of Object.entries(dump.skins)) {
       const [r = 0.1, len = 0.1] = p.args;
       emit(p.group, 'Block', [2 * r * sx, (len + 2 * r) * sy, 2 * r * sz], M, color);
     }
+    for (let k = markStart; k < parts.length; k++) parts[k].hatCand = p.hatColor === true;
   }
+  // ---- fit-up passes ------------------------------------------------------
+  // Rotation-aware vertical half-extent: cylinders store [length, dia, dia]
+  // with length along the ROTATED local X — treating size[1]/2 as the
+  // vertical extent made a tilted brim 'reach' a full radius downward and
+  // defeated the hat clamp entirely.
+  const halfY = (p) =>
+    (Math.abs(p.cf[6]) * p.size[0] + Math.abs(p.cf[7]) * p.size[1] + Math.abs(p.cf[8]) * p.size[2]) / 2;
+  // 0. Promote hat-COLORED head parts to the BuiltinHat group only when they
+  // sit near/above the skull top — pip's hat shares its white with his eye
+  // whites, and color alone once classified his EYES as a hat.
+  {
+    const head = parts.filter((p) => p.group === 'Head');
+    let skull = head[0];
+    for (const p of head) {
+      if (p.size[0] * p.size[1] * p.size[2] > (skull ? skull.size[0] * skull.size[1] * skull.size[2] : 0)) skull = p;
+    }
+    if (skull) {
+      const skullTop = skull.cf[1] + skull.size[1] / 2;
+      for (const p of parts) {
+        if (p.hatCand && p.cf[1] + halfY(p) >= skullTop - 0.25) p.group = 'BuiltinHat';
+      }
+    }
+    for (const p of parts) delete p.hatCand;
+  }
+  // 1. Built-in hat sits ON the head: some species' hats capture with an air
+  // gap (the frog's toque floated ~half a stud). Clamp the hat down so its
+  // underside meets the head top, sinking slightly for contact.
+  {
+    // Reference is the SKULL top, not the head-group max: pip's frog eyes
+    // protrude above his skull and made 'head top' higher than the hat.
+    const head = parts.filter((p) => p.group === 'Head');
+    let skull = head[0];
+    for (const p of head) {
+      if (p.size[0] * p.size[1] * p.size[2] > (skull ? skull.size[0] * skull.size[1] * skull.size[2] : 0)) skull = p;
+    }
+    const hatParts = parts.filter((p) => p.group === 'BuiltinHat');
+    if (hatParts.length > 0 && skull) {
+      const skullTop = skull.cf[1] + skull.size[1] / 2;
+      const hatBottom = Math.min(...hatParts.map((p) => p.cf[1] - halfY(p)));
+      const gap = hatBottom - (skullTop - 0.25);
+      if (gap > 0.03) for (const p of hatParts) p.cf[1] -= gap;
+    }
+  }
+  // 2. Grounding: nothing dangles below the soles (ankle caps protruded
+  // under the cat's feet). Lift the whole rig so its lowest point is y=0.
+  {
+    const minY = Math.min(...parts.map((p) => p.cf[1] - halfY(p)));
+    if (minY < -0.02) for (const p of parts) p.cf[1] -= minY;
+  }
+
   const scaledJoints = {};
   for (const [g, p] of Object.entries(joints)) scaledJoints[g] = [p[0] * S, p[1] * S, p[2] * S];
   out.skins[skin] = { parts, joints: scaledJoints };

@@ -19543,7 +19543,14 @@ for (let s = 0; s < SKINS2.length; s++) {
   }
   for (const t of v.tail ?? []) nameGroup(t, "Tail");
   for (const e of v.ears ?? []) nameGroup(e, "Ears");
-  for (let i = 0; i < 30; i++) view.update(1 / 60, i / 60);
+  for (let i = 0; i < 12; i++) view.update(1 / 60, i / 60);
+  for (const limb of [v.legL, v.legR]) {
+    if (limb) {
+      for (const node of [limb.hip, limb.knee, limb.foot]) {
+        if (node && node.rotation) node.rotation.set(0, 0, 0);
+      }
+    }
+  }
   view.root.updateMatrixWorld(true);
   const refNode = v.rig ?? view.root;
   const refInv = refNode.matrixWorld.clone().invert();
@@ -19568,6 +19575,8 @@ for (let s = 0; s < SKINS2.length; s++) {
   const skip = /* @__PURE__ */ new Set();
   const markSkip = (obj) => obj && obj.isObject3D && obj.traverse((o) => skip.add(o));
   markSkip(v.mouthCav);
+  const eyeSet = /* @__PURE__ */ new Set();
+  for (const e of v.eyes ?? []) e.traverse && e.traverse((o) => eyeSet.add(o));
   const prims = [];
   view.root.traverse((obj) => {
     if (!obj.isMesh) return;
@@ -19585,10 +19594,7 @@ for (let s = 0; s < SKINS2.length; s++) {
         break;
       }
     }
-    if (group === "Head" && mat.color) {
-      const hex = mat.color.getHex();
-      if (hex === v.skin.hatA || hex === v.skin.hatB) group = "BuiltinHat";
-    }
+    const hatColor = group === "Head" && !eyeSet.has(mesh) && mat.color && (mat.color.getHex() === v.skin.hatA || mat.color.getHex() === v.skin.hatB);
     const M = new Matrix4().multiplyMatrices(refInv, new Matrix4().multiplyMatrices(mesh.matrixWorld, r2.mat));
     const pos = new Vector3();
     const quat = new Quaternion();
@@ -19605,6 +19611,7 @@ for (let s = 0; s < SKINS2.length; s++) {
       quat: [quat.x, quat.y, quat.z, quat.w],
       scale: [scl.x, scl.y, scl.z],
       group,
+      hatColor: hatColor === true,
       color: mat.color ? mat.color.getHexString() : "ffffff",
       frames: frames(r2.stack).slice(0, 4)
     });
