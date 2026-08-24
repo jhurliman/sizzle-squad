@@ -33,9 +33,11 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   leafy lettuce, bacon rashers, lathed plates/pans) with a primitive-sphere
   fallback; plate/pan content stacking offsets are hand-tuned, not captured —
   verify the composed look in Studio.
-- 🟡 **Silent until upload**: all 55 SFX WAVs are RENDERED (roblox/audio-out,
-  the real synth through OfflineAudioContext) — awaiting user upload + ids in
-  Sfx.luau. Adaptive music still unbuilt (stems + volume-mix layer).
+- 🟢 **SFX wired**: 50 uploaded sounds (3 variants/event, rotated at random;
+  serve combo-tiered) live in Sfx.luau; asset ids recorded in
+  roblox/audio-out/asset-ids.csv. Only washDone lacks a dedicated upload
+  (falls back to the chopDone chime). Adaptive MUSIC still unbuilt (stems +
+  volume-mix layer).
 - 🟡 **VFX minimal**: fire + floating labels only. No chop bits, steam,
   coin burst, dust puffs, bump stars; no screenshake; no haptics.
 - 🟢 **Photo moment is just a camera push-in** — no team pose at the pass, no
