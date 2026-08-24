@@ -30,11 +30,16 @@ function rotatePart(p, yaw, dx) {
 }
 
 // paper hat parts mirroring Hats.luau hat_paper (pleated) + ChefVisuals
-// attach math incl. per-species HAT_TILT
-const HAT_TILT = {
-  bramble: [5, 4],
-  mochi: [10, 0],
-};
+// attach math, driven by the SAME hat-fits.json registry the game uses
+const FITS = JSON.parse(fs.readFileSync(path.join(DIR, 'hat-fits.json'), 'utf8'));
+function resolveFit(skin, hatId) {
+  const merged = { scale: 1, offset: [0, 0, 0], tilt: [0, 0], hideEars: false, ...FITS.defaults };
+  const species = FITS.species[skin];
+  if (species) {
+    Object.assign(merged, species.default ?? {}, species[hatId] ?? {});
+  }
+  return merged;
+}
 function paperHatParts(parts, skin) {
   const head = parts.filter((p) => p.group === 'Head');
   if (head.length === 0) return [];
@@ -42,10 +47,15 @@ function paperHatParts(parts, skin) {
   for (const p of head) {
     if (p.size[0] * p.size[1] * p.size[2] > skull.size[0] * skull.size[1] * skull.size[2]) skull = p;
   }
-  const s = Math.max(skull.size[0], skull.size[2]) / 1.55;
-  const [tx, tz] = HAT_TILT[skin] ?? [0, 0];
+  const fit = resolveFit(skin, 'hat_paper');
+  const s = (Math.max(skull.size[0], skull.size[2]) / 1.55) * fit.scale;
+  const [tx, tz] = fit.tilt;
   const attach = new THREE.Matrix4()
-    .makeTranslation(skull.cf[0], skull.cf[1] + skull.size[1] * 0.42, skull.cf[2])
+    .makeTranslation(
+      skull.cf[0] + fit.offset[0],
+      skull.cf[1] + skull.size[1] * 0.42 + fit.offset[1],
+      skull.cf[2] + fit.offset[2],
+    )
     .multiply(new THREE.Matrix4().makeRotationX((tx * Math.PI) / 180))
     .multiply(new THREE.Matrix4().makeRotationZ((tz * Math.PI) / 180))
     .multiply(new THREE.Matrix4().makeRotationX((4 * Math.PI) / 180))
@@ -93,7 +103,10 @@ for (const hatState of ['builtin', 'paper']) {
   for (const skin of SPECIES) {
     let parts = data.skins[skin].parts;
     if (hatState === 'paper') {
-      parts = parts.filter((p) => p.group !== 'BuiltinHat').concat(paperHatParts(parts, skin));
+      const fit = resolveFit(skin, 'hat_paper');
+      parts = parts
+        .filter((p) => p.group !== 'BuiltinHat' && (!fit.hideEars || p.group !== 'Ears'))
+        .concat(paperHatParts(parts, skin));
     }
     const all = [];
     ANGLES.forEach((yaw, ai) => {

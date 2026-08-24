@@ -21,12 +21,7 @@ ChefVisuals.__index = ChefVisuals
 local SCALE = 5
 local CHEF_HEIGHT = 0.72 * SCALE
 local MAX_SPEED = 6.2
--- Cosmetic hats match each species' head attitude (owner: "the bear's chef
--- hat should be tilted just a bit to match the tilt of his head").
-local HAT_TILT: { [string]: CFrame } = {
-	bramble = CFrame.Angles(math.rad(5), 0, math.rad(4)),
-	mochi = CFrame.Angles(math.rad(10), 0, 0),
-}
+local HatFits = require(script.Parent.HatFits) :: any
 
 local SKIN_COLORS: { [string]: Color3 } = {
 	bramble = Color3.fromRGB(160, 82, 45),
@@ -101,6 +96,7 @@ function ChefVisuals:ensure(id: number, skin: string): any
 		carryModel = nil :: Model?,
 		hatId = nil :: string?,
 		hatModel = nil :: Model?,
+		hatFit = nil :: any,
 		nameGui = nil :: BillboardGui?,
 		-- articulation tables (rig only)
 		animParts = {} :: { BasePart },
@@ -108,6 +104,7 @@ function ChefVisuals:ensure(id: number, skin: string): any
 		animGroup = {} :: { string },
 		animCFrames = {} :: { CFrame },
 		builtinHatParts = {} :: { BasePart },
+		earParts = {} :: { BasePart },
 		joints = {} :: { [string]: Vector3 },
 		headAttach = Vector3.new(0, CHEF_HEIGHT, 0),
 		headAnchor = nil :: BasePart?,
@@ -136,6 +133,9 @@ function ChefVisuals:ensure(id: number, skin: string): any
 						rigTop = math.max(rigTop, p.CFrame.Y + p.Size.Y / 2)
 						if group.Name == "BuiltinHat" then
 							table.insert(entry.builtinHatParts, p)
+						end
+						if group.Name == "Ears" then
+							table.insert(entry.earParts, p)
 						end
 						if group.Name == "Head" then
 							headTop = math.max(headTop, p.CFrame.Y + p.Size.Y / 2)
@@ -331,9 +331,15 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 	-- ---- hat ---------------------------------------------------------------
 	if hat ~= entry.hatId then
 		entry.hatId = hat
-		-- a cosmetic hat replaces the species' built-in one
+		entry.hatFit = if hat ~= nil then HatFits.resolve(skin, hat) else nil
+		-- a cosmetic hat replaces the species' built-in one, and (per fit
+		-- policy) can also retire the ears it would intersect
 		for _, p in entry.builtinHatParts do
 			p.Transparency = if hat ~= nil then 1 else 0
+		end
+		local hideEars = entry.hatFit ~= nil and entry.hatFit.hideEars
+		for _, p in entry.earParts do
+			p.Transparency = if hideEars then 1 else 0
 		end
 		if entry.hatModel ~= nil then
 			entry.hatModel:Destroy()
@@ -342,13 +348,13 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 		local hatModel = Hats.build(hat)
 		if hatModel ~= nil then
 			pcall(function()
-				(hatModel :: any):ScaleTo(entry.hatScale)
+				(hatModel :: any):ScaleTo(entry.hatScale * (entry.hatFit and entry.hatFit.scale or 1))
 			end)
 			hatModel.Parent = model
 		end
 		entry.hatModel = hatModel
 	end
-	if entry.hatModel ~= nil then
+	if entry.hatModel ~= nil and entry.hatFit ~= nil then
 		local headPose = CFrame.new()
 		if entry.isRig then
 			-- ride the head group's transform so the hat bobs with the head
@@ -357,8 +363,7 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 				headPose = around(j, -0.1 * moveBlend, 0, 0)
 			end
 		end
-		local tilt = HAT_TILT[entry.skin] or CFrame.new()
-		entry.hatModel:PivotTo(baseCF * headPose * CFrame.new(entry.headAttach) * tilt)
+		entry.hatModel:PivotTo(baseCF * headPose * CFrame.new(entry.headAttach + entry.hatFit.offset) * entry.hatFit.tilt)
 	end
 
 	-- ---- nametag -----------------------------------------------------------

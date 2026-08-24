@@ -12,8 +12,11 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 ## A. Built but invisible — systems that persist state with no presentation
 
 - 🟡 **Hats + palettes render; kitchen cosmetics still don't** (plate/pan/
-  bell swaps unbuilt). Palette retint uses dominant-color matching — verify
-  per species in Studio.
+  bell swaps unbuilt). Cosmetic FIT is per-(asset x species) via
+  roblox/hat-fits.json (scale/offset/tilt/hideEars) — only hat_paper is
+  hand-tuned so far; the other 11 hats ride species defaults and each needs
+  a fit pass in the turnaround sheets. Palette retint uses dominant-color
+  matching — verify per species.
 - 🟢 **Ticket icons render via runtime EditableImage** (no upload needed) with a colored-chip fallback if the API is unavailable on some platform — verify on device.
 - 🟢 **Dailies panel live** (intermission "Today's Goals" + completion
   toasts); rewards still auto-claim rather than a claim ceremony.
