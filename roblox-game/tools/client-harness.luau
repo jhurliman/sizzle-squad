@@ -94,3 +94,17 @@ if failures > 0 then
 	error(`{failures} checks failed`)
 end
 print("PASS: client state")
+
+-- 6. the round clock advances locally between score deltas (it used to freeze
+-- until the player acted, because `time` is not in the server's score key)
+state.simTime = 0
+for _ = 1, 120 do
+	state:advanceClock(1 / 60, true)
+end
+check(math.abs(state.simTime - 2) < 0.01, `clock advances locally while playing (t={state.simTime})`)
+state:advanceClock(1 / 60, false)
+check(math.abs(state.simTime - 2) < 0.01, "clock holds between rounds")
+state:applyScore({ coins = 10, patience = 1, time = 42 })
+check(state.simTime == 42, "authoritative score resyncs the clock")
+
+print("PASS: round clock")

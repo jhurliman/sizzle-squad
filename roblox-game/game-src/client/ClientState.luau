@@ -33,6 +33,8 @@ function ClientState.new(shared: any, net: any)
 	self.stations = {} :: { [number]: any }
 	self.orders = {} :: { any }
 	self.score = { coins = 0, served = 0, missed = 0, combo = 0, bestCombo = 0, patience = 1, time = 0 }
+	-- Round clock, advanced locally (see advanceClock).
+	self.simTime = 0
 	self.phase = { phase = "countdown", timer = 0, round = 0, results = nil }
 	self.working = false
 	self.stunned = false
@@ -53,6 +55,7 @@ function ClientState:applySnapshot(snap: any)
 	end
 	self.orders = snap.orders
 	self.score = snap.score
+	self.simTime = (snap.score and snap.score.time) or 0
 	for _, chef in snap.chefs do
 		self.skins[chef.id] = chef.skin
 		self.carrying[chef.id] = chef.carrying
@@ -203,6 +206,27 @@ function ClientState:rebuildCarryable(summary: any): any
 		return { type = "pan", pan = { id = 0, contents = contents, onHeat = true, fire = summary.fire or 0 } }
 	end
 	return nil
+end
+
+--- THE ROUND CLOCK RUNS LOCALLY.
+---
+--- Score deltas are only sent when the SCORE changes (a serve, a miss, a
+--- patience tick) — `time` is not part of the server's change key. So the
+--- replicated time is stale between actions, which froze the HUD clock
+--- (it only moved when you did something) and stalled the music's heat ramp
+--- with it. The clock therefore ticks here every frame and RESYNCS whenever
+--- an authoritative score arrives; the server stays the source of truth.
+function ClientState:advanceClock(dt: number, playing: boolean)
+	if playing then
+		self.simTime += dt
+	end
+end
+
+function ClientState:applyScore(score: any)
+	self.score = score
+	if score.time ~= nil then
+		self.simTime = score.time
+	end
 end
 
 --- Server correction: snap the SIMULATED position (authority) but park the

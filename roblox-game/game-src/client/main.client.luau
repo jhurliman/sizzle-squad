@@ -248,12 +248,15 @@ remotes.OrdersDelta.OnClientEvent:Connect(function(msg)
 end)
 
 remotes.ScoreDelta.OnClientEvent:Connect(function(score)
-	state.score = score
+	state:applyScore(score)
 	hud:updateScore(score)
 end)
 
 local lastPhase = ""
 remotes.RoundPhase.OnClientEvent:Connect(function(phase)
+	if phase.phase == "round" and lastPhase ~= "round" then
+		state.simTime = 0 -- fresh round: restart the local clock
+	end
 	state.phase = phase
 	hud:updatePhase(phase, phase.results and phase.results.cards)
 	inviteButton.Visible = phase.phase == "intermission"
@@ -390,10 +393,11 @@ RunService.RenderStepped:Connect(function(dt)
 	state.clock += dt
 	cameraRig:update(dt)
 	vfx:tick(dt)
+	state:advanceClock(dt, state.phase.phase == "round")
 	-- heat mirrors the sim's ramp (min(1, time/240)); tension is 1 - patience
 	music:update(
 		dt,
-		math.min(1, (state.score.time or 0) / 240),
+		math.min(1, state.simTime / 240),
 		state.score.patience or 1,
 		state.phase.phase == "round"
 	)
@@ -472,7 +476,7 @@ RunService.RenderStepped:Connect(function(dt)
 	hud:updateOrders(state.orders)
 	firstShift:update(state, (state.myChefId ~= nil and state.flags[state.myChefId]) or 0)
 	if state.phase.phase == "round" then
-		hud:updateTimer(shared.TUNING.roundSeconds - (state.score.time or 0))
+		hud:updateTimer(shared.TUNING.roundSeconds - state.simTime)
 	else
 		hud:updateTimer(state.phase.timer or 0)
 	end
