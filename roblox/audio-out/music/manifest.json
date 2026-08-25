@@ -1,0 +1,10 @@
+{
+  "tempo": 128,
+  "loopSeconds": 7.5,
+  "stems": {
+    "base": "music_base.wav",
+    "groove": "music_groove.wav",
+    "melody": "music_melody.wav",
+    "tension": "music_tension.wav"
+  }
+}

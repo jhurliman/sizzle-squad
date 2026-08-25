@@ -19,6 +19,7 @@ local FirstShift = require(script.Parent.FirstShift) :: any
 local Sfx = require(script.Parent.Sfx) :: any
 local StationVisuals = require(script.Parent.StationVisuals) :: any
 local Vfx = require(script.Parent.Vfx) :: any
+local Music = require(script.Parent.Music) :: any
 
 local SCALE = 5
 local remotes = Net.client(ReplicatedStorage)
@@ -39,6 +40,8 @@ vfxFolder.Parent = Workspace
 local vfx = Vfx.new(vfxFolder, function(n)
 	cameraRig:addShake(n)
 end)
+-- music is non-positional: parent to SoundService so it plays 2D everywhere
+local music = Music.new(game:GetService("SoundService"))
 
 -- Invite friends (intermission) — free private servers + party joins are the
 -- other two "play together" paths; this is the in-game nudge.
@@ -315,6 +318,14 @@ remotes.SimEvents.OnClientEvent:Connect(function(events)
 	for _, ev in events do
 		sfx:handle(ev)
 		vfx:handle(ev)
+		-- music steps aside for the events that decide the run
+		if ev.t == "serve" then
+			music:sidechain(0.55)
+		elseif ev.t == "fireStart" or ev.t == "orderExpired" then
+			music:sidechain(0.45)
+		elseif ev.t == "serveWrong" then
+			music:sidechain(0.35)
+		end
 		if ev.t == "bump" then
 			state:applyBump(ev)
 		elseif ev.t == "serve" then
@@ -379,6 +390,13 @@ RunService.RenderStepped:Connect(function(dt)
 	state.clock += dt
 	cameraRig:update(dt)
 	vfx:tick(dt)
+	-- heat mirrors the sim's ramp (min(1, time/240)); tension is 1 - patience
+	music:update(
+		dt,
+		math.min(1, (state.score.time or 0) / 240),
+		state.score.patience or 1,
+		state.phase.phase == "round"
+	)
 
 	-- fixed-step the own-chef mirror
 	acc = math.min(acc + dt, 0.25)

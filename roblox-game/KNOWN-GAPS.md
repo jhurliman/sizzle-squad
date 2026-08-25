@@ -37,13 +37,12 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   serve combo-tiered) live in Sfx.luau; asset ids recorded in
   roblox/audio-out/asset-ids.csv. Only washDone lacks a dedicated upload
   (falls back to the chopDone chime).
-- 🟡 **TODO — adaptive background music unbuilt.** The web game's
-  `src/audio/audio.ts` has an adaptive score (`tickMusic(heat, tension)`):
-  a base bed plus intensity layers keyed to the round's heat ramp and the
-  patience meter. Port: offline-render the score as time-aligned looped
-  stems (base + N intensity layers), upload, start all Sounds together and
-  cross-fade their `Volume` by heat/patience. Sim already replicates
-  heat+patience to the client.
+- 🟡 **Adaptive music: built, awaiting upload.** Four beat-aligned looping
+  stems rendered from the web score (roblox/audio-out/music/, 7.5s @ 128bpm:
+  base/groove/melody/tension) and the runtime mixer (Music.luau) is wired —
+  it cross-fades them by heat (round progress) and tension (1 - patience),
+  ducks under serves/fires, and phase-locks the loops. Silent until the four
+  WAVs are uploaded and their ids filled into Music.luau STEM_IDS.
 - 🟢 **VFX pass done** (Vfx.luau): the web game's full effect map ported —
   chop confetti/sparks, cook bursts, burn smoke, fire puffs, serve confetti
   (3 hues), grab-miss/place puffs, wash sparkles, bump/wall sparks — pooled
