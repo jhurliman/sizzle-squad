@@ -37,12 +37,10 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   serve combo-tiered) live in Sfx.luau; asset ids recorded in
   roblox/audio-out/asset-ids.csv. Only washDone lacks a dedicated upload
   (falls back to the chopDone chime).
-- 🟡 **Adaptive music: built, awaiting upload.** Four beat-aligned looping
-  stems rendered from the web score (roblox/audio-out/music/, 7.5s @ 128bpm:
-  base/groove/melody/tension) and the runtime mixer (Music.luau) is wired —
-  it cross-fades them by heat (round progress) and tension (1 - patience),
-  ducks under serves/fires, and phase-locks the loops. Silent until the four
-  WAVs are uploaded and their ids filled into Music.luau STEM_IDS.
+- 🟢 **Adaptive music live**: four uploaded stems (base/groove/melody/
+  tension, 7.5s @ 128bpm) cross-faded by heat + tension in Music.luau, with
+  sidechain ducking and 1Hz phase-lock. Ids in roblox/audio-out/asset-ids.csv.
+  Mix levels (MASTER, fade curves) are first-pass — tune by ear.
 - 🟢 **VFX pass done** (Vfx.luau): the web game's full effect map ported —
   chop confetti/sparks, cook bursts, burn smoke, fire puffs, serve confetti
   (3 hues), grab-miss/place puffs, wash sparkles, bump/wall sparks — pooled
