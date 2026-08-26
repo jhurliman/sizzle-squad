@@ -24,6 +24,12 @@
       "$className": "Workspace",
       "Kitchen": { "$path": "assets/kitchen.rbxm" }
     },
+    "TextChatService": {
+      "$className": "TextChatService",
+      "$properties": {
+        "ChatVersion": "TextChatService"
+      }
+    },
     "Players": {
       "$className": "Players",
       "$properties": {

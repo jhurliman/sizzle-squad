@@ -81,9 +81,12 @@ dailies have no UI, food is spheres, everything is silent.
 
 ## Remaining (user-gated) launch steps
 
-1. **Publish** the place to a universe (Studio → File → Publish), set
-   `MaxPlayers = 4`, enable **free private servers**, enable Studio API
-   access for DataStores.
+1. **Publish** the place to a universe (Studio → File → Publish), enable
+   **free private servers**, and enable Studio API access for DataStores.
+   `MaxPlayers = 4`, `PreferredPlayers = 4` and
+   `TextChatService.ChatVersion = TextChatService` are place PROPERTIES and are
+   set in `default.project.json`, so they ship with every build — do not set
+   them by hand in Studio, a rebuild would revert that.
 2. ~~**Audio**~~ — DONE: 50 SFX (3 variants/event) and 4 adaptive music stems
    are rendered, uploaded and wired; ids recorded in
    `roblox/audio-out/asset-ids.csv`. Only `washDone` lacks a dedicated upload
