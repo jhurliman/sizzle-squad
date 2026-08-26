@@ -303,7 +303,7 @@ remotes.SimEvents.OnClientEvent:Connect(function(events)
 				)
 			end
 		elseif ev.t == "serveWrong" then
-			hud:worldLabel(Vector3.new(ev.at.x * SCALE, 1.2 * SCALE, ev.at.y * SCALE), "✗", Color3.fromRGB(230, 80, 60))
+			hud:worldLabel(Vector3.new(ev.at.x * SCALE, 1.2 * SCALE, ev.at.y * SCALE), "X", Color3.fromRGB(230, 80, 60))
 		elseif ev.t == "burn" then
 			hud:worldLabel(Vector3.new(ev.at.x * SCALE, 1.5 * SCALE, ev.at.y * SCALE), "Burnt!", Color3.fromRGB(230, 120, 70))
 		elseif ev.t == "fireStart" then

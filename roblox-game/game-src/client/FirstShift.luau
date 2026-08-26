@@ -35,7 +35,9 @@ function FirstShift.new(gui: Instance)
 	}, gui)
 	mk("UICorner", { CornerRadius = UDim.new(0, 14) }, self.frame)
 	self.label = mk("TextLabel", {
-		Size = UDim2.new(1, -60, 1, 0),
+		-- Clear of the skip button, which sits at -48 and is 40 wide: at -60
+		-- the wrapped text ran to within 12px of it and read as touching.
+		Size = UDim2.new(1, -84, 1, 0),
 		Position = UDim2.new(0, 14, 0, 0),
 		BackgroundTransparency = 1,
 		TextColor3 = Color3.fromRGB(58, 32, 19),
@@ -52,7 +54,7 @@ function FirstShift.new(gui: Instance)
 		TextColor3 = Color3.fromRGB(58, 32, 19),
 		TextSize = 14,
 		Font = Enum.Font.GothamBold,
-		Text = "✕",
+		Text = "X",
 	}, self.frame)
 	mk("UICorner", { CornerRadius = UDim.new(0, 8) }, skip)
 	skip.Activated:Connect(function()
@@ -204,7 +206,7 @@ function FirstShift:update(state: any, flags: number): number?
 		target = nearest(state, stationOfKind("crate"))
 	end
 
-	self.label.Text = "👨‍🍳 " .. tip
+	self.label.Text = "🍳 " .. tip
 	self.frame.Visible = true
 	return target
 end

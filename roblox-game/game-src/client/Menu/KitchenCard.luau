@@ -201,7 +201,7 @@ function KitchenCard:setProgress(progress: any)
 			self.goalRows[i].Text = `✅ {d.name}  (+{d.coins}c)`
 			self.goalRows[i].TextColor3 = Theme.GREEN
 		else
-			self.goalRows[i].Text = `▫️ {d.name}  ({math.min(d.progress, d.goal)}/{d.goal})`
+			self.goalRows[i].Text = `• {d.name}  ({math.min(d.progress, d.goal)}/{d.goal})`
 			self.goalRows[i].TextColor3 = Theme.CREAM
 		end
 	end

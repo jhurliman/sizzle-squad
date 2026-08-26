@@ -239,8 +239,13 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   snapping between rounds again, look here first.
 - The round timer chip and the order queue used to survive into results and
   the lobby; both are now gated to `phase == "round"`.
-- 🪙 (Unicode 13) and ✕ (U+2715) have no glyph in Roblox's font stack and
-  rendered as hollow boxes. Coin amounts are spelled out or use the `c` suffix
+- Roblox's font stack drops three classes of glyph, all of which shipped and
+  rendered as empty boxes: **ZWJ sequences** (👨‍🍳), **variation-selector
+  glyphs** (🪙 🍽️ ▫️ — the base char is text-presentation and needs VS16), and
+  **typographic dingbats with no emoji presentation** (✕ U+2715, ✗ U+2717 —
+  those depend on the TEXT font, and FredokaOne has neither). Plain
+  emoji-presentation codepoints (⭐ ✅ ✨ 🔥 🏆 🛒) are fine. The rule is
+  written at the top of shared/BadgeDefs.luau where icons get chosen. Coin amounts are spelled out or use the `c` suffix
   and the close icon is a plain "X". Every other glyph in the UI predates 2016.
 - Palette retint picked the single most common EXACT colour, which on a shaded
   rig is not the coat: pip's green is authored as two tones that each lose to
