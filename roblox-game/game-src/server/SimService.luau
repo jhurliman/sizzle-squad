@@ -47,6 +47,18 @@ function SimService.new(shared: any, opts: { seed: number, chefCount: number?, b
 	self.botFill = opts.botFill == true
 	self.humans = {} :: { [number]: HumanSlot }
 	self.tickEvents = {} :: { any }
+	-- MONOTONIC service clock, deliberately NOT sim.time.
+	--
+	-- Human move validation measures "real seconds since the last accepted
+	-- packet" to size a distance budget. It used to read sim.time, which is
+	-- frozen between rounds (tickMovementOnly never advances it) -- so elapsed
+	-- was always a single tick, the budget collapsed to ~0.24 cells, and
+	-- ordinary walking during results/intermission tripped the correction
+	-- snap. That was the between-rounds rubber-banding.
+	--
+	-- This clock advances in BOTH tick paths and never resets, so a packet is
+	-- judged against the time that actually passed.
+	self.clock = 0
 	self:reset(opts.seed)
 	return self
 end
@@ -217,10 +229,11 @@ function SimService:applyHuman(chef: any, slot: HumanSlot, dt: number, now: numb
 end
 
 --- Advance the sim by wall dt. Returns the drained SimEvent batch and ticks.
-function SimService:tick(dt: number, now: number?): ({ any }, number)
+--- `now` is accepted for call-site compatibility but ignored: timestamps come
+--- from the monotonic self.clock (see SimService.new).
+function SimService:tick(dt: number, _now: number?): ({ any }, number)
 	local shared = self.shared
 	local sim = self.sim
-	local t = now or sim.time
 	self.acc = math.min(self.acc + dt, 0.25)
 	local ticks = 0
 	local batch = self.tickEvents
@@ -229,6 +242,8 @@ function SimService:tick(dt: number, now: number?): ({ any }, number)
 		self.acc -= shared.SIM_DT
 		ticks += 1
 		local sdt = shared.SIM_DT
+		self.clock += sdt
+		local t = self.clock
 
 		local botInputs = if self.botFill then self.bots:update(sim, sdt) else nil
 		local inputs = {}
@@ -287,13 +302,14 @@ function SimService:tick(dt: number, now: number?): ({ any }, number)
 end
 
 --- Movement-only advance for results/intermission.
-function SimService:tickMovementOnly(dt: number, now: number?)
+function SimService:tickMovementOnly(dt: number, _now: number?)
 	local shared = self.shared
 	local sim = self.sim
-	local t = now or sim.time
 	self.acc = math.min(self.acc + dt, 0.25)
 	while self.acc >= shared.SIM_DT do
 		self.acc -= shared.SIM_DT
+		self.clock += shared.SIM_DT
+		local t = self.clock
 		for _, chef in sim.chefs do
 			local slot = self.humans[chef.id]
 			if slot then

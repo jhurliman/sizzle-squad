@@ -1,7 +1,6 @@
 --!strict
--- The front-end shell: one ScreenGui holding the persistent tab cluster, the
--- ready bar, and the full-screen tabbed panel (Wardrobe / Shop / Career /
--- Ranks).
+-- The front-end shell: one ScreenGui holding the centred between-rounds shift
+-- panel and the full-screen tabbed panel (Wardrobe / Shop / Career / Ranks).
 --
 -- WHY THIS EXISTS: the meta was already built — a 30-item catalog, validated
 -- buy/equip, dailies, streaks, three leaderboards — but it was reachable only
@@ -13,7 +12,7 @@
 -- THE PHASE GATE IS THE LOAD-BEARING RULE: the menu may open only when the
 -- round is not running, or when this player has no chef (spectating). It must
 -- never become a way to abandon the team mid-shift. Enforced here by toggling
--- ScreenGui.Enabled -- one flag kills cluster, ready bar and panel together,
+-- ScreenGui.Enabled -- one flag kills the shift panel and the tabs together,
 -- deliberately unlike the scattered per-frame .Visible bookkeeping in
 -- Hud:updatePhase that this module exists to replace.
 
@@ -21,7 +20,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Theme = require(script.Theme) :: any
-local ReadyBar = require(script.ReadyBar) :: any
+local ShiftPanel = require(script.ShiftPanel) :: any
 local KitchenCard = require(script.KitchenCard) :: any
 local EmoteBar = require(script.EmoteBar) :: any
 
@@ -30,13 +29,6 @@ Menu.__index = Menu
 
 local mk = Theme.mk
 
--- Keepalive cadence for MenuState. The server expires a holder after 12s, so
--- a crashed or backgrounded client cannot hold the intermission clock open.
-local KEEPALIVE = 5
-
--- The countdown is only 8s. Letting someone browse into the start of a shift
--- is a trap, so the panel force-closes with a warning at this many seconds.
-local COUNTDOWN_BAILOUT = 3
 
 local TAB_DEFS = {
 	{ id = "wardrobe", label = "WARDROBE", icon = "👕", module = "WardrobeTab" },
@@ -68,7 +60,7 @@ function Menu.new(deps: any)
 	self.phase = { phase = "countdown", timer = 0 }
 	self.spectating = false
 	self.progress = nil :: any
-	self.keepAcc = 0
+	self.autoStarted = false
 
 	local gui = mk("ScreenGui", {
 		Name = "SizzleMenu",
@@ -80,12 +72,14 @@ function Menu.new(deps: any)
 	}, self.player:WaitForChild("PlayerGui"))
 	self.gui = gui
 
-	self:buildCluster()
 	self:buildPanel()
 
-	self.readyBar = ReadyBar.new(gui, {
+	self.shiftPanel = ShiftPanel.new(gui, {
 		onReady = function(on)
 			self.remotes.ReadyUp:FireServer(on)
+		end,
+		onOpenTab = function(tab)
+			self:openTab(tab)
 		end,
 	})
 	self.kitchenCard = KitchenCard.new(gui, {
@@ -116,41 +110,6 @@ function Menu.new(deps: any)
 	end
 	self:relayout()
 	return self
-end
-
--- ---------------------------------------------------------------- cluster
-
-function Menu:buildCluster()
-	self.cluster = mk("Frame", {
-		Name = "Cluster",
-		-- Top-left, tucked under the patience bar (which ends at y=43).
-		Position = UDim2.new(0, 12, 0, 52),
-		Size = UDim2.fromOffset(400, Theme.MIN_TAP),
-		BackgroundTransparency = 1,
-	}, self.gui)
-	mk("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		Padding = UDim.new(0, 6),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-	}, self.cluster)
-
-	self.clusterButtons = {}
-	for i, def in TAB_DEFS do
-		local btn = Theme.button({
-			Name = def.id,
-			Size = UDim2.fromOffset(84, Theme.MIN_TAP),
-			BackgroundTransparency = 0.15,
-			Fill = Theme.BROWN_MID,
-			TextSize = 13,
-			LayoutOrder = i,
-			Text = `{def.icon}\n{def.label}`,
-		}, self.cluster)
-		btn.Activated:Connect(function()
-			self:toggleTab(def.id)
-		end)
-		self.clusterButtons[def.id] = btn
-	end
 end
 
 -- ------------------------------------------------------------------ panel
@@ -344,8 +303,7 @@ function Menu:setOpen(on: boolean)
 	self.open = on
 	self.scrim.Visible = on
 	self.panel.Visible = on
-	self.cluster.Visible = not on
-	self.readyBar:setHidden(on)
+	self.shiftPanel:setHidden(on)
 	self.emoteBar:setHidden(on)
 
 	-- One switch solves movement-while-blind, drag-vs-thumbstick, and stray
@@ -358,11 +316,6 @@ function Menu:setOpen(on: boolean)
 		self.deps.onOpenChanged(on)
 	end
 
-	-- Tell the server, so it can hold the intermission clock while we shop.
-	self.keepAcc = 0
-	if self.remotes.MenuState ~= nil then
-		self.remotes.MenuState:FireServer(on)
-	end
 
 	if on and self.activeTab == nil then
 		self:openTab("wardrobe")
@@ -386,23 +339,17 @@ function Menu:setPhase(phase: any, spectating: boolean)
 		self:setOpen(false)
 	end
 	self.gui.Enabled = allowed
-
-	-- 8 seconds is not enough to browse; bail out before the shift starts.
-	if allowed and self.open and phase.phase == "countdown" and (phase.timer or 0) <= COUNTDOWN_BAILOUT then
-		self:setOpen(false)
-		if self.deps.onToast ~= nil then
-			self.deps.onToast("Shift starting!")
-		end
-	end
-	self.readyBar:setPhase(phase, spectating)
+	self.shiftPanel:setPhase(phase, spectating)
 	self.kitchenCard:setPhase(phase)
+	self:maybeAutoStart()
 end
 
 function Menu:setProgress(progress: any)
 	self.progress = progress
-	self.readyBar:setProgress(progress)
+	self.shiftPanel:setProgress(progress)
 	self.kitchenCard:setProgress(progress)
 	self.emoteBar:setProgress(progress)
+	self:maybeAutoStart()
 	for _, tab in self.tabs do
 		if tab.setProgress ~= nil then
 			tab:setProgress(progress)
@@ -430,18 +377,30 @@ function Menu:setEquipped(equipped: any)
 	end
 end
 
+--- A brand-new player is dropped straight into their first shift; everyone
+--- else presses Start. This is a placeholder for the unbuilt First Shift
+--- onboarding (plan §2.6), which owns that first-round experience -- when it
+--- lands, it should take over this trigger.
+function Menu:maybeAutoStart()
+	if self.autoStarted or self.progress == nil then
+		return
+	end
+	if (self.progress.sessions or 1) > 1 then
+		self.autoStarted = true -- returning player: they press the button
+		return
+	end
+	if self.phase.phase ~= "countdown" or self.spectating then
+		return
+	end
+	self.autoStarted = true
+	self.remotes.ReadyUp:FireServer(true)
+end
+
 function Menu:step(dt: number)
-	self.readyBar:step(dt)
+	self.shiftPanel:step(dt)
 	self.kitchenCard:step(dt)
 	if not self.open then
 		return
-	end
-	self.keepAcc += dt
-	if self.keepAcc >= KEEPALIVE then
-		self.keepAcc = 0
-		if self.remotes.MenuState ~= nil then
-			self.remotes.MenuState:FireServer(true)
-		end
 	end
 	local active = if self.activeTab ~= nil then self.tabs[self.activeTab] else nil
 	if active ~= nil and active.step ~= nil then
@@ -462,19 +421,12 @@ function Menu:relayout()
 	self.content.Position = UDim2.fromOffset(10, L.tabH + 16)
 	self.content.Size = UDim2.new(1, -20, 1, -(L.tabH + 26))
 
-	-- Narrow screens get icon-only cluster buttons so the row cannot reach
-	-- the centred timer chip. Reflow, never scale down.
-	local compact = viewport.X < 720
 	for _, def in TAB_DEFS do
-		local btn = self.clusterButtons[def.id]
-		btn.Size = UDim2.fromOffset(if compact then Theme.MIN_TAP else 84, Theme.MIN_TAP)
-		btn.Text = if compact then def.icon else `{def.icon}\n{def.label}`
-		btn.TextSize = if compact then 20 else 13
 		local tabBtn = self.tabButtons[def.id]
 		tabBtn.Size = UDim2.fromOffset(math.min(150, (L.panelW - 80) / #TAB_DEFS - 6), L.tabH - 6)
 	end
 
-	self.readyBar:relayout(L, viewport)
+	self.shiftPanel:relayout(L, viewport)
 	self.kitchenCard:relayout(L, viewport)
 	self.emoteBar:relayout(L, viewport)
 	for _, tab in self.tabs do

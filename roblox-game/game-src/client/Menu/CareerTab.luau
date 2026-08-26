@@ -119,7 +119,7 @@ function CareerTab:setProgress(progress: any)
 	local level = progress.level or 1
 	local xp, toNext = progress.xp or 0, progress.xpToNext or 1
 	self.levelLabel.Text = `Level {level}`
-	self.statsLabel.Text = `{progress.coins or 0} 🪙   ·   🔥{progress.streak or 0}`
+	self.statsLabel.Text = `{progress.coins or 0} coins   ·   🔥{progress.streak or 0}`
 	self.xpFill.Size = UDim2.fromScale(math.clamp(xp / math.max(1, toNext), 0, 1), 1)
 	self.xpLabel.Text = `{xp} / {toNext} XP to level {level + 1}`
 	self:renderGoals(progress)
@@ -160,7 +160,7 @@ function CareerTab:renderGoals(progress: any)
 			TextSize = 12,
 			TextColor3 = Theme.DIM,
 			ZIndex = 5,
-			Text = `{math.min(d.progress, d.goal)}/{d.goal}  ·  +{d.coins}🪙  +{d.xp} XP`,
+			Text = `{math.min(d.progress, d.goal)}/{d.goal}  ·  +{d.coins}c  +{d.xp} XP`,
 		}, row)
 		-- Toast on the transition, exactly as the old dailies panel did.
 		if done and not self.claimed[d.id] then

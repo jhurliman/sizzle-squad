@@ -185,7 +185,7 @@ function KitchenCard:setProgress(progress: any)
 	local player = Players.LocalPlayer
 	self.title.Text = `Welcome back, {player.DisplayName}`
 	local xp, toNext = progress.xp or 0, progress.xpToNext
-	self.subtitle.Text = `Level {progress.level or 1}  ·  {progress.coins or 0} 🪙  ·  {progress.rounds or 0} shifts worked`
+	self.subtitle.Text = `Level {progress.level or 1}  ·  {progress.coins or 0} coins  ·  {progress.rounds or 0} shifts worked`
 	if toNext ~= nil and toNext > 0 then
 		self.xpFill.Size = UDim2.fromScale(math.clamp(xp / toNext, 0, 1), 1)
 	end

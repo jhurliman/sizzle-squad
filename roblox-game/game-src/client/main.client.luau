@@ -389,13 +389,15 @@ RunService.RenderStepped:Connect(function(dt)
 		highlight.Enabled = false
 	end
 
-	-- HUD
-	hud:updateOrders(state.orders)
+	-- HUD. Orders exist only during a shift.
+	if state.phase.phase == "round" then
+		hud:updateOrders(state.orders)
+	end
 	firstShift:update(state, (state.myChefId ~= nil and state.flags[state.myChefId]) or 0)
+	-- The timer chip is hidden outside a round (Hud:updatePhase), so there is
+	-- nothing to show between shifts.
 	if state.phase.phase == "round" then
 		hud:updateTimer(shared.TUNING.roundSeconds - state.simTime)
-	else
-		hud:updateTimer(state.phase.timer or 0)
 	end
 end)
 

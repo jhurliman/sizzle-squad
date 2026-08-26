@@ -16,7 +16,6 @@ local RoundDirector = require(script.Parent.RoundDirector) :: any
 local Progression = require(script.Parent.Progression) :: any
 local Leaderboards = require(script.Parent.Leaderboards) :: any
 local Badges = require(script.Parent.Badges) :: any
-local MenuGate = require(script.Parent.MenuGate) :: any
 
 local remotes = Net.server(ReplicatedStorage)
 
@@ -36,12 +35,8 @@ progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("
 local Catalog = require(gameShared:WaitForChild("Catalog")) :: any
 local leaderboards = Leaderboards.new(progression, remotes)
 local badges = Badges.new()
-local menuGate = MenuGate.new(Config, os.clock)
 
--- Declared before assignment: holdFn closes over `director`, and a local is
--- not in scope inside its own initialiser (it would capture a nil global).
-local director
-director = RoundDirector.new(shared, Config, simService, crew, replicator, remotes, {
+local director = RoundDirector.new(shared, Config, simService, crew, replicator, remotes, {
 	assistFn = function()
 		return progression:crewQualifiesForAssist(crew)
 	end,
@@ -49,20 +44,7 @@ director = RoundDirector.new(shared, Config, simService, crew, replicator, remot
 		progression:awardRound(crew, results)
 		badges:onRoundEnd(crew, progression, results)
 	end,
-	holdFn = function()
-		return menuGate:anyHolding(crew, director.ready)
-	end,
 })
-
-remotes.MenuState.OnServerEvent:Connect(function(player, open)
-	-- Never during a live round: a hacked client must not be able to pause
-	-- play, and the menu is client-gated to non-round phases anyway.
-	if director.phase == "round" then
-		menuGate:clear(player)
-		return
-	end
-	menuGate:set(player, open == true)
-end)
 
 remotes.ReadyUp.OnServerEvent:Connect(function(player, on)
 	director:setReady(player, on == true)
@@ -237,7 +219,6 @@ Players.PlayerRemoving:Connect(function(player)
 	-- director.ready is keyed by Player and had no cleanup: it leaked a key
 	-- per departure and could strand a stale ready that nothing could clear.
 	director.ready[player] = nil
-	menuGate:clear(player)
 	broadcastEquips()
 	-- Their departure may have made the remaining crew all-ready.
 	if director.phase == "intermission" then

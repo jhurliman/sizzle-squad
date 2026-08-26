@@ -155,6 +155,13 @@ for i = 1, 60 * 320 do
 	director:heartbeat(DT)
 	logPhase()
 
+	-- Rounds no longer start on a timer: the lobby waits for Start. Stand in
+	-- for the player pressing the button, but NOT during the AFK stretch --
+	-- an idle player must not be able to start a shift.
+	if (director.phase == "countdown" or director.phase == "intermission") and sendInput then
+		director:setReady(playerA, true)
+	end
+
 	if director.phase == "round" then
 		if #phaseLog >= 4 and not sawAfk then
 			-- Round 2: go idle to trigger AFK takeover.
@@ -268,15 +275,12 @@ if failures > 0 then
 end
 
 -- ==========================================================================
--- Intermission hold: a player in the wardrobe stops the clock, but only for
--- INTERMISSION_PAUSE_CAP seconds in total. Driven through the injected
--- holdFn, which is exactly why the director takes it as a function rather
--- than reading MenuGate (or any Roblox service) directly.
+-- Explicit start: a round NEVER begins on a timer. countdown and intermission
+-- are open-ended lobbies, and the only way into a shift is every non-AFK chef
+-- pressing Start.
 -- ==========================================================================
 
 failures = 0
-
-local MenuGate = require("../game-src/server/MenuGate") :: any
 
 local svc3 = SimService.new(shared, { seed = 77, botFill = true })
 local rep3 = Replicator.new(shared, Net, remotes, function(chef)
@@ -286,88 +290,61 @@ local clock3 = { t = 0 }
 local crew3 = CrewManager.new(svc3, Net, remotes, rep3, function()
 	return clock3.t
 end)
-local gate = MenuGate.new(Config, function()
-	return clock3.t
-end)
 local dir3
 dir3 = RoundDirector.new(shared, Config, svc3, crew3, rep3, remotes, {
 	seedFn = function()
 		return 7
 	end,
-	holdFn = function()
-		return gate:anyHolding(crew3, dir3.ready)
-	end,
 })
 crew3:playerAdded(playerA)
+dir3:setPhase("intermission", 0)
 
--- Sit in intermission with the menu open the whole time.
-dir3:setPhase("intermission", Config.INTERMISSION)
-gate:set(playerA, true)
-
-local elapsed = 0
-local heldFor = 0
-while dir3.phase == "intermission" and elapsed < 200 do
+-- Sit in the lobby for a long time; nothing should start on its own.
+for _ = 1, 1200 do
 	clock3.t += 0.1
-	elapsed += 0.1
-	crew3:heartbeat() -- AFK sweep
 	crew3:touch(crew3.seats[playerA])
-	gate:set(playerA, true) -- keepalive
-	local was = dir3.timer
+	crew3:heartbeat()
 	dir3:heartbeat(0.1)
-	if dir3.paused then
-		heldFor += 0.1
-	end
-	if was == dir3.timer and dir3.phase == "intermission" and not dir3.paused then
-		break -- clock stalled for a reason other than the hold
-	end
 end
+check(dir3.phase == "intermission", `no auto-start after 120s idle (phase={dir3.phase})`)
 
-local cap = Config.INTERMISSION_PAUSE_CAP
-check(math.abs(heldFor - cap) < 0.25, `menu hold stopped the clock for exactly the cap ({heldFor}s of {cap}s)`)
-check(
-	math.abs(elapsed - (Config.INTERMISSION + cap)) < 0.5,
-	`intermission ran INTERMISSION+CAP then started ({elapsed}s of {Config.INTERMISSION + cap}s)`
-)
-check(dir3.phase == "round", "round started despite the menu still being open")
+-- Pressing Start is the only way in.
+dir3:setReady(playerA, true)
+check(dir3.phase == "round", "pressing Start begins the shift")
 
--- Readying up releases the hold immediately: a shopper is never a hostage.
+-- Same rule from the fresh-server countdown lobby.
 local dir4
 dir4 = RoundDirector.new(shared, Config, svc3, crew3, rep3, remotes, {
 	seedFn = function()
 		return 7
 	end,
-	holdFn = function()
-		return gate:anyHolding(crew3, dir4.ready)
-	end,
 })
-dir4:setPhase("intermission", Config.INTERMISSION)
-gate:set(playerA, true)
-dir4.ready[playerA] = true
-crew3:touch(crew3.seats[playerA])
-dir4:heartbeat(0.1)
-check(not dir4.paused, "a READY player with the menu open does not hold the clock")
+check(dir4.phase == "countdown", "a fresh server opens in the countdown lobby")
+for _ = 1, 600 do
+	clock3.t += 0.1
+	crew3:touch(crew3.seats[playerA])
+	crew3:heartbeat()
+	dir4:heartbeat(0.1)
+end
+check(dir4.phase == "countdown", "countdown never auto-starts either")
+dir4:setReady(playerA, true)
+check(dir4.phase == "round", "Start works from the countdown lobby too")
 
--- A crashed client stops holding on its own once the keepalive lapses.
+-- An AFK chef must not be able to strand the crew in the lobby forever.
 local dir5
 dir5 = RoundDirector.new(shared, Config, svc3, crew3, rep3, remotes, {
 	seedFn = function()
 		return 7
 	end,
-	holdFn = function()
-		return gate:anyHolding(crew3, dir5.ready)
-	end,
 })
-dir5:setPhase("intermission", Config.INTERMISSION)
-gate:set(playerA, true)
-crew3:touch(crew3.seats[playerA])
-dir5:heartbeat(0.1)
-check(dir5.paused, "an open menu holds the clock while the keepalive is fresh")
-clock3.t += (Config.MENU_KEEPALIVE_TIMEOUT + 1)
-crew3:touch(crew3.seats[playerA])
-dir5:heartbeat(0.1)
-check(not dir5.paused, "a lapsed keepalive (crashed client) stops holding the clock")
+dir5:setPhase("intermission", 0)
+local seat = crew3.seats[playerA]
+seat.afk = true
+dir5:setReady(playerA, true)
+check(dir5.phase == "intermission", "an AFK chef's stale ready cannot start a shift alone")
+seat.afk = false
 
-print(if failures > 0 then `{failures} FAILURES` else "PASS: intermission menu hold")
+print(if failures > 0 then `{failures} FAILURES` else "PASS: explicit start")
 if failures > 0 then
 	error(`{failures} checks failed`)
 end

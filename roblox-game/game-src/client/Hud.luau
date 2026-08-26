@@ -284,15 +284,22 @@ end
 
 function Hud:updatePhase(phase: any, cards: any?)
 	local p = phase.phase
+	-- The timer and patience bar belong to a SHIFT. Between rounds the timer
+	-- chip was being reused to show the results/intermission countdowns, which
+	-- read as one clock erratically jumping between unrelated values.
+	local inRound = p == "round"
+	self.timerLabel.Visible = inRound
+	self.patienceFill.Parent.Visible = inRound
+	if not inRound then
+		-- Tickets are a live-service artefact: clear them outright rather than
+		-- leaving the last shift's orders floating over the results screen.
+		self:clearOrders()
+	end
 	if p == "countdown" then
-		self.overlay.Visible = true
-		if phase.waiting then
-			self.overlayTitle.Text = "Kitchen's open!"
-			self.overlayBody.Text = "The shift starts as soon as a chef arrives."
-		else
-			self.overlayTitle.Text = `Shift starts in {math.max(0, math.ceil(phase.timer))}…`
-			self.overlayBody.Text = "One button does everything: walk up to a glowing station and press it."
-		end
+		-- No countdown card any more: countdown is an open-ended lobby waiting
+		-- on Start, and the old text ("Shift starts in N…") counted down a
+		-- timer that no longer exists. The centred ShiftPanel is the lobby UI.
+		self.overlay.Visible = false
 	elseif p == "results" and phase.results ~= nil then
 		local r = phase.results
 		self.overlay.Visible = true
@@ -313,7 +320,8 @@ function Hud:updatePhase(phase: any, cards: any?)
 end
 
 function Hud:updateScore(score: any)
-	self.scoreLabel.Text = `🪙 {score.coins}   x{score.combo}`
+	-- No coin emoji: FredokaOne has no glyph for it and renders a hollow box.
+	self.scoreLabel.Text = `{score.coins}c   x{score.combo}`
 	local f = math.clamp(score.patience, 0, 1)
 	self.patienceFill.Size = UDim2.fromScale(f, 1)
 	self.patienceFill.BackgroundColor3 = if f > 0.5
@@ -326,6 +334,15 @@ function Hud:updateTimer(remaining: number)
 	local m = math.floor(math.max(0, remaining) / 60)
 	local s = math.floor(math.max(0, remaining) % 60)
 	self.timerLabel.Text = string.format("%d:%02d", m, s)
+end
+
+--- Drop every ticket. Called on leaving a round so no orders survive into the
+--- results/lobby screens.
+function Hud:clearOrders()
+	for id, ticket in self.tickets do
+		ticket:Destroy()
+		self.tickets[id] = nil
+	end
 end
 
 --- Floating world-space label (serve values, "+12", grab misses).

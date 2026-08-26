@@ -36,7 +36,6 @@ Net.REMOTES = {
 	CarryDeltas = "RemoteEvent", -- server -> client: { {chefId, carrying-summary}, ... }
 	EquipDeltas = "RemoteEvent", -- server -> client: { {chefId, hat?, name?, skin?, palette?}, ... }
 	PickSpecies = "RemoteEvent", -- client -> server: species name
-	MenuState = "RemoteEvent", -- client -> server: menu open (bool); also a 5s keepalive
 }
 
 local POS_MIN, POS_MAX = -2, 30

@@ -60,7 +60,7 @@ function ShopTab.new(parent: Instance, deps: any)
 		Size = UDim2.fromOffset(130, 30),
 		TextColor3 = Theme.GOLD,
 		ZIndex = 6,
-		Text = "0 🪙",
+		Text = "0 coins",
 	}, parent)
 
 	self.list = Theme.scrollList({
@@ -74,7 +74,7 @@ end
 
 function ShopTab:setProgress(progress: any)
 	self.progress = progress
-	self.coinChip.Text = `{progress.coins or 0} 🪙`
+	self.coinChip.Text = `{progress.coins or 0} coins`
 	self:render()
 end
 
@@ -191,7 +191,7 @@ function ShopTab:render()
 			action.Text = `Lv {item.level}`
 			action.BackgroundColor3 = Theme.GREY
 		else
-			action.Text = `{item.cost} 🪙`
+			action.Text = `{item.cost}c`
 			action.BackgroundColor3 = if coins >= item.cost then Theme.GOLD else Theme.GREY
 			action.TextColor3 = if coins >= item.cost then Theme.BROWN_DEEP else Theme.CREAM
 		end

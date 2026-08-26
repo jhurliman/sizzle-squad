@@ -327,7 +327,7 @@ function WardrobeTab:render()
 			then "equipped"
 			elseif owned then "owned"
 			elseif locked then `Lv {item.level}`
-			else `{item.cost} 🪙`
+			else `{item.cost}c`
 		self:card(next_(), item.name, state, locked, nil, function()
 			if locked then
 				return
@@ -361,7 +361,7 @@ function WardrobeTab:render()
 			then "equipped"
 			elseif owned then "owned"
 			elseif locked then `Lv {item.level}`
-			else `{item.cost} 🪙`
+			else `{item.cost}c`
 		self:card(next_(), item.name, state, locked, tint, function()
 			if locked then
 				return
@@ -378,11 +378,11 @@ function WardrobeTab:render()
 	if sel ~= nil then
 		local affordable = coins >= sel.cost
 		self.buyButton.Visible = true
-		self.buyButton.Text = `BUY  {sel.cost} 🪙`
+		self.buyButton.Text = `BUY  {sel.cost}c`
 		self.buyButton.BackgroundColor3 = if affordable then Theme.GOLD else Theme.GREY
 		self.hint.Text = if affordable
 			then `Trying on {sel.name}. Buy it to keep it.`
-			else `{sel.name} costs {sel.cost} 🪙 — you have {coins}.`
+			else `{sel.name} costs {sel.cost}c — you have {coins}.`
 	else
 		self.buyButton.Visible = false
 		self.hint.Text = "Drag the chef to spin. Tap anything to try it on."

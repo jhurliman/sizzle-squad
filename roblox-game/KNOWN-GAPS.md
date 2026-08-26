@@ -66,7 +66,10 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟡 **First Shift** is a generic contextual tip strip (one rule-picked line),
   not the plan's scripted first-three-tickets with a demonstrating sous-chef.
   (The demonstration concept needs rethinking anyway now that bots are off by
-  default.)
+  default.) **It also owns a trigger it has not claimed yet**: a round never
+  starts on a timer, so everyone presses Start Shift — except a brand-new
+  player, who is auto-started into their first round by a placeholder in
+  Menu:maybeAutoStart. When First Shift lands it should take that over.
 - 🟢 **Late-join hold live**: joiners with <15s left spectate with a notice
   and seat at the next phase change.
 - 🟡 **Solo/duo pacing is machine-validated only** (bot proxy survives
@@ -77,10 +80,13 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 **AFK stage 2 missing**: 20s → bot/park coverage works, but "two idle
   rounds → non-ready spectator" isn't implemented (Roblox's 20-min kick is
   the only backstop).
-- 🟢 **Ready-up shows "n/total ready"** and derives its caption purely from
-  the server's readyIds (the old button latched to "WAITING…" forever). AFK
-  seats no longer block the all-ready short-circuit, and un-ready works. No
-  per-player pips yet.
+- 🟢 **Start Shift is the only way into a round.** countdown and intermission
+  are open-ended lobbies; the centred ShiftPanel shows a Start button, the four
+  menu buttons and your career line, and reports "WAITING FOR CREW n/total"
+  from the server's readyIds (the old button latched to "WAITING…" forever).
+  AFK seats cannot block or trigger a start, and un-ready works. No per-player
+  ready pips yet. The intermission-pause machinery (MenuGate/MenuState) was
+  **removed** rather than kept: with no auto-start there is no clock to pause.
 - 🟢 **Results ceremony is instant text** — no staged reveal, no XP/coin
   tickers.
 - 🟢 **Leaderboards are a Ranks tab with resolved display names** (batched
@@ -109,15 +115,28 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 **Wardrobe has no search/sort**; at 30 items the flat rails are fine, but
   they will not scale to a content cadence.
 
+## C3. Fixed in the front-end pass (kept here as regression bait)
+
+- Between-rounds walking rubber-banded because human move validation timed
+  packets against `sim.time`, which is **frozen** while `tickMovementOnly`
+  runs — the distance budget collapsed to one tick. SimService now keeps a
+  monotonic `self.clock` advanced by both tick paths. If chefs ever start
+  snapping between rounds again, look here first.
+- The round timer chip and the order queue used to survive into results and
+  the lobby; both are now gated to `phase == "round"`.
+- 🪙 has no glyph in Roblox's font stack (Unicode 13) and rendered as a hollow
+  box. Coin amounts are spelled out or use the `c` suffix. Every other emoji
+  in the UI predates 2016 and renders fine.
+
 ## D. Robustness / tech debt
 
 - 🟢 **Corrections glide** (snap absorbed into a decaying visual offset).
 - 🟢 No packet-loss extrapolation beyond hold-last-sample for remote chefs.
 - 🟢 No DataStore retry/backoff beyond pcall, no session locking (same-player
   two-server race), no autosave on server shutdown (BindToClose).
-- 🟢 Rate limiting: MenuState is capped (4 msgs/sec/player) and Emote is now
-  allowlisted by id, but ReadyUp is still unlimited (spam possible; GrabEdge is
-  capped at 3 queued).
+- 🟢 Rate limiting: Emote is allowlisted by id, but ReadyUp is unlimited
+  (spam possible; it re-broadcasts phase on every call). GrabEdge is capped at
+  3 queued.
 - 🟢 No analytics/funnel events (join → first round → second round — the P6
   playtest metrics have nothing instrumenting them yet).
 - 🟢 No `--!native` annotations on the hot sim modules (perf headroom is

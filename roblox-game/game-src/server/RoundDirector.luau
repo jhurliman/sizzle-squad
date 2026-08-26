@@ -21,7 +21,6 @@ function RoundDirector.new(
 		seedFn: (() -> number)?,
 		assistFn: (() -> boolean)?,
 		onRoundEnd: ((any) -> ())?,
-		holdFn: (() -> boolean)?,
 	}
 )
 	local self = setmetatable({}, RoundDirector)
@@ -39,15 +38,10 @@ function RoundDirector.new(
 	self.assistFn = opts.assistFn or function()
 		return false
 	end
-	-- holdFn: should the intermission clock be paused right now? (Menu-open
-	-- state lives in MenuGate; injected so the headless harness can drive it.)
-	self.holdFn = opts.holdFn or function()
-		return false
-	end
 	self.onRoundEnd = opts.onRoundEnd
 
 	self.phase = "countdown" :: Phase
-	self.timer = config.COUNTDOWN
+	self.timer = 0 -- lobbies do not run a clock; only `results` does
 	self.round = 0
 	self.ready = {} :: { [any]: boolean }
 	self.pressure = 0
@@ -55,22 +49,17 @@ function RoundDirector.new(
 	self.stats = {} :: { [number]: { [string]: number } } -- chefId -> counters
 	self.lastResults = nil :: any
 	self.broadcastAcc = 0
-	self.pauseLeft = 0
-	self.paused = false
 	return self
 end
 
 function RoundDirector:setPhase(phase: Phase, timer: number)
 	self.phase = phase
 	self.timer = timer
-	-- Each intermission gets a fresh hold budget; entering a round revokes any
-	-- hold outright so a stale menu flag can never pause live play.
-	if phase == "intermission" then
-		self.pauseLeft = self.config.INTERMISSION_PAUSE_CAP or 0
-	else
-		self.pauseLeft = 0
+	-- A fresh lobby always starts un-readied, so nobody is dragged into the
+	-- next shift by a stale click from the last one.
+	if phase == "countdown" or phase == "intermission" then
+		table.clear(self.ready)
 	end
-	self.paused = false
 	self:broadcastPhase()
 end
 
@@ -92,9 +81,8 @@ function RoundDirector:broadcastPhase()
 		readyIds = readyIds,
 		readyCount = readyCount,
 		readyTotal = readyTotal,
-		paused = self.paused,
-		pauseLeft = self.pauseLeft,
-		pauseCap = self.config.INTERMISSION_PAUSE_CAP or 0,
+		-- countdown/intermission are lobbies waiting on Start, not countdowns
+		awaitingStart = self.phase == "countdown" or self.phase == "intermission",
 		results = if self.phase == "results" or self.phase == "intermission" then self.lastResults else nil,
 	})
 end
@@ -263,8 +251,10 @@ function RoundDirector:tryStart()
 	end
 end
 
+--- Ready-up IS the start button. It works in countdown as well as
+--- intermission, because a round no longer starts on a timer at all.
 function RoundDirector:setReady(player: any, on: boolean)
-	if self.phase ~= "intermission" then
+	if self.phase ~= "intermission" and self.phase ~= "countdown" then
 		return
 	end
 	-- `nil` rather than `false` so the table does not accumulate dead keys.
@@ -320,29 +310,20 @@ function RoundDirector:heartbeat(dt: number)
 		return
 	end
 
-	-- A player browsing the wardrobe holds the intermission clock, but only
-	-- until the budget runs out. Ready players never hold (readying up is the
-	-- release valve), and the all-ready short-circuit still fires regardless,
-	-- so a shopper can never actually hostage the crew.
-	local held = false
-	if self.phase == "intermission" and self.pauseLeft > 0 and self.holdFn() then
-		held = true
-		self.pauseLeft = math.max(0, self.pauseLeft - dt)
-	end
-	self.paused = held
-	if held then
-		return
-	end
-
-	-- countdown / results / intermission all just run their timers.
-	self.timer -= dt
-	if self.timer <= 0 then
-		if self.phase == "countdown" then
-			self:startRound()
-		elseif self.phase == "results" then
-			self:setPhase("intermission", self.config.INTERMISSION)
-		elseif self.phase == "intermission" then
-			self:startRound()
+	-- A ROUND NEVER STARTS ON A TIMER.
+	--
+	-- Being dropped into a shift you did not ask for is disorienting, and it
+	-- also means the wardrobe/shop can cost you the opening seconds of a
+	-- round. countdown and intermission are open-ended lobbies now: the only
+	-- way into a shift is every non-AFK chef pressing Start (see setReady).
+	-- That is also why there is no intermission-pause any more -- there is no
+	-- clock left to pause.
+	--
+	-- Only `results` still runs a timer, because it is a ceremony, not a lobby.
+	if self.phase == "results" then
+		self.timer -= dt
+		if self.timer <= 0 then
+			self:setPhase("intermission", 0)
 		end
 	end
 end
