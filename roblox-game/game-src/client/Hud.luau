@@ -19,6 +19,13 @@ local INGREDIENT_COLORS: { [string]: Color3 } = {
 	bun = Color3.fromRGB(216, 143, 63),
 }
 
+-- ticket queue geometry
+local TICKET_W = 178
+local TICKET_H = 56
+local TICKET_PAD = 6
+-- vertical space kept clear at the bottom for the action button + margin
+local TICKET_RESERVE = 210
+
 local function mk(class: string, props: { [string]: any }, parent: Instance?): any
 	local inst = Instance.new(class) :: any
 	for k, v in props do
@@ -146,16 +153,28 @@ function Hud.new(catalog: any)
 
 	-- screen-space ticket rail, top center under the timer (world billboards
 	-- proved unframeable across aspect ratios — the camera never saw them)
+	-- ORDERS LIVE ON THE RIGHT EDGE, NOT ACROSS THE TOP.
+	--
+	-- A centered top rail sat exactly over the oven and stoves — the one part
+	-- of the room you must watch (cook/burn progress bars). Orders are
+	-- reference you glance at, so they belong at the periphery, queued like a
+	-- real ticket rail: oldest (most urgent) at the top.
+	--
+	-- The band between the score chip and the action button is short on a
+	-- phone (~206px on iPhone landscape) while the board can hold 5 tickets,
+	-- so the whole rail auto-scales down to fit (see updateOrders).
 	self.ticketRail = mk("Frame", {
-		Size = UDim2.new(1, -40, 0, 96),
-		Position = UDim2.new(0, 20, 0, 64),
+		Size = UDim2.new(0, TICKET_W, 1, -TICKET_RESERVE),
+		Position = UDim2.new(1, -(TICKET_W + 10), 0, 62),
 		BackgroundTransparency = 1,
 	}, gui)
+	self.ticketScale = mk("UIScale", { Scale = 1 }, self.ticketRail)
 	mk("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		FillDirection = Enum.FillDirection.Vertical,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
+		VerticalAlignment = Enum.VerticalAlignment.Top,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 8),
+		Padding = UDim.new(0, TICKET_PAD),
 	}, self.ticketRail)
 	self.tickets = {} :: { [number]: any }
 
@@ -312,27 +331,29 @@ function Hud:updateOrders(orders: { any })
 		local t = self.tickets[o.id]
 		if t == nil then
 			local card = mk("Frame", {
-				Size = UDim2.fromOffset(20 + math.max(2, #o.components) * 34, 92),
+				Size = UDim2.fromOffset(TICKET_W, TICKET_H),
 				BackgroundColor3 = Color3.fromRGB(255, 248, 235),
 				LayoutOrder = o.id,
 			}, self.ticketRail)
 			mk("UICorner", { CornerRadius = UDim.new(0, 12) }, card)
 			mk("TextLabel", {
-				Size = UDim2.new(1, 0, 0, 22),
+				Size = UDim2.new(1, -12, 0, 16),
+				Position = UDim2.new(0, 8, 0, 3),
 				BackgroundTransparency = 1,
 				TextColor3 = Color3.fromRGB(58, 32, 19),
-				TextSize = 15,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextSize = 14,
 				Font = Enum.Font.FredokaOne,
 				Text = o.name,
 			}, card)
 			local row = mk("Frame", {
-				Size = UDim2.new(1, -12, 0, 40),
-				Position = UDim2.new(0, 6, 0, 24),
+				Size = UDim2.new(1, -14, 0, 26),
+				Position = UDim2.new(0, 8, 0, 20),
 				BackgroundTransparency = 1,
 			}, card)
 			mk("UIListLayout", {
 				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left,
 				VerticalAlignment = Enum.VerticalAlignment.Center,
 				Padding = UDim.new(0, 3),
 			}, row)
@@ -340,14 +361,14 @@ function Hud:updateOrders(orders: { any })
 				local content = IconViz.content(c.kind, c.state)
 				if content ~= nil then
 					mk("ImageLabel", {
-						Size = UDim2.fromOffset(32, 32),
+						Size = UDim2.fromOffset(24, 24),
 						BackgroundTransparency = 1,
 						ImageContent = content,
 					}, row)
 				else
 					-- fallback: colored chip + state glyph
 					local chip = mk("Frame", {
-						Size = UDim2.fromOffset(26, 26),
+						Size = UDim2.fromOffset(22, 22),
 						BackgroundColor3 = INGREDIENT_COLORS[c.kind] or Color3.fromRGB(150, 150, 150),
 					}, row)
 					mk("UICorner", { CornerRadius = UDim.new(1, 0) }, chip)
@@ -364,8 +385,8 @@ function Hud:updateOrders(orders: { any })
 				end
 			end
 			local bar = mk("Frame", {
-				Size = UDim2.new(1, -12, 0, 8),
-				Position = UDim2.new(0, 6, 1, -14),
+				Size = UDim2.new(1, -16, 0, 6),
+				Position = UDim2.new(0, 8, 1, -10),
 				BackgroundColor3 = Color3.fromRGB(58, 32, 19),
 			}, card)
 			mk("UICorner", { CornerRadius = UDim.new(0, 4) }, bar)
@@ -386,6 +407,19 @@ function Hud:updateOrders(orders: { any })
 		if not live[id] then
 			t.card:Destroy()
 			self.tickets[id] = nil
+		end
+	end
+
+	-- Fit the queue into the band between the score chip and the action
+	-- button. A phone in landscape has ~206px there while the board can hold
+	-- five tickets, so scale the rail down rather than letting it run under
+	-- the controls.
+	local n = #orders
+	if n > 0 and self.ticketScale ~= nil then
+		local available = self.ticketRail.AbsoluteSize.Y
+		if available > 1 then
+			local needed = n * TICKET_H + (n - 1) * TICKET_PAD
+			self.ticketScale.Scale = math.clamp(available / needed, 0.6, 1)
 		end
 	end
 end

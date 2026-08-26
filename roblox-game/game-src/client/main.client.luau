@@ -142,12 +142,14 @@ do
 	local gui = hud.gui
 	for i, ping in PINGS do
 		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.fromOffset(84, 32)
-		btn.Position = UDim2.new(0.5, -180 + (i - 1) * 92, 1, -46)
+		-- compact, in the dead floor band at the bottom: the ticket queue now
+		-- owns the right edge and these must not crowd it
+		btn.Size = UDim2.fromOffset(66, 26)
+		btn.Position = UDim2.new(0.5, -140 + (i - 1) * 70, 1, -34)
 		btn.BackgroundColor3 = Color3.fromRGB(58, 32, 19)
 		btn.BackgroundTransparency = 0.25
 		btn.TextColor3 = Color3.fromRGB(255, 244, 221)
-		btn.TextSize = 16
+		btn.TextSize = 13
 		btn.Font = Enum.Font.FredokaOne
 		btn.Text = ping
 		btn.Parent = gui
