@@ -1,35 +1,42 @@
 --!strict
--- Badge awards (plan §2.7). Badge ids are 0 until badges are created on the
--- universe (user-gated: Creator Dashboard) — a 0 id silently no-ops, so this
--- ships wired and lights up when the ids are filled in.
+-- Badge awards (plan §2.7). All eight are live on the universe.
+--
+-- A 0 id silently no-ops, which is how this shipped before the badges existed
+-- and remains the escape hatch for any future badge added here.
+--
+-- Names, descriptions and icons: roblox-game/store/badges.md
 
 local Badges = {}
 Badges.__index = Badges
 
 Badges.IDS = {
-	firstDish = 0,
-	firstThreeStar = 0,
-	fullHumanCrewThreeStar = 0,
-	hundredDishes = 0,
-	thousandDishes = 0,
-	levelTen = 0,
-	perfectRound = 0, -- zero expired tickets
-	foundingChef = 0, -- launch-window only
+	firstDish = 4431857963958852,
+	firstThreeStar = 4317478992496196,
+	fullHumanCrewThreeStar = 814549161360154,
+	hundredDishes = 1810766503952474,
+	thousandDishes = 2460897867893271,
+	levelTen = 2294823863469429,
+	perfectRound = 437880355258821, -- zero expired tickets
+	foundingChef = 2672137851503382, -- launch-window only
 }
 
-function Badges.new(config: any?)
+--- `service` is injectable so the award rules, the session de-dup and the
+--- Founding Chef window can be tested without BadgeService.
+function Badges.new(config: any?, service: any?)
 	local self = setmetatable({}, Badges)
 	self.config = config
-	self.service = nil
+	self.service = service
 	-- player -> set of badge keys already granted THIS SESSION. Awarding a
 	-- badge someone owns is a no-op on Roblox's side, but the conditions here
 	-- re-fire every round for every player, so without this a four-player
 	-- server burns dozens of pointless BadgeService calls a minute and can
 	-- trip the award rate limit for badges that actually matter.
 	self.granted = {} :: { [any]: { [string]: boolean } }
-	pcall(function()
-		self.service = game:GetService("BadgeService")
-	end)
+	if self.service == nil then
+		pcall(function()
+			self.service = game:GetService("BadgeService")
+		end)
+	end
 	return self
 end
 

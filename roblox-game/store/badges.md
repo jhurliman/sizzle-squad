@@ -8,22 +8,26 @@ Create Badge** (100 Robux each). Upload the matching icon from
 
 Keys left at `0` are silently skipped, so you can do these one at a time.
 
-| `Badges.IDS` key | Icon | Name | Description | Awarded when |
-|---|---|---|---|---|
-| `firstDish` | `first-dish.png` | **First Dish** | Your first plate over the pass. Everyone starts somewhere. | any shift where you serve at least one dish |
-| `perfectRound` | `clean-service.png` | **Clean Service** | Work a whole shift without missing a single ticket. Not one. | `missed == 0` and `served > 0` |
-| `firstThreeStar` | `three-stars.png` | **Three Stars** | Finish a shift with all three stars on the board. | `stars >= 3` |
-| `fullHumanCrewThreeStar` | `full-house.png` | **Full House** | Three stars with a full crew of four chefs. Try coordinating that. | `stars >= 3` with 4 humans seated |
-| `levelTen` | `head-chef.png` | **Head Chef** | Reach level 10. You know where everything lives now. | `profile.level >= 10` |
-| `hundredDishes` | `century.png` | **Century** | Serve 100 dishes. | `totalDishes >= 100` |
-| `thousandDishes` | `thousand-plates.png` | **Thousand Plates** | Serve 1,000 dishes. The pass never stops. | `totalDishes >= 1000` |
-| `foundingChef` | `founding-chef.png` | **Founding Chef** | Worked the line during the launch window. Never awarded again. | end of any shift, while `Config.FOUNDING_CHEF_UNTIL` has not passed |
+**All eight are live** on experience `10761465304` and their ids are wired in
+`Badges.luau`. The table below is the record of what was created.
 
-## Before you spend the Robux
+| `Badges.IDS` key | Badge id | Icon | Name | Description | Awarded when |
+|---|---|---|---|---|---|
+| `firstDish` | `4431857963958852` | `first-dish.png` | **First Dish** | Your first plate over the pass. Everyone starts somewhere. | any shift where you serve at least one dish |
+| `perfectRound` | `437880355258821` | `clean-service.png` | **Clean Service** | Work a whole shift without missing a single ticket. Not one. | `missed == 0` and `served > 0` |
+| `firstThreeStar` | `4317478992496196` | `three-stars.png` | **Three Stars** | Finish a shift with all three stars on the board. | `stars >= 3` |
+| `fullHumanCrewThreeStar` | `814549161360154` | `full-house.png` | **Full House** | Three stars with a full crew of four chefs. Try coordinating that. | `stars >= 3` with 4 humans seated |
+| `levelTen` | `2294823863469429` | `head-chef.png` | **Head Chef** | Reach level 10. You know where everything lives now. | `profile.level >= 10` |
+| `hundredDishes` | `1810766503952474` | `century.png` | **Century** | Serve 100 dishes. | `totalDishes >= 100` |
+| `thousandDishes` | `2460897867893271` | `thousand-plates.png` | **Thousand Plates** | Serve 1,000 dishes. The pass never stops. | `totalDishes >= 1000` |
+| `foundingChef` | `2672137851503382` | `founding-chef.png` | **Founding Chef** | Worked the line during the launch window. Never awarded again. | end of any shift, while `Config.FOUNDING_CHEF_UNTIL` has not passed |
 
-- **Set `Config.FOUNDING_CHEF_UNTIL`** (UTC `YYYY-MM-DD`) to the real last day
-  of your launch window. Past it, nobody can earn Founding Chef again — which
-  is the only thing that makes it worth having. Empty string disables it.
+## Still to confirm
+
+- **`Config.FOUNDING_CHEF_UNTIL` is `2026-10-31`, which is a placeholder.**
+  Set it to the real last day of your launch window. Past that date nobody can
+  earn Founding Chef again — which is the only thing that makes it worth
+  having. An empty string disables the badge.
 - Conditions re-check at the end of every shift. Roblox no-ops a re-award and
   the server also de-dupes per session, so nothing is double-granted.
 - Badges are awarded **server-side** and need API access on the published

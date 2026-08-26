@@ -88,7 +88,11 @@ dailies have no UI, food is spheres, everything is silent.
    are rendered, uploaded and wired; ids recorded in
    `roblox/audio-out/asset-ids.csv`. Only `washDone` lacks a dedicated upload
    (falls back to the chop chime).
-3. **Badges** — 8 of them, wired and inert until the ids exist.
+3. ~~**Badges**~~ — DONE: all 8 created on experience `10761465304` and wired
+   into `Badges.IDS`. Record of ids, names, descriptions and icons is in
+   `roblox-game/store/badges.md`. **One thing still open: set
+   `Config.FOUNDING_CHEF_UNTIL` to your real launch-window end date** (it is a
+   placeholder). Original instructions kept below for any future badge.
 
    Create each at **Creator Dashboard → your experience → Engagement → Badges
    → Create Badge**. Roblox charges **100 Robux per badge** (800 total), and
