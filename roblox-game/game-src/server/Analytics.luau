@@ -27,13 +27,16 @@ local ONBOARDING = {
 	secondShiftStarted = 5,
 }
 
-function Analytics.new()
+--- `service` is injectable so the cohort tagging and bucketing can be tested
+--- headlessly; production passes nothing and gets the real service.
+function Analytics.new(service: any?)
 	local self = setmetatable({}, Analytics)
-	self.service = nil
-	self.enum = nil
-	pcall(function()
-		self.service = game:GetService("AnalyticsService")
-	end)
+	self.service = service
+	if self.service == nil then
+		pcall(function()
+			self.service = game:GetService("AnalyticsService")
+		end)
+	end
 	-- session bookkeeping, keyed by player
 	self.sessions = {} :: { [any]: { joinedAt: number, rounds: number, firstRoundDone: boolean, isNew: boolean } }
 	return self
@@ -147,30 +150,80 @@ function Analytics:levelUp(player: any, level: number)
 	end)
 end
 
-function Analytics:custom(player: any, name: string, value: number?)
+--- `fields` is up to three strings. Roblox slices a custom event's value by
+--- its custom fields, so a bare event answers "how many / what average" but
+--- only a FIELDED one answers "broken down by what".
+---
+--- Keep field values low-cardinality (buckets, not raw numbers): the dashboard
+--- groups by exact string, so a continuous value produces one bucket per
+--- player and no usable breakdown at all.
+function Analytics:custom(player: any, name: string, value: number?, fields: { string }?)
 	if self.service == nil then
 		return
 	end
 	try(function()
-		self.service:LogCustomEvent(player, name, value or 1)
+		local custom = nil
+		if fields ~= nil and #fields > 0 then
+			custom = {}
+			local keys = {
+				Enum.AnalyticsCustomFieldKeys.CustomField01,
+				Enum.AnalyticsCustomFieldKeys.CustomField02,
+				Enum.AnalyticsCustomFieldKeys.CustomField03,
+			}
+			for i = 1, math.min(#fields, 3) do
+				custom[keys[i]] = fields[i]
+			end
+		end
+		self.service:LogCustomEvent(player, name, value or 1, custom)
 	end)
+end
+
+--- Coarse buckets for "how long before they gave up". A distribution is what
+--- you actually want here, and the dashboard can only build one from discrete
+--- field values.
+local function durationBucket(seconds: number): string
+	if seconds < 15 then
+		return "under_15s"
+	elseif seconds < 60 then
+		return "15s_1m"
+	elseif seconds < 180 then
+		return "1m_3m"
+	elseif seconds < 600 then
+		return "3m_10m"
+	end
+	return "over_10m"
 end
 
 --- The session summary is what answers "rounds per session" and "how long did
 --- they stay", which are two of the four launch gates.
-function Analytics:playerRemoving(player: any)
+--- `phase` is the round phase they left during, which separates "sat in the
+--- lobby and never pressed Start" from "bailed mid-shift" -- two very
+--- different problems with the same session length.
+function Analytics:playerRemoving(player: any, phase: string?)
 	local s = self.sessions[player]
 	self.sessions[player] = nil
 	if s == nil then
 		return
 	end
-	local minutes = (os.clock() - s.joinedAt) / 60
-	self:custom(player, "session_minutes", math.floor(minutes * 10) / 10)
-	self:custom(player, "session_rounds", s.rounds)
+	local seconds = os.clock() - s.joinedAt
+	local cohort = if s.rounds == 0 then "no_shift" else "played"
+	local who = if s.isNew then "new" else "returning"
+
+	-- Tagged, so session length can be broken down BY cohort rather than
+	-- averaged across everyone.
+	self:custom(player, "session_minutes", math.floor(seconds / 6) / 10, { cohort, who, durationBucket(seconds) })
+	self:custom(player, "session_rounds", s.rounds, { cohort, who })
+
 	if s.rounds == 0 then
-		-- Joined and left without ever finishing a shift: the single most
-		-- important drop-off to watch during friends-and-family.
-		self:custom(player, "left_before_first_shift", 1)
+		-- Joined and left without ever starting a shift: the most expensive
+		-- drop-off there is. The VALUE is how long they lasted and the FIELDS
+		-- bucket it, so the dashboard gives both an average and a
+		-- distribution -- "how long did the people who bounced actually stay".
+		self:custom(player, "left_before_first_shift", math.floor(seconds), {
+			durationBucket(seconds),
+			phase or "unknown",
+			who,
+		})
 	end
 end
 

@@ -280,7 +280,7 @@ Players.PlayerRemoving:Connect(function(player)
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
 	monetization:playerRemoving(player)
-	analytics:playerRemoving(player)
+	analytics:playerRemoving(player, director.phase)
 	-- director.ready is keyed by Player and had no cleanup: it leaked a key
 	-- per departure and could strand a stale ready that nothing could clear.
 	director.ready[player] = nil

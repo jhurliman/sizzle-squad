@@ -221,7 +221,14 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   rewards and shop purchases, level-up progression events, and a session
   summary (minutes, rounds, left-before-first-shift). Every call is pcall'd and
   degrades to a no-op — an analytics call is never worth taking a round down
-  for. **No data has been observed on the dashboard yet.**
+  for.
+  Drop-off events carry the DURATION as their value and low-cardinality custom
+  fields (time bucket, phase left during, new vs returning), and session length
+  is tagged with its cohort, so the dashboard can answer "how long did the
+  people who bounced actually stay" rather than only "how many bounced".
+  Covered by tools/analytics-harness.luau against an injected fake service.
+  **No data has been observed on the dashboard yet** — events take a while to
+  surface.
 - 🟢 No `--!native` annotations on the hot sim modules (perf headroom is
   currently ~6× budget, so deferred).
 - 🟢 Multi-client behavior validated only via harness emulation + Studio
