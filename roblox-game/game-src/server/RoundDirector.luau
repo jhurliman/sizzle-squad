@@ -21,6 +21,7 @@ function RoundDirector.new(
 		seedFn: (() -> number)?,
 		assistFn: (() -> boolean)?,
 		onRoundEnd: ((any) -> ())?,
+		onRoundStart: ((number) -> ())?,
 	}
 )
 	local self = setmetatable({}, RoundDirector)
@@ -39,6 +40,7 @@ function RoundDirector.new(
 		return false
 	end
 	self.onRoundEnd = opts.onRoundEnd
+	self.onRoundStart = opts.onRoundStart
 
 	self.phase = "countdown" :: Phase
 	self.timer = 0 -- lobbies do not run a clock; only `results` does
@@ -119,6 +121,9 @@ function RoundDirector:startRound()
 	self.pressure = 0
 	self.stats = {}
 	table.clear(self.ready)
+	if self.onRoundStart ~= nil then
+		self.onRoundStart(self.round)
+	end
 	self:setPhase("round", self.shared.TUNING.roundSeconds)
 end
 

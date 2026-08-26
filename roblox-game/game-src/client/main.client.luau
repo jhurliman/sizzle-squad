@@ -23,6 +23,7 @@ local Vfx = require(script.Parent.Vfx) :: any
 local Music = require(script.Parent.Music) :: any
 local Menu = require(script.Parent.Menu) :: any
 local ItemViz = require(script.Parent.ItemViz) :: any
+local Results = require(script.Parent.Results) :: any
 
 local SCALE = 5
 local Config = require(gameShared:WaitForChild("Config")) :: any
@@ -38,7 +39,17 @@ local hud = Hud.new(Catalog)
 -- After the HUD: the touch thumbstick lives in its ScreenGui.
 local input = Input.new(hud.gui)
 local firstShift = FirstShift.new(hud.gui)
+local results = Results.new(hud.gui)
 local sfx = Sfx.new()
+-- Beats need a sound or the ceremony reads as a screenshot: each star and the
+-- level-up borrow the serve chime's combo tiers.
+results.onStar = function(n)
+	sfx:handle({ t = "serve", combo = n * 3 })
+end
+results.onLevelUp = function()
+	sfx:handle({ t = "serve", combo = 8 })
+end
+
 local vfxFolder = Instance.new("Folder")
 vfxFolder.Name = "Vfx"
 vfxFolder.Parent = Workspace
@@ -199,6 +210,11 @@ remotes.RoundPhase.OnClientEvent:Connect(function(phase)
 	end
 	state.phase = phase
 	hud:updatePhase(phase, phase.results and phase.results.cards)
+	if phase.phase == "results" and lastPhase ~= "results" and phase.results ~= nil then
+		results:show(phase.results, phase.results.cards)
+	elseif phase.phase ~= "results" then
+		results:hide()
+	end
 	-- The one call site for the phase gate.
 	menu:setPhase(phase, state.myChefId == nil)
 	-- Photo moment: a 3-star finish gets a celebratory push-in on the pass.
@@ -227,6 +243,10 @@ end)
 remotes.Progress.OnClientEvent:Connect(function(progress)
 	firstShift:setEligible(progress)
 	menu:setProgress(progress)
+	results:setProgress(progress)
+	if progress.award ~= nil then
+		results:setAward(progress.award)
+	end
 	-- Serve-bell cosmetic is local audio, so it reads the owner's own equip
 	-- rather than the elected kitchen set.
 	sfx:setKitchen(Catalog, progress.equipped)
@@ -312,6 +332,7 @@ local seq = 0
 RunService.RenderStepped:Connect(function(dt)
 	state.clock += dt
 	menu:step(dt)
+	results:step(dt)
 	cameraRig:update(dt)
 	vfx:tick(dt)
 	state:advanceClock(dt, state.phase.phase == "round")

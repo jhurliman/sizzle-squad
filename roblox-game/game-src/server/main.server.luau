@@ -17,6 +17,7 @@ local Progression = require(script.Parent.Progression) :: any
 local Leaderboards = require(script.Parent.Leaderboards) :: any
 local Badges = require(script.Parent.Badges) :: any
 local MonetizationServer = require(script.Parent.Monetization) :: any
+local Analytics = require(script.Parent.Analytics) :: any
 
 local remotes = Net.server(ReplicatedStorage)
 
@@ -36,6 +37,7 @@ progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("
 local Catalog = require(gameShared:WaitForChild("Catalog")) :: any
 local leaderboards = Leaderboards.new(progression, remotes)
 local badges = Badges.new()
+local analytics = Analytics.new()
 
 local MonetizationDefs = require(gameShared:WaitForChild("Monetization")) :: any
 local monetization = MonetizationServer.new(Catalog, MonetizationDefs)
@@ -48,6 +50,15 @@ local director = RoundDirector.new(shared, Config, simService, crew, replicator,
 	onRoundEnd = function(results)
 		progression:awardRound(crew, results)
 		badges:onRoundEnd(crew, progression, results)
+		for player in crew.seats do
+			analytics:roundFinished(player, director.round, results, progression.lastAward[player])
+		end
+	end,
+	onRoundStart = function(roundIndex)
+		local crewSize = crew:humanCount()
+		for player in crew.seats do
+			analytics:roundStarted(player, roundIndex, crewSize)
+		end
 	end,
 })
 
@@ -157,6 +168,9 @@ monetization.onGrant = function(player, itemIds)
 	progression:push(player)
 	queueEquips()
 end
+progression.onLevelUp = function(player, level)
+	analytics:levelUp(player, level)
+end
 progression.xpMultiplier = function(_self, player)
 	return monetization:xpMultiplier(player)
 end
@@ -180,7 +194,14 @@ remotes.PickSpecies.OnServerEvent:Connect(function(player, species)
 end)
 
 remotes.ShopAction.OnServerEvent:Connect(function(player, action)
+	local profile = progression.profiles[player]
+	local before = profile and profile.coins or 0
 	progression:shopAction(player, action)
+	-- Diff the balance rather than trusting the request: shopAction is the
+	-- authority on whether a buy actually happened.
+	if profile ~= nil and profile.coins < before then
+		analytics:economy(player, "sink", before - profile.coins, profile.coins, "Shop", tostring(action.id))
+	end
 	queueEquips()
 end)
 
@@ -235,15 +256,23 @@ Players.PlayerAdded:Connect(function(player)
 	end
 	progression:playerAdded(player)
 	monetization:playerAdded(player)
+	analytics:playerAdded(player, progression.profiles[player])
 	if director.phase == "round" and roundRemaining() < Config.LATE_JOIN_CUTOFF then
 		pendingJoins[player] = true
 		remotes.Snapshot:FireClient(player, replicator:snapshotFor(simService.sim))
 	else
 		crew:playerAdded(player)
+		analytics:onboarding(player, "seated")
 	end
 	director:broadcastPhase()
 	leaderboards:pushTo(player)
 	broadcastEquips()
+end)
+
+-- Roblox gives us ~30s at shutdown; without this, everything since the last
+-- 60s autosave is lost -- up to a whole round of coins, XP and unlocks.
+game:BindToClose(function()
+	progression:flushAll()
 end)
 
 Players.PlayerRemoving:Connect(function(player)
@@ -251,6 +280,7 @@ Players.PlayerRemoving:Connect(function(player)
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
 	monetization:playerRemoving(player)
+	analytics:playerRemoving(player)
 	-- director.ready is keyed by Player and had no cleanup: it leaked a key
 	-- per departure and could strand a stale ready that nothing could clear.
 	director.ready[player] = nil

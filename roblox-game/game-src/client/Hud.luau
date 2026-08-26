@@ -300,18 +300,8 @@ function Hud:updatePhase(phase: any, cards: any?)
 		-- on Start, and the old text ("Shift starts in N…") counted down a
 		-- timer that no longer exists. The centred ShiftPanel is the lobby UI.
 		self.overlay.Visible = false
-	elseif p == "results" and phase.results ~= nil then
-		local r = phase.results
-		self.overlay.Visible = true
-		local stars = string.rep("★", r.stars) .. string.rep("☆", 3 - r.stars)
-		self.overlayTitle.Text = `{stars}   {r.coins} coins`
-		local lines = { `{r.served} dishes served · best combo x{r.bestCombo}` }
-		if cards ~= nil then
-			for _, card in cards do
-				table.insert(lines, `🏅 {card.title} — {card.line}`)
-			end
-		end
-		self.overlayBody.Text = table.concat(lines, "\n")
+	-- `results` is NOT handled here any more: the ceremony is staged over the
+	-- whole 12s phase and lives in client/Results.luau.
 	elseif p == "intermission" then
 		self.overlay.Visible = false
 	else

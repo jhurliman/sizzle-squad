@@ -91,8 +91,10 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   AFK seats cannot block or trigger a start, and un-ready works. No per-player
   ready pips yet. The intermission-pause machinery (MenuGate/MenuState) was
   **removed** rather than kept: with no auto-start there is no clock to pause.
-- 🟢 **Results ceremony is instant text** — no staged reveal, no XP/coin
-  tickers.
+- 🟢 **Results ceremony is staged** (client/Results.luau): score lands, stars
+  punch in one at a time with a chime, coins and XP count up to the real
+  per-player award (recorded by awardRound, not re-derived on the client), then
+  superlative cards deal out. No photo-moment staging yet.
 - 🟢 **Leaderboards are a Ranks tab with resolved display names** (batched
   UserService lookup, cached, one call per 90s poll) and the local player's
   row pinned — they used to print raw `u123456` keys. Still not the physical
@@ -205,13 +207,21 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 
 - 🟢 **Corrections glide** (snap absorbed into a decaying visual offset).
 - 🟢 No packet-loss extrapolation beyond hold-last-sample for remote chefs.
-- 🟢 No DataStore retry/backoff beyond pcall, no session locking (same-player
-  two-server race), no autosave on server shutdown (BindToClose).
+- 🟢 **DataStore hardened**: exponential backoff (4 attempts, 0.6s doubling),
+  session locking via an in-profile claim refreshed by the autosave and
+  released on leave (a locked-out server goes session-only and never writes),
+  and BindToClose flushes every profile on shutdown. Covered by
+  tools/datastore-harness.luau against a store that throttles on demand.
 - 🟢 Rate limiting: Emote is allowlisted by id, but ReadyUp is unlimited
   (spam possible; it re-broadcasts phase on every call). GrabEdge is capped at
   3 queued.
-- 🟢 No analytics/funnel events (join → first round → second round — the P6
-  playtest metrics have nothing instrumenting them yet).
+- 🟢 **Analytics wired** (server/Analytics.luau, Roblox AnalyticsService so it
+  lands on the Creator Dashboard with no external service): onboarding funnel
+  for first-session players, a per-shift funnel, economy source/sink on round
+  rewards and shop purchases, level-up progression events, and a session
+  summary (minutes, rounds, left-before-first-shift). Every call is pcall'd and
+  degrades to a no-op — an analytics call is never worth taking a round down
+  for. **No data has been observed on the dashboard yet.**
 - 🟢 No `--!native` annotations on the hot sim modules (perf headroom is
   currently ~6× budget, so deferred).
 - 🟢 Multi-client behavior validated only via harness emulation + Studio

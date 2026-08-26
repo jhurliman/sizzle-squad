@@ -12,6 +12,51 @@ local BOARD_ALLTIME = "SizzleBestRound_v1"
 local BOARD_DISHES = "SizzleCareerDishes_v1"
 local AUTOSAVE_SECONDS = 60
 
+-- DataStore hardening --------------------------------------------------------
+-- Every call was a bare pcall: one transient failure silently threw away a
+-- round's progress, two servers could write the same profile, and a shutdown
+-- lost everything since the last autosave.
+local RETRIES = 4
+local RETRY_BASE = 0.6 -- seconds; doubles each attempt (0.6/1.2/2.4/4.8)
+-- How long another server's claim is respected before we assume it died. Must
+-- comfortably exceed the autosave interval, which refreshes the claim.
+local LOCK_TTL = 150
+
+-- Identifies THIS server. Studio has no JobId, and the headless harnesses have
+-- no `game` at all, so fall back to a random id: two sessions must never look
+-- like the same owner or they would never lock each other out.
+local SERVER_ID = (function(): string
+	local ok, id = pcall(function()
+		return game.JobId
+	end)
+	if ok and typeof(id) == "string" and id ~= "" then
+		return id
+	end
+	return `local-{math.random(1, 1000000000)}`
+end)()
+
+--- Run a DataStore call with exponential backoff.
+---
+--- Backoff rather than a tight loop on purpose: DataStore throttling is a
+--- BUDGET, so hammering a failing key makes the outage worse for every other
+--- request on the server.
+local function withRetry<T>(what: string, fn: () -> T): (boolean, T?)
+	local delay = RETRY_BASE
+	for attempt = 1, RETRIES do
+		local ok, res = pcall(fn)
+		if ok then
+			return true, res
+		end
+		if attempt == RETRIES then
+			warn(`[progression] {what} failed after {RETRIES} attempts: {res}`)
+			return false, nil
+		end
+		task.wait(delay)
+		delay *= 2
+	end
+	return false, nil
+end
+
 local DAILIES = {
 	{ id = "serve10", name = "Serve 10 dishes", stat = "serves", goal = 10, coins = 60, xp = 40 },
 	{ id = "chop15", name = "Chop 15 ingredients", stat = "chops", goal = 15, coins = 50, xp = 30 },
@@ -53,6 +98,10 @@ function Progression.new(config: any, remotes: { [string]: any }, catalog: any, 
 	self.catalog = catalog
 	self.profiles = {} :: { [any]: any }
 	self.dirty = {} :: { [any]: boolean }
+	-- player -> what the last round paid them (coins/xp/levels). Consumed by
+	-- the results ceremony and by analytics; both need the delta, not the
+	-- running total.
+	self.lastAward = {} :: { [any]: any }
 	self.lastSave = os.clock()
 
 	self.stores = nil
@@ -73,14 +122,38 @@ end
 function Progression:playerAdded(player: any)
 	local profile = defaultProfile()
 	if self.stores ~= nil then
-		pcall(function()
-			local saved = self.stores.profiles:GetAsync(`p{player.UserId}`)
-			if saved ~= nil then
-				for k, v in saved do
+		-- Load AND claim in one UpdateAsync, so the read and the lock write
+		-- cannot interleave with another server doing the same thing.
+		local key = `p{player.UserId}`
+		local ok, loaded = withRetry(`load {key}`, function()
+			local out
+			self.stores.profiles:UpdateAsync(key, function(old)
+				local p = old or {}
+				local lock = p.__lock
+				if lock ~= nil and lock.server ~= SERVER_ID and (os.time() - (lock.at or 0)) < LOCK_TTL then
+					-- Live elsewhere. Abort the write; the retry loop backs off
+					-- and the claim expires on its own if that server died.
+					return nil
+				end
+				p.__lock = { server = SERVER_ID, at = os.time() }
+				out = p
+				return p
+			end)
+			return out
+		end)
+		if ok and loaded ~= nil then
+			for k, v in loaded do
+				if k ~= "__lock" then
 					profile[k] = v
 				end
 			end
-		end)
+		elseif ok then
+			-- Someone else holds the profile and would not let go. Play on with
+			-- a session-only profile rather than blocking the join, but never
+			-- write it back: that is how you overwrite a live session.
+			warn(`[progression] {player.Name} profile is locked by another server; session-only`)
+			profile.__readOnly = true
+		end
 	end
 	-- roll dailies for today
 	if profile.daily.day ~= dayKey() then
@@ -95,18 +168,34 @@ function Progression:playerAdded(player: any)
 end
 
 function Progression:playerRemoving(player: any)
-	self:save(player)
+	self.lastAward[player] = nil
+	self:save(player, true)
 	self.profiles[player] = nil
 	self.dirty[player] = nil
 end
 
-function Progression:save(player: any)
+--- Persist a profile. `release` drops our claim (used on leave and shutdown).
+function Progression:save(player: any, release: boolean?)
 	local profile = self.profiles[player]
 	if profile == nil or self.stores == nil then
 		return
 	end
-	pcall(function()
-		self.stores.profiles:SetAsync(`p{player.UserId}`, profile)
+	if profile.__readOnly then
+		return -- never write a profile we could not claim
+	end
+	local key = `p{player.UserId}`
+	withRetry(`save {key}`, function()
+		self.stores.profiles:UpdateAsync(key, function(old)
+			local lock = old ~= nil and old.__lock or nil
+			if lock ~= nil and lock.server ~= SERVER_ID and (os.time() - (lock.at or 0)) < LOCK_TTL then
+				-- Another server claimed it while we were playing: drop our
+				-- write rather than clobbering a live session.
+				return nil
+			end
+			local out = table.clone(profile)
+			out.__lock = if release then nil else { server = SERVER_ID, at = os.time() }
+			return out
+		end)
 	end)
 end
 
@@ -140,6 +229,8 @@ function Progression:push(player: any)
 		equipped = profile.equipped,
 		dailies = dailies,
 		streak = profile.streak.count,
+		-- Only present on the push that follows a round award.
+		award = self.lastAward[player],
 		sessions = profile.sessions or 1,
 		-- The client used to infer species from EquipDeltas.skin; send it.
 		species = profile.species,
@@ -168,6 +259,7 @@ end
 
 function Progression:awardRound(crew: any, results: any)
 	local config = self.config
+	self.lastAward = {}
 	local humans = math.max(1, crew:humanCount())
 	local today = dayKey()
 
@@ -184,7 +276,8 @@ function Progression:awardRound(crew: any, results: any)
 		-- exactly the thing a co-op game wants to encourage.
 		local mult = self.coinMultiplier ~= nil and self:coinMultiplier(player) or 1
 		local crewBonus = (humans - 1) * (config.CREW_BONUS_PER_MATE or 0)
-		profile.coins += math.floor((results.coins + results.stars * 10 + crewBonus) * mult)
+		local coinsEarned = math.floor((results.coins + results.stars * 10 + crewBonus) * mult)
+		profile.coins += coinsEarned
 		profile.rounds += 1
 		profile.totalDishes += serves
 		profile.bestRound = math.max(profile.bestRound, results.coins)
@@ -199,15 +292,35 @@ function Progression:awardRound(crew: any, results: any)
 			xp = math.floor(xp * self:xpMultiplier(player))
 		end
 		profile.xp += xp
+		local levelsGained, granted = 0, {}
 		while profile.xp >= config.LEVEL_CURVE(profile.level) do
 			profile.xp -= config.LEVEL_CURVE(profile.level)
 			profile.level += 1
+			levelsGained += 1
 			profile.coins += profile.level * 25
 			local grant = self.catalog.milestones[profile.level]
 			if grant ~= nil then
 				profile.owned[grant] = true
+				table.insert(granted, grant)
+			end
+			if self.onLevelUp ~= nil then
+				self.onLevelUp(player, profile.level)
 			end
 		end
+
+		-- What this shift was worth, per player. The results ceremony counts
+		-- these up on screen, and analytics logs them as an economy source --
+		-- both need the DELTA, which nothing was recording.
+		self.lastAward[player] = {
+			coins = coinsEarned,
+			xp = xp,
+			levels = levelsGained,
+			level = profile.level,
+			granted = granted,
+			balance = profile.coins,
+			stars = results.stars,
+			served = serves,
+		}
 
 		-- streak (grace token: one missed day per week forgiven)
 		local streak = profile.streak
@@ -250,7 +363,7 @@ function Progression:awardRound(crew: any, results: any)
 		-- leaderboards (server-authoritative; clamp against a generous
 		-- per-round ceiling before writing, quarantine anything above)
 		if self.stores ~= nil and results.coins <= 5000 then
-			pcall(function()
+			withRetry(`boards u{player.UserId}`, function()
 				local key = `u{player.UserId}`
 				self.stores.allTime:UpdateAsync(key, function(old)
 					return math.max(old or 0, results.coins)
@@ -265,13 +378,21 @@ function Progression:awardRound(crew: any, results: any)
 		end
 	end
 
-	-- periodic autosave
+	-- Periodic autosave. This also REFRESHES the lock, which is why LOCK_TTL
+	-- has to be comfortably longer than the autosave interval.
 	if os.clock() - self.lastSave > AUTOSAVE_SECONDS then
 		self.lastSave = os.clock()
+		local pending = {}
 		for player in self.dirty do
-			self:save(player)
+			table.insert(pending, player)
 		end
 		table.clear(self.dirty)
+		-- save() yields on retry, so snapshot the list first.
+		task.spawn(function()
+			for _, player in pending do
+				self:save(player)
+			end
+		end)
 	end
 end
 
@@ -396,6 +517,36 @@ function Progression:crewQualifiesForAssist(crew: any): boolean
 		return false
 	end
 	return (total / n) < self.config.ASSIST_LEVEL or (rounds / n) < self.config.ASSIST_ROUNDS
+end
+
+--- Flush every profile on shutdown.
+---
+--- Roblox gives BindToClose roughly 30 seconds and then kills the server, so
+--- without this a shutdown ate everything since the last autosave -- up to a
+--- full round of coins, XP and unlocks. Saves run in parallel and the whole
+--- thing is bounded, because a hung DataStore must not eat the entire budget.
+function Progression:flushAll()
+	local pending = {}
+	for player in self.profiles do
+		table.insert(pending, player)
+	end
+	local left = #pending
+	if left == 0 then
+		return
+	end
+	for _, player in pending do
+		task.spawn(function()
+			self:save(player, true)
+			left -= 1
+		end)
+	end
+	local deadline = os.clock() + 20
+	while left > 0 and os.clock() < deadline do
+		task.wait(0.1)
+	end
+	if left > 0 then
+		warn(`[progression] shutdown flush timed out with {left} profile(s) unsaved`)
+	end
 end
 
 return Progression
