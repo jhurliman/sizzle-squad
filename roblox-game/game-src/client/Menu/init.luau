@@ -16,6 +16,7 @@
 -- deliberately unlike the scattered per-frame .Visible bookkeeping in
 -- Hud:updatePhase that this module exists to replace.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -413,10 +414,21 @@ end
 function Menu:relayout()
 	local cam = workspace.CurrentCamera
 	local viewport = if cam ~= nil then cam.ViewportSize else Vector2.new(1280, 720)
-	local L = Theme.layoutFor(viewport)
+	-- Roblox draws its own controls (menu, chat, voice) across the top. The
+	-- gui ignores the inset so the ShiftPanel and emote row can use the whole
+	-- screen, which means the PANEL has to dodge the top bar itself -- it was
+	-- sitting underneath it and eating the tab labels.
+	local inset = GuiService:GetGuiInset()
+	local safeTop = inset.Y + 8
+	local L = Theme.layoutFor(Vector2.new(viewport.X, viewport.Y - safeTop))
 	self.layout = L
 
-	self.panel.Size = UDim2.fromOffset(L.panelW, L.panelH)
+	-- Top-anchored under the inset rather than centred, so the tab strip is
+	-- always reachable no matter how tall the panel gets.
+	local panelH = math.min(L.panelH, viewport.Y - safeTop - 12)
+	self.panel.AnchorPoint = Vector2.new(0.5, 0)
+	self.panel.Position = UDim2.new(0.5, 0, 0, safeTop)
+	self.panel.Size = UDim2.fromOffset(L.panelW, panelH)
 	self.tabStrip.Size = UDim2.new(1, -60, 0, L.tabH)
 	self.content.Position = UDim2.fromOffset(10, L.tabH + 16)
 	self.content.Size = UDim2.new(1, -20, 1, -(L.tabH + 26))

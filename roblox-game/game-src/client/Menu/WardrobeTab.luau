@@ -7,10 +7,10 @@
 -- 44 hand-tuned FitLab hat fits finally become visible; until now they were
 -- only ever seen as a small object on a chef mid-round.
 --
--- PREVIEW IS PURELY LOCAL. Tapping a card changes only what you are looking
--- at; nothing reaches the server until APPLY. A server round-trip per tap
--- would feel laggy and would let a scrolling player drive broadcastEquips
--- (which fans out to every client) at scroll frequency.
+-- Tapping something you OWN wears it immediately -- there is no Apply step,
+-- because a confirm button between "I tapped the hat" and "I am wearing the
+-- hat" is pure ceremony. Tapping something you do NOT own only previews it,
+-- and the footer offers to buy; buying then wears it automatically.
 
 local Theme = require(script.Parent.Theme) :: any
 local ChefPreview = require(script.Parent.ChefPreview) :: any
@@ -33,6 +33,9 @@ function WardrobeTab.new(parent: Instance, deps: any)
 	local self = setmetatable({}, WardrobeTab)
 	self.catalog = deps.catalog
 	self.deps = deps
+	-- `equipped` is server truth; `pending` is what the preview shows (they
+	-- differ only while trying on something unowned); `selected` is that
+	-- unowned item, and is what the BUY footer acts on.
 	self.equipped = { skin = "bramble", hat = nil, palette = nil }
 	self.pending = { skin = "bramble", hat = nil, palette = nil }
 	self.selected = nil :: any
@@ -107,32 +110,6 @@ function WardrobeTab.new(parent: Instance, deps: any)
 		self.deps.onShopAction({ action = "buy", id = sel.id })
 	end)
 
-	self.resetButton = Theme.button({
-		Size = UDim2.fromOffset(90, Theme.MIN_TAP),
-		Fill = Theme.BROWN_LIGHT,
-		TextSize = 15,
-		LayoutOrder = 3,
-		ZIndex = 6,
-		Text = "RESET",
-	}, self.footer)
-	self.resetButton.Activated:Connect(function()
-		self.pending = { skin = self.equipped.skin, hat = self.equipped.hat, palette = self.equipped.palette }
-		self.selected = nil
-		self:pushPreview()
-		self:render()
-	end)
-
-	self.applyButton = Theme.button({
-		Size = UDim2.fromOffset(150, Theme.MIN_TAP),
-		TextSize = 18,
-		LayoutOrder = 4,
-		ZIndex = 6,
-		Text = "APPLY",
-	}, self.footer)
-	self.applyButton.Activated:Connect(function()
-		self:apply()
-	end)
-
 	return self
 end
 
@@ -140,11 +117,9 @@ end
 
 --- Own-chef appearance as the server sees it.
 function WardrobeTab:setEquipped(e: any)
-	local dirty = self:isDirty()
 	self.equipped = { skin = e.skin or self.equipped.skin, hat = e.hat, palette = e.palette }
-	-- Don't stomp an in-progress edit; only follow the server when the player
-	-- has nothing pending (e.g. the equip we just applied came back).
-	if not dirty then
+	-- Follow the server unless the player is mid-try-on of something unowned.
+	if self.selected == nil then
 		self.pending = { skin = self.equipped.skin, hat = self.equipped.hat, palette = self.equipped.palette }
 		self:pushPreview()
 	end
@@ -153,13 +128,21 @@ end
 
 function WardrobeTab:setProgress(progress: any)
 	self.progress = progress
+	-- The purchase landed: stop offering to sell it and put it on. Without
+	-- this the BUY button survived the purchase and only cleared when some
+	-- other interaction happened to re-render.
+	local sel = self.selected
+	if sel ~= nil and self:owns(sel.id) then
+		self.selected = nil
+		self:commit(self.catalog.slotKey(sel), sel.id)
+	end
 	self:render()
 end
 
-function WardrobeTab:isDirty(): boolean
-	return self.pending.skin ~= self.equipped.skin
-		or self.pending.hat ~= self.equipped.hat
-		or self.pending.palette ~= self.equipped.palette
+--- Equip one slot. `false` clears it; absent slots are left alone, so this
+--- can never strip something the wardrobe does not manage (plates, bells).
+function WardrobeTab:commit(slot: string, id: string?)
+	self.deps.onShopAction({ action = "equipSet", set = { [slot] = id or false } })
 end
 
 function WardrobeTab:pushPreview()
@@ -172,18 +155,23 @@ function WardrobeTab:owns(id: string): boolean
 	return self.progress ~= nil and self.progress.owned ~= nil and self.progress.owned[id] == true
 end
 
-function WardrobeTab:apply()
-	if not self:isDirty() then
-		return
+--- Tap handler for a wearable card: wear it if it is yours, otherwise put it
+--- on the preview and offer to sell it.
+function WardrobeTab:pick(slot: string, item: any?)
+	local id = if item ~= nil then item.id else nil
+	if slot == "hat" then
+		self.pending.hat = id
+	else
+		self.pending.palette = id
 	end
-	if self.pending.skin ~= self.equipped.skin then
-		self.deps.onPickSpecies(self.pending.skin)
+	if item == nil or self:owns(item.id) then
+		self.selected = nil
+		self:commit(slot, id)
+	else
+		self.selected = if item.exclusive ~= nil then nil else item
 	end
-	-- One atomic commit for every slot, instead of an equip per card tap.
-	self.deps.onShopAction({
-		action = "equipSet",
-		set = { hat = self.pending.hat, palette = self.pending.palette },
-	})
+	self:pushPreview()
+	self:render()
 end
 
 --- Hand-off from the Shop's "TRY IT": preview the item, select it so the
@@ -235,7 +223,7 @@ end
 function WardrobeTab:card(order: number, label: string, state: string, locked: boolean, tint: Color3?, onPick: () -> ())
 	local row = mk("TextButton", {
 		Size = UDim2.new(1, -10, 0, Theme.MIN_TAP),
-		BackgroundColor3 = if state == "equipped" then Theme.GREEN else Theme.BROWN_LIGHT,
+		BackgroundColor3 = if state == "WORN" then Theme.GREEN else Theme.BROWN_LIGHT,
 		BackgroundTransparency = if state == "locked" then 0.55 else 0.2,
 		BorderSizePixel = 0,
 		AutoButtonColor = state ~= "locked",
@@ -294,16 +282,19 @@ function WardrobeTab:render()
 	-- ---- species -----------------------------------------------------
 	self:sectionTitle(next_(), "SPECIES")
 	for _, s in SPECIES do
-		local state = if self.pending.skin == s.id then "equipped" else "pick"
+		local state = if self.pending.skin == s.id then "WORN" else "pick"
 		self:card(next_(), s.label, state, false, nil, function()
 			self.pending.skin = s.id
 			-- Palettes are species-bound; a palette from another species does
 			-- nothing at all, so drop it rather than silently no-op.
 			local pal = if self.pending.palette ~= nil then self.catalog.byId[self.pending.palette] else nil
 			if pal ~= nil and pal.species ~= s.id then
+				-- palettes are species-bound; a mismatched one does nothing
 				self.pending.palette = nil
+				self:commit("palette", nil)
 			end
 			self.selected = nil
+			self.deps.onPickSpecies(s.id)
 			self:pushPreview()
 			self:render()
 		end)
@@ -311,11 +302,8 @@ function WardrobeTab:render()
 
 	-- ---- hats --------------------------------------------------------
 	self:sectionTitle(next_(), "HATS")
-	self:card(next_(), "No hat", if self.pending.hat == nil then "equipped" else "pick", false, nil, function()
-		self.pending.hat = nil
-		self.selected = nil
-		self:pushPreview()
-		self:render()
+	self:card(next_(), "No hat", if self.pending.hat == nil then "WORN" else "pick", false, nil, function()
+		self:pick("hat", nil)
 	end)
 	for _, item in self.catalog.items do
 		if item.kind ~= "hat" or item.hidden then
@@ -325,8 +313,10 @@ function WardrobeTab:render()
 		local locked = (item.level ~= nil and level < item.level) or (item.exclusive ~= nil and not owned)
 		local state = if item.exclusive ~= nil and not owned
 			then "★ PASS"
+			elseif self.equipped.hat == item.id
+			then "WORN"
 			elseif self.pending.hat == item.id
-			then "equipped"
+			then "trying on"
 			elseif owned then "owned"
 			elseif locked then `Lv {item.level}`
 			else `{item.cost}c`
@@ -335,20 +325,14 @@ function WardrobeTab:render()
 				return
 			end
 			-- Try-before-you-buy: unowned hats still preview.
-			self.pending.hat = item.id
-			self.selected = if owned or item.exclusive ~= nil then nil else item
-			self:pushPreview()
-			self:render()
+			self:pick("hat", item)
 		end)
 	end
 
 	-- ---- palettes (this species only) ---------------------------------
 	self:sectionTitle(next_(), `PALETTES — {self.pending.skin}`)
-	self:card(next_(), "Default coat", if self.pending.palette == nil then "equipped" else "pick", false, nil, function()
-		self.pending.palette = nil
-		self.selected = nil
-		self:pushPreview()
-		self:render()
+	self:card(next_(), "Default coat", if self.pending.palette == nil then "WORN" else "pick", false, nil, function()
+		self:pick("palette", nil)
 	end)
 	for _, item in self.catalog.items do
 		if item.kind ~= "palette" or item.species ~= self.pending.skin or item.hidden then
@@ -361,8 +345,10 @@ function WardrobeTab:render()
 			else nil
 		local state = if item.exclusive ~= nil and not owned
 			then "★ PASS"
+			elseif self.equipped.palette == item.id
+			then "WORN"
 			elseif self.pending.palette == item.id
-			then "equipped"
+			then "trying on"
 			elseif owned then "owned"
 			elseif locked then `Lv {item.level}`
 			else `{item.cost}c`
@@ -370,10 +356,7 @@ function WardrobeTab:render()
 			if locked then
 				return
 			end
-			self.pending.palette = item.id
-			self.selected = if owned or item.exclusive ~= nil then nil else item
-			self:pushPreview()
-			self:render()
+			self:pick("palette", item)
 		end)
 	end
 
@@ -389,11 +372,8 @@ function WardrobeTab:render()
 			else `{sel.name} costs {sel.cost}c — you have {coins}.`
 	else
 		self.buyButton.Visible = false
-		self.hint.Text = "Drag the chef to spin. Tap anything to try it on."
+		self.hint.Text = "Drag the chef to spin. Tap anything to wear it."
 	end
-	local dirty = self:isDirty()
-	self.applyButton.BackgroundColor3 = if dirty then Theme.GREEN else Theme.GREY
-	self.applyButton.Text = if dirty then "APPLY" else "APPLIED"
 end
 
 function WardrobeTab:relayout(L: any, _viewport: Vector2)

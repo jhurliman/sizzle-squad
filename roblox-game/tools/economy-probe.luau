@@ -7,6 +7,11 @@
 local shared = require("../out/shared-bundle")
 local Config = require("../game-src/shared/Config")
 local Catalog = require("../game-src/shared/Catalog")
+local Tuning = require("../game-src/shared/Tuning")
+
+-- Measure the game as SHIPPED: the port runs ~8% slower than the raw shared
+-- tuning, and that shows up in dishes per round.
+Tuning.apply(shared, Config)
 
 local SEEDS = { 11, 222, 3333, 44444, 555555, 6666, 77777, 888, 9999, 121212 }
 

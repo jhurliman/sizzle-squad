@@ -348,3 +348,52 @@ print(if failures > 0 then `{failures} FAILURES` else "PASS: explicit start")
 if failures > 0 then
 	error(`{failures} checks failed`)
 end
+
+-- ==========================================================================
+-- Equip slots: plates, pans and the serve bell dress DIFFERENT props, so they
+-- must be independently equippable. Keying them all under "kitchen" meant
+-- buying a pan silently took your plates off -- "feels like a ripoff".
+-- ==========================================================================
+
+failures = 0
+
+local prog = Progression.new(Config, remotes, Catalog)
+prog:playerAdded(playerA)
+local prof = prog.profiles[playerA]
+for _, id in { "kit_plates_blue", "kit_pan_copper", "kit_bell_deep", "kit_plates_gold", "hat_toque" } do
+	prof.owned[id] = true
+end
+
+prog:shopAction(playerA, { action = "equipSet", set = {
+	kitchen_plate = "kit_plates_blue",
+	kitchen_pan = "kit_pan_copper",
+	kitchen_bell = "kit_bell_deep",
+} })
+check(prof.equipped.kitchen_plate == "kit_plates_blue", "plates equipped")
+check(prof.equipped.kitchen_pan == "kit_pan_copper", "pans equip alongside plates")
+check(prof.equipped.kitchen_bell == "kit_bell_deep", "bell equips alongside both")
+
+-- Swapping one slot must leave the others alone.
+prog:shopAction(playerA, { action = "equip", id = "kit_plates_gold" })
+check(prof.equipped.kitchen_plate == "kit_plates_gold", "swapping plates changes the plate slot")
+check(prof.equipped.kitchen_pan == "kit_pan_copper", "swapping plates leaves pans on")
+check(prof.equipped.kitchen_bell == "kit_bell_deep", "swapping plates leaves the bell on")
+
+-- A partial set must not strip slots it does not mention.
+prog:shopAction(playerA, { action = "equipSet", set = { hat = "hat_toque" } })
+check(prof.equipped.hat == "hat_toque", "hat equipped from a partial set")
+check(prof.equipped.kitchen_pan == "kit_pan_copper", "a hat-only equipSet leaves kitchen slots alone")
+-- ...but an explicit false does clear one.
+prog:shopAction(playerA, { action = "equipSet", set = { kitchen_pan = false } })
+check(prof.equipped.kitchen_pan == nil, "explicit false clears a slot")
+check(prof.equipped.kitchen_plate == "kit_plates_gold", "clearing pans leaves plates on")
+
+-- Pass-only content can never be bought with coins.
+prof.coins = 999999
+prog:shopAction(playerA, { action = "buy", id = "hat_halo" })
+check(prof.owned.hat_halo ~= true, "a pass-exclusive hat cannot be bought with coins")
+
+print(if failures > 0 then `{failures} FAILURES` else "PASS: equip slots")
+if failures > 0 then
+	error(`{failures} checks failed`)
+end

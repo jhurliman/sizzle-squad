@@ -25,14 +25,14 @@ local Catalog: { Item } = {
 	{ id = "hat_toque", name = "Classic Toque", kind = "hat", cost = 400 },
 	{ id = "hat_bandana_red", name = "Red Bandana", kind = "hat", cost = 300 },
 	{ id = "hat_bandana_green", name = "Green Bandana", kind = "hat", cost = 300 },
-	{ id = "hat_beret", name = "Beret", kind = "hat", cost = 800 },
+	{ id = "hat_beret", name = "Beret", kind = "hat", cost = 0, exclusive = "trunk" },
 	{ id = "hat_paperboat", name = "Paper Boat", kind = "hat", cost = 250 },
 	{ id = "hat_colander", name = "Colander Helm", kind = "hat", cost = 1400, level = 5 },
-	{ id = "hat_tophat", name = "Top Hat", kind = "hat", cost = 2200, level = 8 },
-	{ id = "hat_crown", name = "Butter Crown", kind = "hat", cost = 4000, level = 12 },
+	{ id = "hat_tophat", name = "Top Hat", kind = "hat", cost = 0, exclusive = "supporter" },
+	{ id = "hat_crown", name = "Butter Crown", kind = "hat", cost = 5000, level = 12 },
 	{ id = "hat_pan", name = "Pan Lid Cap", kind = "hat", cost = 500 },
-	{ id = "hat_mushroom", name = "Mushroom Cap", kind = "hat", cost = 650 },
-	{ id = "hat_halo", name = "Sous-Chef Halo", kind = "hat", cost = 6000, level = 15 },
+	{ id = "hat_mushroom", name = "Mushroom Cap", kind = "hat", cost = 0, exclusive = "trunk" },
+	{ id = "hat_halo", name = "Sous-Chef Halo", kind = "hat", cost = 0, exclusive = "supporter" },
 	-- species palettes (retextures)
 	{ id = "pal_bramble_panda", name = "Panda Bramble", kind = "palette", cost = 900, species = "bramble", color = { 240, 238, 232 } },
 	{ id = "pal_bramble_polar", name = "Polar Bramble", kind = "palette", cost = 900, species = "bramble", color = { 220, 230, 240 } },
@@ -101,6 +101,18 @@ for _, ping in Pings do
 	pingById[ping.id] = ping
 end
 
+--- Which equip slot an item occupies.
+---
+--- Kitchen cosmetics dress DIFFERENT props -- plates, pans and the serve bell
+--- are three independent things -- so keying them all under "kitchen" meant
+--- buying a pan silently took your plates off. They get a slot each.
+local function slotKey(item: Item): string
+	if item.kind == "kitchen" and item.slot ~= nil then
+		return `kitchen_{item.slot}`
+	end
+	return item.kind
+end
+
 --- Wire id -> the text a speech bubble should show, or nil if not allowed.
 local function glyphFor(id: string): string?
 	local ping = pingById[id]
@@ -118,14 +130,17 @@ return {
 	items = Catalog,
 	byId = byId,
 	pings = Pings,
+	slotKey = slotKey,
 	pingById = pingById,
 	glyphFor = glyphFor,
 	-- milestone level -> granted item id (plan: visible drip early)
+	-- Level grants only ever hand out COIN-track items: giving away pass
+	-- content for free would undercut the thing people paid for.
 	milestones = {
 		[3] = "hat_bandana_red",
-		[5] = "hat_colander",
+		[5] = "hat_toque",
 		[7] = "pal_pip_tree",
-		[10] = "hat_tophat",
-		[15] = "hat_halo",
+		[10] = "hat_colander",
+		[15] = "hat_crown",
 	},
 }

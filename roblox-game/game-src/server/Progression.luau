@@ -316,10 +316,11 @@ function Progression:shopAction(player: any, action: any)
 			return
 		end
 		-- equip toggles: equipping the equipped item takes it off
-		if profile.equipped[item.kind] == item.id then
-			profile.equipped[item.kind] = nil
+		local slot = self.catalog.slotKey(item)
+		if profile.equipped[slot] == item.id then
+			profile.equipped[slot] = nil
 		else
-			profile.equipped[item.kind] = item.id
+			profile.equipped[slot] = item.id
 		end
 		self.dirty[player] = true
 	end
@@ -330,24 +331,27 @@ end
 
 local SPECIES = { bramble = true, pip = true, nori = true, mochi = true }
 
---- Commit a whole outfit at once (the Wardrobe's APPLY).
+--- Commit several equip slots at once.
 ---
---- Every field is validated INDEPENDENTLY against ownership and kind; a bad
---- entry is dropped rather than rejecting the whole set, so one stale id in a
---- client's pending state cannot silently discard the rest of the outfit.
---- An explicit nil means "take it off".
+--- Keys are SLOT keys (hat / palette / emote / kitchen_plate / ...). A string
+--- value equips, `false` clears the slot, and an absent key leaves the slot
+--- alone -- so a client that only manages hats cannot accidentally strip the
+--- player's plates. Every entry is validated independently against ownership
+--- and slot, and a bad one is dropped rather than rejecting the whole set.
 function Progression:equipSet(player: any, profile: any, set: any)
 	if typeof(set) ~= "table" then
 		return
 	end
-	for _, kind in { "hat", "palette", "emote", "kitchen" } do
-		local id = set[kind]
-		if id == nil then
-			profile.equipped[kind] = nil
+	for slot, id in set do
+		if typeof(slot) ~= "string" then
+			continue
+		end
+		if id == false then
+			profile.equipped[slot] = nil
 		elseif typeof(id) == "string" then
 			local it = self.catalog.byId[id]
-			if it ~= nil and it.kind == kind and not it.hidden and profile.owned[id] then
-				profile.equipped[kind] = id
+			if it ~= nil and not it.hidden and profile.owned[id] and self.catalog.slotKey(it) == slot then
+				profile.equipped[slot] = id
 			end
 		end
 	end

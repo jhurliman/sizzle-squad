@@ -25,6 +25,10 @@ local Menu = require(script.Parent.Menu) :: any
 local ItemViz = require(script.Parent.ItemViz) :: any
 
 local SCALE = 5
+local Config = require(gameShared:WaitForChild("Config")) :: any
+local Tuning = require(gameShared:WaitForChild("Tuning")) :: any
+Tuning.apply(shared, Config)
+
 local remotes = Net.client(ReplicatedStorage)
 local state = ClientState.new(shared, Net)
 local input = Input.new()
@@ -227,7 +231,7 @@ remotes.Progress.OnClientEvent:Connect(function(progress)
 	menu:setProgress(progress)
 	-- Serve-bell cosmetic is local audio, so it reads the owner's own equip
 	-- rather than the elected kitchen set.
-	sfx:setKitchen(Catalog, progress.equipped and progress.equipped.kitchen)
+	sfx:setKitchen(Catalog, progress.equipped)
 end)
 
 remotes.Correction.OnClientEvent:Connect(function(msg)

@@ -20,6 +20,9 @@ local MonetizationServer = require(script.Parent.Monetization) :: any
 
 local remotes = Net.server(ReplicatedStorage)
 
+local Tuning = require(gameShared:WaitForChild("Tuning")) :: any
+Tuning.apply(shared, Config)
+
 local simService = SimService.new(shared, { seed = os.time() % 2 ^ 31, botFill = Config.BOT_FILL })
 local replicator = Replicator.new(shared, Net, remotes, function(chef)
 	return simService:chefFlags(chef)
@@ -81,17 +84,24 @@ local function electKitchen(): { [string]: string }
 	local best: { [string]: any } = {}
 	for player, _seat in crew.seats do
 		local profile = progression.profiles[player]
-		local id = profile and profile.equipped and profile.equipped.kitchen
-		if id == nil then
+		local equipped = profile and profile.equipped
+		if equipped == nil then
 			continue
 		end
-		local item = Catalog.byId[id]
-		if item == nil or item.slot == nil then
-			continue
-		end
-		local held = best[item.slot]
-		if held == nil or player.UserId < held.userId then
-			best[item.slot] = { id = id, userId = player.UserId }
+		-- Plates, pans and the bell are independent slots, so scan them all
+		-- rather than a single "kitchen" equip.
+		for slot, id in equipped do
+			if not string.find(slot, "^kitchen_") then
+				continue
+			end
+			local item = Catalog.byId[id]
+			if item == nil or item.slot == nil then
+				continue
+			end
+			local held = best[item.slot]
+			if held == nil or player.UserId < held.userId then
+				best[item.slot] = { id = id, userId = player.UserId }
+			end
 		end
 	end
 	local out: { [string]: string } = {}

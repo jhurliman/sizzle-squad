@@ -93,8 +93,13 @@ dailies have no UI, food is spheres, everything is silent.
 
    | Pass | Suggested price | Grants |
    |---|---|---|
-   | Supporter Pass | 199 R$ | +10% XP and coins, 4 Gilded coats, Sizzle! emote, Supporter Plates, star nametag |
-   | Chef's Trunk | 149 R$ | 4 Midnight coats, Boom! emote, Obsidian Pans |
+   | Supporter Pass | 199 R$ | Top Hat + Sous-Chef Halo, +10% XP and coins, 4 Gilded coats, Sizzle! emote, Supporter Plates, star nametag |
+   | Chef's Trunk | 149 R$ | Beret + Mushroom Cap, 4 Midnight coats, Boom! emote, Obsidian Pans |
+
+   Four of the twelve hats (a third) are pass-only; the other eight stay on the
+   coin ladder so there is still something to grind toward. Level milestones
+   only ever grant coin-track items -- handing out pass content free would
+   undercut the thing people paid for.
 
    Then put each pass id into `game-src/shared/Monetization.luau`
    (`PRODUCTS[n].gamePassId`). A pass whose id is still `0` is hidden from the

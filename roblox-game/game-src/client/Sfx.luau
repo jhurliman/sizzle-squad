@@ -98,13 +98,14 @@ end
 --- the owner hears their own bell, so two players can never conflict).
 local BELL_RATE: { [string]: number } = { deep = 0.75, chime = 1.35 }
 
-function Sfx:setKitchen(catalog: any, equippedKitchenId: string?)
+function Sfx:setKitchen(catalog: any, equipped: any)
 	self.bellRate = nil
-	if equippedKitchenId == nil then
+	local id = equipped ~= nil and equipped.kitchen_bell or nil
+	if id == nil then
 		return
 	end
-	local item = catalog.byId[equippedKitchenId]
-	if item ~= nil and item.slot == "bell" and item.variant ~= nil then
+	local item = catalog.byId[id]
+	if item ~= nil and item.variant ~= nil then
 		self.bellRate = BELL_RATE[item.variant]
 	end
 end

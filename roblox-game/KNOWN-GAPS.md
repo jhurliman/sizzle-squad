@@ -136,9 +136,21 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 Star thresholds re-set from the measured distribution; 150/320/500 made
   3 stars unreachable, which quietly killed the photo moment, the star coin
   bonus and two badges.
-- 🟢 Prices set against ~186 coins/round: first buy at ~1.3 rounds, full
-  29-item catalog ~10.5 hours solo. Re-run the probe after touching PACING,
-  STARS or any price.
+- 🟢 Prices set against ~177 coins/round: first buy at ~1.4 rounds, the
+  25-item coin catalog ~8.2 hours solo, with 16 more items behind the two
+  passes. Re-run the probe after touching PACING, STARS, MOVE_SPEED_MUL or any
+  price -- the 8% speed reduction alone moved the whole curve ~6% and pushed
+  3 stars back out of reach until the thresholds were re-cut.
+
+## C2c. Equip slots
+
+- 🟢 Kitchen cosmetics were keyed by KIND, so plates, pans and the bell shared
+  one slot and buying a pan silently took your plates off. They are keyed by
+  slot now (`kitchen_plate` / `kitchen_pan` / `kitchen_bell`), equipSet takes
+  slot keys where `false` clears and an absent key is left alone, and 11
+  harness checks cover it.
+- 🟢 Wardrobe has no Apply step: tapping something you own wears it. Unowned
+  items preview and offer BUY; buying wears them automatically.
 
 ## C3. Fixed in the front-end pass (kept here as regression bait)
 
@@ -164,6 +176,11 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - The touch jump button kept coming back because PlayerModule re-shows it on
   every ControlModule:Enable(), which the menu now triggers on every close. It
   is Visible-locked via its own property-changed signal.
+- The menu ScreenGui ignores the GUI inset (so the shift panel and emote row
+  can use the whole screen), which meant the tabbed panel sat UNDER Roblox's
+  own top bar. The panel is now top-anchored below GuiService:GetGuiInset().
+- Roblox has no letter-spacing property and FredokaOne sets very tight at
+  display sizes, so the START SHIFT headline is spaced by hand.
 
 ## D. Robustness / tech debt
 

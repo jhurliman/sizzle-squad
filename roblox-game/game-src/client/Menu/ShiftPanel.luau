@@ -149,8 +149,12 @@ function ShiftPanel:paint()
 		self.startButton.TextSize = if crew then 22 else 30
 	else
 		self.startButton.BackgroundColor3 = Theme.GREEN
-		self.startButton.Text = "START SHIFT"
-		self.startButton.TextSize = 30
+		-- FredokaOne sets very tight at display sizes and Roblox has no
+		-- letter-spacing property, so the headline is spaced by hand. Only
+		-- this state: letter-spacing "WAITING FOR CREW 2/3" would read as a
+		-- glitch rather than a treatment.
+		self.startButton.Text = "S T A R T   S H I F T"
+		self.startButton.TextSize = self.startSize or 24
 	end
 end
 
@@ -166,7 +170,9 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 		btn.Size = UDim2.fromOffset(tabW, Theme.MIN_TAP)
 		btn.TextSize = if compact then 12 else 14
 	end
-	self.startButton.Size = UDim2.fromOffset(if compact then 260 else 320, if compact then 62 else 72)
+	self.startButton.Size = UDim2.fromOffset(if compact then 260 else 340, if compact then 62 else 72)
+	self.startSize = if compact then 19 else 24
+	self:paint()
 end
 
 return ShiftPanel

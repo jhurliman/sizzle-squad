@@ -124,7 +124,7 @@ function ShopTab:render()
 		end
 		order += 1
 		local isOwned = owned[item.id] == true
-		local isEquipped = equipped[item.kind] == item.id
+		local isEquipped = equipped[self.catalog.slotKey(item)] == item.id
 		local locked = item.level ~= nil and level < item.level
 		local wearable = item.kind == "hat" or item.kind == "palette"
 

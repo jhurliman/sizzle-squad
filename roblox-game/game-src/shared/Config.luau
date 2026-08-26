@@ -71,13 +71,20 @@ Config.ASSIST = {
 Config.BOT_SERVE_VALUE_MUL = 0.6
 
 -- Star thresholds on team coins, set from the measured distribution
--- (n=48 bot rounds: min 122, median 166, p90 211, max 219). The old
--- 150/320/500 made 3 stars mathematically unreachable -- and with it the
--- 3-star photo moment, the star coin bonus and two badges were dead content.
+-- (bot rounds at the shipped MOVE_SPEED_MUL). The old 150/320/500 made 3
+-- stars mathematically unreachable -- and with it the 3-star photo moment, the
+-- star coin bonus and two badges were dead content. Re-run
+-- tools/economy-probe.luau after ANY change to speed or pacing: an 8% speed
+-- change alone moved the whole curve by ~6%.
 --
 -- 1 star: every completed shift (100%).  2 stars: a good shift (~60%).
 -- 3 stars: a genuinely strong shift (~15% at bot skill; more for good humans).
-Config.STARS = { 120, 165, 205 }
+Config.STARS = { 110, 150, 190 }
+
+-- Chefs read ~8% too fast through the port's fixed camera. Applied to the
+-- shared TUNING at startup by shared/Tuning.luau rather than edited upstream,
+-- because that tuning is the WEB game's too.
+Config.MOVE_SPEED_MUL = 0.92
 
 -- Coins per round, per player. Deliberately NOT a share of the team pot: an
 -- even split paid 172 solo but only 27 each in a four-player kitchen, which is
