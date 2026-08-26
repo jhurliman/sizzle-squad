@@ -164,10 +164,17 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   empty rack hands out a DIRTY plate rather than nothing, which is what stops
   it deadlocking a chef already holding food. Setting a dirty plate in a sink
   starts the wash without a second press.
-  A new **scullery sink at cell (4,1)** gives the pile a home: that cell was
-  solid plaster flanking the oven arch, so it was blocked before and is a
-  station now — **not one walkable cell changed**, which is what the "+11 cells"
-  experiments in kitchen.ts warn about.
+  A new **scullery sink at cell (12,1)** gives the pile a home — the empty
+  counter past the right serve window. It replaces a counter rather than adding
+  a cell, so **not one walkable cell changed**, which is what the "+11 cells"
+  experiments in kitchen.ts warn about; the kitchen goes 5 counters to 4, and
+  the same notes say fewer counters is the safer direction (working plates
+  converge instead of scattering).
+  It was first tried at (4,1), the plaster beside the oven arch, which is
+  **dead centre of a buildBackWall timber post** — the post came down through
+  the basin, and stepping the basin forward to dodge it only left it hanging
+  off the counter front. Posts sit at x1, ovenSpan.x0-0.5, ovenSpan.x1+0.5 and
+  W-1: check any future back-wall station against those four.
   Costs ~15% of round throughput (a wash is a walk plus 2.2s standing still),
   so `Config.STARS` was re-cut from the new distribution (median 166 → 130).
   **Never validated with a human** — bot-measured only.
