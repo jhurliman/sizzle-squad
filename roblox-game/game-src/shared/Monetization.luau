@@ -26,7 +26,7 @@ Monetization.PRODUCTS = {
 		id = "supporter",
 		name = "Supporter Pass",
 		blurb = "+10% XP and coins forever, four Gilded coats, the Sizzle! emote, Supporter Plates, and a star on your nametag.",
-		gamePassId = 0,
+		gamePassId = 1959138315,
 		robux = 199,
 		xpMul = 1.1,
 		coinMul = 1.1,
@@ -36,7 +36,7 @@ Monetization.PRODUCTS = {
 		id = "trunk",
 		name = "Chef's Trunk",
 		blurb = "Four Midnight coats, the Boom! emote and Obsidian Pans.",
-		gamePassId = 0,
+		gamePassId = 1958262313,
 		robux = 149,
 	},
 } :: { Product }

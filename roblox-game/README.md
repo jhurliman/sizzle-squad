@@ -102,8 +102,10 @@ dailies have no UI, food is spheres, everything is silent.
    only ever grant coin-track items -- handing out pass content free would
    undercut the thing people paid for.
 
-   Then put each pass id into `game-src/shared/Monetization.luau`
-   (`PRODUCTS[n].gamePassId`). A pass whose id is still `0` is hidden from the
+   **DONE** — Supporter Pass `1959138315`, Chef's Trunk `1958262313`, both
+   wired in `game-src/shared/Monetization.luau`. Icons for each are in
+   `roblox/pass-art/` (512x512, regenerate with `node roblox/pass-art.mjs`).
+   For future passes: put the id into `PRODUCTS[n].gamePassId`. A pass whose id is still `0` is hidden from the
    shop and can never be granted, so shipping without them is safe. Ownership
    is checked on join and again on `PromptGamePassPurchaseFinished`, so a
    purchase applies without a rejoin.
