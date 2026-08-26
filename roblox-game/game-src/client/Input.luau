@@ -63,9 +63,30 @@ function Input.new()
 		return Enum.ContextActionResult.Sink
 	end, true, Enum.KeyCode.E, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
 	if UserInputService.TouchEnabled then
-		ContextActionService:SetPosition(ACTION, UDim2.new(1, -90, 1, -140))
+		-- Roblox's default touch JUMP button (dark circle, up arrow) sits in
+		-- the bottom-right thumb spot and our action button landed on top of
+		-- it. Chefs never jump, so retire it and take that spot: it is the
+		-- best thumb real estate on the screen and the action button is the
+		-- ONLY button this game has.
+		--
+		-- Hidden by name wherever it appears, and re-hidden on DescendantAdded
+		-- because the touch GUI is rebuilt on respawn and device changes.
+		local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+		local function hideJump(inst: Instance)
+			if inst.Name == "JumpButton" and inst:IsA("GuiObject") then
+				inst.Visible = false
+			end
+		end
+		for _, d in playerGui:GetDescendants() do
+			hideJump(d)
+		end
+		playerGui.DescendantAdded:Connect(function(d)
+			task.defer(hideJump, d)
+		end)
+
+		ContextActionService:SetPosition(ACTION, UDim2.new(1, -104, 1, -124))
 		pcall(function()
-			ContextActionService:GetButton(ACTION).Size = UDim2.fromOffset(76, 76)
+			ContextActionService:GetButton(ACTION).Size = UDim2.fromOffset(88, 88)
 		end)
 	end
 	self:setVerb("none")
