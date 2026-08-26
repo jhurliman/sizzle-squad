@@ -33,6 +33,10 @@ function ClientState.new(shared: any, net: any)
 	self.stations = {} :: { [number]: any }
 	self.orders = {} :: { any }
 	self.score = { coins = 0, served = 0, missed = 0, combo = 0, bestCombo = 0, patience = 1, time = 0 }
+	-- Mirrored plate economy: clean plates left on the racks, dirty ones
+	-- stacked at the wash-up.
+	self.plateStock = 0
+	self.dirtyPlates = 0
 	-- Round clock, advanced locally (see advanceClock).
 	self.simTime = 0
 	self.phase = { phase = "countdown", timer = 0, round = 0, results = nil }
@@ -224,6 +228,10 @@ end
 
 function ClientState:applyScore(score: any)
 	self.score = score
+	if score.plateStock ~= nil then
+		self.plateStock = score.plateStock
+		self.dirtyPlates = score.dirtyPlates or 0
+	end
 	if score.time ~= nil then
 		self.simTime = score.time
 	end

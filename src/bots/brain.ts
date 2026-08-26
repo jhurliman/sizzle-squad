@@ -2023,6 +2023,16 @@ export class BotDirector {
       const id = h.type === 'ingredient' ? h.ingredient.id : h.type === 'plate' ? h.plate.id : -1;
       return id !== m.placedItem;
     };
+    // 0. A DIRTY PLATE SOAKING IN A SINK is one press from being clean, and
+    //    whoever put it there walked away empty-handed. Nothing else in the
+    //    planner looks at a station it is not already carrying something
+    //    toward, so without this the plate sits there and the racks stay empty.
+    const soaking = find(
+      (st) => st.kind === 'sink' && st.holding?.type === 'plate' && st.holding.plate.dirty,
+    );
+    if (soaking) {
+      return { station: soaking.id, action: 'grab', why: 'wash up', prio: P.serve };
+    }
     // 1. A plate on a bench that already matches a ticket. Free points —
     //    EXCEPT when that plate is the working plate of a LONGER ticket that is
     //    still alive. Garden Salad is lettuce + tomato and Chopped Salad is

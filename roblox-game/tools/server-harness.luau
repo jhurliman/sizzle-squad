@@ -445,6 +445,72 @@ end
 check(plainFirst ~= nil, `an unscripted board still issues tickets ({plainFirst})`)
 check(#plain.director.scriptedRecipes == 0, "the default board carries no script")
 
+-- ==========================================================================
+-- The plate economy. Washing up used to be unreachable: nothing ever set
+-- plate.dirty and the racks were bottomless, so the sink, its verb, its timer
+-- and its art were all dead. These pin the loop that makes it real.
+-- ==========================================================================
+
+local pe = shared.createSim({ seed = 5, botCount = 0 })
+check(pe.plateStock == shared.TUNING.plateStock, `racks start stocked ({pe.plateStock})`)
+check(pe.dirtyPlates == 0, "nothing is dirty at the start")
+
+-- Drive a full round with bots and watch the whole loop, rather than poking
+-- the private verbs: serve -> dishes pile up -> someone washes -> plates come
+-- back. Every earlier attempt at this mechanic failed somewhere in that cycle
+-- rather than in any single step.
+local live = shared.createSim({ seed = 11, botCount = 0 })
+shared.seedPans(live)
+local botDir = shared.makeBotDirector()
+botDir:setDrivePlayer(true)
+local washes, peakDirty, everStarved, deadlocked = 0, 0, false, false
+for _ = 1, 60 * 190 do
+	local bi = botDir:update(live, shared.SIM_DT)
+	local inputs = {}
+	for _, chef in live.chefs do
+		inputs[chef.id + 1] = bi:get(chef.id) or shared.NO_INPUT
+	end
+	shared.step(live, inputs)
+	for _, ev in live.events do
+		if ev.t == "washDone" then
+			washes += 1
+		end
+	end
+	live.events = {}
+	peakDirty = math.max(peakDirty, live.dirtyPlates)
+	if live.plateStock <= 0 then
+		everStarved = true
+		-- No clean plates AND nothing dirty to wash would be unrecoverable.
+		if live.dirtyPlates <= 0 then
+			local anyPlate = false
+			for _, chef in live.chefs do
+				if chef.carrying ~= nil and chef.carrying.type == "plate" then
+					anyPlate = true
+				end
+			end
+			for _, st in live.kitchen.stations do
+				if st.holding ~= nil and st.holding.type == "plate" then
+					anyPlate = true
+				end
+			end
+			if not anyPlate then
+				deadlocked = true
+			end
+		end
+	end
+	if live.plateStock < 0 or live.dirtyPlates < 0 then
+		deadlocked = true
+	end
+	if live.over then
+		break
+	end
+end
+check(live.score.served > 0, `the round served dishes ({live.score.served})`)
+check(peakDirty > 0, `serving sends plates to the wash-up ({peakDirty} at peak)`)
+check(everStarved, "the racks actually run dry during a round -- the mechanic is reachable")
+check(washes > 0, `and somebody washes up ({washes} times)`)
+check(not deadlocked, "the kitchen never reaches a state with no plates and nothing to wash")
+
 print(if failures > 0 then `{failures} FAILURES` else "PASS: equip slots")
 if failures > 0 then
 	error(`{failures} checks failed`)

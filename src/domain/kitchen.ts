@@ -319,7 +319,7 @@ import { filled } from './portable';
  */
 export const KITCHEN_MAP = [
   '###############',
-  '#DSS#=O=O=#S--#',
+  '#DSSK=O=O=#S--#',
   '#.............#',
   '#.............#',
   '#X-D..TKL..D-W#',

@@ -96,9 +96,13 @@ Config.BOT_SERVE_VALUE_MUL = 0.6
 -- tools/economy-probe.luau after ANY change to speed or pacing: an 8% speed
 -- change alone moved the whole curve by ~6%.
 --
--- 1 star: every completed shift (100%).  2 stars: a good shift (~60%).
--- 3 stars: a genuinely strong shift (~15% at bot skill; more for good humans).
-Config.STARS = { 110, 150, 190 }
+-- 1 star: every completed shift (~98%).  2 stars: a good shift (~60%).
+-- 3 stars: a genuinely strong shift (~20% at bot skill; more for good humans).
+--
+-- RE-CUT when washing up went in: a finite plate stock costs ~15% of a round's
+-- throughput, because a wash is a walk plus 2.2s of standing still. The whole
+-- distribution moved down with it (median 166 -> 130).
+Config.STARS = { 80, 120, 145 }
 
 -- Coins per round, per player. Deliberately NOT a share of the team pot: an
 -- even split paid 172 solo but only 27 each in a four-player kitchen, which is

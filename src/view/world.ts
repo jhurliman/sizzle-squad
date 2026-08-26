@@ -89,6 +89,18 @@ const WAINSCOT_H = 0.9;
  * in it. 0.38 with a shallow apron shows floor between the legs, so even where
  * a bench does cross a chef you still read the whole silhouette through it.
  */
+/**
+ * How far a chopping board sits forward of its cell centre, in cells.
+ *
+ * Bench dressing parks props in the BACK corner, and a board 0.48 deep about
+ * the centre overlapped them. Nudging the board toward the camera clears the
+ * props and puts the working surface nearer the chef.
+ *
+ * MIRRORED in the port's StationVisuals so food resting on a board lands on
+ * the board rather than behind it. Change both.
+ */
+export const BOARD_FORWARD = 0.14;
+
 const TABLE_H = 0.38;
 const COUNTER_H = 0.86;
 /**
@@ -3371,16 +3383,27 @@ export class WorldView {
         // than a margin, and the working face is a MID sage grey: a stop under
         // the crockery, a stop over the walnut rim, and cool, so it can never
         // merge into plank at any lighting.
-        P.box(C.tray, 0.62, 0.04, 0.48, x, h + 0.02, z);
-        P.box(C.trayShade, 0.64, 0.018, 0.5, x, h + 0.004, z);
-        P.box(0x6f4718, 0.58, 0.055, 0.44, x, h + 0.068, z);
-        P.box(C.slate, 0.5, 0.04, 0.36, x, h + 0.108, z);
+        // FORWARD OF CENTRE. Bench dressing parks its props in the back
+        // corner (oz -0.29 in buildDressing) and the board is 0.48 deep about
+        // the cell centre, so the two overlapped by ~0.1 and the board grew a
+        // bowl out of its back edge. Reported from play as boards
+        // intersecting the kitchen tchotchkes. Moving the board toward the
+        // camera clears the props and puts the working surface nearer the
+        // chef, which is also where a real board sits.
+        //
+        // StationVisuals applies the SAME offset to whatever is resting on a
+        // board, or the food would float behind it.
+        const bz = z + BOARD_FORWARD;
+        P.box(C.tray, 0.62, 0.04, 0.48, x, h + 0.02, bz);
+        P.box(C.trayShade, 0.64, 0.018, 0.5, x, h + 0.004, bz);
+        P.box(0x6f4718, 0.58, 0.055, 0.44, x, h + 0.068, bz);
+        P.box(C.slate, 0.5, 0.04, 0.36, x, h + 0.108, bz);
         // A darker channel round the rim — a board is a slab with a lip, and
         // without the line the two slabs above read as one pale card.
-        P.box(0x6f4718, 0.54, 0.018, 0.045, x, h + 0.124, z + 0.185);
+        P.box(0x6f4718, 0.54, 0.018, 0.045, x, h + 0.124, bz + 0.185);
         // Knife laid along the back edge.
-        P.box(C.knife, 0.42, 0.02, 0.06, x + 0.08, h + 0.14, z - 0.19, 0, 0.18);
-        P.box(C.timberDark, 0.16, 0.05, 0.06, x - 0.16, h + 0.14, z - 0.23, 0, 0.18);
+        P.box(C.knife, 0.42, 0.02, 0.06, x + 0.08, h + 0.14, bz - 0.19, 0, 0.18);
+        P.box(C.timberDark, 0.16, 0.05, 0.06, x - 0.16, h + 0.14, bz - 0.23, 0, 0.18);
         break;
       }
       case 'stove': {

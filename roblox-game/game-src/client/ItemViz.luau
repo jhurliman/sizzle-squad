@@ -184,6 +184,13 @@ local function buildFromTemplates(summary: any): Model?
 			return nil
 		end
 		tint(plate, kitchenTint.plate)
+		-- A dirty plate has to LOOK dirty. The captured plate_dirty mesh is
+		-- only ~9% darker than a clean one (rgb 201,191,168 against
+		-- 220,207,178), which at plate scale is invisible -- so the state was
+		-- unreadable even where it was reachable.
+		if summary.dirty then
+			tint(plate, Color3.fromRGB(146, 134, 108))
+		end
 		plate.Parent = wrapper
 		plate:PivotTo(CFrame.new())
 		-- Stacking measured off the web's own plate_full composition: items

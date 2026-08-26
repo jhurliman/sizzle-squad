@@ -151,33 +151,28 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 **Wardrobe has no search/sort**; at 42 items the flat rails still read,
   but they will not survive a content cadence.
 
-## C2a. WASHING UP IS DEAD CONTENT (unresolved)
+## C2a. Washing up (now real)
 
-- 🔴 **Nothing in the sim ever sets `plate.dirty = true`, and the plate racks
-  dispense infinitely.** So: plates never run out, no plate is ever dirty, and
-  the sink can never be used. A whole station, its verb, its 2.2s wash timer,
-  the `washDone` event, a `plate_dirty` mesh and the bot brain's
-  "wash the plate" rule are all unreachable. Reported from play as "I had no
-  clue there were dirty plates and washing in this game."
-  (The `plate_dirty` mesh is also only ~9% darker than a clean plate — even if
-  it were reachable it would not read. Fix that at the same time.)
-
-  **Enabling it is a real feature pass, not a switch.** Attempted and reverted;
-  three separate obstacles, each measured against six seeds:
-  1. A served plate has to go somewhere, and every surface in this kitchen is
-     load-bearing. On counters it broke assembly outright — the brain parks
-     half-built plates on the nearest free counter then goes looking for them —
-     and throughput FELL as plate stock rose. On the plate racks it blocked the
-     dispensers, so chefs reaching for a clean plate picked up a dirty one.
-  2. An empty rack DEADLOCKS a chef already holding food: the fix is somewhere
-     else entirely and they have to guess it. Bots demonstrated it exactly,
-     holding a chopped tomato for the rest of the round.
-  3. Bots wash eagerly when told to and lose ~1.8 dishes/round doing it at full
-     stock; gate it on low stock and the recycle loop only completes once.
-  Best result reached was dishes ~= starting plate count with 1 wash/round,
-  against a 9.7-dish baseline — strictly worse than not having the mechanic.
-  It needs a design decision (where do dirty plates live?) plus brain work,
-  and both games share the sim so it retunes the browser build too.
+- 🟢 **Plates are finite and washing up works.** Nothing used to set
+  `plate.dirty` and the racks were bottomless, so the sink, its verb, its 2.2s
+  timer, the washDone event, the dirty-plate mesh and the bot brain's wash rule
+  were all unreachable — reported from play as "I had no clue there were dirty
+  plates and washing in this game."
+  Serving now sends the plate to a wash-up **count** (never objects on benches:
+  every surface here is load-bearing, and dirty crockery parked on one breaks
+  whatever that surface was for — measured, throughput FELL as stock rose). An
+  empty rack hands out a DIRTY plate rather than nothing, which is what stops
+  it deadlocking a chef already holding food. Setting a dirty plate in a sink
+  starts the wash without a second press.
+  A new **scullery sink at cell (4,1)** gives the pile a home: that cell was
+  solid plaster flanking the oven arch, so it was blocked before and is a
+  station now — **not one walkable cell changed**, which is what the "+11 cells"
+  experiments in kitchen.ts warn about.
+  Costs ~15% of round throughput (a wash is a walk plus 2.2s standing still),
+  so `Config.STARS` was re-cut from the new distribution (median 166 → 130).
+  **Never validated with a human** — bot-measured only.
+- 🟢 Dirty plates now read as dirty: the captured mesh was only ~9% darker than
+  a clean one, which at plate scale is invisible.
 
 ## C2b. Economy (rebalanced from measured data — tools/economy-probe.luau)
 
@@ -210,7 +205,9 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   bench floated ~1.2 studs and looked sunk into the plate stack beside it
   (reported as "a cooking pot" — there is no pot; it is Plates_11_4).
   Regenerate after any change to the kitchen capture.
-- 🟢 Prices set against ~177 coins/round: first buy at ~1.4 rounds, the
+- 🟢 Prices set against ~140 coins/round (was ~177 before washing up took its
+  cut); first buy lands at ~1.8 rounds. Re-run the probe after touching
+  PACING, STARS, MOVE_SPEED_MUL, plateStock or any price: first buy at ~1.4 rounds, the
   25-item coin catalog ~8.2 hours solo, with 16 more items behind the two
   passes. Re-run the probe after touching PACING, STARS, MOVE_SPEED_MUL or any
   price -- the 8% speed reduction alone moved the whole curve ~6% and pushed

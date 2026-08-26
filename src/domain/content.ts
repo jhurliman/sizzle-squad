@@ -69,6 +69,18 @@ export const TUNING = {
    */
   moveSpeed: 5.7,
   /**
+   * How many clean plates the kitchen owns.
+   *
+   * WASHING UP WAS DEAD CONTENT. The sink, its verb, its 2.2s timer, the
+   * washDone event, a dirty-plate mesh and the bot brain's "wash the plate"
+   * rule all existed, but nothing ever set `dirty` and the racks were
+   * bottomless, so no player ever had a reason to walk to a sink.
+   *
+   * A finite stock is what gives the sink a job. Infinity restores the old
+   * bottomless behaviour.
+   */
+  plateStock: 8,
+  /**
    * Multiplier while carrying a plate or a pan — heavier, more committed.
    *
    * 0.9 WAS UNDER THE JUST-NOTICEABLE DIFFERENCE AND THEREFORE FREE.

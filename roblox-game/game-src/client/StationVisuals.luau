@@ -94,6 +94,59 @@ function StationVisuals:ensure(id: number, anchor: Vector3): any
 end
 
 --- stations: the mirrored station table; models: station id -> kitchen Model
+--- A stack of dirty crockery at the wash-up.
+---
+--- Dirty plates are a COUNT in the sim, not objects on benches, so this is the
+--- only place the player ever sees them. Without it the plate economy is
+--- invisible -- reported from play as "I had no clue there were dirty plates
+--- and washing in this game."
+function StationVisuals:updateDishPile(stations: { [number]: any }, count: number)
+	-- The wash-up at the pass (the back-wall sink) owns the pile; that is the
+	-- one nearest where plates actually come back.
+	if self.pileId == nil then
+		local best
+		for id, st in stations do
+			if st.kind == "sink" and (best == nil or st.cell.y < best.cell.y) then
+				best, self.pileId = st, id
+			end
+		end
+	end
+	local st = self.pileId ~= nil and stations[self.pileId] or nil
+	if st == nil then
+		return
+	end
+	local shown = math.min(count, 6)
+	if self.pileShown == shown then
+		return
+	end
+	self.pileShown = shown
+	if self.pile ~= nil then
+		self.pile:Destroy()
+		self.pile = nil
+	end
+	if shown <= 0 then
+		return
+	end
+	local base = topOf(st.kind, st.cell)
+	local holder = Instance.new("Model")
+	holder.Name = "DishPile"
+	for i = 1, shown do
+		local plate = Instance.new("Part")
+		plate.Shape = Enum.PartType.Cylinder
+		plate.Size = Vector3.new(0.16, 1.7, 1.7)
+		-- Grimy, not just "slightly darker": the captured dirty-plate mesh is
+		-- only ~9% off clean, which reads as nothing at all.
+		plate.Color = Color3.fromRGB(150, 140, 116)
+		plate.Anchored = true
+		plate.CanCollide = false
+		plate.CFrame = CFrame.new(base + Vector3.new((i % 2) * 0.12 - 0.06, (i - 1) * 0.2, (i % 3) * 0.1 - 0.1))
+			* CFrame.Angles(0, math.rad(i * 24), math.rad(90))
+		plate.Parent = holder
+	end
+	holder.Parent = self.parent
+	self.pile = holder
+end
+
 function StationVisuals:update(stations: { [number]: any }, models: { [number]: Model })
 	for id, st in stations do
 		local anchor = topOf(st.kind, st.cell or { x = 7, y = 5 })

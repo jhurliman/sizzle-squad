@@ -119,6 +119,18 @@ export interface SimState {
   over: boolean;
   /** Seconds until the next ticket. */
   nextOrderIn: number;
+  /** Clean plates left on the racks; see TUNING.plateStock. */
+  plateStock: number;
+  /**
+   * Dirty plates stacked at the wash-up.
+   *
+   * A COUNT, never objects parked on benches: every surface in this kitchen is
+   * load-bearing, and dirty crockery left on one breaks whatever that surface
+   * was for. Measured -- on counters it broke plate assembly outright and
+   * throughput FELL as plate stock rose; on the racks it blocked the
+   * dispensers.
+   */
+  dirtyPlates: number;
   /** 0..1 ramp of how hard the run currently is. */
   heat: number;
   rand: (this: void) => number;
@@ -236,6 +248,10 @@ export function createSim(opts: SimOptions = {}): SimState {
     events: [],
     over: false,
     nextOrderIn: 1.2,
+    /** Clean plates left on the racks. */
+    plateStock: TUNING.plateStock,
+    /** Dirty plates stacked at the wash-up, waiting to be dealt with. */
+    dirtyPlates: 0,
     heat: 0,
     rand,
     nextId: 1,
@@ -997,7 +1013,13 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
 
   if (!held) {
     if (st.kind === 'crate' && st.dispenses) return 'dispense';
-    if (st.kind === 'plates') return 'dispense';
+    // The rack hands over a clean plate if it has one, otherwise a DIRTY one.
+    // Handing out nothing is what deadlocks: a chef already holding food has
+    // to guess that the fix is somewhere else entirely, and the bots simply
+    // never recovered -- measured, they held a chopped tomato for the rest of
+    // the round. A dirty plate in the hand is a problem with an obvious answer,
+    // and the route from there to a sink already existed.
+    if (st.kind === 'plates') return s.plateStock > 0 || s.dirtyPlates > 0 ? 'dispense' : 'none';
     /**
      * A PAN NEVER LEAVES THE BURNER. YOU ONLY EVER HANDLE FOOD.
      *
@@ -1330,13 +1352,22 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
   const held = chef.carrying;
 
   switch (plan) {
-    case 'dispense':
-      chef.carrying =
-        st.kind === 'plates'
-          ? { type: 'plate', plate: mkPlate(s) }
-          : { type: 'ingredient', ingredient: mkIngredient(s, st.dispenses!) };
+    case 'dispense': {
+      if (st.kind === 'plates') {
+        const clean = s.plateStock > 0;
+        if (!clean && s.dirtyPlates <= 0) return false;
+        if (clean) s.plateStock -= 1;
+        else s.dirtyPlates -= 1;
+        const plate = mkPlate(s);
+        plate.dirty = !clean;
+        chef.carrying = { type: 'plate', plate };
+        emit(s, { t: 'pickup', chef: chef.id, at });
+        return true;
+      }
+      chef.carrying = { type: 'ingredient', ingredient: mkIngredient(s, st.dispenses!) };
       emit(s, { t: 'pickup', chef: chef.id, at });
       return true;
+    }
     case 'take': {
       // Nothing is ever lifted off a burner — see planGrab. A burning pan is
       // handled by 'discard' below, and the pan itself is a fixture.
@@ -1359,6 +1390,13 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       st.work = held.type === 'ingredient' ? (held.ingredient.chop ?? 0) : 0;
       chef.carrying = null;
       emit(s, { t: 'place', chef: chef.id, at });
+      // Setting a dirty plate down in a sink STARTS the wash. Otherwise the
+      // loop is place, press, take -- three presses for one chore, and the
+      // middle one looks like nothing happened.
+      if (st.kind === 'sink' && st.holding?.type === 'plate' && st.holding.plate.dirty) {
+        chef.working = st.id;
+        chef.intent = 'working';
+      }
       return true;
     case 'combine':
       if (held?.type !== 'ingredient' || !st.holding) return false;
@@ -1407,6 +1445,10 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       // ingredient simply rejoins the pile; the plate stack takes its plate
       // back the same way. This is the reference's own instruction to the
       // player and it was the one thing the kitchen could not do.
+      if (st.kind === 'plates' && held?.type === 'plate') {
+        if (held.plate.dirty) s.dirtyPlates += 1;
+        else s.plateStock += 1;
+      }
       chef.carrying = null;
       emit(s, { t: 'place', chef: chef.id, at });
       return true;
@@ -1522,6 +1564,7 @@ function trySer(s: SimState, chef: Chef, plate: Plate, at: Vec2) {
   s.score.coins += value;
   s.score.patience = Math.min(1, s.score.patience + TUNING.patiencePerServe);
   chef.carrying = null;
+  s.dirtyPlates += 1;
   emit(s, { t: 'serve', at, value, combo: s.score.combo, orderId: order.id });
 }
 
