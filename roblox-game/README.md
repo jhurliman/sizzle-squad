@@ -96,7 +96,11 @@ dailies have no UI, food is spheres, everything is silent.
    After creating one, open it and take the number out of the URL
    (`.../badges/<ID>/configure`) — that is the id.
 
-   Then paste each id into `game-src/shared/../server/Badges.luau` -> `Badges.IDS`.
+   Icons are pre-rendered in `roblox/badge-art/` (512x512, regenerate with
+   `node roblox/badge-art.mjs`). **Names, descriptions and the icon for each
+   key are in `roblox-game/store/badges.md`** — copy-paste ready.
+
+   Then paste each id into `game-src/server/Badges.luau` -> `Badges.IDS`.
    A key left at `0` is silently skipped, so you can create them one at a time.
 
    | `Badges.IDS` key | Suggested name | Description | Awarded when |
