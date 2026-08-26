@@ -166,6 +166,12 @@ function Progression:playerAdded(player: any)
 	-- Session count drives the Kitchen Card, which must never appear on a
 	-- player's first-ever session (FirstShift owns that moment).
 	profile.sessions = (profile.sessions or 0) + 1
+	-- A brand-new chef arrives bare-headed even though they already own the
+	-- Paper Hat, so their first shift looks like the game forgot to dress
+	-- them. Put it on; they can take it off in the wardrobe.
+	if profile.sessions == 1 and profile.equipped.hat == nil and profile.owned.hat_paper then
+		profile.equipped.hat = "hat_paper"
+	end
 	self.dirty[player] = true
 	self.profiles[player] = profile
 	self:push(player)

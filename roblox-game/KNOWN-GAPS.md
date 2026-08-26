@@ -68,13 +68,16 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 
 ## C. Systems simplified relative to the plan
 
-- 🟡 **First Shift** is a generic contextual tip strip (one rule-picked line),
-  not the plan's scripted first-three-tickets with a demonstrating sous-chef.
-  (The demonstration concept needs rethinking anyway now that bots are off by
-  default.) **It also owns a trigger it has not claimed yet**: a round never
-  starts on a timer, so everyone presses Start Shift — except a brand-new
-  player, who is auto-started into their first round by a placeholder in
-  Menu:maybeAutoStart. When First Shift lands it should take that over.
+- 🟢 **First Shift POINTS AT THE STATION.** Each tip resolves to a specific
+  station id that gets its own pulsing glow (distinct from the focus
+  highlight), derived from the live ticket: a component wanting `prepped`
+  routes to a board, `cooked` to a stove, `raw` straight to a plate — so it
+  keeps working if an ingredient is added. Brand-new chefs also start wearing
+  the Paper Hat they already own.
+  Not done: the plan's *scripted* first three tickets (that needs the shared
+  order director, which the web game shares), and the demonstrating sous-chef
+  (moot with bots off). Still auto-starts a first-ever player's round from
+  `Menu:maybeAutoStart` rather than owning that trigger itself.
 - 🟢 **Late-join hold live**: joiners with <15s left spectate with a notice
   and seat at the next phase change.
 - 🟢 **Solo pacing is human-validated** in live Roblox. Duo/trio/quad pacing

@@ -101,6 +101,16 @@ local menu = Menu.new({
 	end,
 })
 
+-- The coach's target, distinct from the focus glow: focus is "this is what
+-- the button will act on right now", coach is "this is where you should be
+-- going next". Two different questions, so two different colours.
+local coachGlow = Instance.new("Highlight")
+coachGlow.FillTransparency = 0.62
+coachGlow.FillColor = Color3.fromRGB(120, 220, 255)
+coachGlow.OutlineColor = Color3.fromRGB(210, 245, 255)
+coachGlow.Enabled = false
+coachGlow.Parent = Workspace
+
 local highlight = Instance.new("Highlight")
 highlight.FillTransparency = 0.75
 highlight.FillColor = Color3.fromRGB(255, 214, 120)
@@ -418,7 +428,18 @@ RunService.RenderStepped:Connect(function(dt)
 	if state.phase.phase == "round" then
 		hud:updateOrders(state.orders)
 	end
-	firstShift:update(state, (state.myChefId ~= nil and state.flags[state.myChefId]) or 0)
+	local coachId = firstShift:update(state, (state.myChefId ~= nil and state.flags[state.myChefId]) or 0)
+	local coachModel = coachId ~= nil and stationModels[coachId] or nil
+	-- Never double-glow: if the coach is pointing at what you are already
+	-- focused on, the focus highlight says it better.
+	if coachModel ~= nil and coachId ~= focusId then
+		coachGlow.Adornee = coachModel
+		coachGlow.Enabled = true
+		-- A slow pulse reads as "go here" where a steady glow reads as scenery.
+		coachGlow.FillTransparency = 0.52 + math.sin(state.clock * 4) * 0.16
+	else
+		coachGlow.Enabled = false
+	end
 	-- The timer chip is hidden outside a round (Hud:updatePhase), so there is
 	-- nothing to show between shifts.
 	if state.phase.phase == "round" then
