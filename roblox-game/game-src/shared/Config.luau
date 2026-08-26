@@ -38,7 +38,7 @@ Config.PACING = {
 	[1] = { orderGapMul = 2.2, maxOrdersBonus = -1, ticketTimeMul = 1.5, patienceMissMul = 0.7 },
 	[2] = { orderGapMul = 2.1, maxOrdersBonus = -1, ticketTimeMul = 1.45, patienceMissMul = 0.8 },
 	[3] = { orderGapMul = 2.0, maxOrdersBonus = 0, ticketTimeMul = 1.4, patienceMissMul = 0.9 },
-	[4] = { orderGapMul = 1.9, maxOrdersBonus = 0, ticketTimeMul = 1.35, patienceMissMul = 1.0 },
+	[4] = { orderGapMul = 1.9, maxOrdersBonus = 1, ticketTimeMul = 1.35, patienceMissMul = 1.0 },
 }
 -- Bot-filled kitchens (BOT_FILL = true) use the original table:
 Config.PACING_BOTFILL = {
@@ -50,10 +50,29 @@ Config.PACING_BOTFILL = {
 }
 
 -- Invisible pressure director: hold open/max tickets inside this band by
--- rubber-banding orderGapMul ±20% around the table value.
+-- rubber-banding orderGapMul around the table value.
+--
+-- THIS IS THE 4-PLAYER DIAL, not the table above. Station utilisation was
+-- measured at 3% for boards and 3% for stoves with four chefs on the line
+-- (tools/station-probe.luau) -- NOTHING in the kitchen is contended, so adding
+-- a bench would change nothing. And hard-coding a faster order rate for big
+-- crews just manufactures misses: at four chefs it bought +0.3 dishes for
+-- +5.8 missed tickets and a wipe.
+--
+-- The ceiling the harness measures (~10 dishes) is a BOT-BRAIN ceiling -- it
+-- parks a working plate on the nearest free counter then goes looking for it,
+-- and counter occupancy climbs from 19% to 32% as chefs are added. Four humans
+-- do not have that failure mode, so their real ceiling is unknown and cannot
+-- be measured here.
+--
+-- So the base table stays conservative (bot-safe) and the band is wide enough
+-- for the director to FIND the right level from play: a crew clearing tickets
+-- fast gets up to 50% quicker orders, a crew drowning gets up to 50% slower.
+-- That adapts to a good 4-player crew without guessing on their behalf.
+Config.PRESSURE_BAND_MUL = 0.5
 Config.PRESSURE_LOW = 0.55
 Config.PRESSURE_HIGH = 0.8
-Config.PRESSURE_BAND_MUL = 0.2
+Config.PRESSURE_BAND_MUL = 0.5
 Config.PRESSURE_SMOOTH = 20 -- seconds of smoothing
 
 -- Assist mode (auto, per plan §2.3): applies while the crew's average level
@@ -80,11 +99,6 @@ Config.BOT_SERVE_VALUE_MUL = 0.6
 -- 1 star: every completed shift (100%).  2 stars: a good shift (~60%).
 -- 3 stars: a genuinely strong shift (~15% at bot skill; more for good humans).
 Config.STARS = { 110, 150, 190 }
-
--- Chefs read ~8% too fast through the port's fixed camera. Applied to the
--- shared TUNING at startup by shared/Tuning.luau rather than edited upstream,
--- because that tuning is the WEB game's too.
-Config.MOVE_SPEED_MUL = 0.92
 
 -- Coins per round, per player. Deliberately NOT a share of the team pot: an
 -- even split paid 172 solo but only 27 each in a four-player kitchen, which is

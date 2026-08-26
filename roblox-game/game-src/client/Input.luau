@@ -8,12 +8,14 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
+local Thumbstick = require(script.Parent.Thumbstick) :: any
+
 local Input = {}
 Input.__index = Input
 
 local ACTION = "SizzleAction"
 
-function Input.new()
+function Input.new(hudGui: Instance)
 	local self = setmetatable({}, Input)
 	self.grabQueued = false
 	self.useHeld = false
@@ -69,49 +71,31 @@ function Input.new()
 	end
 	ContextActionService:BindAction(ACTION, self.actionHandler, true, Enum.KeyCode.E, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
 	if UserInputService.TouchEnabled then
-		-- Roblox's default touch JUMP button (dark circle, up arrow) sits in
-		-- the bottom-right thumb spot, right on top of our action button.
-		-- Chefs never jump, so retire it and take that spot: it is the best
-		-- thumb real estate on the screen and the action button is the ONLY
-		-- button this game has.
+		-- TOUCH DEVICES GET OUR OWN STICK, AND ROBLOX'S CONTROLS GET TURNED
+		-- OFF ENTIRELY.
 		--
-		-- Hiding it once is NOT enough, which is why it kept coming back:
-		-- PlayerModule's TouchJump re-shows the button whenever it re-runs
-		-- UpdateVisible -- on respawn, on device change, and on every
-		-- ControlModule:Enable(), which we now call ourselves each time the
-		-- menu closes. So LOCK it: react to its own Visible change and force
-		-- it back down. Writing the same value never re-fires the signal, so
-		-- this settles immediately rather than looping.
-		local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-		local function lockHidden(inst: Instance)
-			if inst.Name ~= "JumpButton" or not inst:IsA("GuiObject") then
-				return
-			end
-			local button = inst :: GuiObject
-			button.Visible = false
-			if button:GetAttribute("SizzleLocked") == true then
-				return
-			end
-			button:SetAttribute("SizzleLocked", true)
-			button:GetPropertyChangedSignal("Visible"):Connect(function()
-				if button.Visible then
-					button.Visible = false
+		-- The jump button was the problem: chefs never jump, but PlayerModule
+		-- re-creates and re-shows it on respawn, on device change, and on
+		-- every ControlModule:Enable() -- which the menu fires on every close.
+		-- Hiding it is a permanent race against code that owns it.
+		--
+		-- Disable() removes the entire touch UI, jump button included, and is
+		-- supported and total. It takes the movement stick with it, so we
+		-- supply one. Keyboard devices keep PlayerModule untouched.
+		self.ownsTouch = not UserInputService.KeyboardEnabled
+		if self.ownsTouch then
+			self.stick = Thumbstick.new(hudGui)
+			task.spawn(function()
+				-- ControlModule arrives asynchronously; keep asking until it
+				-- does, then hold it down for the rest of the session.
+				while self.controlModule == nil do
+					task.wait(0.1)
 				end
+				pcall(function()
+					self.controlModule:Disable()
+				end)
 			end)
 		end
-		self.hideJump = function()
-			for _, d in playerGui:GetDescendants() do
-				lockHidden(d)
-			end
-		end
-		self.hideJump()
-		playerGui.DescendantAdded:Connect(function(d)
-			task.defer(lockHidden, d)
-		end)
-		-- The touch GUI is rebuilt from scratch on respawn.
-		Players.LocalPlayer.CharacterAdded:Connect(function()
-			task.defer(self.hideJump)
-		end)
 
 		ContextActionService:SetPosition(ACTION, UDim2.new(1, -104, 1, -124))
 		pcall(function()
@@ -155,7 +139,12 @@ function Input:setEnabled(on: boolean)
 		return
 	end
 	self.enabled = on
-	if self.controlModule ~= nil then
+	if self.stick ~= nil then
+		self.stick:setEnabled(on)
+	end
+	-- Only touch PlayerModule on devices where we did NOT take over: calling
+	-- Enable() on a touch device is exactly what resurrects the jump button.
+	if self.controlModule ~= nil and not self.ownsTouch then
 		pcall(function()
 			if on then
 				self.controlModule:Enable()
@@ -165,10 +154,6 @@ function Input:setEnabled(on: boolean)
 		end)
 	end
 	if on then
-		-- Enable() re-shows the jump button; put it back down.
-		if self.hideJump ~= nil then
-			task.defer(self.hideJump)
-		end
 		ContextActionService:BindAction(ACTION, self.actionHandler, true, Enum.KeyCode.E, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
 		if UserInputService.TouchEnabled then
 			ContextActionService:SetPosition(ACTION, UDim2.new(1, -104, 1, -124))
@@ -189,10 +174,14 @@ end
 --- Kitchen-space move vector. Camera faces -Z, so screen-up is kitchen -y:
 --- world X -> kitchen x, world Z -> kitchen y, no rotation needed.
 function Input:move(): { x: number, y: number }
-	local mv = Vector3.zero
 	if not self.enabled then
 		return { x = 0, y = 0 }
 	end
+	if self.ownsTouch and self.stick ~= nil then
+		local v = self.stick:move()
+		return { x = v.X, y = v.Y }
+	end
+	local mv = Vector3.zero
 	if self.controlModule ~= nil then
 		local ok, v = pcall(function()
 			return self.controlModule:GetMoveVector()

@@ -8,6 +8,9 @@ local StationVisuals = {}
 StationVisuals.__index = StationVisuals
 
 local ItemViz = require(script.Parent.ItemViz) :: any
+-- Per-cell work-surface heights measured off the captured kitchen; see
+-- tools/gen-surfaces.luau.
+local SurfaceH = require(script.Parent.SurfaceH) :: { [string]: number }
 
 local SCALE = 5
 
@@ -35,12 +38,17 @@ local SURFACE_H: { [string]: number } = {
 }
 
 local function topOf(kind: string?, cell: any): Vector3
-	local h = SURFACE_H[kind or ""] or 0.8
-	-- Counters exist in two heights: the tall fixed ones along the back wall
-	-- (row 1) and the knee-height prep benches out on the floor. Same station
-	-- kind, very different surface.
-	if kind == "counter" and cell.y > 1 then
-		h = 0.55
+	-- MEASURED height for this exact cell wins. The per-kind table below is
+	-- only a fallback: it read `counter` as one height when the floor benches
+	-- top out ~0.37 and the back-wall run ~0.86, so a plate put down on a
+	-- floor bench floated ~1.2 studs and looked like it was sunk into the
+	-- plate stack standing next to it.
+	local h = SurfaceH[`{cell.x},{cell.y}`]
+	if h == nil then
+		h = SURFACE_H[kind or ""] or 0.8
+		if kind == "counter" and cell.y > 1 then
+			h = 0.55
+		end
 	end
 	return Vector3.new((cell.x + 0.5) * SCALE, h * SCALE, (cell.y + 0.5) * SCALE)
 end

@@ -121,14 +121,21 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 
 ## C2b. Economy (rebalanced from measured data — tools/economy-probe.luau)
 
-- 🔴 **THE KITCHEN CANNOT ABSORB A FULL CREW.** Dishes served plateaus at
-  ~10 per round whether one chef works the line or four: throughput is bound by
-  the station count, not by hands. The old pacing table hid this by ramping the
-  order rate with crew size, which produced 7.4 missed tickets and wiped 2 of 5
-  rounds at four players without serving a single extra dish. The table is now
-  flat and everyone survives, but **a fourth player still adds almost no
-  throughput** — the real fix is more stations (a second board, a second
-  stove), which is a level-design change, not a tuning one.
+- 🟡 **4-player throughput is capped by the BOT BRAIN, not the kitchen.**
+  Measured with tools/station-probe.luau: with four chefs on the line, boards
+  sit at **3%** utilisation and stoves at **3%** — nothing in the kitchen is
+  contended, so adding a bench or more stations would change nothing. Hard-
+  coding a faster order rate for big crews does not help either: at four chefs
+  it bought +0.3 dishes for +5.8 missed tickets and a wipe.
+  The ~10 dish/round ceiling tracks a known brain limitation recorded in
+  `src/domain/kitchen.ts` — it parks a working plate on the nearest free
+  counter then goes looking for it, and counter occupancy climbs 19% → 32% as
+  chefs are added. **Four humans do not have that failure mode, so their real
+  ceiling is unknown and cannot be measured with this harness.** The base
+  pacing table therefore stays bot-safe and `PRESSURE_BAND_MUL` was widened
+  0.2 → 0.5 so the invisible director can find the right level from live play:
+  a crew clearing tickets fast gets up to 50% quicker orders. **Needs a real
+  4-human playtest** — that is the only instrument that can answer it.
 - 🟢 Payout no longer divides the team pot per head (it paid 172 solo vs 27
   each at four players — an anti-social incentive in a co-op game). Everyone
   banks the full team value plus a per-crewmate bonus, so a full kitchen pays
@@ -136,6 +143,13 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 Star thresholds re-set from the measured distribution; 150/320/500 made
   3 stars unreachable, which quietly killed the photo moment, the star coin
   bonus and two badges.
+- 🟢 Station item heights are GENERATED from the capture
+  (tools/gen-surfaces.luau → client/SurfaceH.luau), not a per-kind table. The
+  old table read `counter` as one height when the floor benches top out at
+  ~0.37 cells and the back-wall run at ~0.86, so a plate put down on a floor
+  bench floated ~1.2 studs and looked sunk into the plate stack beside it
+  (reported as "a cooking pot" — there is no pot; it is Plates_11_4).
+  Regenerate after any change to the kitchen capture.
 - 🟢 Prices set against ~177 coins/round: first buy at ~1.4 rounds, the
   25-item coin catalog ~8.2 hours solo, with 16 more items behind the two
   passes. Re-run the probe after touching PACING, STARS, MOVE_SPEED_MUL or any
@@ -173,9 +187,14 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - Hud:clearOrders called :Destroy() on the ticket TABLE ({card, fill}), which
   threw out of updatePhase before the results overlay was built — that is what
   left you stuck in the kitchen at round end.
-- The touch jump button kept coming back because PlayerModule re-shows it on
-  every ControlModule:Enable(), which the menu now triggers on every close. It
-  is Visible-locked via its own property-changed signal.
+- The touch jump button could not be reliably hidden: PlayerModule re-creates
+  and re-shows it on respawn, on device change, and on every
+  ControlModule:Enable() — which the menu fires on every close, so every hide
+  was a race against code that legitimately owns that button. Resolved by
+  owning the input instead: on touch-only devices ControlModule:Disable()
+  removes the entire Roblox touch UI (jump button included, supported and
+  total) and client/Thumbstick.luau supplies the movement stick. Keyboard and
+  gamepad devices keep PlayerModule untouched. **Unverified on a real device.**
 - The menu ScreenGui ignores the GUI inset (so the shift panel and emote row
   can use the whole screen), which meant the tabbed panel sat UNDER Roblox's
   own top bar. The panel is now top-anchored below GuiService:GetGuiInset().

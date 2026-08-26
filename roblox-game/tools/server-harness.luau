@@ -208,9 +208,15 @@ check(results.stars ~= nil and results.cards ~= nil, "results carry stars + supe
 local myCard = results.cards[myChefId]
 check(myCard ~= nil, `human got a superlative card ({myCard and myCard.title or "none"})`)
 
--- pacing: 1 human -> base gap 1.0, pressure director stays in band
+-- pacing: 1 human -> base gap 1.0, pressure director stays in band.
+-- Derived from Config, not hardcoded: the band is the 4-player difficulty
+-- dial and is expected to be retuned (see Config.PRESSURE_BAND_MUL).
 local gapMul = simService.sim.director.orderGapMul
-check(gapMul >= 0.79 and gapMul <= 1.21, `pressure director inside band (gapMul={gapMul})`)
+local band = Config.PRESSURE_BAND_MUL
+check(
+	gapMul >= (1 - band) - 0.01 and gapMul <= (1 + band) + 0.01,
+	`pressure director inside band (gapMul={gapMul}, band=+/-{band})`
+)
 check(simService.sim.director.botServeValueMul == Config.BOT_SERVE_VALUE_MUL, "bot serve cut applied")
 
 -- progression: profile grew after rounds

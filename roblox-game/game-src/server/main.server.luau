@@ -20,9 +20,6 @@ local MonetizationServer = require(script.Parent.Monetization) :: any
 
 local remotes = Net.server(ReplicatedStorage)
 
-local Tuning = require(gameShared:WaitForChild("Tuning")) :: any
-Tuning.apply(shared, Config)
-
 local simService = SimService.new(shared, { seed = os.time() % 2 ^ 31, botFill = Config.BOT_FILL })
 local replicator = Replicator.new(shared, Net, remotes, function(chef)
 	return simService:chefFlags(chef)

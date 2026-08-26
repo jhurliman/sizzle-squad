@@ -26,12 +26,8 @@ local ItemViz = require(script.Parent.ItemViz) :: any
 
 local SCALE = 5
 local Config = require(gameShared:WaitForChild("Config")) :: any
-local Tuning = require(gameShared:WaitForChild("Tuning")) :: any
-Tuning.apply(shared, Config)
-
 local remotes = Net.client(ReplicatedStorage)
 local state = ClientState.new(shared, Net)
-local input = Input.new()
 local visualsFolder = Instance.new("Folder")
 visualsFolder.Name = "Chefs"
 visualsFolder.Parent = Workspace
@@ -39,6 +35,8 @@ local visuals = ChefVisuals.new(visualsFolder)
 local stationViz = StationVisuals.new(visualsFolder)
 local cameraRig = CameraRig.new(Workspace.CurrentCamera :: Camera)
 local hud = Hud.new(Catalog)
+-- After the HUD: the touch thumbstick lives in its ScreenGui.
+local input = Input.new(hud.gui)
 local firstShift = FirstShift.new(hud.gui)
 local sfx = Sfx.new()
 local vfxFolder = Instance.new("Folder")
