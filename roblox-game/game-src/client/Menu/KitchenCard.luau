@@ -47,6 +47,9 @@ function KitchenCard.new(gui: Instance, deps: any)
 
 	self.card = Theme.card({
 		Name = "KitchenCard",
+		-- Same reason as the menu panel: the backdrop behind this dismisses on
+		-- tap, and a Frame does not consume one.
+		Active = true,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromOffset(420, 330),

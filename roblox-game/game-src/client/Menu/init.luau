@@ -138,6 +138,15 @@ function Menu:buildPanel()
 		BackgroundTransparency = 0.02,
 		Visible = false,
 		ZIndex = 3,
+		-- THE PANEL SINKS INPUT.
+		--
+		-- The scrim behind it is a full-screen TextButton that closes the menu,
+		-- and a plain Frame does not consume a tap -- so a tap that landed on
+		-- something non-interactive inside the panel fell straight through and
+		-- shut it. Dragging the chef in the wardrobe was the worst case: the
+		-- viewport is the biggest non-button surface in the menu, so grabbing
+		-- the character to spin it closed the dialog instead.
+		Active = true,
 	}, self.gui)
 	Theme.stroke(self.panel, Theme.BROWN_LIGHT, 2)
 
