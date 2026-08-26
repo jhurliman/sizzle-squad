@@ -34,10 +34,21 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 
 ## B. Placeholder presentation
 
-- 🟡 **Limb articulation is first-pass procedural** (gait swings around
-  captured joints, carry/chop poses, torso lean, tail/ear secondary motion,
-  stun flail via BulkMoveTo). Not yet ported: knee/foot two-segment bend,
-  blink/mouth, bank-into-turn, per-species gait personality.
+- 🟢 **Limb articulation is procedural, and now articulated below the group**
+  (gait swings around captured joints, carry/chop poses, torso lean, tail/ear
+  secondary motion, stun flail via BulkMoveTo). The four gaps that stood here
+  are ported: a hip/knee/ankle chain that keeps the planted foot on the floor,
+  blink + jaw-on-effort, bank-into-turn, and a per-species GAIT table
+  (cadence, stride, airtime, static knee/ankle rest, bank). All of it is
+  derived from the rig geometry at `:ensure` time rather than hardcoded per
+  species, so a re-captured rig keeps working. **Verified headlessly, not yet
+  in Studio**: `lune run roblox/pose-dump.luau` runs the shipping animator
+  against chef-rigs.rbxm and `node roblox/anim-sheet.mjs` renders
+  anim-walk-&lt;species&gt;.png (one stride in eight frames), plus
+  anim-idle/-face/-bank.png. Still not ported from the web rig: the stride
+  warp (legs cross fast and hold near full separation), gaze, idle fidget
+  beats, and the mouth CAVITY behind the lip line — the jaw hinges, but there
+  is no dark interior to open onto.
 - 🟢 **Food art is the web game's captured meshes** (tomatoes with stalks,
   leafy lettuce, bacon rashers, lathed plates/pans) with a primitive-sphere
   fallback; plate/pan content stacking offsets are hand-tuned, not captured —

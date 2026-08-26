@@ -58,7 +58,29 @@ npm i             # esbuild
 npm run generate  # needs lune on PATH (brew install lune / cargo install lune / GitHub releases)
 npm run verify    # structural audit of the .rbxl
 npm run render    # headless three.js preview renders (render-persp.png / render-top.png)
+npm run anim      # animation review sheets (see below)
 ```
+
+## Reviewing the chef animator
+
+`chef-sheet.mjs` and `hats-on-chefs.mjs` render the CAPTURED rigs — bind pose,
+fit and palette. They cannot show a gait, because a gait is not in a still.
+
+`npm run anim` covers the other half. `pose-dump.luau` loads
+`game-src/client/ChefVisuals.luau` itself into a Lune sandbox (stubbed
+`game`/`require`, Roblox datatypes from `@lune/roblox`, and the module's own
+injectable `commit` hook handing back the posed CFrames), drives it against the
+real `chef-rigs.rbxm`, and writes `anim-dump.json`. `anim-sheet.mjs` then
+renders, under a level orthographic camera so the floor is a single line you
+can read foot contact against:
+
+- `anim-walk-<species>.png` / `-front.png` — one stride in eight frames
+- `anim-idle.png` — the cast standing, side and front
+- `anim-face-<species>.png` — eyes open / mid-blink / jaw open on effort
+- `anim-bank.png` — turning left, straight, turning right
+
+It is the shipping animator being rendered, not a re-implementation of it, so
+the sheets cannot drift from the game.
 
 ## Known approximations
 

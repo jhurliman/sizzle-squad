@@ -6,7 +6,8 @@
   "scripts": {
     "generate": "node build.mjs && node capture.bundle.mjs && node prepare.mjs && lune run convert.luau",
     "verify": "lune run verify.luau",
-    "render": "esbuild viewer.mjs --bundle --format=iife --outfile=viewer.bundle.js --log-level=warning && node shoot.mjs"
+    "render": "esbuild viewer.mjs --bundle --format=iife --outfile=viewer.bundle.js --log-level=warning && node shoot.mjs",
+    "anim": "lune run pose-dump.luau && node anim-sheet.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"
