@@ -103,7 +103,7 @@ local KNEE_CAP = 1.7 -- past this the shin folds through the thigh
 local ANKLE_FOLLOW = 0.55
 -- How far INSIDE the shoe a trimmed shin should end, in studs. Enough that
 -- articulation cannot expose it, small enough that no gap opens at the ankle.
-local SHIN_INSET = 0.3 -- ankle counter-rotates 55% of the chain, so the sole stays flat
+local SHIN_INSET = 0.4 -- ankle counter-rotates 55% of the chain, so the sole stays flat
 local TOE_OFF = 0.62 -- the trailing foot is plantar-flexed hard; half of what says "moving"
 local HEEL_STRIKE = 0.2 -- the leading foot presents its sole on landing
 local BANK_LIMIT = 0.5 -- 29 degrees. A chef leaning further than this is a motorcycle.
@@ -454,6 +454,37 @@ function ChefVisuals:ensure(id: number, skin: string): any
 				end
 				entry.animSeg[i] = seg
 			end
+			-- SMALL PARTS AT THE ANKLE RIDE THE BOOT, NOT THE SHIN.
+			--
+			-- Only the two long bones articulate as bones. Everything else in
+			-- a leg group is dressing -- a cuff, a strap, a wheel -- and it
+			-- belongs to whichever segment it physically sits on. bramble's
+			-- red cuff sits AT the ankle and overlaps the shoe, but its centre
+			-- is just above footCut, so it rode the shin and swung out from
+			-- under the sole on every stride: the reported red poking through
+			-- the bottom of his shoes, and worst while carrying and walking
+			-- at once, which is most of the game.
+			--
+			-- Any non-bone part that reaches into the boot's own span goes
+			-- with the boot.
+			local footTop = -math.huge
+			for _, i in idx do
+				if entry.animSeg[i] == 2 then
+					local p = entry.animParts[i]
+					footTop = math.max(footTop, p.CFrame.Position.Y + halfY(p))
+				end
+			end
+			if footTop > -math.huge then
+				for _, i in idx do
+					if i ~= thighI and i ~= shinI and entry.animSeg[i] == 1 then
+						local p = entry.animParts[i]
+						if p.CFrame.Position.Y - halfY(p) < footTop then
+							entry.animSeg[i] = 2
+						end
+					end
+				end
+			end
+
 			-- TRIM THE SHIN BACK INTO THE SHOE.
 			--
 			-- Some rigs author the shin all the way down to the sole plane --

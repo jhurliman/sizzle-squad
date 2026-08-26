@@ -215,6 +215,40 @@ for _, skin in SPECIES do
 	end
 	frames.bank = banks
 
+	-- CARRY and STUN both bend the knee further (carryBlend * 0.16, +0.35
+	-- stunned), which is exactly what pushes a shin's tip out from under its
+	-- shoe -- so they need checking, not assuming.
+	--
+	-- carryBlend and the stun decay are lag filters, so each pose is held for
+	-- a second before sampling; the first frames are a ramp, not the pose.
+	local carry = {}
+	for i = 1, 90 do
+		local f = rig.step({ flags = 4, speed = 0 })
+		if i > 60 then
+			table.insert(carry, f)
+		end
+	end
+	frames.carry = carry
+
+	local stunned = {}
+	for i = 1, 60 do
+		local f = rig.step({ stun = 0.5, speed = 0 })
+		if i > 30 then
+			table.insert(stunned, f)
+		end
+	end
+	frames.stun = stunned
+
+	-- and carrying WHILE walking, which stacks both knee terms
+	local carryWalk = {}
+	for i = 1, 120 do
+		local f = rig.step({ flags = 4, speed = 3.2 })
+		if i > 90 then
+			table.insert(carryWalk, f)
+		end
+	end
+	frames.carryWalk = carryWalk
+
 	dump[skin] = frames
 	print(`{skin}: walk {#frames.walk} frames, blink {if frames.blink then "yes" else "MISSED"}`)
 end
