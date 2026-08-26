@@ -10,7 +10,7 @@ StationVisuals.__index = StationVisuals
 local ItemViz = require(script.Parent.ItemViz) :: any
 -- Per-cell work-surface heights measured off the captured kitchen; see
 -- tools/gen-surfaces.luau.
-local SurfaceH = require(script.Parent.SurfaceH) :: { [string]: number }
+local SurfaceH = require(script.Parent.SurfaceH) :: { [string]: { h: number, dx: number, dz: number } }
 
 local SCALE = 5
 
@@ -37,44 +37,26 @@ local SURFACE_H: { [string]: number } = {
 	sink = 0.6,
 }
 
--- How far forward of the cell centre an item rests, in sim units.
---
--- Bench dressing parks its props in the BACK corner (buildDressing, oz -0.29),
--- so anything set down at the centre of a dressed bench lands inside the
--- stockpot or the cloth next to it -- reported from play as plates
--- intersecting the objects on the table.
---
--- Bounded deliberately: a plate is ~0.19 units to its own edge and the bench
--- runs to ~0.45, so 0.20 clears the props with room to spare and still cannot
--- hang off the front.
-local FORWARD: { [string]: number } = {
-	-- Matches BOARD_FORWARD in the web view: the board art itself moved
-	-- forward, so food resting on it has to move with it or it sits behind
-	-- the board.
-	board = 0.14,
-	counter = 0.2,
-}
-
+--- Where an item rests on a station.
+---
+--- Anchors are GENERATED from the captured kitchen (tools/gen-surfaces.luau):
+--- height, plus a nudge in the bench plane that clears the dressing props
+--- parked in the back corner WITHOUT letting the item overhang the furniture.
+--- Both parts have to be measured -- the per-kind fallback below read
+--- `counter` as one height when floor benches top out at 0.37-0.48 and the
+--- back-wall run at 0.86, and a flat forward nudge pushed items off the end of
+--- benches whose far cell sits at the very edge.
 local function topOf(kind: string?, cell: any): Vector3
-	-- MEASURED height for this exact cell wins. The per-kind table below is
-	-- only a fallback: it read `counter` as one height when the floor benches
-	-- top out ~0.37 and the back-wall run ~0.86, so a plate put down on a
-	-- floor bench floated ~1.2 studs and looked like it was sunk into the
-	-- plate stack standing next to it.
-	local h = SurfaceH[`{cell.x},{cell.y}`]
-	if h == nil then
-		h = SURFACE_H[kind or ""] or 0.8
-		if kind == "counter" and cell.y > 1 then
-			h = 0.55
-		end
+	local a = SurfaceH[`{cell.x},{cell.y}`]
+	if a ~= nil then
+		return Vector3.new((cell.x + 0.5 + a.dx) * SCALE, a.h * SCALE, (cell.y + 0.5 + a.dz) * SCALE)
 	end
-	-- Only the dressed benches out on the floor need it; the back-wall run
-	-- (row <= 1) carries no props, and its counters are shallower.
-	local fwd = FORWARD[kind or ""] or 0
-	if kind == "counter" and cell.y <= 1 then
-		fwd = 0
+	-- Fallback for a cell the capture knows nothing about.
+	local h = SURFACE_H[kind or ""] or 0.8
+	if kind == "counter" and cell.y > 1 then
+		h = 0.55
 	end
-	return Vector3.new((cell.x + 0.5) * SCALE, h * SCALE, (cell.y + 0.5 + fwd) * SCALE)
+	return Vector3.new((cell.x + 0.5) * SCALE, h * SCALE, (cell.y + 0.5) * SCALE)
 end
 
 function StationVisuals:ensure(id: number, anchor: Vector3): any
