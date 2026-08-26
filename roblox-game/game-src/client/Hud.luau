@@ -8,6 +8,7 @@
 -- half of that and main.client.luau built the other half and reparented it in
 -- here, which is why neither was findable.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
@@ -42,10 +43,17 @@ function Hud.new(catalog: any)
 	gui.Parent = player:WaitForChild("PlayerGui")
 	self.gui = gui
 
+	-- The gui ignores the GUI inset on purpose -- the thumbstick places itself
+	-- from raw touch coordinates and the emote row wants the whole width -- so
+	-- anything pinned to the TOP has to dodge Roblox's own controls itself.
+	-- The patience bar sat at y=25 and showed as a green stripe running behind
+	-- the Roblox icon and the chat button.
+	local topPad = GuiService:GetGuiInset().Y
+
 	-- timer chip (top center)
 	self.timerLabel = mk("TextLabel", {
 		Size = UDim2.fromOffset(140, 44),
-		Position = UDim2.new(0.5, -70, 0, 12),
+		Position = UDim2.new(0.5, -70, 0, topPad + 8),
 		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
 		BackgroundTransparency = 0.15,
 		TextColor3 = Color3.fromRGB(255, 244, 221),
@@ -58,7 +66,7 @@ function Hud.new(catalog: any)
 	-- coins + combo (top right)
 	self.scoreLabel = mk("TextLabel", {
 		Size = UDim2.fromOffset(170, 44),
-		Position = UDim2.new(1, -182, 0, 12),
+		Position = UDim2.new(1, -182, 0, topPad + 8),
 		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
 		BackgroundTransparency = 0.15,
 		TextColor3 = Color3.fromRGB(255, 224, 102),
@@ -71,7 +79,7 @@ function Hud.new(catalog: any)
 	-- patience bar (top left)
 	local pat = mk("Frame", {
 		Size = UDim2.fromOffset(170, 18),
-		Position = UDim2.new(0, 12, 0, 25),
+		Position = UDim2.new(0, 12, 0, topPad + 21),
 		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
 		BackgroundTransparency = 0.15,
 	}, gui)
@@ -123,7 +131,7 @@ function Hud.new(catalog: any)
 	-- so the whole rail auto-scales down to fit (see updateOrders).
 	self.ticketRail = mk("Frame", {
 		Size = UDim2.new(0, TICKET_W, 1, -TICKET_RESERVE),
-		Position = UDim2.new(1, -(TICKET_W + 10), 0, 62),
+		Position = UDim2.new(1, -(TICKET_W + 10), 0, topPad + 58),
 		BackgroundTransparency = 1,
 	}, gui)
 	self.ticketScale = mk("UIScale", { Scale = 1 }, self.ticketRail)
