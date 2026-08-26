@@ -24,12 +24,13 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 **Species picking moved into the Wardrobe**, alongside hats and palettes
   against a live 3D preview — duplicates allowed by design; nametags
   differentiate.
-- 🟡 **Monetization is wired but inert until pass ids exist.** Two game
-  passes (Supporter Pass, Chef's Trunk) in shared/Monetization.luau, checked on
-  join and on PromptGamePassPurchaseFinished, granting catalog items tagged
-  `exclusive`. A pass with `gamePassId = 0` is hidden and ungrantable. See
-  README → "Remaining launch steps" for what to create. **No purchase has ever
-  been made against a real pass** — untested end-to-end.
+- 🟡 **Monetization is live but no purchase has ever been made.** Both passes
+  exist and their ids are wired (Supporter 1959138315, Chef's Trunk
+  1958262313); ownership is checked on join and on
+  PromptGamePassPurchaseFinished, granting the catalog items tagged
+  `exclusive`. **The buy flow, the grant-on-purchase path and the +10%
+  multipliers have never run against a real Robux transaction.** Icons are in
+  roblox/pass-art/.
 
 ## B. Placeholder presentation
 
@@ -76,9 +77,9 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   Menu:maybeAutoStart. When First Shift lands it should take that over.
 - 🟢 **Late-join hold live**: joiners with <15s left spectate with a notice
   and seat at the next phase change.
-- 🟡 **Solo/duo pacing is machine-validated only** (bot proxy survives
-  comfortably) — needs human feel validation; expect to retune
-  `Config.PACING[1..2]`.
+- 🟢 **Solo pacing is human-validated** in live Roblox. Duo/trio/quad pacing
+  is still bot-proxy only; expect to retune `Config.PACING[2..4]` and
+  `PRESSURE_BAND_MUL` after a real multi-human session.
 - 🟢 **Superlatives**: "Firefighter" DROPPED by design decision (the
   fire-scrape mechanic stays simple); set is serves/chops/cooks/washes/trashes.
 - 🟢 **AFK stage 2 missing**: 20s → bot/park coverage works, but "two idle
@@ -105,12 +106,12 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 
 ## C2. Front-end (new — see plan Part 4)
 
-- 🟡 **The wardrobe's 3D preview has never rendered on a real device.** It
-  drives ChefVisuals inside a ViewportFrame via an injected `commit` (BulkMoveTo
-  silently no-ops outside Workspace) and `pose.speedOverride` (gait is derived
-  from rendered displacement, which is zero for a stationary rig). Verify: the
-  rig is lit and framed, hats sit right, palettes apply, drag-to-spin works,
-  and the frame rate holds on a low-end Android.
+- 🟢 **The wardrobe's 3D preview is confirmed working in live Roblox**
+  (single-player). It drives ChefVisuals inside a ViewportFrame via an injected
+  `commit` (BulkMoveTo silently no-ops outside Workspace) and
+  `pose.speedOverride` (gait is derived from rendered displacement, which is
+  zero for a stationary rig). Still unverified: frame rate on a low-end
+  Android, and the touch drag-to-spin path.
 - 🟢 **Menu is an overlay; walk-up stations are a later pass** (shop board,
   wardrobe mirror, leaderboard wall in the kitchen opening the same panels).
 - 🟢 **Kitchen Card auto-dismisses after 12s**; it has no entrance animation
@@ -118,8 +119,8 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 **Badges have no client surface at all**, and award state is not
   persisted in the profile, so the Career tab shows the milestone track
   instead. Badge ids are still 0 (user-gated).
-- 🟢 **Wardrobe has no search/sort**; at 30 items the flat rails are fine, but
-  they will not scale to a content cadence.
+- 🟢 **Wardrobe has no search/sort**; at 42 items the flat rails still read,
+  but they will not survive a content cadence.
 
 ## C2b. Economy (rebalanced from measured data — tools/economy-probe.luau)
 
@@ -231,9 +232,12 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   surface.
 - 🟢 No `--!native` annotations on the hot sim modules (perf headroom is
   currently ~6× budget, so deferred).
-- 🟢 Multi-client behavior validated only via harness emulation + Studio
-  local server, not under real internet latency (latency-injection flag from
-  the plan is unbuilt).
+- 🟡 **Nothing has ever run with two real clients.** Single-player live Roblox
+  is confirmed (wardrobe, leaderboards, hat equips, DataStore persistence), but
+  drop-in handoff, AFK cover, the ready-up tally, the kitchen-cosmetic
+  election, session locking and client-authoritative movement under real
+  latency have only ever been exercised by harness emulation. The plan's
+  latency-injection flag is unbuilt.
 
 ## E. User-gated (see README → "Remaining launch steps")
 
