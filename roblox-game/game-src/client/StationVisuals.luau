@@ -37,6 +37,24 @@ local SURFACE_H: { [string]: number } = {
 	sink = 0.6,
 }
 
+-- How far forward of the cell centre an item rests, in sim units.
+--
+-- Bench dressing parks its props in the BACK corner (buildDressing, oz -0.29),
+-- so anything set down at the centre of a dressed bench lands inside the
+-- stockpot or the cloth next to it -- reported from play as plates
+-- intersecting the objects on the table.
+--
+-- Bounded deliberately: a plate is ~0.19 units to its own edge and the bench
+-- runs to ~0.45, so 0.20 clears the props with room to spare and still cannot
+-- hang off the front.
+local FORWARD: { [string]: number } = {
+	-- Matches BOARD_FORWARD in the web view: the board art itself moved
+	-- forward, so food resting on it has to move with it or it sits behind
+	-- the board.
+	board = 0.14,
+	counter = 0.2,
+}
+
 local function topOf(kind: string?, cell: any): Vector3
 	-- MEASURED height for this exact cell wins. The per-kind table below is
 	-- only a fallback: it read `counter` as one height when the floor benches
@@ -50,7 +68,13 @@ local function topOf(kind: string?, cell: any): Vector3
 			h = 0.55
 		end
 	end
-	return Vector3.new((cell.x + 0.5) * SCALE, h * SCALE, (cell.y + 0.5) * SCALE)
+	-- Only the dressed benches out on the floor need it; the back-wall run
+	-- (row <= 1) carries no props, and its counters are shallower.
+	local fwd = FORWARD[kind or ""] or 0
+	if kind == "counter" and cell.y <= 1 then
+		fwd = 0
+	end
+	return Vector3.new((cell.x + 0.5) * SCALE, h * SCALE, (cell.y + 0.5 + fwd) * SCALE)
 end
 
 function StationVisuals:ensure(id: number, anchor: Vector3): any
