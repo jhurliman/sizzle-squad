@@ -88,7 +88,39 @@ dailies have no UI, food is spheres, everything is silent.
    are rendered, uploaded and wired; ids recorded in
    `roblox/audio-out/asset-ids.csv`. Only `washDone` lacks a dedicated upload
    (falls back to the chop chime).
-3. **Badges**: create on the Creator Dashboard, fill `Badges.IDS`.
+3. **Badges** — 8 of them, wired and inert until the ids exist.
+
+   Create each at **Creator Dashboard → your experience → Engagement → Badges
+   → Create Badge**. Roblox charges **100 Robux per badge** (800 total), and
+   the icon is a square PNG (512x512 is the safe size, same as a game pass).
+   After creating one, open it and take the number out of the URL
+   (`.../badges/<ID>/configure`) — that is the id.
+
+   Then paste each id into `game-src/shared/../server/Badges.luau` -> `Badges.IDS`.
+   A key left at `0` is silently skipped, so you can create them one at a time.
+
+   | `Badges.IDS` key | Suggested name | Description | Awarded when |
+   |---|---|---|---|
+   | `firstDish` | First Dish | Serve your very first dish. | any shift where you serve >= 1 dish |
+   | `perfectRound` | Clean Service | Finish a shift without missing a single ticket. | `missed == 0` and `served > 0` |
+   | `firstThreeStar` | Three Stars | Finish a shift with all three stars. | `stars >= 3` |
+   | `fullHumanCrewThreeStar` | Full House | Earn three stars with a full crew of four chefs. | `stars >= 3` and 4 humans seated |
+   | `levelTen` | Head Chef | Reach level 10. | `profile.level >= 10` |
+   | `hundredDishes` | Century | Serve 100 dishes. | `totalDishes >= 100` |
+   | `thousandDishes` | Thousand Plates | Serve 1,000 dishes. | `totalDishes >= 1000` |
+   | `foundingChef` | Founding Chef | Play during the launch window. | end of any shift, **while `Config.FOUNDING_CHEF_UNTIL` has not passed** |
+
+   Two things worth knowing before you spend the Robux:
+
+   - **Set `Config.FOUNDING_CHEF_UNTIL`** (UTC `YYYY-MM-DD`) to the last day of
+     your launch window. Past that date nobody can earn it again, which is the
+     only thing that makes it worth having. Empty string disables it.
+   - Award conditions are re-checked at the end of EVERY shift. Roblox treats
+     re-awarding an owned badge as a no-op, and the server also de-dupes per
+     session, so nothing is double-granted and no call is wasted.
+
+   Badges are awarded on the SERVER at round end and need API access enabled on
+   the published place -- the same switch DataStores need.
 3b. **Game passes** (monetization is wired but inert until these exist).
    On the Creator Dashboard → your experience → Monetization → Passes, create:
 

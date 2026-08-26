@@ -17,13 +17,33 @@ Badges.IDS = {
 	foundingChef = 0, -- launch-window only
 }
 
-function Badges.new()
+function Badges.new(config: any?)
 	local self = setmetatable({}, Badges)
+	self.config = config
 	self.service = nil
+	-- player -> set of badge keys already granted THIS SESSION. Awarding a
+	-- badge someone owns is a no-op on Roblox's side, but the conditions here
+	-- re-fire every round for every player, so without this a four-player
+	-- server burns dozens of pointless BadgeService calls a minute and can
+	-- trip the award rate limit for badges that actually matter.
+	self.granted = {} :: { [any]: { [string]: boolean } }
 	pcall(function()
 		self.service = game:GetService("BadgeService")
 	end)
 	return self
+end
+
+function Badges:playerRemoving(player: any)
+	self.granted[player] = nil
+end
+
+--- Is the launch-window badge still earnable?
+function Badges:foundingOpen(): boolean
+	local until_ = self.config ~= nil and self.config.FOUNDING_CHEF_UNTIL or nil
+	if until_ == nil or until_ == "" then
+		return false
+	end
+	return (os.date("!%Y-%m-%d") :: string) <= until_
 end
 
 function Badges:award(player: any, key: string)
@@ -31,6 +51,15 @@ function Badges:award(player: any, key: string)
 	if id == nil or id == 0 or self.service == nil then
 		return
 	end
+	local seen = self.granted[player]
+	if seen == nil then
+		seen = {}
+		self.granted[player] = seen
+	end
+	if seen[key] then
+		return -- already handed out this session
+	end
+	seen[key] = true
 	task.spawn(function()
 		pcall(function()
 			self.service:AwardBadge(player.UserId, id)
@@ -67,7 +96,10 @@ function Badges:onRoundEnd(crew: any, progression: any, results: any)
 		if profile.level >= 10 then
 			self:award(player, "levelTen")
 		end
-		self:award(player, "foundingChef")
+		-- Launch-window only, or it is just a participation trophy.
+		if self:foundingOpen() then
+			self:award(player, "foundingChef")
+		end
 	end
 end
 

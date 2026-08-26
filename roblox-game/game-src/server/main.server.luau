@@ -36,7 +36,7 @@ progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("
 
 local Catalog = require(gameShared:WaitForChild("Catalog")) :: any
 local leaderboards = Leaderboards.new(progression, remotes)
-local badges = Badges.new()
+local badges = Badges.new(Config)
 local analytics = Analytics.new()
 
 local MonetizationDefs = require(gameShared:WaitForChild("Monetization")) :: any
@@ -281,6 +281,7 @@ Players.PlayerRemoving:Connect(function(player)
 	progression:playerRemoving(player)
 	monetization:playerRemoving(player)
 	analytics:playerRemoving(player, director.phase)
+	badges:playerRemoving(player)
 	-- director.ready is keyed by Player and had no cleanup: it leaked a key
 	-- per departure and could strand a stale ready that nothing could clear.
 	director.ready[player] = nil

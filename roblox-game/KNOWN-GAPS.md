@@ -116,9 +116,13 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   wardrobe mirror, leaderboard wall in the kitchen opening the same panels).
 - 🟢 **Kitchen Card auto-dismisses after 12s**; it has no entrance animation
   and no "don't show again".
-- 🟢 **Badges have no client surface at all**, and award state is not
-  persisted in the profile, so the Career tab shows the milestone track
-  instead. Badge ids are still 0 (user-gated).
+- 🟡 **Badges are inert until their ids exist** (all 8 still `0`, so `award()`
+  early-returns). Conditions are correct and de-duped per session, and
+  "Founding Chef" is now gated behind `Config.FOUNDING_CHEF_UNTIL` — without
+  that it was granted to everyone at the end of every shift forever, which
+  made it a participation trophy. Award state is still not persisted in the
+  profile, so there is no client surface; the Career tab shows the milestone
+  track instead. See README → launch steps for the create-and-fill table.
 - 🟢 **Wardrobe has no search/sort**; at 42 items the flat rails still read,
   but they will not survive a content cadence.
 

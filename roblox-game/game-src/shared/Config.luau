@@ -118,4 +118,11 @@ end
 
 Config.AFK_SECONDS = 20
 
+-- "Founding Chef" is only meaningful if it STOPS being awardable. Set this to
+-- the last day of the launch window (UTC, YYYY-MM-DD); until then it is handed
+-- out at the end of any shift, and after it nobody can earn it again. Leave it
+-- empty to disable the badge entirely.
+Config.FOUNDING_CHEF_UNTIL = "2026-10-31"
+
+
 return Config
