@@ -62,9 +62,9 @@ function Hud.new(catalog: any)
 
 	-- The gui ignores the GUI inset on purpose -- the thumbstick places itself
 	-- from raw touch coordinates and the emote row wants the whole width -- so
-	-- anything pinned to the TOP has to dodge Roblox's own controls itself.
-	-- The patience bar sat at y=25 and showed as a green stripe running behind
-	-- the Roblox icon and the chat button.
+	-- anything pinned to the TOP LEFT has to dodge Roblox's own controls
+	-- itself. The patience bar sat at y=25 and showed as a green stripe
+	-- running behind the Roblox icon and the chat button.
 	--
 	-- Read LIVE, not once. GetGuiInset() reports 0 before a session is running
 	-- -- which is why the bar still sat under the controls in the Studio
@@ -76,7 +76,7 @@ function Hud.new(catalog: any)
 	-- timer chip (top center)
 	self.timerLabel = mk("TextLabel", {
 		Size = UDim2.fromOffset(140, 44),
-		Position = UDim2.new(0.5, -70, 0, 8),
+		Position = UDim2.new(0.5, -70, 0, 12),
 		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
 		BackgroundTransparency = 0.15,
 		TextColor3 = Color3.fromRGB(255, 244, 221),
@@ -89,7 +89,7 @@ function Hud.new(catalog: any)
 	-- coins + combo (top right)
 	self.scoreLabel = mk("TextLabel", {
 		Size = UDim2.fromOffset(170, 44),
-		Position = UDim2.new(1, -182, 0, 8),
+		Position = UDim2.new(1, -182, 0, 12),
 		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
 		BackgroundTransparency = 0.15,
 		TextColor3 = Color3.fromRGB(255, 224, 102),
@@ -154,7 +154,7 @@ function Hud.new(catalog: any)
 	-- so the whole rail auto-scales down to fit (see updateOrders).
 	self.ticketRail = mk("Frame", {
 		Size = UDim2.new(0, TICKET_W, 1, -TICKET_RESERVE),
-		Position = UDim2.new(1, -(TICKET_W + 10), 0, 58),
+		Position = UDim2.new(1, -(TICKET_W + 10), 0, 62),
 		BackgroundTransparency = 1,
 	}, gui)
 	self.ticketScale = mk("UIScale", { Scale = 1 }, self.ticketRail)
@@ -184,13 +184,12 @@ function Hud.new(catalog: any)
 	-- floating labels pool
 	self.labelPool = {} :: { any }
 
-	-- Everything pinned to the top of the screen, with its design-time y.
-	self.topChips = {
-		{ self.timerLabel, 8 },
-		{ self.scoreLabel, 8 },
-		{ self.patienceFill.Parent, 21 },
-		{ self.ticketRail, 58 },
-	}
+	-- ONLY the patience bar. It is the sole top-row element on the LEFT, which
+	-- is where Roblox parks its own controls -- the timer is centred and the
+	-- score chip and ticket rail are right-aligned, so none of them collide,
+	-- and pushing them down just spends vertical space that a phone does not
+	-- have.
+	self.topChips = { { self.patienceFill.Parent, 4 } }
 	self:applyTopInset()
 	pcall(function()
 		GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(function()
