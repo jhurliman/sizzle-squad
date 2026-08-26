@@ -101,6 +101,12 @@ const WAINSCOT_H = 0.9;
  */
 export const BOARD_FORWARD = 0.14;
 
+/**
+ * How far a BACK-WALL sink stands forward of its cell centre, in cells, to
+ * clear the timber post that flanks the oven arch.
+ */
+const SINK_FORWARD = 0.3;
+
 const TABLE_H = 0.38;
 const COUNTER_H = 0.86;
 /**
@@ -3478,10 +3484,18 @@ export class WorldView {
         // The wide shallow basin the reference parks on a mid bench. Its rim is
         // bright steel and the water inside it is pale blue — ours was a dark
         // grey slab that read as a hole in the bench from three tables away.
-        P.box(C.steel, 0.88, 0.2, 0.66, x, h + 0.08, z);
-        P.box(0xa9c6c8, 0.74, 0.16, 0.52, x, h + 0.13, z);
-        P.cyl(C.steel, 0.035, 0.035, 0.34, 8, x + 0.3, h + 0.34, z - 0.2);
-        P.cyl(C.steel, 0.035, 0.035, 0.2, 8, x + 0.2, h + 0.49, z - 0.2, 0, Math.PI / 2);
+        // A BACK-WALL SINK STANDS CLEAR OF THE TIMBER FRAME.
+        //
+        // buildBackWall puts a post at ovenSpan.x0 - 0.5, which is dead centre
+        // of the cell beside the arch — exactly where the scullery sink went.
+        // The post is against the wall plane, so moving the basin forward
+        // clears it without touching the architecture, which the frame's own
+        // notes are emphatic about. Floor sinks are unaffected.
+        const sz = againstWall ? z + SINK_FORWARD : z;
+        P.box(C.steel, 0.88, 0.2, 0.66, x, h + 0.08, sz);
+        P.box(0xa9c6c8, 0.74, 0.16, 0.52, x, h + 0.13, sz);
+        P.cyl(C.steel, 0.035, 0.035, 0.34, 8, x + 0.3, h + 0.34, sz - 0.2);
+        P.cyl(C.steel, 0.035, 0.035, 0.2, 8, x + 0.2, h + 0.49, sz - 0.2, 0, Math.PI / 2);
         break;
       }
       default:
