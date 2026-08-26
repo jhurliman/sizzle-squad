@@ -529,6 +529,21 @@ end
 
 -- ------------------------------------------------------------------ assist
 
+--- Is anyone in this crew about to work their very first shift?
+---
+--- Deliberately "any", not "all": a newcomer dropping into a veteran server
+--- still deserves a board that teaches, and a scripted opening costs an
+--- experienced player nothing -- it is three ordinary tickets in a sane order.
+function Progression:crewNeedsFirstShift(crew: any): boolean
+	for player in crew.seats do
+		local profile = self.profiles[player]
+		if profile ~= nil and (profile.rounds or 0) == 0 then
+			return true
+		end
+	end
+	return false
+end
+
 function Progression:crewQualifiesForAssist(crew: any): boolean
 	local total, n = 0, 0
 	local rounds = 0

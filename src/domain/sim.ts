@@ -75,6 +75,23 @@ export interface DirectorKnobs {
    * leaderboard integrity in the port ("bots take a cut"). 1 = off.
    */
   botServeValueMul: number;
+  /**
+   * Recipe ids to issue, in order, before the board goes back to picking at
+   * random. Onboarding uses it to guarantee a first shift that teaches the
+   * loop in the right order: chop → plate → serve, then cook, then a second
+   * chop with more on the plate.
+   *
+   * A random board cannot teach. A brand-new player's first ticket used to be
+   * whatever the dice said, so roughly half of them opened on Bacon Roll and
+   * met the pan — the least discoverable station in the kitchen — before they
+   * had ever chopped anything or carried a plate.
+   *
+   * Empty (the default) skips the branch entirely, so an unscripted board
+   * draws bit-identically to before this existed.
+   */
+  scriptedRecipes: string[];
+  /** How far through `scriptedRecipes` the board has got. */
+  scriptedIndex: number;
 }
 
 export const DEFAULT_DIRECTOR: DirectorKnobs = {
@@ -85,6 +102,8 @@ export const DEFAULT_DIRECTOR: DirectorKnobs = {
   burnTimeMul: 1,
   recipeDepthCap: Infinity,
   botServeValueMul: 1,
+  scriptedRecipes: [],
+  scriptedIndex: 0,
 };
 
 // ------------------------------------------------------------------- state
@@ -127,6 +146,24 @@ export const SIM_DT = 1 / SIM_HZ;
 export interface SimOptions {
   seed?: number;
   botCount?: number;
+  /**
+   * Director knobs applied BEFORE the opening tickets are seeded.
+   *
+   * This has to be a construction option, not a post-hoc assignment: createSim
+   * seeds two tickets immediately (see seedOrders), so a caller that sets
+   * `sim.director` afterwards has already missed the only two tickets a new
+   * player is guaranteed to see.
+   */
+  director?: Partial<DirectorKnobs>;
+}
+
+function buildDirector(over?: Partial<DirectorKnobs>): DirectorKnobs {
+  const d: DirectorKnobs = { ...DEFAULT_DIRECTOR, ...(over ?? {}) };
+  // Always a FRESH array: DEFAULT_DIRECTOR's is shared by reference through
+  // the spread, so two sims would otherwise consume one another's script.
+  d.scriptedRecipes = (over?.scriptedRecipes ?? []).slice();
+  d.scriptedIndex = over?.scriptedIndex ?? 0;
+  return d;
 }
 
 export function createSim(opts: SimOptions = {}): SimState {
@@ -202,7 +239,7 @@ export function createSim(opts: SimOptions = {}): SimState {
     heat: 0,
     rand,
     nextId: 1,
-    director: { ...DEFAULT_DIRECTOR },
+    director: buildDirector(opts.director),
     stepAccum: chefs.map(() => 0),
     contactLock: filled(chefs.length * chefs.length, 0),
   };
@@ -1599,6 +1636,18 @@ function updateStations(s: SimState, dt: number) {
 // --------------------------------------------------------------- orders
 
 function pickRecipe(s: SimState): Recipe {
+  // A scripted opening runs before anything else, and deliberately does NOT
+  // draw from rand(): the sequence is fixed, so spending a draw on it would
+  // desync an otherwise identical seeded replay.
+  const script = s.director.scriptedRecipes;
+  if (s.director.scriptedIndex < script.length) {
+    const wanted = script[s.director.scriptedIndex];
+    s.director.scriptedIndex += 1;
+    for (const r of RECIPES) {
+      if (r.id === wanted) return r;
+    }
+    // Unknown id: fall through and pick normally rather than crash a round.
+  }
   // Unlock deeper recipes as heat rises so minute one is always fair.
     const unlocked = Math.max(2, Math.min(RECIPES.length, 2 + Math.floor(s.heat * (RECIPES.length - 2) + 0.5)));
   // Assist gating (DirectorKnobs.recipeDepthCap): while a crew is learning,

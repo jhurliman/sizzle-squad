@@ -143,6 +143,11 @@ function FirstShift:update(state: any, flags: number): number?
 
 	if working then
 		tip = "Working! Stay put — or press again to stop."
+	elseif tier == 2 and held ~= nil and held.dirty then
+		-- Washing is the one step nobody discovers on their own, because a
+		-- dirty plate looks like a plate.
+		tip = "That plate's dirty — take it to the sink and press to wash it."
+		target = nearest(state, stationOfKind("sink"))
 	elseif tier == 2 then
 		-- Holding a plate.
 		if panId ~= nil then

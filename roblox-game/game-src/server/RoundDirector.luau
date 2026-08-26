@@ -22,6 +22,7 @@ function RoundDirector.new(
 		assistFn: (() -> boolean)?,
 		onRoundEnd: ((any) -> ())?,
 		onRoundStart: ((number) -> ())?,
+		firstShiftFn: (() -> boolean)?,
 	}
 )
 	local self = setmetatable({}, RoundDirector)
@@ -41,6 +42,10 @@ function RoundDirector.new(
 	end
 	self.onRoundEnd = opts.onRoundEnd
 	self.onRoundStart = opts.onRoundStart
+	-- firstShiftFn: is anyone here about to work their first ever shift?
+	self.firstShiftFn = opts.firstShiftFn or function()
+		return false
+	end
 
 	self.phase = "countdown" :: Phase
 	self.timer = 0 -- lobbies do not run a clock; only `results` does
@@ -114,7 +119,16 @@ end
 
 function RoundDirector:startRound()
 	self.round += 1
-	self.simService:reset(self.seedFn())
+	-- A scripted opening for a brand-new chef: chop -> plate -> serve, then
+	-- the pan, then a bigger chop. A random board cannot teach an order of
+	-- operations, and at heat 0 only the first two recipes are unlocked, so
+	-- roughly half of all first tickets were the same salad and the pan --
+	-- the least discoverable station in the kitchen -- might not appear at
+	-- all. Passed at CONSTRUCTION because createSim seeds two tickets on the
+	-- spot; setting the knob afterwards misses exactly the tickets that
+	-- matter most.
+	local script = if self.firstShiftFn() then { "salad", "baconroll", "chopped" } else nil
+	self.simService:reset(self.seedFn(), if script ~= nil then { scriptedRecipes = script } else nil)
 	self.replicator:resetCaches()
 	self.crew:reseat()
 	self:applyPacing()

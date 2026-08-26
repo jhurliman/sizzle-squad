@@ -74,10 +74,17 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   routes to a board, `cooked` to a stove, `raw` straight to a plate — so it
   keeps working if an ingredient is added. Brand-new chefs also start wearing
   the Paper Hat they already own.
-  Not done: the plan's *scripted* first three tickets (that needs the shared
-  order director, which the web game shares), and the demonstrating sous-chef
-  (moot with bots off). Still auto-starts a first-ever player's round from
-  `Menu:maybeAutoStart` rather than owning that trigger itself.
+  **The first three tickets are now scripted** — salad (chop → plate → serve),
+  then Bacon Roll (the pan), then Chopped Salad — via
+  `DirectorKnobs.scriptedRecipes`, passed at sim CONSTRUCTION because createSim
+  seeds two tickets immediately. This bypasses the heat-0 recipe unlock on
+  purpose: only the first two recipes are unlocked at heat 0, so the pan (the
+  least discoverable station) could otherwise never appear in a first shift.
+  Holding a dirty plate now points at the sink, which was the other step
+  nobody discovers alone.
+  Not done: the demonstrating sous-chef (moot with bots off). Still auto-starts
+  a first-ever player's round from `Menu:maybeAutoStart` rather than owning
+  that trigger itself.
 - 🟢 **Late-join hold live**: joiners with <15s left spectate with a notice
   and seat at the next phase change.
 - 🟢 **Solo pacing is human-validated** in live Roblox. Duo/trio/quad pacing

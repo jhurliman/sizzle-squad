@@ -399,6 +399,52 @@ prof.coins = 999999
 prog:shopAction(playerA, { action = "buy", id = "hat_halo" })
 check(prof.owned.hat_halo ~= true, "a pass-exclusive hat cannot be bought with coins")
 
+-- ==========================================================================
+-- The scripted opening. A brand-new chef must meet the kitchen in a teachable
+-- order -- chop, then the pan, then a bigger chop -- rather than whatever the
+-- dice hand them, which opened roughly half of first shifts on the pan.
+-- ==========================================================================
+
+-- At CONSTRUCTION: createSim seeds two tickets immediately, so a script set
+-- afterwards would miss the first two -- which is the whole point of it.
+local scripted = shared.createSim({
+	seed = 99,
+	botCount = 0,
+	director = { scriptedRecipes = { "salad", "baconroll", "chopped" } },
+})
+local issued = {}
+local seenOrder = {}
+local ticks = 0
+while #issued < 3 and ticks < 60 * 200 do
+	shared.step(scripted, {})
+	scripted.events = {}
+	for _, o in scripted.orders do
+		if not seenOrder[o.id] then
+			seenOrder[o.id] = true
+			table.insert(issued, o.recipe.id)
+		end
+	end
+	ticks += 1
+end
+check(issued[1] == "salad", `first ticket is the salad ({issued[1]})`)
+check(issued[2] == "baconroll", `second ticket teaches the pan ({issued[2]})`)
+check(issued[3] == "chopped", `third ticket is the bigger chop ({issued[3]})`)
+
+-- An unscripted board must be untouched by any of this.
+local plain = shared.createSim({ seed = 99, botCount = 0 })
+local plainFirst = nil
+ticks = 0
+while plainFirst == nil and ticks < 60 * 200 do
+	shared.step(plain, {})
+	plain.events = {}
+	if #plain.orders > 0 then
+		plainFirst = plain.orders[1].recipe.id
+	end
+	ticks += 1
+end
+check(plainFirst ~= nil, `an unscripted board still issues tickets ({plainFirst})`)
+check(#plain.director.scriptedRecipes == 0, "the default board carries no script")
+
 print(if failures > 0 then `{failures} FAILURES` else "PASS: equip slots")
 if failures > 0 then
 	error(`{failures} checks failed`)

@@ -63,9 +63,12 @@ function SimService.new(shared: any, opts: { seed: number, chefCount: number?, b
 	return self
 end
 
-function SimService:reset(seed: number)
+--- `director` is applied at CONSTRUCTION, not after: createSim seeds the
+--- opening two tickets immediately, so a knob set afterwards has already
+--- missed them.
+function SimService:reset(seed: number, director: any?)
 	local shared = self.shared
-	self.sim = shared.createSim({ seed = seed, botCount = self.chefCount - 1 })
+	self.sim = shared.createSim({ seed = seed, botCount = self.chefCount - 1, director = director })
 	shared.seedPans(self.sim)
 	for _, chef in self.sim.chefs do
 		chef.isPlayer = false

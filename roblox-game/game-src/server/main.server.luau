@@ -47,6 +47,9 @@ local director = RoundDirector.new(shared, Config, simService, crew, replicator,
 	assistFn = function()
 		return progression:crewQualifiesForAssist(crew)
 	end,
+	firstShiftFn = function()
+		return progression:crewNeedsFirstShift(crew)
+	end,
 	onRoundEnd = function(results)
 		progression:awardRound(crew, results)
 		badges:onRoundEnd(crew, progression, results)
