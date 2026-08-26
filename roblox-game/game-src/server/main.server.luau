@@ -168,6 +168,9 @@ monetization.onGrant = function(player, itemIds)
 	progression:push(player)
 	queueEquips()
 end
+badges.onAward = function(player, key)
+	progression:markBadge(player, key)
+end
 progression.onLevelUp = function(player, level)
 	analytics:levelUp(player, level)
 end
@@ -257,6 +260,7 @@ Players.PlayerAdded:Connect(function(player)
 	progression:playerAdded(player)
 	monetization:playerAdded(player)
 	analytics:playerAdded(player, progression.profiles[player])
+	badges:backfill(player)
 	if director.phase == "round" and roundRemaining() < Config.LATE_JOIN_CUTOFF then
 		pendingJoins[player] = true
 		remotes.Snapshot:FireClient(player, replicator:snapshotFor(simService.sim))

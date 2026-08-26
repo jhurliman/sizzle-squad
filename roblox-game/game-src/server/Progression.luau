@@ -79,6 +79,10 @@ local function defaultProfile(): any
 		-- player equips one (playtest: paper hat on top of built-in hats = jank)
 		equipped = {},
 		daily = { day = "", progress = {}, claimed = {} },
+		-- Earned badges, mirrored from BadgeService so the game can show a
+		-- badge case of its own; Roblox's profile page is otherwise the only
+		-- place they ever appear.
+		badges = {},
 		streak = { lastDay = "", count = 0, graceUsedWeek = "" },
 	}
 end
@@ -232,6 +236,7 @@ function Progression:push(player: any)
 		-- Only present on the push that follows a round award.
 		award = self.lastAward[player],
 		sessions = profile.sessions or 1,
+		badges = profile.badges or {},
 		-- The client used to infer species from EquipDeltas.skin; send it.
 		species = profile.species,
 	})
@@ -476,6 +481,22 @@ function Progression:equipSet(player: any, profile: any, set: any)
 			end
 		end
 	end
+	self.dirty[player] = true
+	self:push(player)
+end
+
+--- Record a badge the server just granted (or found the player already owns),
+--- so the Career tab can show it without asking BadgeService per frame.
+function Progression:markBadge(player: any, key: string)
+	local profile = self.profiles[player]
+	if profile == nil then
+		return
+	end
+	profile.badges = profile.badges or {}
+	if profile.badges[key] then
+		return
+	end
+	profile.badges[key] = true
 	self.dirty[player] = true
 	self:push(player)
 end

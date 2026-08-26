@@ -6,6 +6,8 @@
 -- FRIENDS button that main.client.luau was building by hand.
 
 local Theme = require(script.Parent.Theme) :: any
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local BadgeDefs = require(ReplicatedStorage:WaitForChild("Game"):WaitForChild("BadgeDefs")) :: any
 
 local CareerTab = {}
 CareerTab.__index = CareerTab
@@ -124,6 +126,7 @@ function CareerTab:setProgress(progress: any)
 	self.xpLabel.Text = `{xp} / {toNext} XP to level {level + 1}`
 	self:renderGoals(progress)
 	self:renderMilestones(progress)
+	self:renderBadges(progress)
 end
 
 function CareerTab:renderGoals(progress: any)
@@ -235,6 +238,66 @@ function CareerTab:renderMilestones(progress: any)
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			ZIndex = 5,
 			Text = if item ~= nil then item.name else id,
+		}, row)
+	end
+end
+
+--- The badge case.
+---
+--- Badges are awarded by BadgeService and shown on Roblox's own profile page,
+--- which is somewhere nobody looks mid-session. The server mirrors each award
+--- into the profile so they can live here too, next to the thing that earned
+--- them. Locked ones stay visible on purpose: an achievement you cannot see is
+--- not a goal.
+function CareerTab:renderBadges(progress: any)
+	local earned = progress.badges or {}
+	local total = 0
+	for _, d in BadgeDefs.list do
+		if earned[d.key] then
+			total += 1
+		end
+	end
+	sectionTitle(self.right, 100, `BADGES  ({total}/{#BadgeDefs.list})`)
+	for i, d in BadgeDefs.list do
+		local got = earned[d.key] == true
+		local row = mk("Frame", {
+			Size = UDim2.new(1, -10, 0, 42),
+			BackgroundColor3 = if got then Theme.GOLD else Theme.BROWN_LIGHT,
+			BackgroundTransparency = if got then 0.55 else 0.45,
+			BorderSizePixel = 0,
+			LayoutOrder = 100 + i,
+			ZIndex = 4,
+		}, self.right)
+		Theme.corner(row, 8)
+		Theme.label({
+			Size = UDim2.fromOffset(40, 42),
+			Position = UDim2.fromOffset(8, 0),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextSize = 20,
+			-- Locked badges keep their icon but lose their colour, so the case
+			-- reads as "these exist and you have not got them yet".
+			TextTransparency = if got then 0 else 0.55,
+			ZIndex = 5,
+			Text = d.icon,
+		}, row)
+		Theme.label({
+			Size = UDim2.new(1, -60, 0, 20),
+			Position = UDim2.fromOffset(52, 2),
+			TextSize = 14,
+			Font = Theme.BOLD_FONT,
+			TextColor3 = if got then Theme.CREAM else Theme.DIM,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			ZIndex = 5,
+			Text = d.name,
+		}, row)
+		Theme.label({
+			Size = UDim2.new(1, -60, 0, 18),
+			Position = UDim2.fromOffset(52, 21),
+			TextSize = 11,
+			TextColor3 = Theme.DIM,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			ZIndex = 5,
+			Text = d.blurb,
 		}, row)
 	end
 end

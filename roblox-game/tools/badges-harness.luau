@@ -91,6 +91,23 @@ for _ = 1, 5 do
 end
 check(countOf("firstDish") == 1, `five qualifying shifts award First Dish once ({countOf("firstDish")})`)
 
+-- ---- mirroring into the profile ---------------------------------------
+-- The in-game badge case is driven by onAward, not by BadgeService, so the
+-- callback contract is what actually has to hold.
+awarded = {}
+local mirrored = {}
+b = Badges.new(Config, fake)
+b.onAward = function(_player, key)
+	table.insert(mirrored, key)
+end
+b:onRoundEnd(crewOf(4), progressionWith({ totalDishes = 1200, level = 11 }),
+	{ stars = 3, missed = 0, served = 12, stats = { [0] = { serves = 12 } } })
+local function mirroredHas(key: string): boolean
+	return table.find(mirrored, key) ~= nil
+end
+check(mirroredHas("firstDish") and mirroredHas("fullHumanCrewThreeStar"), "every award is mirrored to the profile")
+check(#mirrored == #awarded, `one mirror per award ({#mirrored} vs {#awarded})`)
+
 -- ---- Founding Chef window ---------------------------------------------
 awarded = {}
 b = Badges.new(Config, fake)

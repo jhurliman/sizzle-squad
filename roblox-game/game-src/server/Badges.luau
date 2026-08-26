@@ -44,6 +44,52 @@ function Badges:playerRemoving(player: any)
 	self.granted[player] = nil
 end
 
+--- Backfill what a player already owns.
+---
+--- Without this, anyone who earned a badge before the game started mirroring
+--- them sees an empty case forever -- the award only fires on the transition,
+--- and Roblox will never re-fire it. One batched call on join, not per badge.
+function Badges:backfill(player: any)
+	if self.service == nil then
+		return
+	end
+	local keys, ids = {}, {}
+	for key, id in Badges.IDS do
+		if id ~= 0 then
+			table.insert(keys, key)
+			table.insert(ids, id)
+		end
+	end
+	if #ids == 0 then
+		return
+	end
+	task.spawn(function()
+		local ok, owned = pcall(function()
+			return self.service:CheckUserBadgesAsync(player.UserId, ids)
+		end)
+		if not ok or owned == nil then
+			return
+		end
+		local has = {}
+		for _, id in owned do
+			has[id] = true
+		end
+		local seen = self.granted[player]
+		if seen == nil then
+			seen = {}
+			self.granted[player] = seen
+		end
+		for i, key in keys do
+			if has[ids[i]] then
+				seen[key] = true -- already owned: never re-award
+				if self.onAward ~= nil then
+					self.onAward(player, key)
+				end
+			end
+		end
+	end)
+end
+
 --- Is the launch-window badge still earnable?
 function Badges:foundingOpen(): boolean
 	local until_ = self.config ~= nil and self.config.FOUNDING_CHEF_UNTIL or nil
@@ -67,6 +113,10 @@ function Badges:award(player: any, key: string)
 		return -- already handed out this session
 	end
 	seen[key] = true
+	-- Mirror it into the profile so the game has a badge case of its own.
+	if self.onAward ~= nil then
+		self.onAward(player, key)
+	end
 	task.spawn(function()
 		pcall(function()
 			self.service:AwardBadge(player.UserId, id)
