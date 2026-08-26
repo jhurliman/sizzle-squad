@@ -100,7 +100,10 @@ local KNEE_FLOOR = 0.1 -- a walking leg is never dead straight
 local KNEE_LIFT = 1.34 -- "a taller lift over a briefer window — a flick, not a shuffle"
 local KNEE_FRONT = 0.5 -- the LEADING knee is bent; two straight legs at full split is the splits
 local KNEE_CAP = 1.7 -- past this the shin folds through the thigh
-local ANKLE_FOLLOW = 0.55 -- ankle counter-rotates 55% of the chain, so the sole stays flat
+local ANKLE_FOLLOW = 0.55
+-- How far INSIDE the shoe a trimmed shin should end, in studs. Enough that
+-- articulation cannot expose it, small enough that no gap opens at the ankle.
+local SHIN_INSET = 0.3 -- ankle counter-rotates 55% of the chain, so the sole stays flat
 local TOE_OFF = 0.62 -- the trailing foot is plantar-flexed hard; half of what says "moving"
 local HEEL_STRIKE = 0.2 -- the leading foot presents its sole on landing
 local BANK_LIMIT = 0.5 -- 29 degrees. A chef leaning further than this is a motorcycle.
@@ -432,14 +435,15 @@ function ChefVisuals:ensure(id: number, skin: string): any
 				thigh, shin = pb, pa
 			end
 			local knee = thigh:Lerp(shin, 0.5)
-			local ankle = shin + (shin - knee)
+			local ankleRaw = shin + (shin - knee)
+			local ankle = ankleRaw
 			entry.kneeAt[name] = knee
 			entry.ankleAt[name] = ankle
 			-- Everything below the knee rides the shin; everything below the
 			-- midpoint of shin-centre-to-ankle is foot. That cut keeps
 			-- bramble's boot cuff on the shin (it sits at the ankle, not on
 			-- it) while taking all four paw spheres with the foot.
-			local footCut = (ankle.Y + shin.Y) / 2
+			local footCut = (ankleRaw.Y + shin.Y) / 2
 			for _, i in idx do
 				local y = entry.animParts[i].CFrame.Y
 				local seg = if y >= knee.Y then 0 elseif y >= footCut then 1 else 2
@@ -450,7 +454,40 @@ function ChefVisuals:ensure(id: number, skin: string): any
 				end
 				entry.animSeg[i] = seg
 			end
-			-- The chain, as offsets, so :update can answer "how far off the
+			-- TRIM THE SHIN BACK INTO THE SHOE.
+			--
+			-- Some rigs author the shin all the way down to the sole plane --
+			-- bramble's ends at y 0.05 against a sole at 0.06 -- so the moment
+			-- the foot tilts, the tip emerges from under the shoe. Reported
+			-- from play as legs poking through the bottom of his shoes.
+			--
+			-- No amount of pivot or ankle tuning fixes that, and both were
+			-- measured: dropping the pivot to the tip made it WORSE (0.19 ->
+			-- 0.27 studs, because the sole then swings further off it), and
+			-- ANKLE_FOLLOW moves it by hundredths, non-monotonically. It is
+			-- geometry, not animation.
+			--
+			-- So shorten the shin from the bottom, keeping its top at the knee.
+			-- The length removed is inside the shoe at every pose, so nothing
+			-- visible is lost.
+			local footBottom = math.huge
+			for _, i in idx do
+				if entry.animSeg[i] == 2 then
+					local p = entry.animParts[i]
+					footBottom = math.min(footBottom, p.CFrame.Position.Y - halfY(p))
+				end
+			end
+			if footBottom < math.huge then
+				local sp = entry.animParts[shinI]
+				local want = footBottom + SHIN_INSET
+				local over = want - (sp.CFrame.Position.Y - halfY(sp))
+				if over > 0 then
+					local trimmed = math.min(over, sp.Size.Y * 0.4)
+					sp.Size = Vector3.new(sp.Size.X, sp.Size.Y - trimmed, sp.Size.Z)
+					sp.CFrame = sp.CFrame * CFrame.new(0, trimmed / 2, 0)
+					entry.animBind[shinI] = sp.CFrame
+				end
+			end			-- The chain, as offsets, so :update can answer "how far off the
 			-- floor is this sole" in six multiplies (see `footRise`). Only Y
 			-- and Z matter: every joint here rotates about X.
 			--
