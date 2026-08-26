@@ -31,6 +31,11 @@ ChefVisuals.__index = ChefVisuals
 
 local SCALE = 5
 local CHEF_HEIGHT = 0.72 * SCALE
+
+-- How far a carried item sits beyond the torso's own front face, in studs.
+-- Enough that it reads as held rather than embedded, small enough that it
+-- stays against the chef.
+local CARRY_CLEARANCE = 0.45
 local MAX_SPEED = 6.2
 local HatFits = require(script.Parent.HatFits) :: any
 
@@ -243,6 +248,9 @@ function ChefVisuals:ensure(id: number, skin: string): any
 		-- the hat ends up floating in front of the face.
 		local skull: BasePart? = nil
 		local skullVolume = 0
+		-- Where a carried item belongs, measured off THIS rig rather than
+		-- guessed from its height. See entry.carryAnchor below.
+		local torsoFront, armY, armN = -math.huge, 0, 0
 		for _, group in model:GetChildren() do
 			if group:IsA("Model") then
 				local joint = group:GetAttribute("Joint")
@@ -258,6 +266,13 @@ function ChefVisuals:ensure(id: number, skin: string): any
 						table.insert(entry.animSeg, 0)
 						table.insert(entry.animMouth, false)
 						rigTop = math.max(rigTop, p.CFrame.Y + p.Size.Y / 2)
+						local gname = group.Name
+						if gname == "Torso" or gname == "Hips" then
+							torsoFront = math.max(torsoFront, p.CFrame.Z + math.max(p.Size.X, p.Size.Y, p.Size.Z) / 2)
+						elseif gname == "ArmL" or gname == "ArmR" then
+							armY += p.CFrame.Y
+							armN += 1
+						end
 						local slot = legIdx[group.Name]
 						if slot ~= nil then
 							table.insert(slot, #entry.animParts)
@@ -359,6 +374,22 @@ function ChefVisuals:ensure(id: number, skin: string): any
 
 		entry.headAnchor = skull
 		entry.rigHeight = math.max(rigTop, CHEF_HEIGHT)
+
+		-- WHERE A CARRIED ITEM SITS, MEASURED, NOT SCALED FROM HEIGHT.
+		--
+		-- It used to be (0, h * 0.52, h * 0.38) off the rig height, which put
+		-- the item 3.5-4.0 studs in front of a chef whose torso front face is
+		-- only 1.6-2.0 studs out — so a tomato floated a whole body-depth clear
+		-- of the bird holding it, and no single constant could fix that,
+		-- because height does not predict body depth (pip is the tallest rig
+		-- and one of the shallowest).
+		--
+		-- No per-species table needed: the rig knows. Sit it just proud of the
+		-- torso's own front face, at the mean height of the arms, and every
+		-- species is right by construction — including any rig captured later.
+		local frontOf = if torsoFront > -math.huge then torsoFront else entry.rigHeight * 0.2
+		local handsAt = if armN > 0 then armY / armN else entry.rigHeight * 0.55
+		entry.carryAnchor = Vector3.new(0, handsAt, frontOf + CARRY_CLEARANCE)
 		if skull ~= nil then
 			entry.headAttach = Vector3.new(skull.CFrame.X, math.max(headTop - 0.25, skull.CFrame.Y + skull.Size.Y * 0.3), skull.CFrame.Z)
 			-- hats fit the SKULL, not the body: pip is tall but small-headed
@@ -1014,11 +1045,8 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 		entry.carryModel = item
 	end
 	if entry.carryModel ~= nil then
-		-- chest height on the MEASURED rig (the species stand ~1.0 world unit
-		-- tall, not the sim's 0.72 collision height — using the constant put
-		-- items at the hips)
-		local h = entry.rigHeight
-		entry.carryModel:PivotTo(baseCF * CFrame.new(0, h * 0.52, h * 0.38))
+		local a = entry.carryAnchor or Vector3.new(0, entry.rigHeight * 0.52, entry.rigHeight * 0.28)
+		entry.carryModel:PivotTo(baseCF * CFrame.new(a))
 	end
 end
 
