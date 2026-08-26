@@ -5,19 +5,13 @@
 -- or 3 rounds. The rules read the client's mirrored state each tick and pick
 -- the single most relevant next step.
 
+local Theme = require(script.Parent.Menu.Theme) :: any
+
 local FirstShift = {}
 FirstShift.__index = FirstShift
 
-local function mk(class: string, props: { [string]: any }, parent: Instance?): any
-	local inst = Instance.new(class) :: any
-	for k, v in props do
-		inst[k] = v
-	end
-	if parent ~= nil then
-		inst.Parent = parent
-	end
-	return inst
-end
+-- Shared with the HUD and every menu surface.
+local mk = Theme.mk
 
 function FirstShift.new(gui: Instance)
 	local self = setmetatable({}, FirstShift)

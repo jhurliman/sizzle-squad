@@ -92,6 +92,23 @@ function Sfx.new()
 	return self
 end
 
+--- Serve-bell cosmetics. There is no separate bell upload, so the variant is
+--- a playback-rate shift on the existing serve chime: audible, honest, and it
+--- needs no asset, no replication and no election (it is LOCAL audio -- only
+--- the owner hears their own bell, so two players can never conflict).
+local BELL_RATE: { [string]: number } = { deep = 0.75, chime = 1.35 }
+
+function Sfx:setKitchen(catalog: any, equippedKitchenId: string?)
+	self.bellRate = nil
+	if equippedKitchenId == nil then
+		return
+	end
+	local item = catalog.byId[equippedKitchenId]
+	if item ~= nil and item.slot == "bell" and item.variant ~= nil then
+		self.bellRate = BELL_RATE[item.variant]
+	end
+end
+
 function Sfx:handle(ev: any)
 	local spec = SPEC[ev.t]
 	if spec == nil then
@@ -129,6 +146,10 @@ function Sfx:handle(ev: any)
 	local clone = template:Clone()
 	clone.Volume = spec.volume
 	clone.PlaybackSpeed = 1 + (math.random() * 2 - 1) * spec.jitter
+	-- equipped serve bell retunes the serve chime
+	if ev.t == "serve" and self.bellRate ~= nil then
+		clone.PlaybackSpeed *= self.bellRate
+	end
 	-- wallHit scales with impact speed, like the web game
 	if ev.t == "wallHit" and ev.speed ~= nil then
 		clone.Volume = spec.volume * math.clamp(ev.speed / 6, 0.2, 1)

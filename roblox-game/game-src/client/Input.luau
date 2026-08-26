@@ -27,6 +27,9 @@ function Input.new()
 		if processed then
 			return
 		end
+		if not self.enabled then
+			return
+		end
 		if input.KeyCode == Enum.KeyCode.Left then
 			self.arrowX = -1
 		elseif input.KeyCode == Enum.KeyCode.Right then
@@ -53,7 +56,9 @@ function Input.new()
 		end
 	end)
 
-	ContextActionService:BindAction(ACTION, function(_, state)
+	self.enabled = true
+	-- Kept on the instance so setEnabled can rebind the very same handler.
+	self.actionHandler = function(_, state)
 		if state == Enum.UserInputState.Begin then
 			self.grabQueued = true
 			self.useHeld = true
@@ -61,7 +66,8 @@ function Input.new()
 			self.useHeld = false
 		end
 		return Enum.ContextActionResult.Sink
-	end, true, Enum.KeyCode.E, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
+	end
+	ContextActionService:BindAction(ACTION, self.actionHandler, true, Enum.KeyCode.E, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
 	if UserInputService.TouchEnabled then
 		-- Roblox's default touch JUMP button (dark circle, up arrow) sits in
 		-- the bottom-right thumb spot and our action button landed on top of
@@ -114,10 +120,52 @@ function Input:setVerb(action: string)
 	end)
 end
 
+--- Suspend/resume gameplay input while a full-screen menu is up.
+---
+--- One switch covers three problems at once: the chef walking blind behind the
+--- panel, the touch thumbstick fighting drag-to-rotate in the wardrobe
+--- viewport, and stray E/Space presses landing as grabs. Disabling the
+--- ControlModule also HIDES the thumbstick, and unbinding the action removes
+--- the touch action button, so the screen visibly clears too.
+function Input:setEnabled(on: boolean)
+	if self.enabled == on then
+		return
+	end
+	self.enabled = on
+	if self.controlModule ~= nil then
+		pcall(function()
+			if on then
+				self.controlModule:Enable()
+			else
+				self.controlModule:Disable()
+			end
+		end)
+	end
+	if on then
+		ContextActionService:BindAction(ACTION, self.actionHandler, true, Enum.KeyCode.E, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
+		if UserInputService.TouchEnabled then
+			ContextActionService:SetPosition(ACTION, UDim2.new(1, -104, 1, -124))
+			pcall(function()
+				ContextActionService:GetButton(ACTION).Size = UDim2.fromOffset(88, 88)
+			end)
+		end
+		self:setVerb("none")
+	else
+		ContextActionService:UnbindAction(ACTION)
+		-- Drop any half-finished press so closing the menu cannot fire a grab.
+		self.grabQueued = false
+		self.useHeld = false
+		self.arrowX = 0
+	end
+end
+
 --- Kitchen-space move vector. Camera faces -Z, so screen-up is kitchen -y:
 --- world X -> kitchen x, world Z -> kitchen y, no rotation needed.
 function Input:move(): { x: number, y: number }
 	local mv = Vector3.zero
+	if not self.enabled then
+		return { x = 0, y = 0 }
+	end
 	if self.controlModule ~= nil then
 		local ok, v = pcall(function()
 			return self.controlModule:GetMoveVector()

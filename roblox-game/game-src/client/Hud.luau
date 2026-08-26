@@ -1,12 +1,17 @@
 --!strict
--- HUD: round timer, coins/combo, patience, order tickets (BillboardGuis over
--- the serve counters), focus highlight + verb chip, phase overlays
--- (countdown card / results ceremony / intermission with ready-up + shop),
--- and the emote wheel. Icons are vector/text placeholders until the icon
--- spritesheet is uploaded (Open Cloud — user-gated).
+-- HUD: strictly the IN-ROUND surface -- round timer, coins/combo, patience,
+-- the order ticket queue, phase overlays (countdown card / results ceremony),
+-- the spectate notice, toasts and floating world labels.
+--
+-- Everything meta (shop, species picking, daily goals, ready-up, the career
+-- strip, leaderboards, invites) moved to client/Menu. This file used to hold
+-- half of that and main.client.luau built the other half and reparented it in
+-- here, which is why neither was findable.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+
+local Theme = require(script.Parent.Menu.Theme) :: any
 
 local Hud = {}
 Hud.__index = Hud
@@ -26,16 +31,8 @@ local TICKET_PAD = 6
 -- vertical space kept clear at the bottom for the action button + margin
 local TICKET_RESERVE = 210
 
-local function mk(class: string, props: { [string]: any }, parent: Instance?): any
-	local inst = Instance.new(class) :: any
-	for k, v in props do
-		inst[k] = v
-	end
-	if parent ~= nil then
-		inst.Parent = parent
-	end
-	return inst
-end
+-- Shared with every menu surface (this was three copies of the same helper).
+local mk = Theme.mk
 
 function Hud.new(catalog: any)
 	local self = setmetatable({}, Hud)
@@ -112,45 +109,6 @@ function Hud.new(catalog: any)
 		Text = "",
 	}, self.overlay)
 
-	-- ready button (intermission)
-	self.readyButton = mk("TextButton", {
-		Size = UDim2.fromOffset(220, 56),
-		Position = UDim2.new(0.5, -110, 0.72, 0),
-		BackgroundColor3 = Color3.fromRGB(92, 174, 64),
-		TextColor3 = Color3.new(1, 1, 1),
-		TextSize = 28,
-		Font = Enum.Font.FredokaOne,
-		Text = "READY!",
-		Visible = false,
-	}, gui)
-	mk("UICorner", { CornerRadius = UDim.new(0, 16) }, self.readyButton)
-
-	-- shop panel (intermission, toggled)
-	self.shopButton = mk("TextButton", {
-		Size = UDim2.fromOffset(120, 40),
-		Position = UDim2.new(0.5, -60, 0.82, 0),
-		BackgroundColor3 = Color3.fromRGB(204, 75, 66),
-		TextColor3 = Color3.new(1, 1, 1),
-		TextSize = 20,
-		Font = Enum.Font.FredokaOne,
-		Text = "SHOP",
-		Visible = false,
-	}, gui)
-	mk("UICorner", { CornerRadius = UDim.new(0, 12) }, self.shopButton)
-	self.shopPanel = self:buildShop(gui)
-
-	-- progression strip (bottom left)
-	self.progressLabel = mk("TextLabel", {
-		Size = UDim2.fromOffset(260, 30),
-		Position = UDim2.new(0, 12, 1, -42),
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(255, 244, 221),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextSize = 18,
-		Font = Enum.Font.GothamBold,
-		Text = "",
-	}, gui)
-
 	-- screen-space ticket rail, top center under the timer (world billboards
 	-- proved unframeable across aspect ratios — the camera never saw them)
 	-- ORDERS LIVE ON THE RIGHT EDGE, NOT ACROSS THE TOP.
@@ -178,69 +136,6 @@ function Hud.new(catalog: any)
 	}, self.ticketRail)
 	self.tickets = {} :: { [number]: any }
 
-	-- species picker (countdown + intermission)
-	self.speciesRow = mk("Frame", {
-		Size = UDim2.fromOffset(4 * 96 + 24, 44),
-		Position = UDim2.new(0.5, -(4 * 96 + 24) / 2, 0.62, 0),
-		BackgroundTransparency = 1,
-		Visible = false,
-	}, gui)
-	mk("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		Padding = UDim.new(0, 8),
-	}, self.speciesRow)
-	self.speciesButtons = {} :: { [string]: any }
-	local SPECIES_LABELS = { { "bramble", "🐻 Bramble" }, { "pip", "🐸 Pip" }, { "nori", "🐱 Nori" }, { "mochi", "🐤 Mochi" } }
-	for _, def in SPECIES_LABELS do
-		local id, text = def[1], def[2]
-		local btn = mk("TextButton", {
-			Size = UDim2.fromOffset(96, 40),
-			BackgroundColor3 = Color3.fromRGB(58, 32, 19),
-			BackgroundTransparency = 0.2,
-			TextColor3 = Color3.fromRGB(255, 244, 221),
-			TextSize = 16,
-			Font = Enum.Font.FredokaOne,
-			Text = text,
-		}, self.speciesRow)
-		mk("UICorner", { CornerRadius = UDim.new(0, 10) }, btn)
-		self.speciesButtons[id] = btn
-	end
-
-	-- daily goals panel (intermission, left side)
-	self.dailiesPanel = mk("Frame", {
-		Size = UDim2.fromOffset(230, 150),
-		Position = UDim2.new(0, 12, 0, 64),
-		BackgroundColor3 = Color3.fromRGB(40, 24, 12),
-		BackgroundTransparency = 0.15,
-		Visible = false,
-	}, gui)
-	mk("UICorner", { CornerRadius = UDim.new(0, 12) }, self.dailiesPanel)
-	mk("TextLabel", {
-		Size = UDim2.new(1, 0, 0, 26),
-		BackgroundTransparency = 1,
-		TextColor3 = Color3.fromRGB(255, 224, 102),
-		TextSize = 16,
-		Font = Enum.Font.FredokaOne,
-		Text = "TODAY'S GOALS",
-	}, self.dailiesPanel)
-	self.dailyRows = {}
-	for i = 1, 3 do
-		local row = mk("TextLabel", {
-			Size = UDim2.new(1, -16, 0, 34),
-			Position = UDim2.new(0, 10, 0, 26 + (i - 1) * 38),
-			BackgroundTransparency = 1,
-			TextColor3 = Color3.fromRGB(255, 244, 221),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextSize = 14,
-			Font = Enum.Font.GothamMedium,
-			TextWrapped = true,
-			Text = "",
-		}, self.dailiesPanel)
-		self.dailyRows[i] = row
-	end
-	self.claimedDailies = {} :: { [string]: boolean }
-
 	-- spectator notice (late join during a round)
 	self.spectateLabel = mk("TextLabel", {
 		Size = UDim2.new(0, 320, 0, 30),
@@ -261,47 +156,8 @@ function Hud.new(catalog: any)
 	return self
 end
 
---- Wire the species buttons and highlight the current pick.
-function Hud:bindSpecies(onPick: (string) -> ())
-	for id, btn in self.speciesButtons do
-		btn.Activated:Connect(function()
-			onPick(id)
-		end)
-	end
-end
-
-function Hud:setSpecies(current: string?)
-	for id, btn in self.speciesButtons do
-		btn.BackgroundColor3 = if id == current then Color3.fromRGB(92, 174, 64) else Color3.fromRGB(58, 32, 19)
-	end
-end
-
 function Hud:setSpectating(on: boolean)
 	self.spectateLabel.Visible = on
-end
-
---- Daily goals rows + a toast when one completes.
-function Hud:updateDailies(dailies: { any }?)
-	if dailies == nil then
-		return
-	end
-	for i = 1, 3 do
-		local d = dailies[i]
-		local row = self.dailyRows[i]
-		if d == nil then
-			row.Text = ""
-		elseif d.claimed then
-			row.Text = `✅ {d.name}  (+{d.coins}c)`
-			row.TextColor3 = Color3.fromRGB(150, 210, 120)
-			if not self.claimedDailies[d.id] then
-				self.claimedDailies[d.id] = true
-				self:toast(`Daily complete: {d.name}  +{d.coins}c`)
-			end
-		else
-			row.Text = `▫️ {d.name}  ({math.min(d.progress, d.goal)}/{d.goal})`
-			row.TextColor3 = Color3.fromRGB(255, 244, 221)
-		end
-	end
 end
 
 function Hud:toast(text: string)
@@ -424,92 +280,10 @@ function Hud:updateOrders(orders: { any })
 	end
 end
 
--- ------------------------------------------------------------------- shop
-
-function Hud:buildShop(gui: any): any
-	local panel = mk("ScrollingFrame", {
-		Size = UDim2.fromOffset(360, 380),
-		Position = UDim2.new(0.5, -180, 0.5, -210),
-		BackgroundColor3 = Color3.fromRGB(40, 24, 12),
-		BackgroundTransparency = 0.05,
-		Visible = false,
-		CanvasSize = UDim2.fromOffset(0, 0),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 6,
-	}, gui)
-	mk("UICorner", { CornerRadius = UDim.new(0, 14) }, panel)
-	mk("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, panel)
-	self.shopRows = {}
-	for i, item in self.catalog.items do
-		local row = mk("Frame", {
-			Size = UDim2.new(1, -12, 0, 44),
-			BackgroundColor3 = Color3.fromRGB(66, 40, 22),
-			LayoutOrder = i,
-		}, panel)
-		mk("UICorner", { CornerRadius = UDim.new(0, 8) }, row)
-		mk("TextLabel", {
-			Size = UDim2.new(0.55, 0, 1, 0),
-			Position = UDim2.new(0, 10, 0, 0),
-			BackgroundTransparency = 1,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextColor3 = Color3.fromRGB(255, 244, 221),
-			TextSize = 16,
-			Font = Enum.Font.GothamBold,
-			Text = `{item.name}  ·  {item.kind}`,
-		}, row)
-		local btn = mk("TextButton", {
-			Size = UDim2.fromOffset(110, 32),
-			Position = UDim2.new(1, -120, 0.5, -16),
-			BackgroundColor3 = Color3.fromRGB(92, 174, 64),
-			TextColor3 = Color3.new(1, 1, 1),
-			TextSize = 16,
-			Font = Enum.Font.FredokaOne,
-			Text = `{item.cost}c`,
-		}, row)
-		mk("UICorner", { CornerRadius = UDim.new(0, 8) }, btn)
-		self.shopRows[item.id] = btn
-	end
-	return panel
-end
-
---- Refresh shop buttons against the replicated profile.
-function Hud:updateShop(progress: any, onAction: (string, string) -> ())
-	for id, btn in self.shopRows do
-		local item = self.catalog.byId[id]
-		local owned = progress.owned ~= nil and progress.owned[id] == true
-		local equipped = progress.equipped ~= nil and progress.equipped[item.kind] == id
-		if equipped then
-			btn.Text = "EQUIPPED"
-			btn.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
-		elseif owned then
-			btn.Text = "EQUIP"
-			btn.BackgroundColor3 = Color3.fromRGB(70, 130, 200)
-		elseif item.level ~= nil and (progress.level or 1) < item.level then
-			btn.Text = `Lv {item.level}`
-			btn.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
-		else
-			btn.Text = `{item.cost}c`
-			btn.BackgroundColor3 = Color3.fromRGB(92, 174, 64)
-		end
-		if btn:GetAttribute("wired") ~= true then
-			btn:SetAttribute("wired", true)
-			btn.Activated:Connect(function()
-				local o = progress.owned ~= nil and progress.owned[id] == true
-				onAction(if o then "equip" else "buy", id)
-			end)
-		end
-	end
-end
-
 -- ------------------------------------------------------------------ update
 
 function Hud:updatePhase(phase: any, cards: any?)
 	local p = phase.phase
-	self.readyButton.Visible = p == "intermission"
-	self.shopButton.Visible = p == "intermission"
-	self.shopPanel.Visible = self.shopPanel.Visible and p == "intermission"
-	self.speciesRow.Visible = p == "intermission" or p == "countdown"
-	self.dailiesPanel.Visible = p == "intermission"
 	if p == "countdown" then
 		self.overlay.Visible = true
 		if phase.waiting then
@@ -552,11 +326,6 @@ function Hud:updateTimer(remaining: number)
 	local m = math.floor(math.max(0, remaining) / 60)
 	local s = math.floor(math.max(0, remaining) % 60)
 	self.timerLabel.Text = string.format("%d:%02d", m, s)
-end
-
-function Hud:updateProgress(progress: any)
-	self.progressLabel.Text = `Lv {progress.level}  ·  {progress.coins} coins  ·  🔥{progress.streak}`
-	self:updateDailies(progress.dailies)
 end
 
 --- Floating world-space label (serve values, "+12", grab misses).

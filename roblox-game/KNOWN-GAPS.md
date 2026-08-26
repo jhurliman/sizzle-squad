@@ -11,15 +11,19 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 
 ## A. Built but invisible — systems that persist state with no presentation
 
-- 🟡 **Hats + palettes render; kitchen cosmetics still don't** (plate/pan/
-  bell swaps unbuilt). All 12 hats x 4 species are hand-tuned in
-  hat-fits.json via FitLab (offset/tilt/scale/hideEars); verify new hats in
-  hats-on-<species>.png. Palette retint uses dominant-color matching.
+- 🟢 **All four cosmetic tracks now render.** Hats + palettes as before (12
+  hats x 4 species hand-tuned in hat-fits.json via FitLab; verify new hats in
+  hats-on-<species>.png; palette retint uses dominant-color matching). Emotes
+  drive the ping bar. Kitchen cosmetics: plates/pans tint via ItemViz with a
+  server-side election (one item per slot across the crew, lowest UserId wins
+  ties), serve bells retune the serve chime locally. **Untested with two real
+  clients** — the election needs a Studio local-server check.
 - 🟢 **Ticket icons render via runtime EditableImage** (no upload needed) with a colored-chip fallback if the API is unavailable on some platform — verify on device.
-- 🟢 **Dailies panel live** (intermission "Today's Goals" + completion
-  toasts); rewards still auto-claim rather than a claim ceremony.
-- 🟢 **Species picker live** (countdown + intermission row, persisted to the
-  profile) — duplicates allowed by design; nametags differentiate.
+- 🟢 **Dailies live in the Career tab** ("Today's Goals" + completion toasts);
+  rewards still auto-claim rather than a claim ceremony.
+- 🟢 **Species picking moved into the Wardrobe**, alongside hats and palettes
+  against a live 3D preview — duplicates allowed by design; nametags
+  differentiate.
 - 🟡 **Supporter Pass / monetization not implemented at all** (no gamepass
   check, no +10% XP hook, no bundles). Plan §2.5; deliberately last.
 
@@ -52,8 +56,10 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   rather than custom sprites.
 - 🟢 **Photo moment is just a camera push-in** — no team pose at the pass, no
   confetti, no framed score layout.
-- 🟢 **Emote row, not wheel**: four fixed ping buttons; owned emote cosmetics
-  from the catalog never appear anywhere.
+- 🟢 **Emote row, not wheel**: four built-in pings plus every owned emote
+  cosmetic. Still a row rather than the planned radial wheel. Emotes now
+  travel as IDS (server allowlists pings + owned cosmetics) instead of
+  arbitrary client text — that old path was an unmoderated free-text channel.
 
 ## C. Systems simplified relative to the plan
 
@@ -71,15 +77,37 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 **AFK stage 2 missing**: 20s → bot/park coverage works, but "two idle
   rounds → non-ready spectator" isn't implemented (Roblox's 20-min kick is
   the only backstop).
-- 🟢 **Ready-up shows no per-player state** (no "2/3 ready" indicator).
+- 🟢 **Ready-up shows "n/total ready"** and derives its caption purely from
+  the server's readyIds (the old button latched to "WAITING…" forever). AFK
+  seats no longer block the all-ready short-circuit, and un-ready works. No
+  per-player pips yet.
 - 🟢 **Results ceremony is instant text** — no staged reveal, no XP/coin
   tickers.
-- 🟢 **Leaderboard "wall" is an intermission text panel**, not the physical
-  in-world board; each server reads OrderedDataStores directly (fine at
-  launch scale; the MemoryStore/MessagingService cache from plan §2.4 is
-  unbuilt).
+- 🟢 **Leaderboards are a Ranks tab with resolved display names** (batched
+  UserService lookup, cached, one call per 90s poll) and the local player's
+  row pinned — they used to print raw `u123456` keys. Still not the physical
+  in-world board; each server reads OrderedDataStores directly (fine at launch
+  scale; the MemoryStore/MessagingService cache from plan §2.4 is unbuilt).
 - 🟢 **Assist mode is unlabeled anywhere** (plan wanted "Heat 1: Breakfast
   Shift" style naming of the visible ramp).
+
+## C2. Front-end (new — see plan Part 4)
+
+- 🟡 **The wardrobe's 3D preview has never rendered on a real device.** It
+  drives ChefVisuals inside a ViewportFrame via an injected `commit` (BulkMoveTo
+  silently no-ops outside Workspace) and `pose.speedOverride` (gait is derived
+  from rendered displacement, which is zero for a stationary rig). Verify: the
+  rig is lit and framed, hats sit right, palettes apply, drag-to-spin works,
+  and the frame rate holds on a low-end Android.
+- 🟢 **Menu is an overlay; walk-up stations are a later pass** (shop board,
+  wardrobe mirror, leaderboard wall in the kitchen opening the same panels).
+- 🟢 **Kitchen Card auto-dismisses after 12s**; it has no entrance animation
+  and no "don't show again".
+- 🟢 **Badges have no client surface at all**, and award state is not
+  persisted in the profile, so the Career tab shows the milestone track
+  instead. Badge ids are still 0 (user-gated).
+- 🟢 **Wardrobe has no search/sort**; at 30 items the flat rails are fine, but
+  they will not scale to a content cadence.
 
 ## D. Robustness / tech debt
 
@@ -87,7 +115,8 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 No packet-loss extrapolation beyond hold-last-sample for remote chefs.
 - 🟢 No DataStore retry/backoff beyond pcall, no session locking (same-player
   two-server race), no autosave on server shutdown (BindToClose).
-- 🟢 No rate limiting on Emote/ReadyUp remotes (spam possible; GrabEdge is
+- 🟢 Rate limiting: MenuState is capped (4 msgs/sec/player) and Emote is now
+  allowlisted by id, but ReadyUp is still unlimited (spam possible; GrabEdge is
   capped at 3 queued).
 - 🟢 No analytics/funnel events (join → first round → second round — the P6
   playtest metrics have nothing instrumenting them yet).
@@ -105,8 +134,9 @@ spritesheet · device playtests + soft-launch gates.
 ---
 
 **Suggested next batches** (roughly by first-impression impact):
-1. 🔴 batch: limb articulation pass, cosmetics rendering, dailies panel,
-   species picker.
-2. 🟡 batch: shaped food, VFX pass, corrections smoothing, late-join hold,
-   pacing feel-tune from playtests.
-3. 🟢 batch: ceremony polish, wheel, wall, analytics, hardening.
+1. 🔴 device pass: the wardrobe preview and the whole menu at 896x414 and at
+   375px height, plus a two-client check of the kitchen-cosmetic election and
+   the intermission hold.
+2. 🟡 batch: limb articulation, results ceremony staging, pacing feel-tune.
+3. 🟢 batch: emote wheel, physical walk-up stations, leaderboard wall,
+   analytics, DataStore hardening, monetization.

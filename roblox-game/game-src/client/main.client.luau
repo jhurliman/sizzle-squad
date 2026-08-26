@@ -20,6 +20,8 @@ local Sfx = require(script.Parent.Sfx) :: any
 local StationVisuals = require(script.Parent.StationVisuals) :: any
 local Vfx = require(script.Parent.Vfx) :: any
 local Music = require(script.Parent.Music) :: any
+local Menu = require(script.Parent.Menu) :: any
+local ItemViz = require(script.Parent.ItemViz) :: any
 
 local SCALE = 5
 local remotes = Net.client(ReplicatedStorage)
@@ -42,68 +44,6 @@ local vfx = Vfx.new(vfxFolder, function(n)
 end)
 -- music is non-positional: parent to SoundService so it plays 2D everywhere
 local music = Music.new(game:GetService("SoundService"))
-
--- Invite friends (intermission) — free private servers + party joins are the
--- other two "play together" paths; this is the in-game nudge.
-local inviteButton = Instance.new("TextButton")
-inviteButton.Size = UDim2.fromOffset(150, 40)
-inviteButton.Position = UDim2.new(0.5, 76, 0.82, 0)
-inviteButton.BackgroundColor3 = Color3.fromRGB(70, 130, 200)
-inviteButton.TextColor3 = Color3.new(1, 1, 1)
-inviteButton.TextSize = 18
-inviteButton.Font = Enum.Font.FredokaOne
-inviteButton.Text = "INVITE FRIENDS"
-inviteButton.Visible = false
-inviteButton.Parent = hud.gui
-do
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
-	corner.Parent = inviteButton
-end
-inviteButton.Activated:Connect(function()
-	pcall(function()
-		local SocialService = game:GetService("SocialService")
-		SocialService:PromptGameInvite(Players.LocalPlayer)
-	end)
-end)
-
--- Leaderboards panel (intermission)
-local boardsButton = Instance.new("TextButton")
-boardsButton.Size = UDim2.fromOffset(110, 40)
-boardsButton.Position = UDim2.new(0.5, -180, 0.82, 0)
-boardsButton.BackgroundColor3 = Color3.fromRGB(160, 120, 60)
-boardsButton.TextColor3 = Color3.new(1, 1, 1)
-boardsButton.TextSize = 18
-boardsButton.Font = Enum.Font.FredokaOne
-boardsButton.Text = "RANKS"
-boardsButton.Visible = false
-boardsButton.Parent = hud.gui
-do
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
-	corner.Parent = boardsButton
-end
-local boardsPanel = Instance.new("TextLabel")
-boardsPanel.Size = UDim2.fromOffset(340, 360)
-boardsPanel.Position = UDim2.new(0.5, -170, 0.5, -200)
-boardsPanel.BackgroundColor3 = Color3.fromRGB(40, 24, 12)
-boardsPanel.BackgroundTransparency = 0.05
-boardsPanel.TextColor3 = Color3.fromRGB(255, 244, 221)
-boardsPanel.TextSize = 15
-boardsPanel.Font = Enum.Font.Code
-boardsPanel.TextYAlignment = Enum.TextYAlignment.Top
-boardsPanel.TextXAlignment = Enum.TextXAlignment.Left
-boardsPanel.Text = "No rankings yet — cook something!"
-boardsPanel.Visible = false
-boardsPanel.Parent = hud.gui
-do
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 14)
-	corner.Parent = boardsPanel
-end
-boardsButton.Activated:Connect(function()
-	boardsPanel.Visible = not boardsPanel.Visible
-end)
 
 -- ---------------------------------------------------------- station lookup
 
@@ -128,39 +68,30 @@ local function indexStations(stations: { any })
 	end
 end
 
+-- The front-end. It owns every meta surface (wardrobe/shop/career/ranks), the
+-- ready bar, the join card and the emote row; this file just forwards state.
+local menu = Menu.new({
+	catalog = Catalog,
+	remotes = remotes,
+	input = input,
+	hudGui = hud.gui,
+	onToast = function(text)
+		hud:toast(text)
+	end,
+	onShopAction = function(action)
+		remotes.ShopAction:FireServer(action)
+	end,
+	onPickSpecies = function(species)
+		remotes.PickSpecies:FireServer(species)
+	end,
+})
+
 local highlight = Instance.new("Highlight")
 highlight.FillTransparency = 0.75
 highlight.FillColor = Color3.fromRGB(255, 214, 120)
 highlight.OutlineColor = Color3.fromRGB(255, 234, 180)
 highlight.Enabled = false
 highlight.Parent = Workspace
-
--- ------------------------------------------------------------- emote pings
-
-local PINGS = { "Nice!", "Help!", "Fire!", "Order up!" }
-do
-	local gui = hud.gui
-	for i, ping in PINGS do
-		local btn = Instance.new("TextButton")
-		-- compact, in the dead floor band at the bottom: the ticket queue now
-		-- owns the right edge and these must not crowd it
-		btn.Size = UDim2.fromOffset(66, 26)
-		btn.Position = UDim2.new(0.5, -140 + (i - 1) * 70, 1, -34)
-		btn.BackgroundColor3 = Color3.fromRGB(58, 32, 19)
-		btn.BackgroundTransparency = 0.25
-		btn.TextColor3 = Color3.fromRGB(255, 244, 221)
-		btn.TextSize = 13
-		btn.Font = Enum.Font.FredokaOne
-		btn.Text = ping
-		btn.Parent = gui
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 10)
-		corner.Parent = btn
-		btn.Activated:Connect(function()
-			remotes.Emote:FireServer(ping)
-		end)
-	end
-end
 
 local function speechBubble(chefId: number, text: string)
 	local entry = visuals.chefs[chefId]
@@ -224,7 +155,8 @@ remotes.CarryDeltas.OnClientEvent:Connect(function(carries)
 	end
 end)
 
-remotes.EquipDeltas.OnClientEvent:Connect(function(list)
+remotes.EquipDeltas.OnClientEvent:Connect(function(msg)
+	local list = msg.chefs or msg
 	table.clear(state.hats)
 	table.clear(state.names)
 	table.clear(state.palettes)
@@ -236,13 +168,15 @@ remotes.EquipDeltas.OnClientEvent:Connect(function(list)
 			state.skins[e.chefId] = e.skin
 		end
 	end
+	-- Team-visible crockery: one elected item per slot for the whole kitchen.
+	ItemViz.setKitchen(Catalog, msg.kitchen)
 	if state.myChefId ~= nil then
-		hud:setSpecies(state.skins[state.myChefId])
+		menu:setEquipped({
+			skin = state.skins[state.myChefId],
+			hat = state.hats[state.myChefId],
+			palette = state.palettes[state.myChefId],
+		})
 	end
-end)
-
-hud:bindSpecies(function(species)
-	remotes.PickSpecies:FireServer(species)
 end)
 
 remotes.OrdersDelta.OnClientEvent:Connect(function(msg)
@@ -261,11 +195,8 @@ remotes.RoundPhase.OnClientEvent:Connect(function(phase)
 	end
 	state.phase = phase
 	hud:updatePhase(phase, phase.results and phase.results.cards)
-	inviteButton.Visible = phase.phase == "intermission"
-	boardsButton.Visible = phase.phase == "intermission"
-	if phase.phase ~= "intermission" then
-		boardsPanel.Visible = false
-	end
+	-- The one call site for the phase gate.
+	menu:setPhase(phase, state.myChefId == nil)
 	-- Photo moment: a 3-star finish gets a celebratory push-in on the pass.
 	if phase.phase == "results" and lastPhase ~= "results" and phase.results ~= nil and phase.results.stars >= 3 then
 		local camera = Workspace.CurrentCamera :: Camera
@@ -286,29 +217,15 @@ remotes.RoundPhase.OnClientEvent:Connect(function(phase)
 end)
 
 remotes.Leaderboards.OnClientEvent:Connect(function(boards)
-	local lines = { "═══ WEEKLY BEST ═══" }
-	for _, e in boards.weekly or {} do
-		table.insert(lines, string.format("%2d. %-18s %6d", e.rank, e.key, e.value))
-	end
-	table.insert(lines, "")
-	table.insert(lines, "═══ ALL-TIME ═══")
-	for _, e in boards.allTime or {} do
-		table.insert(lines, string.format("%2d. %-18s %6d", e.rank, e.key, e.value))
-	end
-	table.insert(lines, "")
-	table.insert(lines, "═══ CAREER DISHES ═══")
-	for _, e in boards.dishes or {} do
-		table.insert(lines, string.format("%2d. %-18s %6d", e.rank, e.key, e.value))
-	end
-	boardsPanel.Text = table.concat(lines, "\n")
+	menu:setLeaderboards(boards)
 end)
 
 remotes.Progress.OnClientEvent:Connect(function(progress)
-	hud:updateProgress(progress)
 	firstShift:setEligible(progress)
-	hud:updateShop(progress, function(action, id)
-		remotes.ShopAction:FireServer({ action = action, id = id })
-	end)
+	menu:setProgress(progress)
+	-- Serve-bell cosmetic is local audio, so it reads the owner's own equip
+	-- rather than the elected kitchen set.
+	sfx:setKitchen(Catalog, progress.equipped and progress.equipped.kitchen)
 end)
 
 remotes.Correction.OnClientEvent:Connect(function(msg)
@@ -316,7 +233,12 @@ remotes.Correction.OnClientEvent:Connect(function(msg)
 end)
 
 remotes.Emote.OnClientEvent:Connect(function(msg)
-	speechBubble(msg.chefId, msg.emote)
+	-- The wire carries an id; the glyph is resolved locally so the server
+	-- never rebroadcasts player-authored text.
+	local glyph = Catalog.glyphFor(msg.emote)
+	if glyph ~= nil then
+		speechBubble(msg.chefId, glyph)
+	end
 end)
 
 remotes.SimEvents.OnClientEvent:Connect(function(events)
@@ -377,14 +299,6 @@ remotes.SimEvents.OnClientEvent:Connect(function(events)
 	end
 end)
 
-hud.readyButton.Activated:Connect(function()
-	remotes.ReadyUp:FireServer(true)
-	hud.readyButton.Text = "WAITING…"
-end)
-hud.shopButton.Activated:Connect(function()
-	hud.shopPanel.Visible = not hud.shopPanel.Visible
-end)
-
 -- --------------------------------------------------------------- main loop
 
 local acc = 0
@@ -393,6 +307,7 @@ local seq = 0
 
 RunService.RenderStepped:Connect(function(dt)
 	state.clock += dt
+	menu:step(dt)
 	cameraRig:update(dt)
 	vfx:tick(dt)
 	state:advanceClock(dt, state.phase.phase == "round")

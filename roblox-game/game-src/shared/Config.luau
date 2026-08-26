@@ -9,8 +9,20 @@ local Config = {}
 -- Round flow (seconds)
 Config.COUNTDOWN = 8
 Config.RESULTS = 12
-Config.INTERMISSION = 25
+-- 25s was not enough to browse a wardrobe, so the intermission is longer AND
+-- pausable (see INTERMISSION_PAUSE_CAP). It still short-circuits the moment
+-- everyone is ready, so the common case does not get slower.
+Config.INTERMISSION = 40
 Config.LATE_JOIN_CUTOFF = 15 -- <15s left: hold joiner in kitchen-cam until results
+
+-- Menu hold: while a seated, non-ready, non-AFK player has the menu open, the
+-- intermission clock stops -- but only for this many seconds in total, so one
+-- shopper can never hold three teammates hostage. Ceiling is therefore
+-- INTERMISSION + INTERMISSION_PAUSE_CAP.
+Config.INTERMISSION_PAUSE_CAP = 15
+Config.MENU_KEEPALIVE = 5 -- client resend interval
+Config.MENU_KEEPALIVE_TIMEOUT = 12 -- server expiry: a crashed client cannot hold
+Config.MENU_MAX_MSGS_PER_SEC = 4 -- MenuState rate limit
 
 -- Bots are OPT-IN (playtest verdict: watching bots efficiently play the game
 -- for you kills the fun of learning it). The brain stays in the codebase —

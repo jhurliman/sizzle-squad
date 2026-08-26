@@ -86,6 +86,10 @@ function Progression:playerAdded(player: any)
 	if profile.daily.day ~= dayKey() then
 		profile.daily = { day = dayKey(), progress = {}, claimed = {} }
 	end
+	-- Session count drives the Kitchen Card, which must never appear on a
+	-- player's first-ever session (FirstShift owns that moment).
+	profile.sessions = (profile.sessions or 0) + 1
+	self.dirty[player] = true
 	self.profiles[player] = profile
 	self:push(player)
 end
@@ -136,6 +140,9 @@ function Progression:push(player: any)
 		equipped = profile.equipped,
 		dailies = dailies,
 		streak = profile.streak.count,
+		sessions = profile.sessions or 1,
+		-- The client used to infer species from EquipDeltas.skin; send it.
+		species = profile.species,
 	})
 end
 
@@ -268,8 +275,20 @@ function Progression:shopAction(player: any, action: any)
 	if profile == nil or typeof(action) ~= "table" then
 		return
 	end
+	-- equipSet carries a whole outfit rather than one id, so it is handled
+	-- before the single-item lookup.
+	if action.action == "equipSet" then
+		self:equipSet(player, profile, action.set)
+		return
+	end
 	local item = self.catalog.byId[action.id]
 	if item == nil then
+		return
+	end
+	-- A hidden item is a reserved id whose in-game consumer is not built yet.
+	-- Refuse it server-side too: filtering it out of the shop UI alone would
+	-- leave a crafted remote able to spend coins on something invisible.
+	if item.hidden then
 		return
 	end
 	if action.action == "buy" then
@@ -303,6 +322,41 @@ end
 -- ----------------------------------------------------------------- species
 
 local SPECIES = { bramble = true, pip = true, nori = true, mochi = true }
+
+--- Commit a whole outfit at once (the Wardrobe's APPLY).
+---
+--- Every field is validated INDEPENDENTLY against ownership and kind; a bad
+--- entry is dropped rather than rejecting the whole set, so one stale id in a
+--- client's pending state cannot silently discard the rest of the outfit.
+--- An explicit nil means "take it off".
+function Progression:equipSet(player: any, profile: any, set: any)
+	if typeof(set) ~= "table" then
+		return
+	end
+	for _, kind in { "hat", "palette", "emote", "kitchen" } do
+		local id = set[kind]
+		if id == nil then
+			profile.equipped[kind] = nil
+		elseif typeof(id) == "string" then
+			local it = self.catalog.byId[id]
+			if it ~= nil and it.kind == kind and not it.hidden and profile.owned[id] then
+				profile.equipped[kind] = id
+			end
+		end
+	end
+	self.dirty[player] = true
+	self:push(player)
+end
+
+--- Emote allowlist for the Emote remote: only cosmetics the player owns.
+function Progression:ownsEmote(player: any, id: string): boolean
+	local profile = self.profiles[player]
+	if profile == nil then
+		return false
+	end
+	local item = self.catalog.byId[id]
+	return item ~= nil and item.kind == "emote" and profile.owned[id] == true
+end
 
 function Progression:setSpecies(player: any, species: any): boolean
 	local profile = self.profiles[player]

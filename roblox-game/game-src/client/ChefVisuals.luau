@@ -30,12 +30,23 @@ local SKIN_COLORS: { [string]: Color3 } = {
 	mochi = Color3.fromRGB(235, 165, 50),
 }
 
-function ChefVisuals.new(parent: Instance)
+--- Commit poses straight into the world. This is the only place the module
+--- touches a global, which is exactly why it is injectable: `BulkMoveTo` is a
+--- Workspace API and silently does NOTHING for parts that are not Workspace
+--- descendants -- a rig inside a ViewportFrame would sit in bind pose at the
+--- wrong origin with no error raised. The wardrobe passes a plain CFrame loop.
+local function defaultCommit(parts: { BasePart }, cframes: { CFrame })
+	workspace:BulkMoveTo(parts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
+end
+
+--- opts.commit: override how posed CFrames reach the parts (see above).
+function ChefVisuals.new(parent: Instance, opts: any?)
 	local self = setmetatable({}, ChefVisuals)
 	self.parent = parent
 	self.rigsFolder = ReplicatedStorage:FindFirstChild("Rigs")
 	self.chefs = {} :: { [number]: any }
 	self.time = 0
+	self.commit = (opts ~= nil and opts.commit) or defaultCommit
 	return self
 end
 
@@ -237,6 +248,15 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 	if entry.lastPos ~= nil then
 		rawSpeed = math.min((p - entry.lastPos).Magnitude / dt, MAX_SPEED * 1.3)
 	end
+	-- Speed is derived from RENDERED DISPLACEMENT, so a rig posed at a fixed
+	-- point (the wardrobe turntable) reads exactly zero and the entire gait --
+	-- moveBlend, stepSin, hop, tail sway, ear bounce -- goes dead. This lets a
+	-- stationary preview show the real walk cycle. Faking it by walking the
+	-- preview in a tiny circle does not work: the radius needed to reach
+	-- moveBlend ~= 0.5 is ~0.07 cells, a visible 0.7-stud drift on the rig.
+	if pose.speedOverride ~= nil then
+		rawSpeed = pose.speedOverride
+	end
 	entry.lastPos = p
 	entry.smSpeed += (rawSpeed - entry.smSpeed) * math.min(1, dt * 8)
 	local speed = entry.smSpeed
@@ -316,7 +336,7 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 			local t = pose_[entry.animGroup[i]]
 			cframes[i] = if t ~= nil then baseCF * t * bind else baseCF * bind
 		end
-		workspace:BulkMoveTo(entry.animParts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
+		self.commit(entry.animParts, cframes)
 	else
 		local body = model:FindFirstChild("Body") :: Part?
 		local head = model:FindFirstChild("Head") :: Part?

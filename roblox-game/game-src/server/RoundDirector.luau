@@ -17,7 +17,12 @@ function RoundDirector.new(
 	crew: any,
 	replicator: any,
 	remotes: { [string]: any },
-	opts: { seedFn: (() -> number)?, assistFn: (() -> boolean)?, onRoundEnd: ((any) -> ())? }
+	opts: {
+		seedFn: (() -> number)?,
+		assistFn: (() -> boolean)?,
+		onRoundEnd: ((any) -> ())?,
+		holdFn: (() -> boolean)?,
+	}
 )
 	local self = setmetatable({}, RoundDirector)
 	self.shared = shared
@@ -34,6 +39,11 @@ function RoundDirector.new(
 	self.assistFn = opts.assistFn or function()
 		return false
 	end
+	-- holdFn: should the intermission clock be paused right now? (Menu-open
+	-- state lives in MenuGate; injected so the headless harness can drive it.)
+	self.holdFn = opts.holdFn or function()
+		return false
+	end
 	self.onRoundEnd = opts.onRoundEnd
 
 	self.phase = "countdown" :: Phase
@@ -45,21 +55,46 @@ function RoundDirector.new(
 	self.stats = {} :: { [number]: { [string]: number } } -- chefId -> counters
 	self.lastResults = nil :: any
 	self.broadcastAcc = 0
+	self.pauseLeft = 0
+	self.paused = false
 	return self
 end
 
 function RoundDirector:setPhase(phase: Phase, timer: number)
 	self.phase = phase
 	self.timer = timer
+	-- Each intermission gets a fresh hold budget; entering a round revokes any
+	-- hold outright so a stale menu flag can never pause live play.
+	if phase == "intermission" then
+		self.pauseLeft = self.config.INTERMISSION_PAUSE_CAP or 0
+	else
+		self.pauseLeft = 0
+	end
+	self.paused = false
 	self:broadcastPhase()
 end
 
 function RoundDirector:broadcastPhase()
+	-- readyIds is what lets the client render its own ready caption as a pure
+	-- function of server state instead of remembering that it clicked.
+	local readyIds = {}
+	for player in self.crew.seats do
+		if self.ready[player] then
+			table.insert(readyIds, player.UserId)
+		end
+	end
+	local readyCount, readyTotal = self:readyTally()
 	self.remotes.RoundPhase:FireAllClients({
 		phase = self.phase,
 		timer = self.timer,
 		round = self.round,
 		waiting = not self.simService.botFill and self.crew:humanCount() == 0,
+		readyIds = readyIds,
+		readyCount = readyCount,
+		readyTotal = readyTotal,
+		paused = self.paused,
+		pauseLeft = self.pauseLeft,
+		pauseCap = self.config.INTERMISSION_PAUSE_CAP or 0,
 		results = if self.phase == "results" or self.phase == "intermission" then self.lastResults else nil,
 	})
 end
@@ -203,21 +238,39 @@ function RoundDirector:buildResults(): any
 	}
 end
 
-function RoundDirector:setReady(player: any, on: boolean)
-	if self.phase == "intermission" then
-		self.ready[player] = on
-		-- All present humans ready -> start immediately.
-		local all = true
-		for p in self.crew.seats do
-			if not self.ready[p] then
-				all = false
-				break
+--- Ready count over seats that can actually answer.
+---
+--- AFK seats are EXCLUDED. They used to be counted, so one idle player blocked
+--- the all-ready short-circuit for everybody and the crew had to sit out the
+--- full intermission timer.
+function RoundDirector:readyTally(): (number, number)
+	local n, total = 0, 0
+	for player, seat in self.crew.seats do
+		if not seat.afk then
+			total += 1
+			if self.ready[player] then
+				n += 1
 			end
 		end
-		if all and next(self.crew.seats) ~= nil then
-			self:startRound()
-		end
 	end
+	return n, total
+end
+
+function RoundDirector:tryStart()
+	local n, total = self:readyTally()
+	if total > 0 and n >= total then
+		self:startRound()
+	end
+end
+
+function RoundDirector:setReady(player: any, on: boolean)
+	if self.phase ~= "intermission" then
+		return
+	end
+	-- `nil` rather than `false` so the table does not accumulate dead keys.
+	self.ready[player] = if on then true else nil
+	self:broadcastPhase() -- echo immediately; the caption is derived from this
+	self:tryStart()
 end
 
 function RoundDirector:heartbeat(dt: number)
@@ -226,6 +279,10 @@ function RoundDirector:heartbeat(dt: number)
 		self.broadcastAcc = 0
 		if self.phase == "round" then
 			self:updatePressure(1)
+		elseif self.phase == "intermission" then
+			-- Re-check: the last hold-out may have just gone AFK, which makes
+			-- the remaining crew all-ready without anyone pressing anything.
+			self:tryStart()
 		end
 		self:broadcastPhase()
 	end
@@ -260,6 +317,20 @@ function RoundDirector:heartbeat(dt: number)
 		and self.crew:humanCount() == 0
 		and (self.phase == "countdown" or self.phase == "intermission")
 	then
+		return
+	end
+
+	-- A player browsing the wardrobe holds the intermission clock, but only
+	-- until the budget runs out. Ready players never hold (readying up is the
+	-- release valve), and the all-ready short-circuit still fires regardless,
+	-- so a shopper can never actually hostage the crew.
+	local held = false
+	if self.phase == "intermission" and self.pauseLeft > 0 and self.holdFn() then
+		held = true
+		self.pauseLeft = math.max(0, self.pauseLeft - dt)
+	end
+	self.paused = held
+	if held then
 		return
 	end
 

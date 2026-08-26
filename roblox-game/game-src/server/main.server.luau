@@ -16,6 +16,7 @@ local RoundDirector = require(script.Parent.RoundDirector) :: any
 local Progression = require(script.Parent.Progression) :: any
 local Leaderboards = require(script.Parent.Leaderboards) :: any
 local Badges = require(script.Parent.Badges) :: any
+local MenuGate = require(script.Parent.MenuGate) :: any
 
 local remotes = Net.server(ReplicatedStorage)
 
@@ -32,10 +33,15 @@ local crew = CrewManager.new(simService, Net, remotes, replicator, os.clock, fun
 end)
 progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("Catalog")))
 
+local Catalog = require(gameShared:WaitForChild("Catalog")) :: any
 local leaderboards = Leaderboards.new(progression, remotes)
 local badges = Badges.new()
+local menuGate = MenuGate.new(Config, os.clock)
 
-local director = RoundDirector.new(shared, Config, simService, crew, replicator, remotes, {
+-- Declared before assignment: holdFn closes over `director`, and a local is
+-- not in scope inside its own initialiser (it would capture a nil global).
+local director
+director = RoundDirector.new(shared, Config, simService, crew, replicator, remotes, {
 	assistFn = function()
 		return progression:crewQualifiesForAssist(crew)
 	end,
@@ -43,21 +49,71 @@ local director = RoundDirector.new(shared, Config, simService, crew, replicator,
 		progression:awardRound(crew, results)
 		badges:onRoundEnd(crew, progression, results)
 	end,
+	holdFn = function()
+		return menuGate:anyHolding(crew, director.ready)
+	end,
 })
+
+remotes.MenuState.OnServerEvent:Connect(function(player, open)
+	-- Never during a live round: a hacked client must not be able to pause
+	-- play, and the menu is client-gated to non-round phases anyway.
+	if director.phase == "round" then
+		menuGate:clear(player)
+		return
+	end
+	menuGate:set(player, open == true)
+end)
 
 remotes.ReadyUp.OnServerEvent:Connect(function(player, on)
 	director:setReady(player, on == true)
 end)
 
-remotes.Emote.OnServerEvent:Connect(function(player, emote)
+-- Emotes travel as IDS. This used to rebroadcast any client-supplied string
+-- (<=24 chars) to every player, which is an unmoderated free-text channel in
+-- a game aimed at this audience. Now the id must be a built-in ping or an
+-- emote cosmetic the sender actually owns, and the client maps id -> glyph.
+remotes.Emote.OnServerEvent:Connect(function(player, id)
 	local seat = crew.seats[player]
-	if seat ~= nil and typeof(emote) == "string" and #emote <= 24 then
-		remotes.Emote:FireAllClients({ chefId = seat.chefId, emote = emote })
+	if seat == nil or typeof(id) ~= "string" then
+		return
 	end
+	local allowed = Catalog.pingById[id] ~= nil or progression:ownsEmote(player, id)
+	if not allowed then
+		return
+	end
+	remotes.Emote:FireAllClients({ chefId = seat.chefId, emote = id })
 end)
 
 -- Everyone sees everyone's hat + name: broadcast the seat -> cosmetics map
 -- whenever it could have changed (join, leave, equip, reseat).
+--- Plates, pans and the serve bell are SHARED props, but every player has
+--- their own equip. Elect one item per slot among seated players, lowest
+--- UserId winning ties: a deliberately dumb, legible rule that is stable
+--- across re-equips rather than flickering with whoever acted last.
+local function electKitchen(): { [string]: string }
+	local best: { [string]: any } = {}
+	for player, _seat in crew.seats do
+		local profile = progression.profiles[player]
+		local id = profile and profile.equipped and profile.equipped.kitchen
+		if id == nil then
+			continue
+		end
+		local item = Catalog.byId[id]
+		if item == nil or item.slot == nil then
+			continue
+		end
+		local held = best[item.slot]
+		if held == nil or player.UserId < held.userId then
+			best[item.slot] = { id = id, userId = player.UserId }
+		end
+	end
+	local out: { [string]: string } = {}
+	for slot, entry in best do
+		out[slot] = entry.id
+	end
+	return out
+end
+
 local function broadcastEquips()
 	local list = {}
 	for player, seat in crew.seats do
@@ -76,7 +132,21 @@ local function broadcastEquips()
 			name = player.DisplayName or player.Name,
 		})
 	end
-	remotes.EquipDeltas:FireAllClients(list)
+	remotes.EquipDeltas:FireAllClients({ chefs = list, kitchen = electKitchen() })
+end
+
+-- A wardrobe makes equips far more frequent, and this is an O(players x chefs)
+-- rebuild fanned out to everyone. Coalesce bursts behind a trailing debounce.
+local equipsPending = false
+local function queueEquips()
+	if equipsPending then
+		return
+	end
+	equipsPending = true
+	task.delay(0.25, function()
+		equipsPending = false
+		broadcastEquips()
+	end)
 end
 
 remotes.PickSpecies.OnServerEvent:Connect(function(player, species)
@@ -91,12 +161,12 @@ remotes.PickSpecies.OnServerEvent:Connect(function(player, species)
 			end
 		end
 	end
-	broadcastEquips()
+	queueEquips()
 end)
 
 remotes.ShopAction.OnServerEvent:Connect(function(player, action)
 	progression:shopAction(player, action)
-	broadcastEquips()
+	queueEquips()
 end)
 
 -- The Roblox avatar never appears in the kitchen: the chef IS the player's
@@ -164,7 +234,15 @@ Players.PlayerRemoving:Connect(function(player)
 	pendingJoins[player] = nil
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
+	-- director.ready is keyed by Player and had no cleanup: it leaked a key
+	-- per departure and could strand a stale ready that nothing could clear.
+	director.ready[player] = nil
+	menuGate:clear(player)
 	broadcastEquips()
+	-- Their departure may have made the remaining crew all-ready.
+	if director.phase == "intermission" then
+		director:tryStart()
+	end
 end)
 
 -- Reseats (new round) reshuffle chef ids; refresh the cosmetics map when the

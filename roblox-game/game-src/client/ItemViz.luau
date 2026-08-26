@@ -60,6 +60,49 @@ local function part(props: { [string]: any }, parent: Instance): Part
 end
 
 --- Stable identity for a summary, so callers rebuild only on change.
+-- Team-visible kitchen cosmetics. The server elects ONE item per slot across
+-- the crew (see main.server electKitchen) so everyone sees the same crockery;
+-- this is just the tint that election resolves to.
+local kitchenTint: { [string]: Color3? } = { plate = nil, pan = nil }
+
+-- Bumped whenever the elected crockery changes. ItemViz.key folds it in for
+-- plates and pans, so callers that cache by key rebuild with the new tint
+-- instead of showing the old crockery until the item happens to change.
+local kitchenGen = 0
+
+--- slot -> catalog item id (or nil). Called from the EquipDeltas handler.
+function ItemViz.setKitchen(catalog: any, kitchen: { [string]: string }?)
+	kitchenTint.plate = nil
+	kitchenTint.pan = nil
+	if kitchen == nil then
+		return
+	end
+	for slot, id in kitchen do
+		local item = catalog.byId[id]
+		if item ~= nil and item.color ~= nil then
+			kitchenTint[slot] = Color3.fromRGB(item.color[1], item.color[2], item.color[3])
+		end
+	end
+	kitchenGen += 1
+end
+
+--- Lerp every BasePart in `model` toward `color`. Used only on the crockery
+--- itself, never on a whole-pan composition (those bake the food in, and
+--- tinting one would recolour the bacon along with the pan).
+local function tint(model: Instance?, color: Color3?)
+	if model == nil or color == nil then
+		return
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Color = d.Color:Lerp(color, 0.75)
+		end
+	end
+	if model:IsA("BasePart") then
+		model.Color = model.Color:Lerp(color, 0.75)
+	end
+end
+
 function ItemViz.key(summary: any): string
 	if summary == nil then
 		return "-"
@@ -67,13 +110,13 @@ function ItemViz.key(summary: any): string
 	if summary.type == "ingredient" then
 		return `i:{summary.kind}:{summary.state}`
 	elseif summary.type == "plate" then
-		local k = `p:{if summary.dirty then "d" else "c"}`
+		local k = `p{kitchenGen}:{if summary.dirty then "d" else "c"}`
 		for _, c in summary.contents do
 			k ..= `:{c.kind}.{c.state}`
 		end
 		return k
 	elseif summary.type == "pan" then
-		local k = "n"
+		local k = `n{kitchenGen}`
 		for _, c in summary.contents do
 			k ..= `:{c.kind}.{c.state}`
 		end
@@ -140,6 +183,7 @@ local function buildFromTemplates(summary: any): Model?
 			wrapper:Destroy()
 			return nil
 		end
+		tint(plate, kitchenTint.plate)
 		plate.Parent = wrapper
 		plate:PivotTo(CFrame.new())
 		-- Stacking measured off the web's own plate_full composition: items
@@ -170,6 +214,7 @@ local function buildFromTemplates(summary: any): Model?
 			wrapper:Destroy()
 			return nil
 		end
+		tint(pan, kitchenTint.pan)
 		pan.Parent = wrapper
 		pan:PivotTo(CFrame.new())
 		for i, c in contents do
@@ -211,6 +256,7 @@ function ItemViz.build(summary: any): Model?
 			CFrame = CFrame.Angles(0, 0, math.rad(90)),
 			Name = "Plate",
 		}, model)
+		tint(plate, kitchenTint.plate)
 		if summary.dirty then
 			part({
 				Shape = Enum.PartType.Ball,

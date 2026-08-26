@@ -266,3 +266,108 @@ print(if failures > 0 then `{failures} FAILURES` else "PASS: bots-off mode")
 if failures > 0 then
 	error(`{failures} checks failed`)
 end
+
+-- ==========================================================================
+-- Intermission hold: a player in the wardrobe stops the clock, but only for
+-- INTERMISSION_PAUSE_CAP seconds in total. Driven through the injected
+-- holdFn, which is exactly why the director takes it as a function rather
+-- than reading MenuGate (or any Roblox service) directly.
+-- ==========================================================================
+
+failures = 0
+
+local MenuGate = require("../game-src/server/MenuGate") :: any
+
+local svc3 = SimService.new(shared, { seed = 77, botFill = true })
+local rep3 = Replicator.new(shared, Net, remotes, function(chef)
+	return svc3:chefFlags(chef)
+end)
+local clock3 = { t = 0 }
+local crew3 = CrewManager.new(svc3, Net, remotes, rep3, function()
+	return clock3.t
+end)
+local gate = MenuGate.new(Config, function()
+	return clock3.t
+end)
+local dir3
+dir3 = RoundDirector.new(shared, Config, svc3, crew3, rep3, remotes, {
+	seedFn = function()
+		return 7
+	end,
+	holdFn = function()
+		return gate:anyHolding(crew3, dir3.ready)
+	end,
+})
+crew3:playerAdded(playerA)
+
+-- Sit in intermission with the menu open the whole time.
+dir3:setPhase("intermission", Config.INTERMISSION)
+gate:set(playerA, true)
+
+local elapsed = 0
+local heldFor = 0
+while dir3.phase == "intermission" and elapsed < 200 do
+	clock3.t += 0.1
+	elapsed += 0.1
+	crew3:heartbeat() -- AFK sweep
+	crew3:touch(crew3.seats[playerA])
+	gate:set(playerA, true) -- keepalive
+	local was = dir3.timer
+	dir3:heartbeat(0.1)
+	if dir3.paused then
+		heldFor += 0.1
+	end
+	if was == dir3.timer and dir3.phase == "intermission" and not dir3.paused then
+		break -- clock stalled for a reason other than the hold
+	end
+end
+
+local cap = Config.INTERMISSION_PAUSE_CAP
+check(math.abs(heldFor - cap) < 0.25, `menu hold stopped the clock for exactly the cap ({heldFor}s of {cap}s)`)
+check(
+	math.abs(elapsed - (Config.INTERMISSION + cap)) < 0.5,
+	`intermission ran INTERMISSION+CAP then started ({elapsed}s of {Config.INTERMISSION + cap}s)`
+)
+check(dir3.phase == "round", "round started despite the menu still being open")
+
+-- Readying up releases the hold immediately: a shopper is never a hostage.
+local dir4
+dir4 = RoundDirector.new(shared, Config, svc3, crew3, rep3, remotes, {
+	seedFn = function()
+		return 7
+	end,
+	holdFn = function()
+		return gate:anyHolding(crew3, dir4.ready)
+	end,
+})
+dir4:setPhase("intermission", Config.INTERMISSION)
+gate:set(playerA, true)
+dir4.ready[playerA] = true
+crew3:touch(crew3.seats[playerA])
+dir4:heartbeat(0.1)
+check(not dir4.paused, "a READY player with the menu open does not hold the clock")
+
+-- A crashed client stops holding on its own once the keepalive lapses.
+local dir5
+dir5 = RoundDirector.new(shared, Config, svc3, crew3, rep3, remotes, {
+	seedFn = function()
+		return 7
+	end,
+	holdFn = function()
+		return gate:anyHolding(crew3, dir5.ready)
+	end,
+})
+dir5:setPhase("intermission", Config.INTERMISSION)
+gate:set(playerA, true)
+crew3:touch(crew3.seats[playerA])
+dir5:heartbeat(0.1)
+check(dir5.paused, "an open menu holds the clock while the keepalive is fresh")
+clock3.t += (Config.MENU_KEEPALIVE_TIMEOUT + 1)
+crew3:touch(crew3.seats[playerA])
+dir5:heartbeat(0.1)
+check(not dir5.paused, "a lapsed keepalive (crashed client) stops holding the clock")
+
+print(if failures > 0 then `{failures} FAILURES` else "PASS: intermission menu hold")
+if failures > 0 then
+	error(`{failures} checks failed`)
+end
