@@ -84,9 +84,10 @@ dailies have no UI, food is spheres, everything is silent.
 1. **Publish** the place to a universe (Studio → File → Publish), set
    `MaxPlayers = 4`, enable **free private servers**, enable Studio API
    access for DataStores.
-2. **Audio**: offline-render the WebAudio synth (`src/audio/audio.ts`) to
-   .ogg via node-web-audio-api, upload via Open Cloud, fill the ids in
-   `game-src/client/Sfx.luau` (categories are already mapped to events).
+2. ~~**Audio**~~ — DONE: 50 SFX (3 variants/event) and 4 adaptive music stems
+   are rendered, uploaded and wired; ids recorded in
+   `roblox/audio-out/asset-ids.csv`. Only `washDone` lacks a dedicated upload
+   (falls back to the chop chime).
 3. **Badges**: create on the Creator Dashboard, fill `Badges.IDS`.
 3b. **Game passes** (monetization is wired but inert until these exist).
    On the Creator Dashboard → your experience → Monetization → Passes, create:
@@ -107,10 +108,9 @@ dailies have no UI, food is spheres, everything is silent.
    is checked on join and again on `PromptGamePassPurchaseFinished`, so a
    purchase applies without a rejoin.
 
-   Everything a pass grants is a palette, emote or kitchen tint — all pure data
-   that renders today. Deliberately no paid hats: a new hat needs a
-   `Hats.build` case plus four hand-tuned FitLab entries, and selling something
-   invisible is the bug this pass spent its time removing.
+   Every pass item already renders today — the four pass hats are existing,
+   FitLab-tuned assets moved off the coin ladder, not new art. Nothing here
+   needs an upload or a new `Hats.build` case.
 4. **Icon spritesheet**: render `src/ui/icons.ts` to a PNG, upload, swap the
    ticket chips from colored circles to ImageLabels.
 5. **Playtests** (plan P6–P8): friends & family via private links, then soft
