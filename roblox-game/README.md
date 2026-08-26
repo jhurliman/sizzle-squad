@@ -88,6 +88,24 @@ dailies have no UI, food is spheres, everything is silent.
    .ogg via node-web-audio-api, upload via Open Cloud, fill the ids in
    `game-src/client/Sfx.luau` (categories are already mapped to events).
 3. **Badges**: create on the Creator Dashboard, fill `Badges.IDS`.
+3b. **Game passes** (monetization is wired but inert until these exist).
+   On the Creator Dashboard → your experience → Monetization → Passes, create:
+
+   | Pass | Suggested price | Grants |
+   |---|---|---|
+   | Supporter Pass | 199 R$ | +10% XP and coins, 4 Gilded coats, Sizzle! emote, Supporter Plates, star nametag |
+   | Chef's Trunk | 149 R$ | 4 Midnight coats, Boom! emote, Obsidian Pans |
+
+   Then put each pass id into `game-src/shared/Monetization.luau`
+   (`PRODUCTS[n].gamePassId`). A pass whose id is still `0` is hidden from the
+   shop and can never be granted, so shipping without them is safe. Ownership
+   is checked on join and again on `PromptGamePassPurchaseFinished`, so a
+   purchase applies without a rejoin.
+
+   Everything a pass grants is a palette, emote or kitchen tint — all pure data
+   that renders today. Deliberately no paid hats: a new hat needs a
+   `Hats.build` case plus four hand-tuned FitLab entries, and selling something
+   invisible is the bug this pass spent its time removing.
 4. **Icon spritesheet**: render `src/ui/icons.ts` to a PNG, upload, swap the
    ticket chips from colored circles to ImageLabels.
 5. **Playtests** (plan P6–P8): friends & family via private links, then soft

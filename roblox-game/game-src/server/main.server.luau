@@ -16,6 +16,7 @@ local RoundDirector = require(script.Parent.RoundDirector) :: any
 local Progression = require(script.Parent.Progression) :: any
 local Leaderboards = require(script.Parent.Leaderboards) :: any
 local Badges = require(script.Parent.Badges) :: any
+local MonetizationServer = require(script.Parent.Monetization) :: any
 
 local remotes = Net.server(ReplicatedStorage)
 
@@ -35,6 +36,10 @@ progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("
 local Catalog = require(gameShared:WaitForChild("Catalog")) :: any
 local leaderboards = Leaderboards.new(progression, remotes)
 local badges = Badges.new()
+
+local MonetizationDefs = require(gameShared:WaitForChild("Monetization")) :: any
+local monetization = MonetizationServer.new(Catalog, MonetizationDefs)
+
 
 local director = RoundDirector.new(shared, Config, simService, crew, replicator, remotes, {
 	assistFn = function()
@@ -111,7 +116,7 @@ local function broadcastEquips()
 			hat = profile and profile.equipped and profile.equipped.hat or nil,
 			palette = profile and profile.equipped and profile.equipped.palette or nil,
 			skin = skin,
-			name = player.DisplayName or player.Name,
+			name = monetization:flairFor(player) .. (player.DisplayName or player.Name),
 		})
 	end
 	remotes.EquipDeltas:FireAllClients({ chefs = list, kitchen = electKitchen() })
@@ -129,6 +134,27 @@ local function queueEquips()
 		equipsPending = false
 		broadcastEquips()
 	end)
+end
+
+-- Premium grants land in the profile like any other unlock, so the wardrobe
+-- and shop need no special case for them.
+monetization.onGrant = function(player, itemIds)
+	local profile = progression.profiles[player]
+	if profile == nil then
+		return
+	end
+	for _, id in itemIds do
+		profile.owned[id] = true
+	end
+	progression.dirty[player] = true
+	progression:push(player)
+	queueEquips()
+end
+progression.xpMultiplier = function(_self, player)
+	return monetization:xpMultiplier(player)
+end
+progression.coinMultiplier = function(_self, player)
+	return monetization:coinMultiplier(player)
 end
 
 remotes.PickSpecies.OnServerEvent:Connect(function(player, species)
@@ -201,6 +227,7 @@ Players.PlayerAdded:Connect(function(player)
 		vaultCharacter(player.Character)
 	end
 	progression:playerAdded(player)
+	monetization:playerAdded(player)
 	if director.phase == "round" and roundRemaining() < Config.LATE_JOIN_CUTOFF then
 		pendingJoins[player] = true
 		remotes.Snapshot:FireClient(player, replicator:snapshotFor(simService.sim))
@@ -216,6 +243,7 @@ Players.PlayerRemoving:Connect(function(player)
 	pendingJoins[player] = nil
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
+	monetization:playerRemoving(player)
 	-- director.ready is keyed by Player and had no cleanup: it leaked a key
 	-- per departure and could strand a stale ready that nothing could clear.
 	director.ready[player] = nil

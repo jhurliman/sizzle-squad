@@ -160,25 +160,71 @@ function ChefVisuals:ensure(id: number, skin: string): any
 				end
 			end
 		end
-		-- palette support: remember every part's authored color and find the
-		-- coat (the most common color by rough bucket) to retint later
-		local buckets: { [string]: { n: number, c: Color3 } } = {}
-		for _, part2 in entry.animParts do
-			table.insert(entry.origColors, part2.Color)
+		-- Palette support: remember every part's authored colour, then work out
+		-- which parts ARE the coat.
+		--
+		-- This used to pick the single most common exact colour. That is wrong
+		-- on a shaded rig: pip's green is authored as two tones (a light
+		-- 162,216,117 and a dark 92,186,60, 8 parts each) which each lose to
+		-- his 10-part cream belly -- so "Axolotl Pip" faithfully turned his
+		-- BELLY pink and left him green. Same story on bramble.
+		--
+		-- So cluster by HUE weighted by part volume (visual mass, not part
+		-- count), ignoring near-greys and near-blacks, which are eyes, teeth,
+		-- aprons and outlines rather than coat.
+		local HUE_TOLERANCE = 0.09 -- ~32 degrees either side
+		local MIN_SAT, MIN_VAL = 0.18, 0.12
+		local bins = table.create(24, 0)
+		local hsv = {}
+		for i, part2 in entry.animParts do
 			local c = part2.Color
-			local key = `{math.floor(c.R * 12)}:{math.floor(c.G * 12)}:{math.floor(c.B * 12)}`
-			local b = buckets[key]
-			if b == nil then
-				buckets[key] = { n = 1, c = c }
-			else
-				b.n += 1
+			table.insert(entry.origColors, c)
+			local h, sat, val = c:ToHSV()
+			hsv[i] = { h = h, s = sat, v = val }
+			if sat >= MIN_SAT and val >= MIN_VAL then
+				local size = part2.Size
+				local mass = size.X * size.Y * size.Z
+				local bin = math.clamp(math.floor(h * 24) + 1, 1, 24)
+				bins[bin] += mass
 			end
 		end
-		local bestN = 0
-		for _, b in buckets do
-			if b.n > bestN then
-				bestN = b.n
-				entry.coatColor = b.c
+		local bestBin, bestMass = 0, 0
+		for i, m in bins do
+			if m > bestMass then
+				bestBin, bestMass = i, m
+			end
+		end
+		entry.coatMask = {}
+		entry.coatHsv = hsv
+		if bestMass > 0 then
+			-- Weighted circular mean hue over the winning bin and its neighbours.
+			local centre = (bestBin - 0.5) / 24
+			local sx, sy, sw, sv, wn = 0, 0, 0, 0, 0
+			for i, part2 in entry.animParts do
+				local q = hsv[i]
+				if q.s >= MIN_SAT and q.v >= MIN_VAL then
+					local d = math.abs(q.h - centre)
+					d = math.min(d, 1 - d) -- hue is a circle
+					if d <= HUE_TOLERANCE then
+						local size = part2.Size
+						local mass = size.X * size.Y * size.Z
+						sx += math.cos(q.h * 2 * math.pi) * mass
+						sy += math.sin(q.h * 2 * math.pi) * mass
+						sw += q.s * mass
+						sv += q.v * mass
+						wn += mass
+					end
+				end
+			end
+			if wn > 0 then
+				local meanH = (math.atan2(sy, sx) / (2 * math.pi)) % 1
+				entry.coatRef = { h = meanH, s = sw / wn, v = sv / wn }
+				entry.coatColor = Color3.fromHSV(meanH, sw / wn, sv / wn)
+				for i, q in hsv do
+					local d = math.abs(q.h - meanH)
+					d = math.min(d, 1 - d)
+					entry.coatMask[i] = q.s >= MIN_SAT and q.v >= MIN_VAL and d <= HUE_TOLERANCE
+				end
 			end
 		end
 
@@ -209,9 +255,14 @@ local function around(joint: Vector3, rx: number, ry: number, rz: number): CFram
 end
 
 --- Retint the coat-colored parts toward an equipped palette (or restore).
+--- Recolour the coat, preserving its shading.
+---
+--- Every coat part keeps its light/dark relationship to the coat average and
+--- only takes on the target's hue and saturation, so a two-tone rig stays
+--- two-tone. A flat lerp toward one colour flattens the model instead.
 function ChefVisuals:applyPalette(entry: any, paletteId: string?)
 	local key = paletteId or "-"
-	if entry.paletteApplied == key or not entry.isRig or entry.coatColor == nil then
+	if entry.paletteApplied == key or not entry.isRig or entry.coatRef == nil then
 		return
 	end
 	entry.paletteApplied = key
@@ -220,12 +271,27 @@ function ChefVisuals:applyPalette(entry: any, paletteId: string?)
 	if item ~= nil and item.kind == "palette" and item.species == entry.skin and item.color ~= nil then
 		target = Color3.fromRGB(item.color[1], item.color[2], item.color[3])
 	end
-	local coat = entry.coatColor :: Color3
+	if target == nil then
+		for i, part in entry.animParts do
+			if entry.coatMask[i] then
+				part.Color = entry.origColors[i]
+			end
+		end
+		return
+	end
+	local th, ts, tv = (target :: Color3):ToHSV()
+	local ref = entry.coatRef
 	for i, part in entry.animParts do
-		local orig = entry.origColors[i]
-		local d = math.abs(orig.R - coat.R) + math.abs(orig.G - coat.G) + math.abs(orig.B - coat.B)
-		if d < 0.22 then
-			part.Color = if target ~= nil then orig:Lerp(target, 0.8) else orig
+		if entry.coatMask[i] then
+			local q = entry.coatHsv[i]
+			-- relative shade, so highlights stay highlights
+			local satScale = if ref.s > 0.01 then q.s / ref.s else 1
+			local valScale = if ref.v > 0.01 then q.v / ref.v else 1
+			part.Color = Color3.fromHSV(
+				th,
+				math.clamp(ts * satScale, 0, 1),
+				math.clamp(tv * valScale, 0.02, 1)
+			)
 		end
 	end
 end

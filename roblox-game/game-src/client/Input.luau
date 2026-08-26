@@ -70,24 +70,47 @@ function Input.new()
 	ContextActionService:BindAction(ACTION, self.actionHandler, true, Enum.KeyCode.E, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
 	if UserInputService.TouchEnabled then
 		-- Roblox's default touch JUMP button (dark circle, up arrow) sits in
-		-- the bottom-right thumb spot and our action button landed on top of
-		-- it. Chefs never jump, so retire it and take that spot: it is the
-		-- best thumb real estate on the screen and the action button is the
-		-- ONLY button this game has.
+		-- the bottom-right thumb spot, right on top of our action button.
+		-- Chefs never jump, so retire it and take that spot: it is the best
+		-- thumb real estate on the screen and the action button is the ONLY
+		-- button this game has.
 		--
-		-- Hidden by name wherever it appears, and re-hidden on DescendantAdded
-		-- because the touch GUI is rebuilt on respawn and device changes.
+		-- Hiding it once is NOT enough, which is why it kept coming back:
+		-- PlayerModule's TouchJump re-shows the button whenever it re-runs
+		-- UpdateVisible -- on respawn, on device change, and on every
+		-- ControlModule:Enable(), which we now call ourselves each time the
+		-- menu closes. So LOCK it: react to its own Visible change and force
+		-- it back down. Writing the same value never re-fires the signal, so
+		-- this settles immediately rather than looping.
 		local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-		local function hideJump(inst: Instance)
-			if inst.Name == "JumpButton" and inst:IsA("GuiObject") then
-				inst.Visible = false
+		local function lockHidden(inst: Instance)
+			if inst.Name ~= "JumpButton" or not inst:IsA("GuiObject") then
+				return
+			end
+			local button = inst :: GuiObject
+			button.Visible = false
+			if button:GetAttribute("SizzleLocked") == true then
+				return
+			end
+			button:SetAttribute("SizzleLocked", true)
+			button:GetPropertyChangedSignal("Visible"):Connect(function()
+				if button.Visible then
+					button.Visible = false
+				end
+			end)
+		end
+		self.hideJump = function()
+			for _, d in playerGui:GetDescendants() do
+				lockHidden(d)
 			end
 		end
-		for _, d in playerGui:GetDescendants() do
-			hideJump(d)
-		end
+		self.hideJump()
 		playerGui.DescendantAdded:Connect(function(d)
-			task.defer(hideJump, d)
+			task.defer(lockHidden, d)
+		end)
+		-- The touch GUI is rebuilt from scratch on respawn.
+		Players.LocalPlayer.CharacterAdded:Connect(function()
+			task.defer(self.hideJump)
 		end)
 
 		ContextActionService:SetPosition(ACTION, UDim2.new(1, -104, 1, -124))
@@ -142,6 +165,10 @@ function Input:setEnabled(on: boolean)
 		end)
 	end
 	if on then
+		-- Enable() re-shows the jump button; put it back down.
+		if self.hideJump ~= nil then
+			task.defer(self.hideJump)
+		end
 		ContextActionService:BindAction(ACTION, self.actionHandler, true, Enum.KeyCode.E, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
 		if UserInputService.TouchEnabled then
 			ContextActionService:SetPosition(ACTION, UDim2.new(1, -104, 1, -124))

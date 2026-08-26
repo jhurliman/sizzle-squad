@@ -159,7 +159,7 @@ function Menu:buildPanel()
 		Size = UDim2.fromOffset(40, 40),
 		Position = UDim2.new(1, -48, 0, 10),
 		Fill = Theme.BROWN_LIGHT,
-		Text = "✕",
+		Text = "X", -- NOT U+2715: no glyph in the UI font, renders as an empty box
 		TextSize = 20,
 		ZIndex = 4,
 	}, self.panel)

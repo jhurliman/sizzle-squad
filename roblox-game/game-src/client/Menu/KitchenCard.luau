@@ -171,7 +171,7 @@ function KitchenCard.new(gui: Instance, deps: any)
 		Fill = Theme.BROWN_LIGHT,
 		TextSize = 18,
 		ZIndex = 9,
-		Text = "✕",
+		Text = "X", -- NOT U+2715: no glyph in the UI font, renders as an empty box
 	}, self.card)
 	close.Activated:Connect(function()
 		self:hide()

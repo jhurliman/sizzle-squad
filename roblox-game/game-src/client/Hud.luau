@@ -339,8 +339,12 @@ end
 --- Drop every ticket. Called on leaving a round so no orders survive into the
 --- results/lobby screens.
 function Hud:clearOrders()
+	-- A ticket entry is { card, fill }, NOT an Instance. Calling :Destroy() on
+	-- the table threw out of updatePhase before the results overlay was built,
+	-- which is what left you stuck in the kitchen at round end with the last
+	-- shift's orders still on screen.
 	for id, ticket in self.tickets do
-		ticket:Destroy()
+		ticket.card:Destroy()
 		self.tickets[id] = nil
 	end
 end

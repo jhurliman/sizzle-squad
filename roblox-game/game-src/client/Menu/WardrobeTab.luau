@@ -322,8 +322,10 @@ function WardrobeTab:render()
 			continue
 		end
 		local owned = self:owns(item.id)
-		local locked = item.level ~= nil and level < item.level
-		local state = if self.pending.hat == item.id
+		local locked = (item.level ~= nil and level < item.level) or (item.exclusive ~= nil and not owned)
+		local state = if item.exclusive ~= nil and not owned
+			then "★ PASS"
+			elseif self.pending.hat == item.id
 			then "equipped"
 			elseif owned then "owned"
 			elseif locked then `Lv {item.level}`
@@ -334,7 +336,7 @@ function WardrobeTab:render()
 			end
 			-- Try-before-you-buy: unowned hats still preview.
 			self.pending.hat = item.id
-			self.selected = if owned then nil else item
+			self.selected = if owned or item.exclusive ~= nil then nil else item
 			self:pushPreview()
 			self:render()
 		end)
@@ -353,11 +355,13 @@ function WardrobeTab:render()
 			continue
 		end
 		local owned = self:owns(item.id)
-		local locked = item.level ~= nil and level < item.level
+		local locked = (item.level ~= nil and level < item.level) or (item.exclusive ~= nil and not owned)
 		local tint = if item.color ~= nil
 			then Color3.fromRGB(item.color[1], item.color[2], item.color[3])
 			else nil
-		local state = if self.pending.palette == item.id
+		local state = if item.exclusive ~= nil and not owned
+			then "★ PASS"
+			elseif self.pending.palette == item.id
 			then "equipped"
 			elseif owned then "owned"
 			elseif locked then `Lv {item.level}`
@@ -367,7 +371,7 @@ function WardrobeTab:render()
 				return
 			end
 			self.pending.palette = item.id
-			self.selected = if owned then nil else item
+			self.selected = if owned or item.exclusive ~= nil then nil else item
 			self:pushPreview()
 			self:render()
 		end)

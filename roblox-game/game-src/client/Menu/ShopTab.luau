@@ -5,6 +5,9 @@
 -- as "{name} · {kind}" text rows with no icon, no grouping and no preview.
 -- Wearables hand off to the Wardrobe rather than asking you to buy blind.
 
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+
 local Theme = require(script.Parent.Theme) :: any
 
 local ShopTab = {}
@@ -18,11 +21,13 @@ local FILTERS = {
 	{ id = "palette", label = "COATS" },
 	{ id = "emote", label = "EMOTES" },
 	{ id = "kitchen", label = "KITCHEN" },
+	{ id = "premium", label = "★ PREMIUM" },
 }
 
 function ShopTab.new(parent: Instance, deps: any)
 	local self = setmetatable({}, ShopTab)
 	self.catalog = deps.catalog
+	self.money = deps.monetization
 	self.deps = deps
 	self.filter = "all"
 
@@ -93,6 +98,10 @@ function ShopTab:render()
 	end
 	local progress = self.progress
 	if progress == nil then
+		return
+	end
+	if self.filter == "premium" then
+		self:renderPremium(progress)
 		return
 	end
 	local level, coins = progress.level or 1, progress.coins or 0
@@ -215,6 +224,86 @@ function ShopTab:render()
 			LayoutOrder = 1,
 			ZIndex = 5,
 			Text = "Nothing here yet.",
+		}, self.list)
+	end
+end
+
+--- Robux products. Rendered from shared/Monetization, and a product whose
+--- gamePassId is still 0 is simply not shown -- the same inert-until-configured
+--- convention the badge ids use.
+function ShopTab:renderPremium(progress: any)
+	local owned = progress.owned or {}
+	local order, shown = 0, 0
+	for _, product in self.money.PRODUCTS do
+		if product.gamePassId == 0 then
+			continue
+		end
+		shown += 1
+		order += 1
+		-- "Owned" is inferred from the grants actually in the profile, so the
+		-- card reflects what the server believes, not a local guess.
+		local grants = self.money.grantsOf(self.catalog, product.id)
+		local has = #grants > 0
+		for _, id in grants do
+			if owned[id] ~= true then
+				has = false
+			end
+		end
+
+		local card = mk("Frame", {
+			Size = UDim2.new(1, -10, 0, 96),
+			BackgroundColor3 = if has then Theme.GREEN else Theme.BROWN_LIGHT,
+			BackgroundTransparency = 0.2,
+			BorderSizePixel = 0,
+			LayoutOrder = order,
+			ZIndex = 4,
+		}, self.list)
+		Theme.corner(card, 10)
+		Theme.label({
+			Size = UDim2.new(1, -170, 0, 26),
+			Position = UDim2.fromOffset(14, 8),
+			TextSize = 18,
+			Font = Theme.TITLE_FONT,
+			TextColor3 = Theme.GOLD,
+			ZIndex = 5,
+			Text = product.name,
+		}, card)
+		Theme.label({
+			Size = UDim2.new(1, -170, 0, 54),
+			Position = UDim2.fromOffset(14, 34),
+			TextSize = 13,
+			TextWrapped = true,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			ZIndex = 5,
+			Text = product.blurb,
+		}, card)
+		local buy = Theme.button({
+			Size = UDim2.fromOffset(140, Theme.MIN_TAP),
+			Position = UDim2.new(1, -150, 0.5, -Theme.MIN_TAP / 2),
+			Fill = if has then Theme.GREY else Theme.GOLD,
+			TextColor3 = if has then Theme.CREAM else Theme.BROWN_DEEP,
+			TextSize = 16,
+			ZIndex = 5,
+			Text = if has then "OWNED" else `R$ {product.robux}`,
+		}, card)
+		if not has then
+			buy.Activated:Connect(function()
+				pcall(function()
+					MarketplaceService:PromptGamePassPurchase(Players.LocalPlayer, product.gamePassId)
+				end)
+			end)
+		end
+	end
+
+	if shown == 0 then
+		Theme.label({
+			Size = UDim2.new(1, -20, 0, 80),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextWrapped = true,
+			TextColor3 = Theme.DIM,
+			LayoutOrder = 1,
+			ZIndex = 5,
+			Text = "No passes are set up yet.\nCreate them on the Creator Dashboard and put their ids in shared/Monetization.luau.",
 		}, self.list)
 	end
 end

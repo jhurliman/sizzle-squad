@@ -179,9 +179,12 @@ function Progression:awardRound(crew: any, results: any)
 		local stats = results.stats[seat.chefId] or {}
 		local serves = stats.serves or 0
 
-		-- coins: even team share + star bonus
-		local coinShare = math.floor(results.coins / humans) + results.stars * 10
-		profile.coins += coinShare
+		-- Coins: the FULL team value, not a share of it. Dividing by crew size
+		-- meant a fourth player cost everyone 75% of their pay, which punished
+		-- exactly the thing a co-op game wants to encourage.
+		local mult = self.coinMultiplier ~= nil and self:coinMultiplier(player) or 1
+		local crewBonus = (humans - 1) * (config.CREW_BONUS_PER_MATE or 0)
+		profile.coins += math.floor((results.coins + results.stars * 10 + crewBonus) * mult)
 		profile.rounds += 1
 		profile.totalDishes += serves
 		profile.bestRound = math.max(profile.bestRound, results.coins)
@@ -191,6 +194,10 @@ function Progression:awardRound(crew: any, results: any)
 			config.XP_SOFT_CAP,
 			config.XP_BASE + serves * config.XP_PER_DISH + results.stars * config.XP_PER_STAR
 		)
+		-- Supporter Pass XP boost (1.0 when nothing is owned / unconfigured).
+		if self.xpMultiplier ~= nil then
+			xp = math.floor(xp * self:xpMultiplier(player))
+		end
 		profile.xp += xp
 		while profile.xp >= config.LEVEL_CURVE(profile.level) do
 			profile.xp -= config.LEVEL_CURVE(profile.level)

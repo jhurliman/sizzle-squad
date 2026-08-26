@@ -24,8 +24,12 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 **Species picking moved into the Wardrobe**, alongside hats and palettes
   against a live 3D preview — duplicates allowed by design; nametags
   differentiate.
-- 🟡 **Supporter Pass / monetization not implemented at all** (no gamepass
-  check, no +10% XP hook, no bundles). Plan §2.5; deliberately last.
+- 🟡 **Monetization is wired but inert until pass ids exist.** Two game
+  passes (Supporter Pass, Chef's Trunk) in shared/Monetization.luau, checked on
+  join and on PromptGamePassPurchaseFinished, granting catalog items tagged
+  `exclusive`. A pass with `gamePassId = 0` is hidden and ungrantable. See
+  README → "Remaining launch steps" for what to create. **No purchase has ever
+  been made against a real pass** — untested end-to-end.
 
 ## B. Placeholder presentation
 
@@ -115,6 +119,27 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 **Wardrobe has no search/sort**; at 30 items the flat rails are fine, but
   they will not scale to a content cadence.
 
+## C2b. Economy (rebalanced from measured data — tools/economy-probe.luau)
+
+- 🔴 **THE KITCHEN CANNOT ABSORB A FULL CREW.** Dishes served plateaus at
+  ~10 per round whether one chef works the line or four: throughput is bound by
+  the station count, not by hands. The old pacing table hid this by ramping the
+  order rate with crew size, which produced 7.4 missed tickets and wiped 2 of 5
+  rounds at four players without serving a single extra dish. The table is now
+  flat and everyone survives, but **a fourth player still adds almost no
+  throughput** — the real fix is more stations (a second board, a second
+  stove), which is a level-design change, not a tuning one.
+- 🟢 Payout no longer divides the team pot per head (it paid 172 solo vs 27
+  each at four players — an anti-social incentive in a co-op game). Everyone
+  banks the full team value plus a per-crewmate bonus, so a full kitchen pays
+  ~+32% per player.
+- 🟢 Star thresholds re-set from the measured distribution; 150/320/500 made
+  3 stars unreachable, which quietly killed the photo moment, the star coin
+  bonus and two badges.
+- 🟢 Prices set against ~186 coins/round: first buy at ~1.3 rounds, full
+  29-item catalog ~10.5 hours solo. Re-run the probe after touching PACING,
+  STARS or any price.
+
 ## C3. Fixed in the front-end pass (kept here as regression bait)
 
 - Between-rounds walking rubber-banded because human move validation timed
@@ -124,9 +149,21 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
   snapping between rounds again, look here first.
 - The round timer chip and the order queue used to survive into results and
   the lobby; both are now gated to `phase == "round"`.
-- 🪙 has no glyph in Roblox's font stack (Unicode 13) and rendered as a hollow
-  box. Coin amounts are spelled out or use the `c` suffix. Every other emoji
-  in the UI predates 2016 and renders fine.
+- 🪙 (Unicode 13) and ✕ (U+2715) have no glyph in Roblox's font stack and
+  rendered as hollow boxes. Coin amounts are spelled out or use the `c` suffix
+  and the close icon is a plain "X". Every other glyph in the UI predates 2016.
+- Palette retint picked the single most common EXACT colour, which on a shaded
+  rig is not the coat: pip's green is authored as two tones that each lose to
+  his cream belly, so "Axolotl Pip" turned his belly pink and left him green.
+  Coat detection now clusters by hue weighted by part volume and remaps
+  hue/saturation while preserving each part's relative shade (pip 13% -> 64% of
+  visual mass retinted, bramble 92%).
+- Hud:clearOrders called :Destroy() on the ticket TABLE ({card, fill}), which
+  threw out of updatePhase before the results overlay was built — that is what
+  left you stuck in the kitchen at round end.
+- The touch jump button kept coming back because PlayerModule re-shows it on
+  every ControlModule:Enable(), which the menu now triggers on every close. It
+  is Visible-locked via its own property-changed signal.
 
 ## D. Robustness / tech debt
 

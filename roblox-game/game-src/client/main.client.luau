@@ -10,6 +10,7 @@ local shared = require(ReplicatedStorage:WaitForChild("Shared")) :: any
 local gameShared = ReplicatedStorage:WaitForChild("Game")
 local Net = require(gameShared:WaitForChild("Net")) :: any
 local Catalog = require(gameShared:WaitForChild("Catalog")) :: any
+local MonetizationDefs = require(gameShared:WaitForChild("Monetization")) :: any
 local ClientState = require(script.Parent.ClientState) :: any
 local Input = require(script.Parent.Input) :: any
 local ChefVisuals = require(script.Parent.ChefVisuals) :: any
@@ -72,6 +73,7 @@ end
 -- ready bar, the join card and the emote row; this file just forwards state.
 local menu = Menu.new({
 	catalog = Catalog,
+	monetization = MonetizationDefs,
 	remotes = remotes,
 	input = input,
 	hudGui = hud.gui,

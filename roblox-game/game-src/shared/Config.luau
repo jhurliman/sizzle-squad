@@ -19,16 +19,26 @@ Config.LATE_JOIN_CUTOFF = 15 -- <15s left: hold joiner in kitchen-cam until resu
 -- flip this on for bot-backfilled kitchens, or wire it to a lobby vote later.
 Config.BOT_FILL = false
 
--- Difficulty by (non-AFK) human count — the director table from plan §2.3,
--- retuned for HUMAN-ONLY crews: the web baseline assumed 3 bots closing ~90%
--- of tickets, so a solo human needs a far gentler order clock. (Solo pacing
--- validated by tools/solo-pacing-harness.luau with a bot as human proxy.)
+-- Difficulty by (non-AFK) human count.
+--
+-- MEASURED, not guessed (tools/economy-probe.luau): dishes served plateaus at
+-- ~10-11 per round REGARDLESS of crew size or order rate, because throughput
+-- is bound by the kitchen's stations -- chefs contend for the same boards and
+-- stoves. The old table ramped the order gap to 0.85 at four players, which
+-- produced 7.4 missed tickets a round and wiped 2 rounds in 5 without serving
+-- a single extra dish.
+--
+-- So the table is nearly FLAT, sitting on the measured yield peak (gap ~2.0).
+-- Bigger crews get a slight tightening for feel, not for throughput.
+--
+-- The real fix for four players is more stations, not more tickets: see
+-- KNOWN-GAPS "the kitchen cannot absorb a full crew".
 Config.PACING = {
 	[0] = { orderGapMul = 3.0, maxOrdersBonus = -1, ticketTimeMul = 1.5, patienceMissMul = 0.5 }, -- idle kitchen
-	[1] = { orderGapMul = 2.4, maxOrdersBonus = -1, ticketTimeMul = 1.5, patienceMissMul = 0.7 },
-	[2] = { orderGapMul = 1.5, maxOrdersBonus = -1, ticketTimeMul = 1.25, patienceMissMul = 0.85 },
-	[3] = { orderGapMul = 1.05, maxOrdersBonus = 0, ticketTimeMul = 1.1, patienceMissMul = 0.95 },
-	[4] = { orderGapMul = 0.85, maxOrdersBonus = 0, ticketTimeMul = 1.0, patienceMissMul = 1.0 },
+	[1] = { orderGapMul = 2.2, maxOrdersBonus = -1, ticketTimeMul = 1.5, patienceMissMul = 0.7 },
+	[2] = { orderGapMul = 2.1, maxOrdersBonus = -1, ticketTimeMul = 1.45, patienceMissMul = 0.8 },
+	[3] = { orderGapMul = 2.0, maxOrdersBonus = 0, ticketTimeMul = 1.4, patienceMissMul = 0.9 },
+	[4] = { orderGapMul = 1.9, maxOrdersBonus = 0, ticketTimeMul = 1.35, patienceMissMul = 1.0 },
 }
 -- Bot-filled kitchens (BOT_FILL = true) use the original table:
 Config.PACING_BOTFILL = {
@@ -60,8 +70,20 @@ Config.ASSIST = {
 -- Leaderboard integrity: bot-plated dishes pay this fraction (plan §2.4).
 Config.BOT_SERVE_VALUE_MUL = 0.6
 
--- Star thresholds on team coins (tunable against live data).
-Config.STARS = { 150, 320, 500 }
+-- Star thresholds on team coins, set from the measured distribution
+-- (n=48 bot rounds: min 122, median 166, p90 211, max 219). The old
+-- 150/320/500 made 3 stars mathematically unreachable -- and with it the
+-- 3-star photo moment, the star coin bonus and two badges were dead content.
+--
+-- 1 star: every completed shift (100%).  2 stars: a good shift (~60%).
+-- 3 stars: a genuinely strong shift (~15% at bot skill; more for good humans).
+Config.STARS = { 120, 165, 205 }
+
+-- Coins per round, per player. Deliberately NOT a share of the team pot: an
+-- even split paid 172 solo but only 27 each in a four-player kitchen, which is
+-- an anti-social incentive in a co-op game. Everyone now banks the full team
+-- value plus a bonus for each crewmate, so playing together always pays more.
+Config.CREW_BONUS_PER_MATE = 20
 
 -- Progression (plan §2.5)
 Config.XP_BASE = 50
