@@ -140,6 +140,34 @@ Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around 
 - 🟢 **Wardrobe has no search/sort**; at 42 items the flat rails still read,
   but they will not survive a content cadence.
 
+## C2a. WASHING UP IS DEAD CONTENT (unresolved)
+
+- 🔴 **Nothing in the sim ever sets `plate.dirty = true`, and the plate racks
+  dispense infinitely.** So: plates never run out, no plate is ever dirty, and
+  the sink can never be used. A whole station, its verb, its 2.2s wash timer,
+  the `washDone` event, a `plate_dirty` mesh and the bot brain's
+  "wash the plate" rule are all unreachable. Reported from play as "I had no
+  clue there were dirty plates and washing in this game."
+  (The `plate_dirty` mesh is also only ~9% darker than a clean plate — even if
+  it were reachable it would not read. Fix that at the same time.)
+
+  **Enabling it is a real feature pass, not a switch.** Attempted and reverted;
+  three separate obstacles, each measured against six seeds:
+  1. A served plate has to go somewhere, and every surface in this kitchen is
+     load-bearing. On counters it broke assembly outright — the brain parks
+     half-built plates on the nearest free counter then goes looking for them —
+     and throughput FELL as plate stock rose. On the plate racks it blocked the
+     dispensers, so chefs reaching for a clean plate picked up a dirty one.
+  2. An empty rack DEADLOCKS a chef already holding food: the fix is somewhere
+     else entirely and they have to guess it. Bots demonstrated it exactly,
+     holding a chopped tomato for the rest of the round.
+  3. Bots wash eagerly when told to and lose ~1.8 dishes/round doing it at full
+     stock; gate it on low stock and the recycle loop only completes once.
+  Best result reached was dishes ~= starting plate count with 1 wash/round,
+  against a 9.7-dish baseline — strictly worse than not having the mechanic.
+  It needs a design decision (where do dirty plates live?) plus brain work,
+  and both games share the sim so it retunes the browser build too.
+
 ## C2b. Economy (rebalanced from measured data — tools/economy-probe.luau)
 
 - 🟡 **4-player throughput is capped by the BOT BRAIN, not the kitchen.**
