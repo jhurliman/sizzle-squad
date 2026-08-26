@@ -35,6 +35,23 @@ local TICKET_RESERVE = 210
 -- Shared with every menu surface (this was three copies of the same helper).
 local mk = Theme.mk
 
+-- Roblox's topbar is ~36px and always present in a real session; a floor keeps
+-- the HUD clear of it even where the inset API reports nothing.
+local TOPBAR_MIN = 36
+
+local function topInset(): number
+	local ok, rect = pcall(function()
+		return GuiService.TopbarInset
+	end)
+	if ok and rect ~= nil and rect.Height > 0 then
+		return rect.Height
+	end
+	local ok2, inset = pcall(function()
+		return GuiService:GetGuiInset()
+	end)
+	return if ok2 and inset ~= nil then inset.Y else 0
+end
+
 function Hud.new(catalog: any)
 	local self = setmetatable({}, Hud)
 	self.catalog = catalog
@@ -48,12 +65,18 @@ function Hud.new(catalog: any)
 	-- anything pinned to the TOP has to dodge Roblox's own controls itself.
 	-- The patience bar sat at y=25 and showed as a green stripe running behind
 	-- the Roblox icon and the chat button.
-	local topPad = GuiService:GetGuiInset().Y
+	--
+	-- Read LIVE, not once. GetGuiInset() reports 0 before a session is running
+	-- -- which is why the bar still sat under the controls in the Studio
+	-- editor after the first attempt at this -- and the inset changes at
+	-- runtime as Roblox shows and hides its own chrome. TOPBAR_MIN is a floor
+	-- for the cases where it reports nothing at all.
+	self.topChips = {}
 
 	-- timer chip (top center)
 	self.timerLabel = mk("TextLabel", {
 		Size = UDim2.fromOffset(140, 44),
-		Position = UDim2.new(0.5, -70, 0, topPad + 8),
+		Position = UDim2.new(0.5, -70, 0, 8),
 		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
 		BackgroundTransparency = 0.15,
 		TextColor3 = Color3.fromRGB(255, 244, 221),
@@ -66,7 +89,7 @@ function Hud.new(catalog: any)
 	-- coins + combo (top right)
 	self.scoreLabel = mk("TextLabel", {
 		Size = UDim2.fromOffset(170, 44),
-		Position = UDim2.new(1, -182, 0, topPad + 8),
+		Position = UDim2.new(1, -182, 0, 8),
 		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
 		BackgroundTransparency = 0.15,
 		TextColor3 = Color3.fromRGB(255, 224, 102),
@@ -79,7 +102,7 @@ function Hud.new(catalog: any)
 	-- patience bar (top left)
 	local pat = mk("Frame", {
 		Size = UDim2.fromOffset(170, 18),
-		Position = UDim2.new(0, 12, 0, topPad + 21),
+		Position = UDim2.new(0, 12, 0, 21),
 		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
 		BackgroundTransparency = 0.15,
 	}, gui)
@@ -131,7 +154,7 @@ function Hud.new(catalog: any)
 	-- so the whole rail auto-scales down to fit (see updateOrders).
 	self.ticketRail = mk("Frame", {
 		Size = UDim2.new(0, TICKET_W, 1, -TICKET_RESERVE),
-		Position = UDim2.new(1, -(TICKET_W + 10), 0, topPad + 58),
+		Position = UDim2.new(1, -(TICKET_W + 10), 0, 58),
 		BackgroundTransparency = 1,
 	}, gui)
 	self.ticketScale = mk("UIScale", { Scale = 1 }, self.ticketRail)
@@ -161,7 +184,31 @@ function Hud.new(catalog: any)
 	-- floating labels pool
 	self.labelPool = {} :: { any }
 
+	-- Everything pinned to the top of the screen, with its design-time y.
+	self.topChips = {
+		{ self.timerLabel, 8 },
+		{ self.scoreLabel, 8 },
+		{ self.patienceFill.Parent, 21 },
+		{ self.ticketRail, 58 },
+	}
+	self:applyTopInset()
+	pcall(function()
+		GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(function()
+			self:applyTopInset()
+		end)
+	end)
+
 	return self
+end
+
+--- Re-pin the top row below Roblox's own controls.
+function Hud:applyTopInset()
+	local pad = math.max(topInset(), TOPBAR_MIN)
+	for _, entry in self.topChips do
+		local inst, baseY = entry[1], entry[2]
+		local p = inst.Position
+		inst.Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, pad + baseY)
+	end
 end
 
 function Hud:setSpectating(on: boolean)
