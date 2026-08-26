@@ -24,6 +24,13 @@
       "$className": "Workspace",
       "Kitchen": { "$path": "assets/kitchen.rbxm" }
     },
+    "Players": {
+      "$className": "Players",
+      "$properties": {
+        "MaxPlayers": 4,
+        "PreferredPlayers": 4
+      }
+    },
     "Lighting": {
       "$className": "Lighting",
       "$properties": {
