@@ -16,3 +16,10 @@ progress/index.html
 
 .DS_Store
 *.log
+
+# Open Cloud credentials live at ~/.config/sizzle/opencloud.json, never here.
+# These patterns are a backstop in case anyone puts one in the tree anyway.
+opencloud.json
+.env
+.env.*
+*.apikey
