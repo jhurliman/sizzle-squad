@@ -204,7 +204,11 @@ function Results:step(dt: number)
 	self.scale.Scale += (1 - self.scale.Scale) * math.min(1, dt * 9)
 
 	if self.t >= T_STATS and self.stats.Text == "" then
-		self.stats.Text = `{r.served} dishes served  ·  best combo x{r.bestCombo}  ·  {r.coins} team coins`
+		-- "best combo x7" was the same category error the in-round chip made:
+		-- bestCombo is a COUNT of consecutive clean serves, and a 7 streak pays
+		-- x1.90, not x7. As an end-of-round record the count is the interesting
+		-- number, so it keeps the count and loses the multiplication sign.
+		self.stats.Text = `{r.served} dishes served  ·  best streak {r.bestCombo}  ·  {r.coins} team coins`
 	end
 
 	-- stars punch in one at a time

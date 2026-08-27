@@ -10,7 +10,12 @@
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+
+-- The tip multiplier is the SIM's number, not the HUD's. Reading it from the
+-- shared bundle is what stops the chip and the scoring drifting apart again.
+local shared = require(ReplicatedStorage:WaitForChild("Shared")) :: any
 
 local Theme = require(script.Parent.Menu.Theme) :: any
 
@@ -108,6 +113,30 @@ function Hud.new(catalog: any)
 	}, gui)
 	mk("UICorner", { CornerRadius = UDim.new(0, 12) }, self.scoreLabel)
 
+	-- COMBO, ON ITS OWN CHIP, AND ONLY WHEN IT IS PAYING.
+	--
+	-- This used to be "x{combo}" tacked onto the coins chip, printing the raw
+	-- streak COUNT behind a multiplication sign: a fresh round read "26c  x0",
+	-- which says every dish is worth nothing. The count is not the multiplier
+	-- and never was -- combo 3 pays 1.30, not 3.00.
+	--
+	-- So the chip now shows the real multiplier, carries the word COMBO to say
+	-- what is being multiplied, and is hidden below combo 2 because a streak
+	-- pays nothing until it is a streak. Appearing and vanishing is also the
+	-- only feedback the player gets that a streak started or broke.
+	self.comboLabel = mk("TextLabel", {
+		Size = UDim2.fromOffset(150, 28),
+		Position = UDim2.new(0, 12, 0, 84),
+		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
+		BackgroundTransparency = 0.15,
+		TextColor3 = Color3.fromRGB(255, 224, 102),
+		TextSize = 18,
+		Font = Enum.Font.FredokaOne,
+		Text = "",
+		Visible = false,
+	}, gui)
+	mk("UICorner", { CornerRadius = UDim.new(0, 10) }, self.comboLabel)
+
 	-- patience bar (top left)
 	local pat = mk("Frame", {
 		Size = UDim2.fromOffset(170, 18),
@@ -201,6 +230,7 @@ function Hud.new(catalog: any)
 	self.topChips = {
 		{ self.patienceFill.Parent, 4 },
 		{ self.scoreLabel, 26 },
+		{ self.comboLabel, 66 },
 	}
 	self:applyTopInset()
 	pcall(function()
@@ -356,6 +386,11 @@ function Hud:updatePhase(phase: any, cards: any?)
 	local inRound = p == "round"
 	self.timerLabel.Visible = inRound
 	self.patienceFill.Parent.Visible = inRound
+	-- A combo belongs to a shift too: it must not hang over the results screen
+	-- advertising a streak that is already over.
+	if not inRound then
+		self.comboLabel.Visible = false
+	end
 	if not inRound then
 		-- Tickets are a live-service artefact: clear them outright rather than
 		-- leaving the last shift's orders floating over the results screen.
@@ -377,7 +412,19 @@ end
 
 function Hud:updateScore(score: any)
 	-- No coin emoji: FredokaOne has no glyph for it and renders a hollow box.
-	self.scoreLabel.Text = `{score.coins}c   x{score.combo}`
+	self.scoreLabel.Text = `{score.coins}c`
+	local combo = score.combo or 0
+	if combo >= 2 then
+		local mul = shared.comboMultiplier(combo)
+		self.comboLabel.Text = string.format("COMBO  x%.2f", mul)
+		-- Runs yellow -> orange across the 1.00..2.50 range so the chip reads
+		-- as heat without needing a second number.
+		local t = math.clamp((mul - 1) / 1.5, 0, 1)
+		self.comboLabel.TextColor3 = Color3.fromRGB(255, math.floor(224 - 74 * t), math.floor(102 - 62 * t))
+		self.comboLabel.Visible = true
+	else
+		self.comboLabel.Visible = false
+	end
 	local f = math.clamp(score.patience, 0, 1)
 	self.patienceFill.Size = UDim2.fromScale(f, 1)
 	self.patienceFill.BackgroundColor3 = if f > 0.5

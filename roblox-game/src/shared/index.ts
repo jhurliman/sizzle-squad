@@ -3,6 +3,7 @@
 export {
   SIM_DT,
   SIM_HZ,
+  comboMultiplier,
   createSim,
   mulberry32,
   seedPans,

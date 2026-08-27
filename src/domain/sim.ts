@@ -1519,6 +1519,25 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
  * an order who walked past the pass, and charging them a combo for it is
  * punishing a player for the ambiguity of a hitbox they cannot see.
  */
+/**
+ * TIP MULTIPLIER FOR A STREAK OF `combo` CONSECUTIVE CLEAN SERVES.
+ *
+ * Exported because the HUD needs the same number the scoring does. It used to
+ * be inline at the serve site while the HUD printed the raw streak COUNT
+ * behind an "x", so the chip read "x0" on a fresh round -- a multiplier of
+ * zero, i.e. "nothing you serve is worth anything", which is the opposite of
+ * what a streak of zero means. Two readouts of one quantity is how that
+ * happens; now there is one.
+ *
+ * combo 1 pays 1.00 (a streak has not earned anything until it is a streak),
+ * and it climbs 0.15 a serve to a 2.50 ceiling at combo 11. The max() only
+ * matters to callers outside the serve path -- there the count is always >= 1
+ * because it is incremented first -- so it cannot move scoring.
+ */
+export function comboMultiplier(combo: number): number {
+  return 1 + Math.min(1.5, Math.max(0, combo - 1) * 0.15);
+}
+
 function plateIsWorkInProgress(s: SimState, plate: Plate): boolean {
   if (plate.contents.length === 0) return true;
   const have = new Map<string, number>();
@@ -1559,7 +1578,7 @@ function trySer(s: SimState, chef: Chef, plate: Plate, at: Vec2) {
   s.score.served += 1;
   // Fresher tickets tip better; combos multiply. Rewards flow, not hoarding.
   const freshness = 0.6 + 0.4 * (order.remaining / order.total);
-  const comboMul = 1 + Math.min(1.5, (s.score.combo - 1) * 0.15);
+  const comboMul = comboMultiplier(s.score.combo);
   const value = Math.round(order.recipe.baseValue * freshness * comboMul * (plate.botMade === true ? s.director.botServeValueMul : 1));
   s.score.coins += value;
   s.score.patience = Math.min(1, s.score.patience + TUNING.patiencePerServe);
