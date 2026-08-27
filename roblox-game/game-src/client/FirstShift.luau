@@ -125,15 +125,46 @@ local function unfinishedAt(state: any, kind: string, doneState: string): number
 	return nil
 end
 
---- Is a clean plate already down somewhere, waiting to be built on?
-local function stagedPlate(state: any): boolean
+--- The station holding a clean plate that is waiting to be built on, if any.
+---
+--- Returns the ID rather than a boolean because "put it on a plate" has to
+--- glow the plate the player actually staged. Pointing at the plate DISPENSER
+--- instead sends them across the kitchen to fetch a second plate.
+local function stagedPlateId(state: any): number?
 	for _, st in state.mirrorSim.kitchen.stations do
 		local h = state.stations[st.id] and state.stations[st.id].holding
 		if h ~= nil and h.type == "plate" and h.dirty ~= true then
-			return true
+			return st.id
 		end
 	end
-	return false
+	return nil
+end
+
+--- A station holding a loose ingredient that has reached the state its ticket
+--- wants: finished work sitting there waiting to be collected and plated.
+---
+--- Without this the coach went quiet on its own instructions. It told you to
+--- chop the lettuce, and the moment you did, the board no longer held anything
+--- "unfinished", your hands were empty, and it sent you back to the crate for
+--- more lettuce -- past the chopped lettuce it had just had you make.
+local function readyAt(state: any, order: any): (number?, string?)
+	for _, st in state.mirrorSim.kitchen.stations do
+		local h = state.stations[st.id] and state.stations[st.id].holding
+		if h ~= nil and h.type == "ingredient" then
+			local wanted = nil
+			if order ~= nil then
+				for _, c in order.components do
+					if c.kind == h.kind then
+						wanted = c.state
+					end
+				end
+			end
+			if wanted == nil or h.state == wanted then
+				return st.id, h.kind
+			end
+		end
+	end
+	return nil, nil
 end
 
 function FirstShift:setEligible(progress: any)
@@ -174,6 +205,8 @@ function FirstShift:update(state: any, flags: number): number?
 
 	local held = if state.myChefId ~= nil then state.carrying[state.myChefId] else nil
 	local order = state.orders[1]
+	-- Finished work waiting to be collected, resolved against the live ticket.
+	local readyId, readyKind = readyAt(state, order)
 	local tip, target
 
 	if working then
@@ -216,8 +249,8 @@ function FirstShift:update(state: any, flags: number): number?
 			tip = line
 			target = nearest(state, stationOfKind(kind))
 		else
-			tip = "That's ready — put it on a plate."
-			target = nearest(state, stationOfKind("plates"))
+			tip = "That's ready — put it on your plate."
+			target = stagedPlateId(state) or nearest(state, stationOfKind("plates"))
 		end
 	elseif carrying then
 		tip = "Take it to the glowing station and press."
@@ -225,10 +258,13 @@ function FirstShift:update(state: any, flags: number): number?
 	elseif chopId ~= nil then
 		tip = "Press at the glowing board to chop it."
 		target = chopId
+	elseif readyId ~= nil then
+		tip = `That {readyKind} is ready — pick it up and add it to your plate.`
+		target = readyId
 	elseif panId ~= nil then
 		tip = "Food's ready! Press at the glowing pan to take it."
 		target = panId
-	elseif not stagedPlate(state) then
+	elseif stagedPlateId(state) == nil then
 		-- THE PLATE COMES FIRST. Everything you prepare needs somewhere to go,
 		-- and a player who chops before staging one ends up holding food with
 		-- nowhere to put it. Opening on the crate taught that order backwards.
