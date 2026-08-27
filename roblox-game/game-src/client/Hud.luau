@@ -26,7 +26,12 @@ local INGREDIENT_COLORS: { [string]: Color3 } = {
 }
 
 -- ticket queue geometry
-local TICKET_W = 178
+-- Narrower and hard against the right edge: the rail used to start 10px in at
+-- 178 wide and hang below the score chip, which put two ticket cards squarely
+-- over the right serve counter -- a station the player has to watch.
+local TICKET_W = 150
+-- Height unchanged: the card packs a name, an icon row and a progress bar into
+-- fixed offsets, and shortening it starts overlapping them.
 local TICKET_H = 56
 local TICKET_PAD = 6
 -- vertical space kept clear at the bottom for the action button + margin
@@ -86,14 +91,18 @@ function Hud.new(catalog: any)
 	}, gui)
 	mk("UICorner", { CornerRadius = UDim.new(0, 12) }, self.timerLabel)
 
-	-- coins + combo (top right)
+	-- Coins + combo, TOP LEFT under the patience bar. It vacated the top-right
+	-- corner so the ticket rail could have it: orders are the thing the player
+	-- reads constantly, and they were the thing overlapping the kitchen.
+	-- Grouping them with patience also puts every "how am I doing" readout in
+	-- one column instead of three corners.
 	self.scoreLabel = mk("TextLabel", {
-		Size = UDim2.fromOffset(170, 44),
-		Position = UDim2.new(1, -182, 0, 12),
+		Size = UDim2.fromOffset(150, 34),
+		Position = UDim2.new(0, 12, 0, 46),
 		BackgroundColor3 = Color3.fromRGB(58, 32, 19),
 		BackgroundTransparency = 0.15,
 		TextColor3 = Color3.fromRGB(255, 224, 102),
-		TextSize = 24,
+		TextSize = 21,
 		Font = Enum.Font.FredokaOne,
 		Text = "0",
 	}, gui)
@@ -153,8 +162,8 @@ function Hud.new(catalog: any)
 	-- phone (~206px on iPhone landscape) while the board can hold 5 tickets,
 	-- so the whole rail auto-scales down to fit (see updateOrders).
 	self.ticketRail = mk("Frame", {
-		Size = UDim2.new(0, TICKET_W, 1, -TICKET_RESERVE),
-		Position = UDim2.new(1, -(TICKET_W + 10), 0, 62),
+		Size = UDim2.new(0, TICKET_W, 1, -(TICKET_RESERVE - 56)),
+		Position = UDim2.new(1, -(TICKET_W + 6), 0, 6),
 		BackgroundTransparency = 1,
 	}, gui)
 	self.ticketScale = mk("UIScale", { Scale = 1 }, self.ticketRail)
@@ -189,7 +198,10 @@ function Hud.new(catalog: any)
 	-- score chip and ticket rail are right-aligned, so none of them collide,
 	-- and pushing them down just spends vertical space that a phone does not
 	-- have.
-	self.topChips = { { self.patienceFill.Parent, 4 } }
+	self.topChips = {
+		{ self.patienceFill.Parent, 4 },
+		{ self.scoreLabel, 26 },
+	}
 	self:applyTopInset()
 	pcall(function()
 		GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(function()
