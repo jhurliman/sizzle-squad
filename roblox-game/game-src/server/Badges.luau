@@ -9,6 +9,10 @@
 local Badges = {}
 Badges.__index = Badges
 
+--- Seconds between queued badge awards. Roblox's notification is on screen for
+--- roughly five, so anything shorter overlaps the one before it.
+local AWARD_GAP = 5
+
 Badges.IDS = {
 	firstDish = 4431857963958852,
 	firstThreeStar = 4317478992496196,
@@ -32,6 +36,10 @@ function Badges.new(config: any?, service: any?)
 	-- server burns dozens of pointless BadgeService calls a minute and can
 	-- trip the award rate limit for badges that actually matter.
 	self.granted = {} :: { [any]: { [string]: boolean } }
+	-- Pending AwardBadge calls, drained one every AWARD_GAP seconds. See
+	-- Badges:enqueue.
+	self.pending = {} :: { { player: any, id: number } }
+	self.pumping = false
 	if self.service == nil then
 		pcall(function()
 			self.service = game:GetService("BadgeService")
@@ -42,6 +50,25 @@ end
 
 function Badges:playerRemoving(player: any)
 	self.granted[player] = nil
+	-- Pacing must never cost someone a badge they earned. Anything still
+	-- queued for a leaving player is awarded at once: the toasts would overlap,
+	-- but they are not there to see them, and the grant is what matters.
+	local flush = {}
+	for i = #self.pending, 1, -1 do
+		if self.pending[i].player == player then
+			table.insert(flush, table.remove(self.pending, i).id)
+		end
+	end
+	if #flush > 0 and self.service ~= nil then
+		local userId = player.UserId
+		task.spawn(function()
+			for _, id in flush do
+				pcall(function()
+					self.service:AwardBadge(userId, id)
+				end)
+			end
+		end)
+	end
 end
 
 --- Backfill what a player already owns.
@@ -117,10 +144,39 @@ function Badges:award(player: any, key: string)
 	if self.onAward ~= nil then
 		self.onAward(player, key)
 	end
+	self:enqueue(player, id)
+end
+
+--- ONE BADGE TOAST AT A TIME.
+---
+--- Roblox's own "Badge Awarded" notification slides in from the right and sits
+--- for about five seconds, and AwardBadge is what triggers it -- there is no
+--- way to grant quietly and present it ourselves. onRoundEnd can fire up to
+--- seven awards for one player in a single tick, and the first round of an
+--- established player is exactly that case (firstDish and hundredDishes and
+--- thousandDishes and foundingChef all at once). Fired together they animate
+--- on top of each other, half of them clipped off the right edge of the
+--- screen, which is what a player reported.
+---
+--- So awards queue and drain one per AWARD_GAP. The profile mirror in :award
+--- still happens immediately, so the game's own badge case is never behind.
+function Badges:enqueue(player: any, id: number)
+	table.insert(self.pending, { player = player, id = id })
+	if self.pumping then
+		return
+	end
+	self.pumping = true
 	task.spawn(function()
-		pcall(function()
-			self.service:AwardBadge(player.UserId, id)
-		end)
+		while #self.pending > 0 do
+			local job = table.remove(self.pending, 1)
+			pcall(function()
+				self.service:AwardBadge(job.player.UserId, job.id)
+			end)
+			if #self.pending > 0 then
+				task.wait(AWARD_GAP)
+			end
+		end
+		self.pumping = false
 	end)
 end
 

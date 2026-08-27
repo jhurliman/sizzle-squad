@@ -123,5 +123,42 @@ b:onRoundEnd(crewOf(1), progressionWith({ totalDishes = 1, level = 1 }),
 check(not has("foundingChef"), "Founding Chef is unearnable after the window closes")
 today = "2026-08-26"
 
+-- ---- pacing must never cost a badge ------------------------------------
+--
+-- Awards drain one every AWARD_GAP so Roblox's own "Badge Awarded" toasts do
+-- not slide in on top of each other. The env above stubs task.wait to nothing,
+-- so it proves the queue DROPS nothing but cannot see the pacing at all. This
+-- one defers every task.spawn instead of running it, which freezes the pump
+-- mid-queue and exposes the case that would silently cost a real player a real
+-- badge: leaving before the queue drains.
+local deferred = {}
+local envPaced = {
+	os = { date = function(_fmt) return today end, time = os.time, clock = os.clock },
+	math = math, table = table, string = string, pairs = pairs, ipairs = ipairs,
+	setmetatable = setmetatable, warn = function() end, print = print,
+	task = {
+		spawn = function(f, ...)
+			local a = table.pack(...)
+			table.insert(deferred, function() f(table.unpack(a, 1, a.n)) end)
+		end,
+		wait = function() end,
+	},
+	game = { GetService = function() return nil end },
+}
+local BadgesPaced = luau.load(luau.compile(fs.readFile("game-src/server/Badges.luau")), { environment = envPaced })()
+awarded = {}
+local bp = BadgesPaced.new(Config, fake)
+bp:onRoundEnd(crewOf(4), progressionWith({ totalDishes = 1200, level = 11 }),
+	{ stars = 3, missed = 0, served = 12, stats = { [0] = { serves = 12 } } })
+local queued = #bp.pending
+check(#awarded == 0, `a round-end sweep queues its awards instead of firing them together ({#awarded} fired)`)
+check(queued > 1, `the sweep really did stack several awards ({queued} queued)`)
+bp:playerRemoving(playerA)
+check(#bp.pending == 0, "leaving empties that player's queue")
+for _, f in deferred do
+	f()
+end
+check(#awarded == queued, `a player who leaves mid-queue still receives every badge ({#awarded} of {queued})`)
+
 print(if failures > 0 then `{failures} FAILURES` else "PASS: badges")
 if failures > 0 then error(`{failures} checks failed`) end
