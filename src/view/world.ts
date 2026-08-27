@@ -4836,6 +4836,31 @@ export class WorldView {
         }
       }
     }
+
+    // A COOPERED BARREL, PARKED OUT OF PLAY.
+    //
+    // This is the survivor of the deleted nooks() pass. It used to stand in a
+    // walkable pocket beside the right-hand benches, where it blocked a
+    // counter a player needed to reach. It is not the barrel that was wrong,
+    // only the ground it stood on.
+    //
+    // Rows 9 and 10 of KITCHEN_MAP are '#', so the band behind the near rank
+    // is real floor that no chef can ever occupy — it is the closest a prop
+    // can sit to the play area while still being unreachable. Tucked by the
+    // left end of the right-hand near bench (which spans x 10.7..14.1).
+    //
+    // Named palette colours, not raw hex: the converter picks a material from
+    // the nearest palette NAME, so a hand-mixed brown would have come out as
+    // stone the way the flour sacks did. benchTopAlt/benchRail match /^bench/
+    // and resolve to WoodPlanks, which is what a barrel wants.
+    {
+      const bx = 10.35;
+      const bz = 10.4;
+      this.contact(bx, bz + 0.12, 0.95, 0.95, 0.85);
+      P.cyl(C.benchTopAlt, 0.28, 0.24, 0.44, 14, bx, 0.22, bz);
+      for (const hy of [0.1, 0.35]) P.cyl(C.steelDark, 0.29, 0.29, 0.045, 14, bx, hy, bz);
+      P.cyl(C.benchRail, 0.3, 0.29, 0.06, 14, bx, 0.46, bz);
+    }
   }
 
   /**
