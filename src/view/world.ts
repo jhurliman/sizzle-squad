@@ -4744,11 +4744,27 @@ export class WorldView {
     /**
      * Each variant's largest half-width, so the placer can solve rather than
      * guess. A wall-side nook leaves 0.96 - 0.31 = 0.65 of clear cell, so
-     * nothing here may exceed 0.32 — which is why the sacks and the firewood
-     * crate came down in size rather than the clearance coming down to meet
-     * them. The crate's figure is its yawed diagonal, not its width.
+     * nothing here may exceed 0.32 — which is why the firewood crate came down
+     * in size rather than the clearance coming up to meet it. The crate's
+     * figure is its yawed diagonal, not its width.
+     *
+     * There was a fourth variant, a stack of flour sacks. It is gone, and the
+     * reason is worth keeping because it will bite the next prop too.
+     *
+     * The Roblox converter does not read colour VALUES to pick a material. It
+     * reverse-matches each final colour to the nearest name in the palette
+     * (prepare.mjs `colorName`), then keys the material off that NAME:
+     * anything matching /^(stone|cobble|arch|slate|hearth|flag|chimney|
+     * wainscot|soot)/ becomes Slate. The sacks were authored in raw hex rather
+     * than a named palette entry, their linen tones landed nearest a stone
+     * name, and so cloth arrived in engine as rock -- a cairn with a bean
+     * balanced on it. Nothing of the intended read survived.
+     *
+     * The lesson, not the workaround: author props with NAMED palette colours.
+     * A raw hex silently inherits the material of whatever it happens to sit
+     * closest to. The Toads are safe because they use C.toadSkin/C.toadCap.
      */
-    const NOOK_RAD = [0.32, 0.3, 0.32, 0.27];
+    const NOOK_RAD = [0.3, 0.32, 0.27];
     const walk = (x: number, y: number) =>
       x >= 0 && y >= 0 && x < k.width && y < k.height && k.cells[y * k.width + x] === 'floor';
     let i = 0;
@@ -4785,7 +4801,7 @@ export class WorldView {
         // that clears both the skirt and the prop's own half-width, and if
         // even that is impossible (it no longer is — see NOOK_RAD) centre it
         // in whatever span is left.
-        const variant = i++ % 4;
+        const variant = i++ % 3;
         const bx = -open[0];
         const bz = -open[1];
         const rad = NOOK_RAD[variant];
@@ -4802,29 +4818,6 @@ export class WorldView {
         this.contact(cx, cz + 0.12, 0.95, 0.95, 0.85);
         switch (variant) {
           case 0: {
-            // A stack of flour sacks.
-            //
-            // These were three near-white ellipsoids in a colour picked when
-            // "pale cream is the one thing this floor has none of" was true.
-            // It stopped being true: against the pale flagstone the room
-            // ended up with, they merged into each other AND into the ground,
-            // and the reported read was "a weird white blobby thing". Linen
-            // over jute puts a value step between sack and floor, and a
-            // cinched, tied neck is what makes the silhouette say SACK rather
-            // than dough — three smooth blobs have no such landmark at all.
-            const linen = 0xdfd2ac;
-            const linenAlt = 0xc2b184;
-            const cord = 0x9a8a63;
-            // Two lying flat...
-            P.ball(linen, 0.2, cx - 0.05, 0.12, cz - 0.04, 1.15, 0.62, 0.95);
-            P.ball(linenAlt, 0.185, cx + 0.07, 0.13, cz + 0.07, 1.1, 0.6, 0.92);
-            // ...and one stood on top of them, tied off at the neck.
-            P.ball(linen, 0.15, cx, 0.29, cz + 0.01, 1.0, 0.92, 0.95);
-            P.cyl(cord, 0.062, 0.062, 0.09, 10, cx, 0.455, cz + 0.01);
-            P.ball(linen, 0.065, cx, 0.53, cz + 0.01, 1.2, 0.75, 1.2);
-            break;
-          }
-          case 1: {
             // A coopered barrel with two steel hoops — the room's own bin
             // vocabulary, so it never reads as a station you can use.
             P.cyl(C.benchTopAlt, 0.28, 0.24, 0.44, 14, cx, 0.22, cz);
@@ -4832,7 +4825,7 @@ export class WorldView {
             P.cyl(C.benchRail, 0.3, 0.29, 0.06, 14, cx, 0.46, cz);
             break;
           }
-          case 2: {
+          case 1: {
             // A crate of firewood for the oven.
             P.box(C.benchLeg, 0.48, 0.3, 0.38, cx, 0.15, cz, 0, yaw);
             P.box(C.benchTopAlt, 0.5, 0.05, 0.4, cx, 0.31, cz, 0, yaw);
