@@ -167,6 +167,59 @@ local function readyAt(state: any, order: any): (number?, string?)
 	return nil, nil
 end
 
+--- The first component of `order` that nothing has covered yet.
+---
+--- The coach used to read components[1] every single time, so once the lettuce
+--- was chopped and plated it went right on saying "grab lettuce" -- naming the
+--- one ingredient the player had just finished. It has to subtract what is
+--- already accounted for: on the staged plate, in the player's hands, loose on
+--- a station, or cooking in a pan.
+---
+--- Matching is on kind AND state, which is what makes the half-done cases fall
+--- out correctly: raw lettuce on a board does not satisfy a "lettuce prepped"
+--- line, so it is still owed -- and the chop branch above has already claimed
+--- that situation anyway.
+local function nextNeeded(state: any, order: any, held: any): any?
+	local need: { [string]: number } = {}
+	for _, c in order.components do
+		local k = `{c.kind}:{c.state}`
+		need[k] = (need[k] or 0) + 1
+	end
+	local function consume(kind: string?, st: string?)
+		if kind == nil then
+			return
+		end
+		local k = `{kind}:{st}`
+		if (need[k] or 0) > 0 then
+			need[k] -= 1
+		end
+	end
+	local function consumeAll(h: any)
+		if h == nil then
+			return
+		end
+		if h.type == "ingredient" then
+			consume(h.kind, h.state)
+		elseif h.type == "plate" or h.type == "pan" then
+			for _, c in h.contents or {} do
+				consume(c.kind, c.state)
+			end
+		end
+	end
+	for _, st in state.mirrorSim.kitchen.stations do
+		consumeAll(state.stations[st.id] and state.stations[st.id].holding)
+	end
+	consumeAll(held)
+	for _, c in order.components do
+		local k = `{c.kind}:{c.state}`
+		if (need[k] or 0) > 0 then
+			need[k] -= 1
+			return c
+		end
+	end
+	return nil
+end
+
 function FirstShift:setEligible(progress: any)
 	self.active = not self.skipped
 		and (progress.level or 1) < 3
@@ -273,14 +326,19 @@ function FirstShift:update(state: any, flags: number): number?
 	elseif order ~= nil then
 		-- Nothing in hand: point at the crate for the first thing the oldest
 		-- ticket still needs.
-		local want = order.components[1]
+		local want = nextNeeded(state, order, held)
 		if want ~= nil then
 			tip = `Ticket: {order.name}. Grab {want.kind} from the glowing crate.`
 			target = nearest(state, function(st)
 				return st.kind == "crate" and st.dispenses == want.kind
 			end)
 		end
-		if target == nil then
+		if want == nil then
+			-- Everything the ticket asks for is on the plate: the only move
+			-- left is to run it to the window.
+			tip = `{order.name} is complete — pick up the plate and serve it.`
+			target = stagedPlateId(state) or nearest(state, stationOfKind("serve"))
+		elseif target == nil then
 			tip = `Ticket: {order.name}. Grab what it needs from a crate.`
 			target = nearest(state, stationOfKind("crate"))
 		end
@@ -293,5 +351,17 @@ function FirstShift:update(state: any, flags: number): number?
 	self.frame.Visible = true
 	return target
 end
+
+-- The coaching DECISIONS are pure functions of replicated state, and five
+-- separate bugs have now been reported in them (hands-only reasoning, chopped
+-- food invisible, the dispenser glowed instead of the staged plate, and this
+-- one). Exposed so tools/coach-harness.luau can walk a whole ticket without
+-- needing a DataModel -- FirstShift.new builds GUI, the logic does not.
+FirstShift._debug = {
+	nextNeeded = nextNeeded,
+	readyAt = readyAt,
+	stagedPlateId = stagedPlateId,
+	unfinishedAt = unfinishedAt,
+}
 
 return FirstShift
