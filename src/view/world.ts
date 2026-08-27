@@ -4739,6 +4739,16 @@ export class WorldView {
   private nooks() {
     const k = this.kitchen;
     const P = this.props;
+    /** How far the side walls' cobbles stand proud of their inner face. */
+    const SKIRT_INTRUDE = 0.31;
+    /**
+     * Each variant's largest half-width, so the placer can solve rather than
+     * guess. A wall-side nook leaves 0.96 - 0.31 = 0.65 of clear cell, so
+     * nothing here may exceed 0.32 — which is why the sacks and the firewood
+     * crate came down in size rather than the clearance coming down to meet
+     * them. The crate's figure is its yawed diagonal, not its width.
+     */
+    const NOOK_RAD = [0.32, 0.3, 0.32, 0.27];
     const walk = (x: number, y: number) =>
       x >= 0 && y >= 0 && x < k.width && y < k.height && k.cells[y * k.width + x] === 'floor';
     let i = 0;
@@ -4761,28 +4771,57 @@ export class WorldView {
           [0, 1],
           [0, -1],
         ].find(([dx, dy]) => walk(x + dx, y + dy))!;
-        const cx = x + 0.5 - open[0] * 0.2;
-        const cz = y + 0.5 - open[1] * 0.2;
+        //
+        // ...BUT NOT INTO THE COBBLES. `cobbleSkirt` stands its stones up to
+        // 0.28 proud of the side wall's inner face, at knee height, which is
+        // exactly the height everything in this method is. A flat 0.2 push
+        // toward a closed side that happened to be a side wall drove the prop
+        // straight through them: the flour sacks read as a white blob growing
+        // out of the rubble and the barrel had a bite taken out of it.
+        //
+        // So the push is now solved rather than assumed. Work in u, the
+        // distance from the cell's CLOSED edge to the prop's centre: stow at
+        // 0.3 when that clears, otherwise back off to the nearest position
+        // that clears both the skirt and the prop's own half-width, and if
+        // even that is impossible (it no longer is — see NOOK_RAD) centre it
+        // in whatever span is left.
+        const variant = i++ % 4;
+        const bx = -open[0];
+        const bz = -open[1];
+        const rad = NOOK_RAD[variant];
+        const nx = x + bx;
+        // Only the two side walls carry a cobble skirt; a closed side made of
+        // furniture is flush with the cell edge.
+        const eat = bx !== 0 && (nx <= 0 || nx >= k.width - 1) ? SKIRT_INTRUDE : 0.04;
+        const lo = eat + rad;
+        const hi = 0.96 - rad;
+        const u = lo <= hi ? Math.min(Math.max(0.3, lo), hi) : (eat + 0.96) / 2;
+        const cx = bx !== 0 ? x + (bx < 0 ? u : 1 - u) : x + 0.5;
+        const cz = bz !== 0 ? y + (bz < 0 ? u : 1 - u) : y + 0.5;
         const yaw = (this.runOffset(x + 3, y + 11) * 2 - 1) * 0.5;
         this.contact(cx, cz + 0.12, 0.95, 0.95, 0.85);
-        switch (i++ % 4) {
+        switch (variant) {
           case 0: {
-            // A stack of flour sacks. Pale cream, which is the one thing the
-            // floor of this room has none of.
-            for (let s = 0; s < 3; s++) {
-              const t = s === 2 ? 0.62 : 1;
-              P.ball(
-                s === 1 ? 0xe4d9b6 : 0xf0e7c8,
-                0.24 * t,
-                cx + (s === 1 ? 0.13 : -0.1) * (s === 2 ? 0 : 1),
-                0.13 + s * 0.16,
-                cz + (s % 2 ? 0.08 : -0.06),
-                1.15,
-                0.72,
-                0.95,
-              );
-            }
-            P.box(0xc9bd95, 0.34, 0.03, 0.2, cx, 0.29, cz + 0.06, 0, yaw);
+            // A stack of flour sacks.
+            //
+            // These were three near-white ellipsoids in a colour picked when
+            // "pale cream is the one thing this floor has none of" was true.
+            // It stopped being true: against the pale flagstone the room
+            // ended up with, they merged into each other AND into the ground,
+            // and the reported read was "a weird white blobby thing". Linen
+            // over jute puts a value step between sack and floor, and a
+            // cinched, tied neck is what makes the silhouette say SACK rather
+            // than dough — three smooth blobs have no such landmark at all.
+            const linen = 0xdfd2ac;
+            const linenAlt = 0xc2b184;
+            const cord = 0x9a8a63;
+            // Two lying flat...
+            P.ball(linen, 0.2, cx - 0.05, 0.12, cz - 0.04, 1.15, 0.62, 0.95);
+            P.ball(linenAlt, 0.185, cx + 0.07, 0.13, cz + 0.07, 1.1, 0.6, 0.92);
+            // ...and one stood on top of them, tied off at the neck.
+            P.ball(linen, 0.15, cx, 0.29, cz + 0.01, 1.0, 0.92, 0.95);
+            P.cyl(cord, 0.062, 0.062, 0.09, 10, cx, 0.455, cz + 0.01);
+            P.ball(linen, 0.065, cx, 0.53, cz + 0.01, 1.2, 0.75, 1.2);
             break;
           }
           case 1: {
@@ -4795,8 +4834,8 @@ export class WorldView {
           }
           case 2: {
             // A crate of firewood for the oven.
-            P.box(C.benchLeg, 0.56, 0.3, 0.44, cx, 0.15, cz, 0, yaw);
-            P.box(C.benchTopAlt, 0.58, 0.05, 0.46, cx, 0.31, cz, 0, yaw);
+            P.box(C.benchLeg, 0.48, 0.3, 0.38, cx, 0.15, cz, 0, yaw);
+            P.box(C.benchTopAlt, 0.5, 0.05, 0.4, cx, 0.31, cz, 0, yaw);
             for (let s = 0; s < 4; s++)
               P.cyl(
                 s % 2 ? C.timberDark : C.benchApron,
@@ -4804,7 +4843,7 @@ export class WorldView {
                 0.062,
                 0.5,
                 7,
-                cx - 0.16 + s * 0.11,
+                cx - 0.14 + s * 0.095,
                 0.38 + (s % 2) * 0.04,
                 cz,
                 0,
