@@ -106,6 +106,36 @@ local function processingFor(wanted: string): (string, string)
 	return "plates", "That's ready to plate."
 end
 
+--- A station of `kind` holding an ingredient that has not reached `doneState`.
+---
+--- The coach used to be driven ENTIRELY by what was in your hands, so the
+--- instant you set lettuce down on a board your hands were empty and it told
+--- you to fetch lettuce from the crate -- while the lettuce you had just
+--- delivered sat there unchopped, one press from done. Work already started
+--- outranks starting anything new.
+local function unfinishedAt(state: any, kind: string, doneState: string): number?
+	for _, st in state.mirrorSim.kitchen.stations do
+		if st.kind == kind then
+			local h = state.stations[st.id] and state.stations[st.id].holding
+			if h ~= nil and h.type == "ingredient" and h.state ~= doneState then
+				return st.id
+			end
+		end
+	end
+	return nil
+end
+
+--- Is a clean plate already down somewhere, waiting to be built on?
+local function stagedPlate(state: any): boolean
+	for _, st in state.mirrorSim.kitchen.stations do
+		local h = state.stations[st.id] and state.stations[st.id].holding
+		if h ~= nil and h.type == "plate" and h.dirty ~= true then
+			return true
+		end
+	end
+	return false
+end
+
 function FirstShift:setEligible(progress: any)
 	self.active = not self.skipped
 		and (progress.level or 1) < 3
@@ -139,6 +169,9 @@ function FirstShift:update(state: any, flags: number): number?
 		end
 	end
 
+	-- Something half-done on a board: one press from finished.
+	local chopId = unfinishedAt(state, "board", "prepped")
+
 	local held = if state.myChefId ~= nil then state.carrying[state.myChefId] else nil
 	local order = state.orders[1]
 	local tip, target
@@ -159,6 +192,11 @@ function FirstShift:update(state: any, flags: number): number?
 		if panId ~= nil then
 			tip = "Food's ready — press at the glowing pan to scoop it onto your plate."
 			target = panId
+		elseif held ~= nil and #(held.contents or {}) == 0 then
+			-- An EMPTY plate has no business at the serve window; glowing one
+			-- there teaches the wrong loop on the very first shift.
+			tip = "Set the plate down on a free counter — that's where the dish gets built."
+			target = nearest(state, stationOfKind("counter"))
 		else
 			tip = "Plate in hand. Take it to the serve window when the ticket is complete."
 			target = nearest(state, stationOfKind("serve"))
@@ -184,9 +222,18 @@ function FirstShift:update(state: any, flags: number): number?
 	elseif carrying then
 		tip = "Take it to the glowing station and press."
 		target = nearest(state, stationOfKind("board"))
+	elseif chopId ~= nil then
+		tip = "Press at the glowing board to chop it."
+		target = chopId
 	elseif panId ~= nil then
 		tip = "Food's ready! Press at the glowing pan to take it."
 		target = panId
+	elseif not stagedPlate(state) then
+		-- THE PLATE COMES FIRST. Everything you prepare needs somewhere to go,
+		-- and a player who chops before staging one ends up holding food with
+		-- nowhere to put it. Opening on the crate taught that order backwards.
+		tip = "Start with a plate: take one from the stack and set it on a counter."
+		target = nearest(state, stationOfKind("plates"))
 	elseif order ~= nil then
 		-- Nothing in hand: point at the crate for the first thing the oldest
 		-- ticket still needs.

@@ -65,8 +65,30 @@ local stationModels: { [number]: Model } = {}
 local serveAnchors: { Vector3 } = {}
 
 local function indexStations(stations: { any })
+	-- THE STATIONS FOLDER IS ONE LEVEL UP FROM WHERE THIS LOOKED.
+	--
+	-- The capture pipeline writes a model named "SizzleSquadKitchen", and in
+	-- the standalone roblox/sizzle-squad.rbxl that is a real level in the tree.
+	-- But default.project.json mounts assets/kitchen.rbxm AT the "Kitchen" key,
+	-- and Rojo RENAMES a single-root rbxm to its key -- so in the built place
+	-- the path is Workspace.Kitchen.Stations and the SizzleSquadKitchen level
+	-- does not exist at all.
+	--
+	-- The old lookup therefore always resolved to nil, stationModels stayed
+	-- empty, and both Highlights silently never found an adornee: no focus
+	-- highlight on the targeted station, and no glow on the crate the First
+	-- Shift coach was telling players to look at. Nothing errored, because
+	-- every consumer treats a missing model as "not highlighted".
+	--
+	-- Accept both shapes, and say so loudly if neither resolves.
 	local kitchen = Workspace:FindFirstChild("Kitchen")
-	local root = kitchen and kitchen:FindFirstChild("SizzleSquadKitchen")
+	local root = kitchen
+	if kitchen ~= nil then
+		local nested = kitchen:FindFirstChild("SizzleSquadKitchen")
+		if nested ~= nil then
+			root = nested
+		end
+	end
 	local folder = root and root:FindFirstChild("Stations")
 	for _, st in stations do
 		local kindCap = st.kind:sub(1, 1):upper() .. st.kind:sub(2)
@@ -79,6 +101,10 @@ local function indexStations(stations: { any })
 		if st.kind == "serve" then
 			table.insert(serveAnchors, Vector3.new((st.cell.x + 0.5) * SCALE, 5.4 * SCALE, st.cell.y * SCALE))
 		end
+	end
+	-- This failing silently is what let the highlights stay gone for weeks.
+	if next(stationModels) == nil then
+		warn("[sizzle] indexStations found no station models — focus highlight and coach glow are dead")
 	end
 end
 
