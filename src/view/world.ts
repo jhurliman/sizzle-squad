@@ -4844,18 +4844,25 @@ export class WorldView {
     // counter a player needed to reach. It is not the barrel that was wrong,
     // only the ground it stood on.
     //
-    // Rows 9 and 10 of KITCHEN_MAP are '#', so the band behind the near rank
-    // is real floor that no chef can ever occupy — it is the closest a prop
-    // can sit to the play area while still being unreachable. Tucked by the
-    // left end of the right-hand near bench (which spans x 10.7..14.1).
+    // Rows 9 and 10 of KITCHEN_MAP are '#', so this band is real floor that no
+    // chef can ever occupy — the closest a prop can sit to the play area while
+    // staying unreachable.
+    //
+    // It goes in the pocket between the right-hand rank's FRONT edge and the
+    // cobbles, not at either end of the bench. Measured from the top-down
+    // render rather than guessed: that bench is yawed 0.09 and its right end
+    // lands at x 13.77, which is already inside the cobbles' 13.72 reach — so
+    // there is no gap at the end to tuck anything into. The pocket in front of
+    // it is the only place on this side that is beside both the table and the
+    // wall. Clearances: 0.17 to the cobbles, 0.23 to the bench front.
     //
     // Named palette colours, not raw hex: the converter picks a material from
     // the nearest palette NAME, so a hand-mixed brown would have come out as
     // stone the way the flour sacks did. benchTopAlt/benchRail match /^bench/
     // and resolve to WoodPlanks, which is what a barrel wants.
     {
-      const bx = 10.35;
-      const bz = 10.4;
+      const bx = 13.25;
+      const bz = 12.15;
       this.contact(bx, bz + 0.12, 0.95, 0.95, 0.85);
       P.cyl(C.benchTopAlt, 0.28, 0.24, 0.44, 14, bx, 0.22, bz);
       for (const hy of [0.1, 0.35]) P.cyl(C.steelDark, 0.29, 0.29, 0.045, 14, bx, hy, bz);
