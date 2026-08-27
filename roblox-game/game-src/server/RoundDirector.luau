@@ -41,6 +41,8 @@ function RoundDirector.new(
 		return false
 	end
 	self.onRoundEnd = opts.onRoundEnd
+	-- Round index the award already fired for; see the latch in heartbeat.
+	self.awardedRound = -1
 	self.onRoundStart = opts.onRoundStart
 	-- firstShiftFn: is anyone here about to work their first ever shift?
 	self.firstShiftFn = opts.firstShiftFn or function()
@@ -304,7 +306,20 @@ function RoundDirector:heartbeat(dt: number)
 		self.replicator:flush(self.simService.sim, events, dt)
 		if self.simService.sim.over then
 			self.lastResults = self:buildResults()
-			if self.onRoundEnd ~= nil then
+			-- ONE AWARD PER ROUND, EVER.
+			--
+			-- onRoundEnd is what pays coins and XP and increments the career
+			-- counters, so firing it twice for one round silently doubles a
+			-- player's permanent record -- and a profile turned up in testing
+			-- with 22542 shifts worked against 11172 dishes served, which no
+			-- amount of play can produce (rounds are 180s even when nobody
+			-- touches them, so that is 1100 hours). The phase change below is
+			-- what is meant to make this unreachable, and measurably does, but
+			-- "unreachable by control flow" is exactly what that profile
+			-- disproves for some earlier build. Latch it on the round index so
+			-- no future re-entry can charge a round twice.
+			if self.onRoundEnd ~= nil and self.awardedRound ~= self.round then
+				self.awardedRound = self.round
 				self.onRoundEnd(self.lastResults)
 			end
 			self:setPhase("results", self.config.RESULTS)

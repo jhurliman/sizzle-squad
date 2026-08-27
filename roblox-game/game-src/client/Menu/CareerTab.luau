@@ -121,7 +121,14 @@ function CareerTab:setProgress(progress: any)
 	local level = progress.level or 1
 	local xp, toNext = progress.xp or 0, progress.xpToNext or 1
 	self.levelLabel.Text = `Level {level}`
-	self.statsLabel.Text = `{progress.coins or 0} coins   ·   🔥{progress.streak or 0}`
+	-- "🔥2" told the player nothing -- a flame and a bare number, reported as
+	-- literally unreadable. It is the DAILY streak, so say so; and at 0 or 1
+	-- days there is no streak to advertise, so the chip drops it entirely
+	-- rather than boasting about a streak of one.
+	local streak = progress.streak or 0
+	self.statsLabel.Text = if streak >= 2
+		then `{progress.coins or 0} coins   ·   🔥 {streak} day streak`
+		else `{progress.coins or 0} coins`
 	self.xpFill.Size = UDim2.fromScale(math.clamp(xp / math.max(1, toNext), 0, 1), 1)
 	self.xpLabel.Text = `{xp} / {toNext} XP to level {level + 1}`
 	self:renderGoals(progress)
