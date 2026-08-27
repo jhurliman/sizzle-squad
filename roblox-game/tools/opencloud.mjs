@@ -10,6 +10,11 @@ import path from 'node:path';
 
 const CONFIG = path.join(os.homedir(), '.config', 'sizzle', 'opencloud.json');
 
+// Not a secret: universe ids are public -- they appear in Open Cloud URLs and
+// in the creator dashboard. Baking it in means every command works with only
+// the API key in the environment. Override with ROBLOX_UNIVERSE_ID.
+const DEFAULT_UNIVERSE_ID = '10761465304';
+
 function creds() {
   let file = {};
   if (fs.existsSync(CONFIG)) file = JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
@@ -17,11 +22,11 @@ function creds() {
     // ROBLOX_SIZZLE_SQUAD_API_KEY is where this project's key actually lives
     // (exported from ~/.zshrc); the generic name stays supported for CI.
     apiKey: process.env.ROBLOX_SIZZLE_SQUAD_API_KEY || process.env.ROBLOX_API_KEY || file.apiKey,
-    universeId: process.env.ROBLOX_UNIVERSE_ID || file.universeId,
+    universeId: process.env.ROBLOX_UNIVERSE_ID || file.universeId || DEFAULT_UNIVERSE_ID,
     placeId: process.env.ROBLOX_PLACE_ID || file.placeId,
   };
-  if (!c.apiKey || !c.universeId) {
-    console.error(`missing credentials. Create ${CONFIG}:\n` +
+  if (!c.apiKey) {
+    console.error(`missing API key. Export ROBLOX_SIZZLE_SQUAD_API_KEY, or create ${CONFIG}:\n` +
       `{ "apiKey": "...", "universeId": "...", "placeId": "..." }\n` +
       `See roblox-game/tools/OPEN-CLOUD.md.`);
     process.exit(1);
@@ -102,12 +107,27 @@ async function cmdWipe(userId) {
   const { universeId } = creds();
   await api(entryUrl(universeId, PROFILE_STORE, `p${userId}`), { method: 'DELETE' });
   console.log(`profile p${userId} deleted`);
+  // Boards are keyed `u{UserId}` (Progression writes `u{player.UserId}`), NOT
+  // the bare id -- deleting the bare id silently removes nothing.
+  //
+  // They must be deleted rather than left to correct themselves: allTime and
+  // weekly are written with math.max, so an inflated best sticks forever, and
+  // dishes is an IncrementAsync, so a wiped profile carries on adding to the
+  // old total.
   for (const board of [...BOARDS, `SizzleWeekly_${weekKey()}`]) {
     try {
-      await api(`${ODS}/${universeId}/orderedDataStores/${board}/scopes/global/entries/${userId}`, { method: 'DELETE' });
+      await api(`${ODS}/${universeId}/orderedDataStores/${board}/scopes/global/entries/u${userId}`, { method: 'DELETE' });
       console.log(`  board ${board}: row removed`);
     } catch (e) {
-      console.log(`  board ${board}: ${String(e.message).includes('404') ? 'no row' : e.message}`);
+      const m = String(e.message);
+      if (m.includes('404') || m.includes('NOT_FOUND')) {
+        console.log(`  board ${board}: no row`);
+      } else if (m.includes('ordered-data-store')) {
+        console.log(`  board ${board}: key lacks the Ordered Data Stores permission ` +
+          `(add API System "Ordered Data Stores" -> read + write to the key)`);
+      } else {
+        console.log(`  board ${board}: ${m}`);
+      }
     }
   }
 }

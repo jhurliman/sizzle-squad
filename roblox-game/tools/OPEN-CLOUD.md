@@ -15,6 +15,11 @@ about DataStores, BadgeService, MarketplaceService or GuiService.
     `read`, `write`, `list`, `delete`.
     `delete` is what lets a corrupt profile be removed; without it the tool can
     read but not repair.
+  - **Ordered Data Stores** → same experience → tick `read`, `write`.
+    Separate from Universe Datastores, and easy to miss: the career leaderboards
+    are ordered stores, so without it a wiped profile keeps its old rows — and
+    those do not heal, because best-round is written with `math.max` and career
+    dishes with `IncrementAsync`.
   - **Universe Places / Luau Execution** → select the same experience → tick
     `luau-execution-session:write` (may be listed as *Luau Execution
     Sessions*). Skip this one if you only want profile access.
