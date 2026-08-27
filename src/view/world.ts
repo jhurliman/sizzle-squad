@@ -4542,7 +4542,21 @@ export class WorldView {
 
     this.dressPass(span);
     this.foreground();
-    this.nooks();
+    // NO FLOOR DRESSING INSIDE THE PLAY AREA. There used to be a `nooks()`
+    // pass here that stood a barrel, a firewood crate or a stockpot in every
+    // floor cell with exactly one walkable neighbour.
+    //
+    // Its premise was that a flow field never routes a chef THROUGH such a
+    // cell, which is true and irrelevant: chefs route TO it. A cell with one
+    // walkable neighbour has three neighbours that are furniture, so standing
+    // in it is precisely how a player reaches up to three station faces —
+    // those pockets are not spare ground, they are the best-served tiles in
+    // the room. Every prop the pass placed was therefore standing where
+    // somebody needed to stand, and one was reported blocking a counter.
+    //
+    // The near-field rank in `foreground()` already dresses the room from
+    // OUTSIDE the map (z = height + 0.05), which is where scenery belongs.
+    // If the floor wants more character, it goes there, not in here.
 
     // The two servers. In the reference a Toad stands behind each team counter
     // and the order balloon hangs off its head; ours were unmanned coloured
@@ -4718,144 +4732,6 @@ export class WorldView {
     void W;
   }
 
-  /**
-   * FLOOR DRESSING IN THE MAP'S DEAD ENDS.
-   *
-   * The critic measured our empty-cell fraction at 17-34% of the lower frame
-   * against the reference's 6%, and the level cannot close that on its own:
-   * every dressed cell added to the middle of a row costs the bot brain
-   * throughput, and the numbers are in kitchen.ts. What the level CAN hand over
-   * for free is its list of nooks — floor cells with exactly one walkable
-   * orthogonal neighbour, i.e. the pockets between two islands of furniture. A
-   * flow field never routes a chef through one (there is nothing on the far
-   * side), so a sack of flour or a barrel standing in it is worth an eighth of
-   * the room's bare floor at zero cost to the sim.
-   *
-   * Everything here is knee-height or under, for the same reason the benches
-   * are: nothing in this room may ever hide a character from a frontal camera.
-   * Nothing here is a station, and nothing here blocks a cell — the map is not
-   * touched, so if the level changes these follow it.
-   */
-  private nooks() {
-    const k = this.kitchen;
-    const P = this.props;
-    /** How far the side walls' cobbles stand proud of their inner face. */
-    const SKIRT_INTRUDE = 0.31;
-    /**
-     * Each variant's largest half-width, so the placer can solve rather than
-     * guess. A wall-side nook leaves 0.96 - 0.31 = 0.65 of clear cell, so
-     * nothing here may exceed 0.32 — which is why the firewood crate came down
-     * in size rather than the clearance coming up to meet it. The crate's
-     * figure is its yawed diagonal, not its width.
-     *
-     * There was a fourth variant, a stack of flour sacks. It is gone, and the
-     * reason is worth keeping because it will bite the next prop too.
-     *
-     * The Roblox converter does not read colour VALUES to pick a material. It
-     * reverse-matches each final colour to the nearest name in the palette
-     * (prepare.mjs `colorName`), then keys the material off that NAME:
-     * anything matching /^(stone|cobble|arch|slate|hearth|flag|chimney|
-     * wainscot|soot)/ becomes Slate. The sacks were authored in raw hex rather
-     * than a named palette entry, their linen tones landed nearest a stone
-     * name, and so cloth arrived in engine as rock -- a cairn with a bean
-     * balanced on it. Nothing of the intended read survived.
-     *
-     * The lesson, not the workaround: author props with NAMED palette colours.
-     * A raw hex silently inherits the material of whatever it happens to sit
-     * closest to. The Toads are safe because they use C.toadSkin/C.toadCap.
-     */
-    const NOOK_RAD = [0.3, 0.32, 0.27];
-    const walk = (x: number, y: number) =>
-      x >= 0 && y >= 0 && x < k.width && y < k.height && k.cells[y * k.width + x] === 'floor';
-    let i = 0;
-    for (let y = 2; y < k.height - 1; y++) {
-      for (let x = 1; x < k.width - 1; x++) {
-        if (!walk(x, y)) continue;
-        const n = [
-          [1, 0],
-          [-1, 0],
-          [0, 1],
-          [0, -1],
-        ].filter(([dx, dy]) => walk(x + dx, y + dy)).length;
-        if (n !== 1) continue;
-        // Sit it against the closed side of the nook, not dead centre, so the
-        // prop reads as stowed against the furniture rather than dropped in a
-        // walkway — and so a chef nudged into the cell still has the open half.
-        const open = [
-          [1, 0],
-          [-1, 0],
-          [0, 1],
-          [0, -1],
-        ].find(([dx, dy]) => walk(x + dx, y + dy))!;
-        //
-        // ...BUT NOT INTO THE COBBLES. `cobbleSkirt` stands its stones up to
-        // 0.28 proud of the side wall's inner face, at knee height, which is
-        // exactly the height everything in this method is. A flat 0.2 push
-        // toward a closed side that happened to be a side wall drove the prop
-        // straight through them: the flour sacks read as a white blob growing
-        // out of the rubble and the barrel had a bite taken out of it.
-        //
-        // So the push is now solved rather than assumed. Work in u, the
-        // distance from the cell's CLOSED edge to the prop's centre: stow at
-        // 0.3 when that clears, otherwise back off to the nearest position
-        // that clears both the skirt and the prop's own half-width, and if
-        // even that is impossible (it no longer is — see NOOK_RAD) centre it
-        // in whatever span is left.
-        const variant = i++ % 3;
-        const bx = -open[0];
-        const bz = -open[1];
-        const rad = NOOK_RAD[variant];
-        const nx = x + bx;
-        // Only the two side walls carry a cobble skirt; a closed side made of
-        // furniture is flush with the cell edge.
-        const eat = bx !== 0 && (nx <= 0 || nx >= k.width - 1) ? SKIRT_INTRUDE : 0.04;
-        const lo = eat + rad;
-        const hi = 0.96 - rad;
-        const u = lo <= hi ? Math.min(Math.max(0.3, lo), hi) : (eat + 0.96) / 2;
-        const cx = bx !== 0 ? x + (bx < 0 ? u : 1 - u) : x + 0.5;
-        const cz = bz !== 0 ? y + (bz < 0 ? u : 1 - u) : y + 0.5;
-        const yaw = (this.runOffset(x + 3, y + 11) * 2 - 1) * 0.5;
-        this.contact(cx, cz + 0.12, 0.95, 0.95, 0.85);
-        switch (variant) {
-          case 0: {
-            // A coopered barrel with two steel hoops — the room's own bin
-            // vocabulary, so it never reads as a station you can use.
-            P.cyl(C.benchTopAlt, 0.28, 0.24, 0.44, 14, cx, 0.22, cz);
-            for (const hy of [0.1, 0.35]) P.cyl(C.steelDark, 0.29, 0.29, 0.045, 14, cx, hy, cz);
-            P.cyl(C.benchRail, 0.3, 0.29, 0.06, 14, cx, 0.46, cz);
-            break;
-          }
-          case 1: {
-            // A crate of firewood for the oven.
-            P.box(C.benchLeg, 0.48, 0.3, 0.38, cx, 0.15, cz, 0, yaw);
-            P.box(C.benchTopAlt, 0.5, 0.05, 0.4, cx, 0.31, cz, 0, yaw);
-            for (let s = 0; s < 4; s++)
-              P.cyl(
-                s % 2 ? C.timberDark : C.benchApron,
-                0.062,
-                0.062,
-                0.5,
-                7,
-                cx - 0.14 + s * 0.095,
-                0.38 + (s % 2) * 0.04,
-                cz,
-                0,
-                Math.PI / 2,
-              );
-            break;
-          }
-          default: {
-            // A copper stockpot off the line, lid beside it.
-            P.cyl(C.copperDark, 0.26, 0.22, 0.34, 16, cx, 0.17, cz);
-            P.cyl(C.copperRim, 0.27, 0.27, 0.05, 16, cx, 0.36, cz);
-            P.cyl(C.copper, 0.19, 0.19, 0.04, 14, cx, 0.4, cz);
-            P.ball(C.copperRim, 0.05, cx, 0.44, cz);
-            break;
-          }
-        }
-      }
-    }
-  }
 
   /**
    * THE FOREGROUND RANK — SET DRESSING IN THE ROW THE PLAYER CANNOT ENTER.
