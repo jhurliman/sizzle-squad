@@ -4548,11 +4548,15 @@ export class WorldView {
     // and the order balloon hangs off its head; ours were unmanned coloured
     // boxes, which left the upper-left and upper-right thirds of the frame —
     // the two places the reference puts its biggest, brightest shapes — as flat
-    // ochre wall. They stand BEHIND the counter, so the counter crops them at
-    // the chest exactly as it does theirs, and they are static merged geometry:
-    // set dressing, not characters.
-    this.passToad(span.x0 - 1.9, 1.34, C.teamRed, 0xd8574c);
-    this.passToad(span.x1 + 1.9, 1.34, C.teamGreen, 0x4f9d3e);
+    // ochre wall. They stand ON the counter's station-free inboard seam (see
+    // passToad), and they are static merged geometry: set dressing, not
+    // characters.
+    // x: the station-free gap-filler between the counter cells and the post.
+    // z: forward of the post's front face (BACK_Z + 0.344 = 1.344) so his back
+    // does not sink into the timber, and behind the counter's front edge
+    // (1.93) so he does not overhang it.
+    this.passToad(span.x0 - 0.75, 1.62, C.teamRed, 0xd8574c);
+    this.passToad(span.x1 + 0.75, 1.62, C.teamGreen, 0x4f9d3e);
 
     // The big kitchen props go on the benches that are NOT ingredient trays —
     // boards and free counters — so nothing ever competes with the thing the
@@ -5019,6 +5023,24 @@ export class WorldView {
    */
   private passToad(x: number, z: number, spot: number, vest: number) {
     const P = this.props;
+    // HE STANDS ON THE COUNTER, not behind it.
+    //
+    // Cropping him at the chest with the counter was the reference's framing,
+    // but the reference's counter is not also a game surface. Ours is: every
+    // counter cell is somewhere a plate gets put down, and the right-hand
+    // server was additionally sharing his cell with the new scullery sink —
+    // his outboard mitt sat 0.29 cells inside the basin.
+    //
+    // The fix is not an alcove and does not cost a station. Between the last
+    // counter CELL and the timber post flanking the oven there is a half-cell
+    // of gap-filler counter that carries no station and never holds an item
+    // (`dressPass` builds it at x = span.x0 - 0.75 / span.x1 + 0.75). He stands
+    // on that, whole, in front of the post — cream cap on dark timber, at the
+    // inboard end of his own team's counter.
+    //
+    // 0.36 is measured, not chosen: the torso ball's underside sits at 0.496
+    // and the counter rail's top face is COUNTER_H = 0.86.
+    const L = 0.36;
     // The counter rail sits at 0.86. The reference's servers clear it by a
     // whole head, and the cap alone is about the width of the tray in front of
     // them — ours cleared it by half a cap and read as a beige egg.
@@ -5035,35 +5057,43 @@ export class WorldView {
     // Cap smaller (0.40) and higher (1.66), face bigger and higher (1.32),
     // eyes pushed further proud (z+0.25). The sightline now clears the cap's
     // footprint at y≈1.33, a clear 0.06 below the brim.
-    const capY = 1.66;
+    const capY = L + 1.66;
     const capR = 0.4;
     const capH = 0.68;
 
-    // Torso — only the top of it clears the counter, so the vest panel is what
-    // carries the team colour, not the body.
-    P.ball(C.toadSkin, 0.27, x, 0.82, z, 1.0, 1.2, 0.9);
-    P.ball(vest, 0.25, x, 0.8, z + 0.07, 1.02, 1.06, 0.72);
-    P.ball(C.toadCap, 0.13, x, 1.02, z + 0.06, 1.5, 0.45, 0.9);
-    // ARMS, resting on the counter rail and reaching forward over it, because
-    // the reference's Toads are visibly DOING something behind their counters.
-    // Two stubs at the shoulder read as nothing; a stub, an elbow and a mitt
-    // sat on the rail reads as a body leaning on a bench.
+    // FEET, because he is standing ON the counter now and a legless bean
+    // resting on a rail reads as a bust someone left behind.
+    P.ball(0xfbf6e8, 0.1, x - 0.12, L + 0.55, z + 0.06, 1.1, 0.62, 1.5);
+    P.ball(0xfbf6e8, 0.1, x + 0.12, L + 0.55, z + 0.06, 1.1, 0.62, 1.5);
+    // Torso.
+    P.ball(C.toadSkin, 0.27, x, L + 0.82, z, 1.0, 1.2, 0.9);
+    // The vest is a PANEL, not a paunch. Sized to be a strip above a counter
+    // rail, at full height it bulged into a pink egg wider than the body. Now
+    // inset 0.035 inside the torso's silhouette on both sides and flattened to
+    // 0.55 depth, so cream shows around it and it reads as something he is
+    // wearing.
+    P.ball(vest, 0.24, x, L + 0.86, z + 0.14, 0.98, 0.92, 0.55);
+    P.ball(C.toadCap, 0.13, x, L + 1.02, z + 0.06, 1.5, 0.45, 0.9);
+    // ARMS hang at his sides. They used to reach forward onto the counter
+    // rail, which was the correct pose for a body cropped at the chest BY that
+    // rail; standing on top of it, the same pose left two mitts floating a
+    // third of a cell above the surface.
     for (const s of [-1, 1]) {
-      P.ball(C.toadSkin, 0.105, x + s * 0.28, 0.95, z + 0.04, 1, 1.2, 1);
-      P.ball(C.toadSkin, 0.088, x + s * 0.35, 0.86, z + 0.2, 1, 1, 1.5);
-      P.ball(0xfbf6e8, 0.095, x + s * 0.36, 0.85, z + 0.36, 1.05, 0.85, 1.05);
+      P.ball(C.toadSkin, 0.105, x + s * 0.28, L + 0.95, z + 0.02, 1, 1.2, 1);
+      P.ball(C.toadSkin, 0.088, x + s * 0.32, L + 0.87, z + 0.05, 1, 1.3, 1);
+      P.ball(0xfbf6e8, 0.095, x + s * 0.34, L + 0.76, z + 0.08, 1.05, 1, 1.05);
     }
 
     // Face. Bigger skull, and the features carried well forward of it so they
     // survive both the cap above and the counter below.
-    P.ball(C.toadSkin, 0.285, x, 1.32, z + 0.02, 1, 0.94, 1);
+    P.ball(C.toadSkin, 0.285, x, L + 1.32, z + 0.02, 1, 0.94, 1);
     for (const s of [-1, 1]) {
-      P.ball(0x2b2119, 0.06, x + s * 0.11, 1.34, z + 0.25, 1, 1.55, 0.5);
-      P.ball(0xffffff, 0.022, x + s * 0.13, 1.4, z + 0.27, 1, 1, 0.5);
-      P.ball(0xf0a086, 0.062, x + s * 0.21, 1.25, z + 0.18, 1, 0.7, 0.5);
+      P.ball(0x2b2119, 0.06, x + s * 0.11, L + 1.34, z + 0.25, 1, 1.55, 0.5);
+      P.ball(0xffffff, 0.022, x + s * 0.13, L + 1.4, z + 0.27, 1, 1, 0.5);
+      P.ball(0xf0a086, 0.062, x + s * 0.21, L + 1.25, z + 0.18, 1, 0.7, 0.5);
     }
     // A mouth. Without one a Toad is a bean with two dots on it.
-    P.ball(0x2b2119, 0.052, x, 1.19, z + 0.26, 1.5, 0.42, 0.4);
+    P.ball(0x2b2119, 0.052, x, L + 1.19, z + 0.26, 1.5, 0.42, 0.4);
 
     // Cap, with the spots sat properly ON the dome rather than floating near it.
     P.ball(C.toadCap, capR, x, capY, z, 1, capH, 1);
