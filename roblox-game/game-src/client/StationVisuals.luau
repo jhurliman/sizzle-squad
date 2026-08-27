@@ -59,6 +59,60 @@ local function topOf(kind: string?, cell: any): Vector3
 	return Vector3.new((cell.x + 0.5) * SCALE, h * SCALE, (cell.y + 0.5) * SCALE)
 end
 
+--- Tint the plate RACKS to match the equipped crockery.
+---
+--- ItemViz only ever tints the plate in your hands or on a bench, because the
+--- racks are captured kitchen geometry rather than item models. That made the
+--- cosmetic read as a bug: you took a white plate off a white stack and it
+--- turned gold in your hands. The rack is the thing you take it FROM, so it
+--- has to match.
+---
+--- Originals are cached on first tint so unequipping restores them.
+function StationVisuals:setPlateTint(catalog: any, kitchen: { [string]: string }?)
+	local id = kitchen ~= nil and kitchen.plate or nil
+	local item = if id ~= nil then catalog.byId[id] else nil
+	local color = if item ~= nil and item.color ~= nil
+		then Color3.fromRGB(item.color[1], item.color[2], item.color[3])
+		else nil
+	if self.plateTintKey == tostring(id) then
+		return
+	end
+	self.plateTintKey = tostring(id)
+	self.plateTint = color
+	self.plateTintDirty = true
+end
+
+--- Applied from update(), where the station models are known.
+function StationVisuals:applyPlateTint(stations: { [number]: any }, models: { [number]: Model })
+	if not self.plateTintDirty then
+		return
+	end
+	self.plateTintDirty = false
+	self.plateOrig = self.plateOrig or {}
+	for id, st in stations do
+		if st.kind ~= "plates" then
+			continue
+		end
+		local model = models[id]
+		if model == nil then
+			-- Models are indexed from the first snapshot; try again next frame.
+			self.plateTintDirty = true
+			continue
+		end
+		for _, p in model:GetDescendants() do
+			if not p:IsA("BasePart") then
+				continue
+			end
+			if self.plateOrig[p] == nil then
+				self.plateOrig[p] = p.Color
+			end
+			p.Color = if self.plateTint ~= nil
+				then self.plateOrig[p]:Lerp(self.plateTint, 0.75)
+				else self.plateOrig[p]
+		end
+	end
+end
+
 function StationVisuals:ensure(id: number, anchor: Vector3): any
 	local e = self.entries[id]
 	if e ~= nil then
@@ -154,6 +208,7 @@ function StationVisuals:updateDishPile(stations: { [number]: any }, count: numbe
 end
 
 function StationVisuals:update(stations: { [number]: any }, models: { [number]: Model })
+	self:applyPlateTint(stations, models)
 	for id, st in stations do
 		local anchor = topOf(st.kind, st.cell or { x = 7, y = 5 })
 		local e = self:ensure(id, anchor)

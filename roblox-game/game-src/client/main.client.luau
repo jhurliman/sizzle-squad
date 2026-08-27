@@ -195,6 +195,8 @@ remotes.EquipDeltas.OnClientEvent:Connect(function(msg)
 	end
 	-- Team-visible crockery: one elected item per slot for the whole kitchen.
 	ItemViz.setKitchen(Catalog, msg.kitchen)
+	-- and the racks the plates come off, or the tint reads as a bug
+	stationViz:setPlateTint(Catalog, msg.kitchen)
 	if state.myChefId ~= nil then
 		menu:setEquipped({
 			skin = state.skins[state.myChefId],
