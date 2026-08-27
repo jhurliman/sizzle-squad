@@ -101,13 +101,22 @@ function ShopTab:render()
 		return
 	end
 	if self.filter == "premium" then
-		self:renderPremium(progress)
+		self:renderPremium(progress, true)
 		return
 	end
 	local level, coins = progress.level or 1, progress.coins or 0
 	local owned, equipped = progress.owned or {}, progress.equipped or {}
 
-	local order = 0
+	-- PREMIUM LEADS THE "ALL" SHELF.
+	--
+	-- The passes used to render only under their own filter tab, which put the
+	-- two things in this experience that take real money behind a tab nobody
+	-- has a reason to press. They now head the default view, and keep their tab
+	-- for anyone who wants just those.
+	--
+	-- renderPremium returns the last LayoutOrder it used so the catalog rows
+	-- carry on below rather than interleaving from zero.
+	local order = if self.filter == "all" then self:renderPremium(progress, false) else 0
 	for _, item in self.catalog.items do
 		-- `hidden` items are reserved ids whose in-game consumer is not built
 		-- yet; taking coins for something invisible is the bug this pass is
@@ -231,7 +240,10 @@ end
 --- Robux products. Rendered from shared/Monetization, and a product whose
 --- gamePassId is still 0 is simply not shown -- the same inert-until-configured
 --- convention the badge ids use.
-function ShopTab:renderPremium(progress: any)
+--- @param standalone true when the Premium tab is the whole view; false when
+--- these cards are heading the All shelf, where an empty state would be noise
+--- among real items.
+function ShopTab:renderPremium(progress: any, standalone: boolean?): number
 	local owned = progress.owned or {}
 	local order, shown = 0, 0
 	for _, product in self.money.PRODUCTS do
@@ -295,7 +307,7 @@ function ShopTab:renderPremium(progress: any)
 		end
 	end
 
-	if shown == 0 then
+	if shown == 0 and standalone then
 		Theme.label({
 			Size = UDim2.new(1, -20, 0, 80),
 			TextXAlignment = Enum.TextXAlignment.Center,
@@ -306,6 +318,7 @@ function ShopTab:renderPremium(progress: any)
 			Text = "No passes are set up yet.\nCreate them on the Creator Dashboard and put their ids in shared/Monetization.luau.",
 		}, self.list)
 	end
+	return order
 end
 
 function ShopTab:relayout(L: any, _viewport: Vector2)

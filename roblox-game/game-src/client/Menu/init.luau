@@ -126,7 +126,29 @@ function Menu:buildPanel()
 		Visible = false,
 		ZIndex = 2,
 	}, self.gui)
-	self.scrim.Activated:Connect(function()
+	-- ONLY A TAP GENUINELY OUTSIDE THE PANEL DISMISSES.
+	--
+	-- The panel is Active so it ought to sink taps before they reach this
+	-- full-screen button, and that fix was made once already -- but it did not
+	-- hold, because `content` (and anything else laid over the panel body) is
+	-- a plain Frame drawn ABOVE it. Every non-button surface in the dialog was
+	-- a hole again, and the failure is silent and total: tap a label, lose the
+	-- whole shop.
+	--
+	-- Making each child Active is the fragile version of this fix; it has to be
+	-- got right again for every container anyone adds later. Comparing against
+	-- the panel's own rect cannot rot that way. The ScreenGui sets
+	-- IgnoreGuiInset, so AbsolutePosition and InputObject.Position share an
+	-- origin and no inset correction is needed.
+	self.scrim.Activated:Connect(function(input)
+		if self.panel.Visible and input ~= nil then
+			local tl = self.panel.AbsolutePosition
+			local sz = self.panel.AbsoluteSize
+			local x, y = input.Position.X, input.Position.Y
+			if x >= tl.X and x <= tl.X + sz.X and y >= tl.Y and y <= tl.Y + sz.Y then
+				return
+			end
+		end
 		self:close("scrim")
 	end)
 
@@ -183,6 +205,10 @@ function Menu:buildPanel()
 		Size = UDim2.new(1, -20, 1, -68),
 		BackgroundTransparency = 1,
 		ZIndex = 3,
+		-- Belt to the scrim's braces: this frame covers the whole panel body
+		-- and is drawn above it, so without this it is the hole taps fell
+		-- through. The scrim's rect test is what actually guarantees the fix.
+		Active = true,
 	}, self.panel)
 
 	-- Tabs are constructed lazily: building four screens (one with a 3D

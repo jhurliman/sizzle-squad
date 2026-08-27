@@ -128,8 +128,20 @@ local BUILDERS: { [string]: (Model) -> () } = {
 		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(0.35, 0.35, 0.35), Color = Color3.fromRGB(50, 50, 56), CFrame = CFrame.new(0, 0.45, 0) }, m)
 	end,
 	hat_mushroom = function(m)
+		-- THE SPOTS WERE INSIDE THE CAP.
+		--
+		-- The cap is an ellipsoid centred (0, 0.45, 0) with semi-axes
+		-- (0.95, 0.55, 0.95). Substituting the three old spot centres into
+		-- x²/a² + y²/b² + z²/c² gives 0.51, 0.43 and 0.36 — all well under 1,
+		-- so every one of them was buried in the red and the hat rendered as a
+		-- plain red spheroid. They were authored as if the cap were a unit
+		-- sphere, which it is in no axis.
+		--
+		-- Each spot now sits exactly ON the shell (t = 1.000), so it reads as
+		-- half-sunk into the cap the way a mushroom's does. Anything moved here
+		-- has to be re-solved against the ellipsoid, not nudged by eye.
 		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.9, 1.1, 1.9), Color = Color3.fromRGB(210, 70, 60), CFrame = CFrame.new(0, 0.45, 0) }, m)
-		for _, o in { Vector3.new(0.5, 0.65, 0.3), Vector3.new(-0.4, 0.7, -0.2), Vector3.new(0.1, 0.5, -0.55) } do
+		for _, o in { Vector3.new(0.51, 0.88, 0.28), Vector3.new(-0.46, 0.92, -0.21), Vector3.new(0.08, 0.85, -0.65) } do
 			part({ Shape = Enum.PartType.Ball, Size = Vector3.new(0.35, 0.25, 0.35), Color = WHITE, CFrame = CFrame.new(o) }, m)
 		end
 	end,

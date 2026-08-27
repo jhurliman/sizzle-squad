@@ -1,64 +1,72 @@
 #!/usr/bin/env node
 // Open Cloud CLI: read/wipe live profiles and run Luau inside the real place.
 //
-// CREDENTIALS LIVE OUTSIDE THE REPO, at ~/.config/sizzle/opencloud.json, so
-// there is no path by which a key reaches git. Env vars override it, which is
-// what CI would use. See tools/OPEN-CLOUD.md for how to mint the key.
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+// CREDENTIALS LIVE OUTSIDE THE REPO, at ~/.config/sizzle/opencloud.json. Env
+// vars override it, which is what CI would use. See tools/OPEN-CLOUD.md for how
+// to mint the key.
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
-const CONFIG = path.join(os.homedir(), '.config', 'sizzle', 'opencloud.json');
+const CONFIG = path.join(os.homedir(), ".config", "sizzle", "opencloud.json");
 
-// Not a secret: universe ids are public -- they appear in Open Cloud URLs and
-// in the creator dashboard. Baking it in means every command works with only
-// the API key in the environment. Override with ROBLOX_UNIVERSE_ID.
-const DEFAULT_UNIVERSE_ID = '10761465304';
+// Override with ROBLOX_UNIVERSE_ID.
+const DEFAULT_UNIVERSE_ID = "10761465304";
 
 function creds() {
   let file = {};
-  if (fs.existsSync(CONFIG)) file = JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
+  if (fs.existsSync(CONFIG)) file = JSON.parse(fs.readFileSync(CONFIG, "utf8"));
   const c = {
-    // ROBLOX_SIZZLE_SQUAD_API_KEY is where this project's key actually lives
-    // (exported from ~/.zshrc); the generic name stays supported for CI.
-    apiKey: process.env.ROBLOX_SIZZLE_SQUAD_API_KEY || process.env.ROBLOX_API_KEY || file.apiKey,
-    universeId: process.env.ROBLOX_UNIVERSE_ID || file.universeId || DEFAULT_UNIVERSE_ID,
+    apiKey:
+      process.env.ROBLOX_SIZZLE_SQUAD_API_KEY ||
+      process.env.ROBLOX_API_KEY ||
+      file.apiKey,
+    universeId:
+      process.env.ROBLOX_UNIVERSE_ID || file.universeId || DEFAULT_UNIVERSE_ID,
     placeId: process.env.ROBLOX_PLACE_ID || file.placeId,
   };
   if (!c.apiKey) {
-    console.error(`missing API key. Export ROBLOX_SIZZLE_SQUAD_API_KEY, or create ${CONFIG}:\n` +
-      `{ "apiKey": "...", "universeId": "...", "placeId": "..." }\n` +
-      `See roblox-game/tools/OPEN-CLOUD.md.`);
+    console.error(
+      `missing API key. Export ROBLOX_SIZZLE_SQUAD_API_KEY, or create ${CONFIG}:\n` +
+        `{ "apiKey": "...", "universeId": "...", "placeId": "..." }\n` +
+        `See roblox-game/tools/OPEN-CLOUD.md.`,
+    );
     process.exit(1);
   }
   return c;
 }
 
 // The key must never reach stdout, a log, or an error message.
-async function api(url, { method = 'GET', body, headers = {} } = {}) {
+async function api(url, { method = "GET", body, headers = {} } = {}) {
   const { apiKey } = creds();
   const res = await fetch(url, {
     method,
-    headers: { 'x-api-key': apiKey, ...headers },
+    headers: { "x-api-key": apiKey, ...headers },
     body,
   });
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`${method} ${url.replace(/\?.*/, '')} -> ${res.status} ${text.slice(0, 400)}`);
+    throw new Error(
+      `${method} ${url.replace(/\?.*/, "")} -> ${res.status} ${text.slice(0, 400)}`,
+    );
   }
   return text ? JSON.parse(text) : null;
 }
 
-const DS = 'https://apis.roblox.com/datastores/v1/universes';
-const ODS = 'https://apis.roblox.com/ordered-data-stores/v1/universes';
-const PROFILE_STORE = 'SizzleProfiles_v1';
-const BOARDS = ['SizzleBestRound_v1', 'SizzleCareerDishes_v1'];
+const DS = "https://apis.roblox.com/datastores/v1/universes";
+const ODS = "https://apis.roblox.com/ordered-data-stores/v1/universes";
+const PROFILE_STORE = "SizzleProfiles_v1";
+const BOARDS = ["SizzleBestRound_v1", "SizzleCareerDishes_v1"];
 
 function weekKey() {
   const t = new Date();
   const start = Date.UTC(t.getUTCFullYear(), 0, 1);
-  const yday = Math.floor((Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - start) / 86400000) + 1;
-  return `${t.getUTCFullYear()}-${String(Math.floor(yday / 7) + 1).padStart(2, '0')}`;
+  const yday =
+    Math.floor(
+      (Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - start) /
+        86400000,
+    ) + 1;
+  return `${t.getUTCFullYear()}-${String(Math.floor(yday / 7) + 1).padStart(2, "0")}`;
 }
 
 function entryUrl(universeId, store, key) {
@@ -69,25 +77,37 @@ function entryUrl(universeId, store, key) {
 async function cmdCheck() {
   const { universeId } = creds();
   const out = await api(`${DS}/${universeId}/standard-datastores?limit=50`);
-  console.log('credentials OK. datastores in this universe:');
+  console.log("credentials OK. datastores in this universe:");
   for (const d of out.datastores || []) console.log(`  ${d.name}`);
   if (!(out.datastores || []).some((d) => d.name === PROFILE_STORE)) {
-    console.log(`  (note: ${PROFILE_STORE} not listed -- nothing has saved yet, or wrong universe)`);
+    console.log(
+      `  (note: ${PROFILE_STORE} not listed -- nothing has saved yet, or wrong universe)`,
+    );
   }
 }
 
 async function cmdList() {
   const { universeId } = creds();
-  const q = new URLSearchParams({ datastoreName: PROFILE_STORE, limit: '100' });
-  const out = await api(`${DS}/${universeId}/standard-datastores/datastore/entries?${q}`);
+  const q = new URLSearchParams({ datastoreName: PROFILE_STORE, limit: "100" });
+  const out = await api(
+    `${DS}/${universeId}/standard-datastores/datastore/entries?${q}`,
+  );
   const keys = (out.keys || []).map((k) => k.key);
-  console.log(keys.length ? keys.join('\n') : '(no profiles stored)');
+  console.log(keys.length ? keys.join("\n") : "(no profiles stored)");
 }
 
 async function cmdProfile(userId) {
   const { universeId } = creds();
   const p = await api(entryUrl(universeId, PROFILE_STORE, `p${userId}`));
-  const fields = ['rounds', 'totalDishes', 'bestRound', 'coins', 'xp', 'level', 'sessions'];
+  const fields = [
+    "rounds",
+    "totalDishes",
+    "bestRound",
+    "coins",
+    "xp",
+    "level",
+    "sessions",
+  ];
   console.log(`--- p${userId} ---`);
   for (const f of fields) console.log(`  ${f}: ${JSON.stringify(p[f])}`);
   if (p.streak) console.log(`  streak: ${JSON.stringify(p.streak)}`);
@@ -98,20 +118,25 @@ async function cmdProfile(userId) {
     // A real shift serves tens of dishes. Far below 1 means most of those
     // "shifts" were never played -- which is what exposed the inflated profile.
     console.log(`  dishes per shift: ${(dishes / rounds).toFixed(3)}`);
-    console.log(`  implied hours at 180s a shift: ${((rounds * 180) / 3600).toFixed(0)}`);
+    console.log(
+      `  implied hours at 180s a shift: ${((rounds * 180) / 3600).toFixed(0)}`,
+    );
   }
-  if (process.argv.includes('--raw')) console.log(JSON.stringify(p, null, 2));
+  if (process.argv.includes("--raw")) console.log(JSON.stringify(p, null, 2));
 }
 
 async function cmdWipe(userId) {
   const { universeId } = creds();
   try {
-    await api(entryUrl(universeId, PROFILE_STORE, `p${userId}`), { method: 'DELETE' });
+    await api(entryUrl(universeId, PROFILE_STORE, `p${userId}`), {
+      method: "DELETE",
+    });
     console.log(`profile p${userId} deleted`);
   } catch (e) {
     // Already gone is a success for a repair tool, and must not abort the
     // board cleanup that follows -- that is how a half-done wipe happens.
-    if (/404|NOT_FOUND/.test(String(e.message))) console.log(`profile p${userId}: already absent`);
+    if (/404|NOT_FOUND/.test(String(e.message)))
+      console.log(`profile p${userId}: already absent`);
     else throw e;
   }
   await wipeBoards(universeId, userId);
@@ -141,9 +166,13 @@ async function wipeBoards(universeId, userId) {
     } catch (e) {
       if (!/404|NOT_FOUND/.test(String(e.message))) {
         const m = String(e.message);
-        console.log(`  ${board}: ${/ordered-data-store/.test(m)
-          ? 'key lacks the Ordered Data Stores permission (API System "Ordered Data Stores" -> read + write)'
-          : m}`);
+        console.log(
+          `  ${board}: ${
+            /ordered-data-store/.test(m)
+              ? 'key lacks the Ordered Data Stores permission (API System "Ordered Data Stores" -> read + write)'
+              : m
+          }`,
+        );
         continue;
       }
     }
@@ -152,10 +181,12 @@ async function wipeBoards(universeId, userId) {
       continue;
     }
     try {
-      await api(url, { method: 'DELETE' });
+      await api(url, { method: "DELETE" });
       console.log(`  ${board}: removed row worth ${had}`);
     } catch (e) {
-      console.log(`  ${board}: read ${had} but DELETE failed -- ${String(e.message)}`);
+      console.log(
+        `  ${board}: read ${had} but DELETE failed -- ${String(e.message)}`,
+      );
     }
   }
 }
@@ -165,26 +196,36 @@ async function wipeBoards(universeId, userId) {
 // Roblox-only behaviour possible at all.
 async function cmdLuau(file) {
   const { universeId, placeId } = creds();
-  if (!placeId) throw new Error('placeId is required for luau execution');
-  const script = fs.readFileSync(file, 'utf8');
+  if (!placeId) throw new Error("placeId is required for luau execution");
+  const script = fs.readFileSync(file, "utf8");
   const base = `https://apis.roblox.com/cloud/v2/universes/${universeId}/places/${placeId}`;
   const task = await api(`${base}/luau-execution-session-tasks`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ script }),
   });
-  process.stderr.write('running');
+  process.stderr.write("running");
   let done = task;
-  for (let i = 0; i < 120 && !['COMPLETE', 'FAILED', 'CANCELLED'].includes(done.state); i++) {
+  for (
+    let i = 0;
+    i < 120 && !["COMPLETE", "FAILED", "CANCELLED"].includes(done.state);
+    i++
+  ) {
     await new Promise((r) => setTimeout(r, 2000));
-    process.stderr.write('.');
+    process.stderr.write(".");
     done = await api(`https://apis.roblox.com/cloud/v2/${task.path}`);
   }
-  process.stderr.write('\n');
-  const logs = await api(`https://apis.roblox.com/cloud/v2/${task.path}/logs?maxPageSize=1000`);
-  for (const m of logs.luauExecutionSessionTaskLogs?.[0]?.messages || []) console.log(m);
-  if (done.state !== 'COMPLETE') {
-    console.error(`state: ${done.state}`, JSON.stringify(done.error || {}, null, 2));
+  process.stderr.write("\n");
+  const logs = await api(
+    `https://apis.roblox.com/cloud/v2/${task.path}/logs?maxPageSize=1000`,
+  );
+  for (const m of logs.luauExecutionSessionTaskLogs?.[0]?.messages || [])
+    console.log(m);
+  if (done.state !== "COMPLETE") {
+    console.error(
+      `state: ${done.state}`,
+      JSON.stringify(done.error || {}, null, 2),
+    );
     process.exit(1);
   }
 }

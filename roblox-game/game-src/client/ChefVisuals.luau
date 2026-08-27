@@ -892,6 +892,9 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 	local baseCF = base * CFrame.new(0, hop, 0) * CFrame.Angles(wobble, 0, rock + bank)
 
 	local model = entry.model :: Model
+	-- The head group's final transform, published for the hat below so the two
+	-- cannot drift apart (they did -- see the hat block).
+	local headGroupPose = CFrame.new()
 	if entry.isRig and #entry.animParts > 0 then
 		-- ---- group poses ---------------------------------------------------
 		-- skaters scissor gently and crouch; walkers swing
@@ -940,6 +943,27 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 		local headPitch = -torsoPitch * 0.6 + (if stunned then math.sin(self.time * 20) * 0.15 else 0)
 		set("Head", headPitch, 0, 0)
 		set("BuiltinHat", headPitch, 0, 0)
+		-- THE HEAD RIDES THE TORSO.
+		--
+		-- Head is a SIBLING group, not a child of Torso: `set` rotates it about
+		-- its own neck joint in rig space and it inherits nothing. The
+		-- counter-rotation above only means "stay level" against a torso that
+		-- has already carried the head forward. Applied on its own it pitched
+		-- the skull BACKWARD off a neck that was leaning FORWARD, and the two
+		-- errors add -- which is the head-about-to-fall-off look the walk cycle
+		-- had on all four rigs.
+		--
+		-- Composing the torso transform in front of it makes Head behave like
+		-- the child the arithmetic already assumed it was.
+		local torsoCF = pose_["Torso"]
+		if torsoCF ~= nil then
+			for _, g in { "Head", "BuiltinHat" } do
+				if pose_[g] ~= nil then
+					pose_[g] = torsoCF * pose_[g]
+				end
+			end
+		end
+		headGroupPose = pose_["Head"] or CFrame.new()
 		set("Tail", 0, math.sin(entry.phase * math.pi - 1.1) * 0.45 * moveBlend + math.sin(self.time * 1.7) * 0.08, 0)
 		set(
 			"Ears",
@@ -1062,15 +1086,13 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 		entry.hatModel = hatModel
 	end
 	if entry.hatModel ~= nil and entry.hatFit ~= nil then
-		local headPose = CFrame.new()
-		if entry.isRig then
-			-- ride the head group's transform so the hat bobs with the head
-			local j = entry.joints.Head
-			if j ~= nil then
-				headPose = around(j, -0.1 * moveBlend, 0, 0)
-			end
-		end
-		entry.hatModel:PivotTo(baseCF * headPose * CFrame.new(entry.headAttach + entry.hatFit.offset) * entry.hatFit.tilt)
+		-- The hat rides the head's ACTUAL transform.
+		--
+		-- It used to re-derive one, `around(j, -0.1 * moveBlend, 0, 0)`, which
+		-- was a different number from the head's real pitch and knew nothing
+		-- about the stun wobble or the torso lean. Two independent expressions
+		-- for one pose is how a hat comes loose from a skull; now there is one.
+		entry.hatModel:PivotTo(baseCF * headGroupPose * CFrame.new(entry.headAttach + entry.hatFit.offset) * entry.hatFit.tilt)
 	end
 
 	-- ---- nametag -----------------------------------------------------------

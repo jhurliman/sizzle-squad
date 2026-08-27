@@ -185,7 +185,9 @@ function CareerTab:renderGoals(progress: any)
 	local stats = {
 		{ "Shifts worked", progress.rounds or 0 },
 		{ "Dishes served", progress.totalDishes or 0 },
-		{ "Best shift", progress.bestRound or 0 },
+		-- bestRound is a COIN figure, like the chip and the shop prices; without
+		-- the suffix it read as a count of something.
+		{ "Best shift", `{progress.bestRound or 0}c` },
 	}
 	for i, s in stats do
 		Theme.label({
