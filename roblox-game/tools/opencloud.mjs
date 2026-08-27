@@ -14,7 +14,9 @@ function creds() {
   let file = {};
   if (fs.existsSync(CONFIG)) file = JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
   const c = {
-    apiKey: process.env.ROBLOX_API_KEY || file.apiKey,
+    // ROBLOX_SIZZLE_SQUAD_API_KEY is where this project's key actually lives
+    // (exported from ~/.zshrc); the generic name stays supported for CI.
+    apiKey: process.env.ROBLOX_SIZZLE_SQUAD_API_KEY || process.env.ROBLOX_API_KEY || file.apiKey,
     universeId: process.env.ROBLOX_UNIVERSE_ID || file.universeId,
     placeId: process.env.ROBLOX_PLACE_ID || file.placeId,
   };
