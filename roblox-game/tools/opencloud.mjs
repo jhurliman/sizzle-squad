@@ -105,8 +105,26 @@ async function cmdProfile(userId) {
 
 async function cmdWipe(userId) {
   const { universeId } = creds();
-  await api(entryUrl(universeId, PROFILE_STORE, `p${userId}`), { method: 'DELETE' });
-  console.log(`profile p${userId} deleted`);
+  try {
+    await api(entryUrl(universeId, PROFILE_STORE, `p${userId}`), { method: 'DELETE' });
+    console.log(`profile p${userId} deleted`);
+  } catch (e) {
+    // Already gone is a success for a repair tool, and must not abort the
+    // board cleanup that follows -- that is how a half-done wipe happens.
+    if (/404|NOT_FOUND/.test(String(e.message))) console.log(`profile p${userId}: already absent`);
+    else throw e;
+  }
+  await wipeBoards(universeId, userId);
+}
+
+function boardUrl(universeId, board, userId) {
+  return `${ODS}/${universeId}/orderedDataStores/${board}/scopes/global/entries/u${userId}`;
+}
+
+// Read-then-delete, so the output distinguishes "removed a row worth N" from
+// "there was nothing here" -- the earlier version could not tell those apart
+// and reported success either way.
+async function wipeBoards(universeId, userId) {
   // Boards are keyed `u{UserId}` (Progression writes `u{player.UserId}`), NOT
   // the bare id -- deleting the bare id silently removes nothing.
   //
@@ -115,19 +133,29 @@ async function cmdWipe(userId) {
   // dishes is an IncrementAsync, so a wiped profile carries on adding to the
   // old total.
   for (const board of [...BOARDS, `SizzleWeekly_${weekKey()}`]) {
+    const url = boardUrl(universeId, board, userId);
+    let had = null;
     try {
-      await api(`${ODS}/${universeId}/orderedDataStores/${board}/scopes/global/entries/u${userId}`, { method: 'DELETE' });
-      console.log(`  board ${board}: row removed`);
+      const row = await api(url);
+      had = row.value;
     } catch (e) {
-      const m = String(e.message);
-      if (m.includes('404') || m.includes('NOT_FOUND')) {
-        console.log(`  board ${board}: no row`);
-      } else if (m.includes('ordered-data-store')) {
-        console.log(`  board ${board}: key lacks the Ordered Data Stores permission ` +
-          `(add API System "Ordered Data Stores" -> read + write to the key)`);
-      } else {
-        console.log(`  board ${board}: ${m}`);
+      if (!/404|NOT_FOUND/.test(String(e.message))) {
+        const m = String(e.message);
+        console.log(`  ${board}: ${/ordered-data-store/.test(m)
+          ? 'key lacks the Ordered Data Stores permission (API System "Ordered Data Stores" -> read + write)'
+          : m}`);
+        continue;
       }
+    }
+    if (had === null) {
+      console.log(`  ${board}: no row`);
+      continue;
+    }
+    try {
+      await api(url, { method: 'DELETE' });
+      console.log(`  ${board}: removed row worth ${had}`);
+    } catch (e) {
+      console.log(`  ${board}: read ${had} but DELETE failed -- ${String(e.message)}`);
     }
   }
 }
@@ -166,6 +194,7 @@ const run = {
   check: cmdCheck,
   list: cmdList,
   profile: () => cmdProfile(arg),
+  boards: () => wipeBoards(creds().universeId, arg),
   wipe: () => cmdWipe(arg),
   luau: () => cmdLuau(arg),
 }[cmd];
@@ -174,6 +203,7 @@ if (!run) {
   node tools/opencloud.mjs check              verify the key and list datastores
   node tools/opencloud.mjs list               list stored profile keys
   node tools/opencloud.mjs profile <userId>   read one profile (--raw for all fields)
+  node tools/opencloud.mjs boards <userId>    clear just the leaderboard rows
   node tools/opencloud.mjs wipe <userId>      delete the profile and its board rows
   node tools/opencloud.mjs luau <file.luau>   run a script inside the real place`);
   process.exit(1);
