@@ -4837,32 +4837,34 @@ export class WorldView {
       }
     }
 
-    // A COOPERED BARREL, PARKED OUT OF PLAY.
+    // A COOPERED BARREL, IN THE CELL BELOW THE PLAY AREA'S BOTTOM-RIGHT CORNER.
     //
-    // This is the survivor of the deleted nooks() pass. It used to stand in a
-    // walkable pocket beside the right-hand benches, where it blocked a
-    // counter a player needed to reach. It is not the barrel that was wrong,
-    // only the ground it stood on.
+    // The survivor of the deleted nooks() pass. It is not the barrel that was
+    // ever wrong, only the ground it stood on.
     //
-    // Rows 9 and 10 of KITCHEN_MAP are '#', so this band is real floor that no
-    // chef can ever occupy — the closest a prop can sit to the play area while
-    // staying unreachable.
+    // KITCHEN_MAP row 8 is the last walkable row and runs x 1..13, so (13, 8)
+    // is the furthest a chef can get down and to the right. (13, 9) is '#' —
+    // the cell directly in front of that corner — which makes it the one spot
+    // that is simultaneously unreachable, adjacent to the play area, and
+    // inside the fixed camera's frame. Earlier attempts put it at the end of a
+    // bench and then in the pocket in front of the near rank; both were out of
+    // frame or out of the way of nothing.
     //
-    // It goes in the pocket between the right-hand rank's FRONT edge and the
-    // cobbles, not at either end of the bench. Measured from the top-down
-    // render rather than guessed: that bench is yawed 0.09 and its right end
-    // lands at x 13.77, which is already inside the cobbles' 13.72 reach — so
-    // there is no gap at the end to tuck anything into. The pocket in front of
-    // it is the only place on this side that is beside both the table and the
-    // wall. Clearances: 0.17 to the cobbles, 0.23 to the bench front.
+    // It will partially occlude a chef's feet when they stand in that corner.
+    // That is accepted: it costs nothing mechanically, and the alternative is
+    // a prop nobody ever sees.
     //
-    // Named palette colours, not raw hex: the converter picks a material from
-    // the nearest palette NAME, so a hand-mixed brown would have come out as
-    // stone the way the flour sacks did. benchTopAlt/benchRail match /^bench/
-    // and resolve to WoodPlanks, which is what a barrel wants.
+    // x is 13.3 rather than the cell centre 13.5 because the cobbles stand
+    // 0.28 proud of the wall face at 14, reaching 13.72; at 13.5 the barrel's
+    // 0.3 radius would bury 0.08 of itself in the stones. 13.3 clears by 0.07.
+    //
+    // Named palette colours, deliberately: benchTopAlt/benchRail match /^bench/
+    // and resolve to WoodPlanks. A hand-mixed brown would be reverse-matched to
+    // the nearest palette NAME and could come out as stone, the way the flour
+    // sacks did.
     {
-      const bx = 13.25;
-      const bz = 12.15;
+      const bx = 13.3;
+      const bz = 9.5;
       this.contact(bx, bz + 0.12, 0.95, 0.95, 0.85);
       P.cyl(C.benchTopAlt, 0.28, 0.24, 0.44, 14, bx, 0.22, bz);
       for (const hy of [0.1, 0.35]) P.cyl(C.steelDark, 0.29, 0.29, 0.045, 14, bx, hy, bz);
