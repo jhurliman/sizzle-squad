@@ -41,6 +41,10 @@ function RoundDirector.new(
 		return false
 	end
 	self.onRoundEnd = opts.onRoundEnd
+	-- Requested bot-fill, applied at the next startRound. Toggling
+	-- simService.botFill directly would take effect mid-shift and freeze every
+	-- bot on the spot, mid-carry.
+	self.pendingBotFill = simService.botFill
 	-- Round index the award already fired for; see the latch in heartbeat.
 	self.awardedRound = -1
 	self.onRoundStart = opts.onRoundStart
@@ -87,6 +91,8 @@ function RoundDirector:broadcastPhase()
 		timer = self.timer,
 		round = self.round,
 		waiting = not self.simService.botFill and self.crew:humanCount() == 0,
+		botFill = self.simService.botFill,
+		botFillPending = self.pendingBotFill,
 		readyIds = readyIds,
 		readyCount = readyCount,
 		readyTotal = readyTotal,
@@ -130,6 +136,7 @@ function RoundDirector:startRound()
 	-- spot; setting the knob afterwards misses exactly the tickets that
 	-- matter most.
 	local script = if self.firstShiftFn() then { "salad", "baconroll", "chopped" } else nil
+	self.simService.botFill = self.pendingBotFill
 	self.simService:reset(self.seedFn(), if script ~= nil then { scriptedRecipes = script } else nil)
 	self.replicator:resetCaches()
 	self.crew:reseat()

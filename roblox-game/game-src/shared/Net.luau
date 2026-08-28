@@ -36,6 +36,7 @@ Net.REMOTES = {
 	CarryDeltas = "RemoteEvent", -- server -> client: { {chefId, carrying-summary}, ... }
 	EquipDeltas = "RemoteEvent", -- server -> client: { {chefId, hat?, name?, skin?, palette?}, ... }
 	PickSpecies = "RemoteEvent", -- client -> server: species name
+	BotFill = "RemoteEvent", -- client -> server: bots fill empty seats (bool)
 }
 
 local POS_MIN, POS_MAX = -2, 30

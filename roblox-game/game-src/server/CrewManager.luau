@@ -67,6 +67,67 @@ function CrewManager:touch(seat: Seat)
 	end
 end
 
+--- Give chef `chefId` the species `want`, WITHOUT ever putting the same
+--- character in the kitchen twice.
+---
+--- sim.ts seeds the four chefs with four distinct skins (`skins[i % 4]`), so
+--- uniqueness holds by construction until something assigns a skin directly —
+--- which is exactly what this used to do. Two players whose wardrobe
+--- preference matched both got it, and the kitchen ran two identical chefs.
+---
+--- Swapping PRESERVES the invariant rather than repairing it afterwards:
+--- whoever held `want` takes this chef's old skin, so the set of four is
+--- always a permutation of the four species.
+---
+--- The one request that cannot be granted is a species another SEATED HUMAN is
+--- wearing. They chose it too and were here first, so the caller keeps the
+--- distinct skin it already holds — which is "the next available character".
+--- Bots are always displaced; they have no preference.
+---
+--- Returns the skin actually held afterwards, which may not be `want`.
+function CrewManager:claimSkin(chefId: number, want: string?): string?
+	local chefs = self.simService.sim.chefs
+	local mine = chefs[chefId + 1]
+	if mine == nil then
+		return nil
+	end
+	if want == nil or mine.skin == want then
+		return mine.skin
+	end
+	for i, other in chefs do
+		if other ~= mine and other.skin == want then
+			if self.byChef[i - 1] ~= nil then
+				return mine.skin -- a human is wearing it; keep ours
+			end
+			other.skin, mine.skin = mine.skin, want
+			return mine.skin
+		end
+	end
+	-- Nobody holds it (shouldn't happen with a full permutation, but a skin
+	-- list that grows past four would land here).
+	mine.skin = want
+	return mine.skin
+end
+
+--- Species currently worn by a SEATED HUMAN, mapped to that human's UserId.
+---
+--- The value is the owner rather than `true` because this is broadcast to
+--- everyone: a client has to be able to tell "someone else has this" from
+--- "this is the one I am wearing", and comparing UserIds is the only way that
+--- does not need a second lookup. Bot-held species are absent — picking one
+--- just displaces the bot.
+function CrewManager:takenSkins(): { [string]: number }
+	local taken = {}
+	local chefs = self.simService.sim.chefs
+	for i, chef in chefs do
+		local seat = self.byChef[i - 1]
+		if seat ~= nil and chef.skin ~= nil then
+			taken[chef.skin] = seat.player.UserId
+		end
+	end
+	return taken
+end
+
 function CrewManager:playerAdded(player: any)
 	local chefId = self.simService:freeChef()
 	if chefId == nil then
@@ -75,13 +136,12 @@ function CrewManager:playerAdded(player: any)
 		return nil
 	end
 	local chef = self.simService:setHuman(chefId, true)
-	local want = self.skinFor and self.skinFor(player)
-	if chef ~= nil and want ~= nil then
-		chef.skin = want
-	end
 	local seat: Seat = { player = player, chefId = chefId, lastInputAt = self.now(), afk = false }
 	self.seats[player] = seat
 	self.byChef[chefId] = seat
+	-- Seat FIRST, then claim: claimSkin consults byChef to decide which
+	-- species are spoken for, and this seat has to be in it.
+	self:claimSkin(chefId, self.skinFor and self.skinFor(player))
 	self.remotes.ChefAssign:FireClient(player, {
 		chefId = chefId,
 		skin = chef and chef.skin or "bramble",
@@ -135,16 +195,16 @@ end
 
 --- Re-seat every connected player after a sim reset (new round).
 function CrewManager:reseat()
+	-- Drop the old chef->seat map first. Reseating moves everyone, and a stale
+	-- entry would make claimSkin think a chef nobody occupies is spoken for.
+	table.clear(self.byChef)
 	for player, seat in self.seats do
 		local chefId = self.simService:freeChef()
 		if chefId ~= nil then
 			local chef = self.simService:setHuman(chefId, true)
-			local want = self.skinFor and self.skinFor(player)
-			if chef ~= nil and want ~= nil then
-				chef.skin = want
-			end
 			seat.chefId = chefId
 			self.byChef[chefId] = seat
+			self:claimSkin(chefId, self.skinFor and self.skinFor(player))
 			self.remotes.ChefAssign:FireClient(player, {
 				chefId = chefId,
 				skin = chef and chef.skin or "bramble",

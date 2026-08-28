@@ -20,6 +20,8 @@ WardrobeTab.__index = WardrobeTab
 
 local mk = Theme.mk
 
+local LOCAL_USER_ID = game:GetService("Players").LocalPlayer.UserId
+
 local SPECIES = {
 	{ id = "bramble", label = "🐻 Bramble" },
 	{ id = "pip", label = "🐸 Pip" },
@@ -265,6 +267,14 @@ function WardrobeTab:card(order: number, label: string, state: string, locked: b
 	return row
 end
 
+--- Species other seated players are wearing right now (species -> UserId).
+function WardrobeTab:setTaken(taken: any)
+	self.taken = taken
+	if self.built then
+		self:render()
+	end
+end
+
 function WardrobeTab:render()
 	for _, c in self.rail:GetChildren() do
 		if not c:IsA("UIListLayout") then
@@ -282,8 +292,16 @@ function WardrobeTab:render()
 	-- ---- species -----------------------------------------------------
 	self:sectionTitle(next_(), "SPECIES")
 	for _, s in SPECIES do
-		local state = if self.pending.skin == s.id then "WORN" else "pick"
-		self:card(next_(), s.label, state, false, nil, function()
+		-- A species another player is already wearing stays TAPPABLE on purpose.
+		-- Trying hats on is the whole reason this screen exists, and the pick
+		-- still saves your preference for the next server where the character
+		-- is free — the server simply will not hand you a duplicate here. The
+		-- label is what stops that reading as the wardrobe being broken.
+		local owner = self.taken and self.taken[s.id]
+		local byOther = owner ~= nil and owner ~= LOCAL_USER_ID
+		local state = if self.pending.skin == s.id then "WORN" elseif byOther then "IN USE" else "pick"
+		local sub = if byOther then "Another chef here is this one — try it on, wear it next time" else nil
+		self:card(next_(), s.label, state, false, sub, function()
 			self.pending.skin = s.id
 			-- Palettes are species-bound; a palette from another species does
 			-- nothing at all, so drop it rather than silently no-op.

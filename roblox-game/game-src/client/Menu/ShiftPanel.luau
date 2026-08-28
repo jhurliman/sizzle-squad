@@ -97,6 +97,25 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		self.tabButtons[t.id] = btn
 	end
 
+	-- BOTS ARE OPTIONAL, AND THE LOBBY IS WHERE YOU SAY SO.
+	--
+	-- Sits with the tab row rather than in a settings screen because it is a
+	-- per-server choice made in the ten seconds before a shift, not a
+	-- preference. The caption states what will happen at the NEXT start, since
+	-- that is when it lands — flipping bots mid-shift would freeze them where
+	-- they stand, mid-carry.
+	self.botButton = Theme.button({
+		Size = UDim2.fromOffset(196, Theme.MIN_TAP),
+		Fill = Theme.BROWN_MID,
+		BackgroundTransparency = 0.1,
+		TextSize = 14,
+		LayoutOrder = #TABS + 1,
+		Text = "BOTS: ON",
+	}, self.tabRow)
+	self.botButton.Activated:Connect(function()
+		self.deps.onToggleBots(not self.botFill)
+	end)
+
 	self.progressChip = Theme.chip({
 		Size = UDim2.fromOffset(320, 34),
 		TextSize = 15,
@@ -120,6 +139,16 @@ function ShiftPanel:setProgress(progress: any)
 	-- NOT the coin emoji: FredokaOne has no glyph for it and it renders as a
 	-- hollow box (the 🔥 in the same string is fine).
 	self.progressChip.Text = `Lv {progress.level or 1}  ·  {progress.coins or 0} coins{suffix}`
+end
+
+function ShiftPanel:setBots(on: boolean, pending: boolean)
+	self.botFill = pending
+	self.botButton.Text = if pending then "BOTS: ON" else "BOTS: OFF"
+	self.botButton.BackgroundColor3 = if pending then Theme.BROWN_MID else Theme.BROWN_DEEP
+	-- Only say "next shift" when the pending value has not landed yet.
+	if on ~= pending then
+		self.botButton.Text ..= "  (next shift)"
+	end
 end
 
 function ShiftPanel:setPhase(phase: any, spectating: boolean)

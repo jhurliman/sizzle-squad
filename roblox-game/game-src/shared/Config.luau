@@ -17,7 +17,12 @@ Config.LATE_JOIN_CUTOFF = 15 -- <15s left: hold joiner in kitchen-cam until resu
 -- Bots are OPT-IN (playtest verdict: watching bots efficiently play the game
 -- for you kills the fun of learning it). The brain stays in the codebase —
 -- flip this on for bot-backfilled kitchens, or wire it to a lobby vote later.
-Config.BOT_FILL = false
+-- Bots fill any seat no human is in. ON by default: a server that a single
+-- player joins has to be playable, and three empty aprons is not a kitchen.
+-- Players can turn them off per server from the shift panel; the change lands
+-- at the next round start rather than mid-shift, because flipping it live
+-- freezes every bot where it stands.
+Config.BOT_FILL = true
 
 -- Difficulty by (non-AFK) human count.
 --
@@ -126,7 +131,11 @@ Config.AFK_SECONDS = 20
 -- the last day of the launch window (UTC, YYYY-MM-DD); until then it is handed
 -- out at the end of any shift, and after it nobody can earn it again. Leave it
 -- empty to disable the badge entirely.
-Config.FOUNDING_CHEF_UNTIL = "2026-10-31"
+-- Launch is Halloween 2026, so the founding window runs from launch to the end
+-- of November. This is a PERMANENT badge on real accounts: past this date
+-- nobody can earn it again, and before it everyone who finishes a shift does,
+-- so a date that is too late turns it into a participation trophy.
+Config.FOUNDING_CHEF_UNTIL = "2026-11-30"
 
 
 return Config

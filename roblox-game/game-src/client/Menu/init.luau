@@ -82,6 +82,9 @@ function Menu.new(deps: any)
 		onOpenTab = function(tab)
 			self:openTab(tab)
 		end,
+		onToggleBots = function(on)
+			self.remotes.BotFill:FireServer(on)
+		end,
 	})
 	self.kitchenCard = KitchenCard.new(gui, {
 		onOpenTab = function(tab)
@@ -378,6 +381,20 @@ function Menu:setPhase(phase: any, spectating: boolean)
 	self.shiftPanel:setPhase(phase, spectating)
 	self.kitchenCard:setPhase(phase)
 	self:maybeAutoStart()
+end
+
+--- Species other seated players are wearing (species -> UserId), from the
+--- EquipDeltas broadcast. Held here so a wardrobe built later still gets it.
+function Menu:setBots(on: boolean, pending: boolean)
+	self.shiftPanel:setBots(on, pending)
+end
+
+function Menu:setTaken(taken: any)
+	self.taken = taken
+	local w = self.tabs and self.tabs.wardrobe
+	if w ~= nil and w.setTaken ~= nil then
+		w:setTaken(taken)
+	end
 end
 
 function Menu:setProgress(progress: any)

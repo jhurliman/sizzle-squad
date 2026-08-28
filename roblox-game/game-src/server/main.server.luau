@@ -69,6 +69,21 @@ remotes.ReadyUp.OnServerEvent:Connect(function(player, on)
 	director:setReady(player, on == true)
 end)
 
+-- BOTS ARE OPTIONAL, AND ANY SEATED PLAYER MAY DECIDE.
+--
+-- No host role exists in this game and inventing one for a four-player co-op
+-- kitchen is not worth it: the worst case is somebody flipping a toggle their
+-- crewmates did not want, in a lobby, where it is one tap to flip back.
+-- Spectators and unseated clients are ignored so a passer-by cannot change a
+-- shift they are not working.
+remotes.BotFill.OnServerEvent:Connect(function(player, on)
+	if crew.seats[player] == nil then
+		return
+	end
+	director.pendingBotFill = on == true
+	director:broadcastPhase()
+end)
+
 -- Emotes travel as IDS. This used to rebroadcast any client-supplied string
 -- (<=24 chars) to every player, which is an unmoderated free-text channel in
 -- a game aimed at this audience. Now the id must be a built-in ping or an
@@ -140,7 +155,10 @@ local function broadcastEquips()
 			name = monetization:flairFor(player) .. (player.DisplayName or player.Name),
 		})
 	end
-	remotes.EquipDeltas:FireAllClients({ chefs = list, kitchen = electKitchen() })
+	-- `taken` is the species other SEATED HUMANS are wearing right now. The
+	-- wardrobe still previews every character (trying hats on is the whole
+	-- point of it) but cannot select one that is spoken for in this server.
+	remotes.EquipDeltas:FireAllClients({ chefs = list, kitchen = electKitchen(), taken = crew:takenSkins() })
 end
 
 -- A wardrobe makes equips far more frequent, and this is an O(players x chefs)
@@ -185,16 +203,16 @@ progression.coinMultiplier = function(_self, player)
 end
 
 remotes.PickSpecies.OnServerEvent:Connect(function(player, species)
+	-- The wardrobe choice is a PREFERENCE and is always saved, even when this
+	-- server cannot grant it: it is what you will be given in the next server
+	-- where the character is free. What you actually wear here is decided by
+	-- claimSkin, which refuses a species another seated human is wearing.
 	if not progression:setSpecies(player, species) then
 		return
 	end
 	local seat = crew.seats[player]
 	if seat ~= nil then
-		for _, chef in simService.sim.chefs do
-			if chef.id == seat.chefId then
-				chef.skin = species
-			end
-		end
+		crew:claimSkin(seat.chefId, species)
 	end
 	queueEquips()
 end)

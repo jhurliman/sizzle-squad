@@ -208,6 +208,11 @@ end)
 
 remotes.EquipDeltas.OnClientEvent:Connect(function(msg)
 	local list = msg.chefs or msg
+	-- Which species are spoken for by other seated players, so the wardrobe
+	-- can say so rather than letting a pick silently not take effect.
+	if msg.taken ~= nil then
+		menu:setTaken(msg.taken)
+	end
 	table.clear(state.hats)
 	table.clear(state.names)
 	table.clear(state.palettes)
@@ -243,6 +248,7 @@ end)
 
 local lastPhase = ""
 remotes.RoundPhase.OnClientEvent:Connect(function(phase)
+	menu:setBots(phase.botFill == true, phase.botFillPending ~= false)
 	if phase.phase == "round" and lastPhase ~= "round" then
 		state.simTime = 0 -- fresh round: restart the local clock
 	end
