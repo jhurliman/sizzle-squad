@@ -248,7 +248,7 @@ end)
 
 local lastPhase = ""
 remotes.RoundPhase.OnClientEvent:Connect(function(phase)
-	menu:setBots(phase.botFill == true, phase.botFillPending ~= false)
+	menu:setBots(phase.botFill == true, phase.botFillPending ~= false, phase.phase)
 	if phase.phase == "round" and lastPhase ~= "round" then
 		state.simTime = 0 -- fresh round: restart the local clock
 	end

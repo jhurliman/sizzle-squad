@@ -159,12 +159,19 @@ function ShiftPanel:setProgress(progress: any)
 	self.progressChip.Text = `Lv {progress.level or 1}  ·  {progress.coins or 0} coins{suffix}`
 end
 
-function ShiftPanel:setBots(on: boolean, pending: boolean)
+function ShiftPanel:setBots(on: boolean, pending: boolean, phase: string?)
 	self.botFill = pending
 	self.botButton.Text = if pending then "BOTS: ON" else "BOTS: OFF"
 	self.botButton.BackgroundColor3 = if pending then Theme.BROWN_MID else Theme.BROWN_DEEP
-	-- Only say "next shift" when the pending value has not landed yet.
-	if on ~= pending then
+	-- "(next shift)" ONLY while a shift is actually running.
+	--
+	-- The qualifier exists because the toggle lands at the next round start
+	-- rather than mid-carry, so during a shift it is telling the truth: what
+	-- you just picked is not what is on the floor right now. In a LOBBY the
+	-- pending value simply is what Start will give you, so the qualifier is
+	-- noise — and it read as nonsense to a player who had not yet worked a
+	-- shift at all, which is every player's first thirty seconds.
+	if phase == "round" and on ~= pending then
 		self.botButton.Text ..= "  (next shift)"
 	end
 end

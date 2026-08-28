@@ -404,8 +404,8 @@ end
 
 --- Species other seated players are wearing (species -> UserId), from the
 --- EquipDeltas broadcast. Held here so a wardrobe built later still gets it.
-function Menu:setBots(on: boolean, pending: boolean)
-	self.shiftPanel:setBots(on, pending)
+function Menu:setBots(on: boolean, pending: boolean, phase: string?)
+	self.shiftPanel:setBots(on, pending, phase)
 end
 
 function Menu:setTaken(taken: any)
