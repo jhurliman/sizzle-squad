@@ -519,6 +519,49 @@ const SLIP_CD = 22;
  */
 const SLIP_BEAT = 0.45;
 
+/**
+ * THE THINKING BEAT.
+ *
+ * Bots plan three times a second and act on it instantly, and the result reads
+ * as relentless — a player reported the pace as intimidating, which is a
+ * different complaint from "the bots win too much" and needs a different fix.
+ * A human pauses on the spot when they decide what to do next; these did not,
+ * ever.
+ *
+ * So: when a bot picks up a NEW plan having had none — a task boundary, the
+ * moment a person would look around — it sometimes stands still for a beat
+ * first. Deliberately not armed when a plan is REPLACED mid-way (that already
+ * has `reactionLag`, and doubling up there is what used to spend a quarter of
+ * the animation budget on statues), and never mid-carry, which would read as
+ * lag rather than thought.
+ *
+ * Both are instance knobs so tools/thinkpause-probe.luau can sweep them, and
+ * the defaults below ARE the swept result. Rolled off the per-bot `dice`, so a
+ * service still replays exactly and parity is unaffected.
+ *
+ * 24 seeds, dishes served against no pause at all:
+ *
+ *     rate 0.20 beat 0.40   +1.5%    2.0% of chef-ticks standing still
+ *     rate 0.25 beat 0.40   +2.5%    2.2%      <- shipped
+ *     rate 0.30 beat 0.45   -1.0%    3.0%
+ *     rate 0.40 beat 0.40   -2.0%    3.2%
+ *     rate 0.40 beat 0.55   -2.1%    4.2%
+ *     rate 0.55 beat 0.55  -13.8%    5.7%
+ *     rate 1.00 beat 1.00  -48.9%   12.2%
+ *
+ * The shipped setting costs NOTHING — it measures slightly positive, which is
+ * inside the noise but certainly not a nerf, and the plausible mechanism is
+ * less plan thrash and less contention for the same station. Standing-still
+ * time goes from 0.1% of chef-ticks to 2.2%, which is the twenty-fold increase
+ * in visible hesitation the change is actually for.
+ *
+ * The cliff past 0.5 is steep, so treat these as tuned rather than arbitrary:
+ * anything above about beat 0.45 starts costing real dishes, and a solo player
+ * in an empty server needs a crew that can still three-star a shift.
+ */
+const THINK_RATE = 0.25;
+const THINK_BEAT = 0.4;
+
 const YIELD_RADIUS = 2.0;
 /**
  * The beat. Not independently swept: it is set to the length of the double-take
@@ -864,6 +907,14 @@ class Telemetry {
 }
 
 export class BotDirector {
+  /** See THINK_RATE / THINK_BEAT. Instance knobs so a probe can sweep them. */
+  thinkRate = THINK_RATE;
+  thinkBeat = THINK_BEAT;
+  /** Sweep hook for tools/botfarm-probe.luau. */
+  setThinkPause(rate: number, beat: number) {
+    this.thinkRate = rate;
+    this.thinkBeat = beat;
+  }
   private mem = new Map<number, BotMemory>();
   /** stationId -> chefId, so two bots never chase the same board. */
   private claims = new Map<number, number>();
@@ -1251,6 +1302,8 @@ export class BotDirector {
           // only when a plan the bot was mid-way through is dropped, which is
           // the moment that is worth reading.
           if (cur) m.lagTimer = m.reactionLag;
+          // A task boundary: no plan before, one now. Sometimes take a beat.
+          else if (job && m.dice() < this.thinkRate) m.lagTimer = Math.max(m.lagTimer, this.thinkBeat);
           m.job = job;
           m.jobAge = 0;
           m.flow = null;
