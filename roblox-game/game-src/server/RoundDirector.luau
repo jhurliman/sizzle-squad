@@ -271,6 +271,21 @@ function RoundDirector:buildResults(): any
 			stars = i
 		end
 	end
+	-- FINISHING FIRST SHIFT IS THREE STARS, FULL STOP.
+	--
+	-- Two scripted dishes will never clear an 80-coin threshold, so a player
+	-- who did exactly what they were told would be shown a one-star result --
+	-- the game's own way of saying "that was poor" -- as the very first thing
+	-- it ever tells them. The tutorial's success condition is completing it,
+	-- and the results screen has to agree with that.
+	--
+	-- The `firstThreeStar` badge is deliberately NOT granted here (see
+	-- Badges:onRoundEnd): three stars earned in a real kitchen is a thing worth
+	-- having, and handing it out for the tutorial would spend it on the one
+	-- shift nobody could fail.
+	if self.tutorialFn() then
+		stars = 3
+	end
 	-- One positive card per human, no repeats, never a shame stat.
 	local cards = {}
 	local used = {}
@@ -295,6 +310,7 @@ function RoundDirector:buildResults(): any
 		missed = score.missed,
 		bestCombo = score.bestCombo,
 		stars = stars,
+		tutorial = self.tutorialFn(),
 		time = sim.time,
 		cards = cards,
 		stats = self.stats,

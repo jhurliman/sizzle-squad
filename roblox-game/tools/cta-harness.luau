@@ -113,6 +113,15 @@ local pad = btn:FindFirstChildWhichIsA("UIPadding")
 check(pad ~= nil and pad.PaddingTop.Offset > pad.PaddingBottom.Offset,
 	`more padding above than below, so caps sit on the optical centre ({pad and pad.PaddingTop.Offset}/{pad and pad.PaddingBottom.Offset})`)
 
+-- THE SHADOW MUST BE INSIDE THE LAYOUT BOX.
+--
+-- It hangs below the face, so if the root is only as tall as the face the
+-- shadow bleeds into whatever the column puts underneath and eats the gap.
+-- Reported as the Start button sitting too close to the info chip.
+check(root.Size.Y.Offset == 72 + Theme.SHADOW_DY,
+	`the root reserves the shadow's overhang ({root.Size.Y.Offset} = 72 + {Theme.SHADOW_DY})`)
+check(face.Size.Y.Offset == -Theme.SHADOW_DY, "and the face stops short of it")
+
 -- depth
 check(#root:GetChildren() >= 3, "shadow, face and button are all present")
 check(btn.ZIndex > face.ZIndex, "the label draws over the fill")

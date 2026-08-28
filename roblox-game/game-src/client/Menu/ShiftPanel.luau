@@ -43,13 +43,14 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		Name = "ShiftPanel",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.58),
-		Size = UDim2.fromOffset(600, 190),
+		Size = UDim2.fromOffset(600, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		Visible = false,
 	}, gui)
 	mk("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
-		Padding = UDim.new(0, 12),
+		Padding = UDim.new(0, 18),
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
@@ -309,7 +310,11 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	local rowsH = rows * Theme.MIN_TAP + (rows - 1) * gap
 	local widest = math.max(self.rows[1].Size.X.Offset, self.rows[2].Size.X.Offset)
 	self.tabRow.Size = UDim2.fromOffset(widest, rowsH)
-	self.root.Size = UDim2.fromOffset(math.max(widest, 320), 142 + rowsH)
+	-- Height comes from the column's own contents (AutomaticSize.Y), not from a
+	-- hand-summed constant: the old `142 + rowsH` had to be re-derived by hand
+	-- every time a gap or a control changed height, and was already carrying
+	-- 12px of slack nobody could account for.
+	self.root.Size = UDim2.fromOffset(math.max(widest, 320), 0)
 	self.startRoot.Size = UDim2.fromOffset(if compact then 260 else 340, if compact then 62 else 72)
 	-- No per-state TextSize any more: the CTA scales its own label (see
 	-- Theme.cta). Only the ceiling moves with the breakpoint.

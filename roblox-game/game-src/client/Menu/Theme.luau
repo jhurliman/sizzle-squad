@@ -51,6 +51,10 @@ Theme.DISPLAY_FONT = Enum.Font.LuckiestGuy
 -- because the menu competes with the thumbstick zone on a phone.
 Theme.MIN_TAP = 48
 
+-- How far a CTA's shadow sits below its face. Named because the layout has to
+-- reserve it; see Theme.cta.
+Theme.SHADOW_DY = 5
+
 function Theme.mk(class: string, props: { [string]: any }, parent: Instance?): any
 	local inst = Instance.new(class) :: any
 	for k, v in props do
@@ -159,8 +163,15 @@ function Theme.cta(props: { [string]: any }, parent: Instance?): any
 	local maxText = props.TextSize or 30
 	props.TextSize = nil
 
+	-- THE SHADOW IS PART OF THE BUTTON'S FOOTPRINT.
+	--
+	-- It hangs SHADOW_DY below the face, and the root used to be exactly the
+	-- face's size -- so the shadow bled past the bottom edge of the layout box
+	-- and ate that many pixels out of the gap the UIListLayout was leaving
+	-- underneath. The button read as crowding whatever sat below it. Reserve
+	-- the overhang and the declared gap is the gap you actually see.
 	local root = mk("Frame", {
-		Size = size,
+		Size = UDim2.new(size.X.Scale, size.X.Offset, size.Y.Scale, size.Y.Offset + Theme.SHADOW_DY),
 		BackgroundTransparency = 1,
 		LayoutOrder = props.LayoutOrder or 1,
 	}, parent)
@@ -170,8 +181,8 @@ function Theme.cta(props: { [string]: any }, parent: Instance?): any
 	-- shadow has to be faked with an image. A hard offset shadow at low alpha
 	-- reads as deliberate; a fake blur made of stacked frames does not.
 	local shadow = mk("Frame", {
-		Size = UDim2.new(1, 0, 1, 0),
-		Position = UDim2.fromOffset(0, 5),
+		Size = UDim2.new(1, 0, 1, -Theme.SHADOW_DY),
+		Position = UDim2.fromOffset(0, Theme.SHADOW_DY),
 		BackgroundColor3 = Theme.BROWN_DEEP,
 		BackgroundTransparency = 0.45,
 		BorderSizePixel = 0,
@@ -181,7 +192,7 @@ function Theme.cta(props: { [string]: any }, parent: Instance?): any
 
 	local face = mk("Frame", {
 		Name = "CtaFace",
-		Size = UDim2.new(1, 0, 1, 0),
+		Size = UDim2.new(1, 0, 1, -Theme.SHADOW_DY),
 		BackgroundColor3 = fill,
 		BorderSizePixel = 0,
 		ZIndex = z + 1,
@@ -197,7 +208,7 @@ function Theme.cta(props: { [string]: any }, parent: Instance?): any
 	local btn = mk(
 		"TextButton",
 		Theme.merge({
-			Size = UDim2.new(1, 0, 1, 0),
+			Size = UDim2.new(1, 0, 1, -Theme.SHADOW_DY),
 			BackgroundTransparency = 1,
 			TextColor3 = Theme.WHITE,
 			-- THE LABEL FITS ITSELF.
@@ -234,7 +245,7 @@ function Theme.cta(props: { [string]: any }, parent: Instance?): any
 		local dy = if down then 3 else 0
 		face.Position = UDim2.fromOffset(0, dy)
 		btn.Position = UDim2.fromOffset(0, dy)
-		shadow.Position = UDim2.fromOffset(0, if down then 2 else 5)
+		shadow.Position = UDim2.fromOffset(0, if down then Theme.SHADOW_DY - 3 else Theme.SHADOW_DY)
 	end
 	btn.MouseButton1Down:Connect(function()
 		press(true)

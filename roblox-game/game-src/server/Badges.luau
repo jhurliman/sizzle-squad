@@ -191,7 +191,10 @@ function Badges:onRoundEnd(crew: any, progression: any, results: any)
 		if (stats.serves or 0) > 0 then
 			self:award(player, "firstDish")
 		end
-		if results.stars >= 3 then
+		-- The tutorial always reports three stars (RoundDirector:buildResults),
+		-- so the star badges have to ignore it or every player would own
+		-- "Three Stars" before working a real shift.
+		if results.stars >= 3 and not results.tutorial then
 			self:award(player, "firstThreeStar")
 			if crew:humanCount() >= 4 then
 				self:award(player, "fullHumanCrewThreeStar")

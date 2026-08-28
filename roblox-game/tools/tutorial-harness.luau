@@ -141,6 +141,14 @@ director:heartbeat(1 / 60)
 check(director.phase == "results", `{Config.TUTORIAL.DISHES} dishes ends the shift (phase={director.phase})`)
 check(awarded ~= nil, "and the results/payout path ran")
 
+-- FINISHING IS THREE STARS. Two scripted dishes cannot clear an 80-coin
+-- threshold, so without this the first thing the game ever tells a new player
+-- about their own performance is one star.
+check(awarded ~= nil and awarded.stars == 3, `finishing First Shift is three stars (got {awarded and awarded.stars})`)
+check(awarded ~= nil and awarded.tutorial == true, "and the results are marked as the tutorial's")
+-- ...which is what stops Badges handing out "Three Stars" for it.
+check(awarded ~= nil and awarded.coins < Config.STARS[1], `on a score that would otherwise be one star ({awarded and awarded.coins} coins, 3-star threshold {Config.STARS[3]})`)
+
 -- 7. the payout ranks them up and can never be paid twice
 check(profile.level >= 2, `the tutorial payout reaches level {profile.level} (>= 2)`)
 check(profile.tutorialDone == true, "and marks the tutorial done")
