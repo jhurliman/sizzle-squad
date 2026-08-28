@@ -4,7 +4,8 @@ The canonical ledger of everything that is placeholder, simplified relative to
 the port plan, or not yet built. If it's not shippable-quality, it should be
 on this list; if you find something missing from it, that's a bug in the list.
 (User-gated items that need the account owner are in README.md → "Remaining
-launch steps"; they're cross-referenced here but not duplicated.)
+launch steps"; they're cross-referenced here but not duplicated. The dated
+launch calendar these gaps feed into is in LAUNCH.md.)
 
 Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around ·
 🟢 fit and finish / debt.

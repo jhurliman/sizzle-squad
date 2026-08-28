@@ -81,6 +81,10 @@ dailies have no UI, food is spheres, everything is silent.
 
 ## Remaining (user-gated) launch steps
 
+These are the *what*. The **when** — the dated campaign calendar backwards from
+the Halloween 2026 target, and the audience-reach reasoning that sets those
+dates — is in [LAUNCH.md](LAUNCH.md).
+
 1. **Publish** the place to a universe (Studio → File → Publish), enable
    **free private servers**, and enable Studio API access for DataStores.
    `MaxPlayers = 4`, `PreferredPlayers = 4` and
