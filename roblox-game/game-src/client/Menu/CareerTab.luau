@@ -78,9 +78,19 @@ function CareerTab.new(parent: Instance, deps: any)
 		Size = UDim2.new(0.5, -6, 1, -140),
 		ZIndex = 4,
 	}, parent)
-	self.right = Theme.scrollList({
+	-- The right column is shared: friends on top, milestones beneath. Friends
+	-- get the fixed slice because the list is short and never scrolls in
+	-- practice -- three friends online is a lot -- while milestones are long.
+	self.friends = Theme.scrollList({
 		Position = UDim2.new(0.5, 6, 0, 86),
-		Size = UDim2.new(0.5, -6, 1, -140),
+		Size = UDim2.new(0.5, -6, 0, 150),
+		BackgroundTransparency = 1,
+		ZIndex = 4,
+	}, parent)
+
+	self.right = Theme.scrollList({
+		Position = UDim2.new(0.5, 6, 0, 244),
+		Size = UDim2.new(0.5, -6, 1, -298),
 		ZIndex = 4,
 	}, parent)
 
@@ -118,6 +128,9 @@ end
 
 function CareerTab:setProgress(progress: any)
 	self.progress = progress
+	-- Cheap and yielding: friendsHere is a pcall'd web call on its own thread,
+	-- so refreshing it alongside progress costs nothing on the render path.
+	self:renderFriends()
 	local level = progress.level or 1
 	local xp, toNext = progress.xp or 0, progress.xpToNext or 1
 	self.levelLabel.Text = `Level {level}`
@@ -202,6 +215,60 @@ end
 
 --- The milestone track: which levels grant which cosmetic, and whether it is
 --- already yours. Real data, unlike a badge grid (badge ids are still 0).
+--- FRIENDS ALREADY IN A SIZZLE SQUAD KITCHEN.
+---
+--- Sits beside INVITE FRIENDS because they answer the two halves of the same
+--- question: bring someone here, or go to where they already are. Roblox can
+--- do the second from a profile page, but sending a player OUT of the
+--- experience to come back into it is the moment they stop coming back.
+---
+--- Only friends with a reachable server are listed. GetFriendsOnline also
+--- returns people on the website and in the app, and a "join" that cannot
+--- work is worse than an absence.
+function CareerTab:renderFriends()
+	for _, c in self.friends:GetChildren() do
+		if not c:IsA("UIListLayout") then
+			c:Destroy()
+		end
+	end
+	local social = self.deps and self.deps.social
+	if social == nil then
+		return
+	end
+	sectionTitle(self.friends, 1, "FRIENDS PLAYING NOW")
+	task.spawn(function()
+		local here = social:friendsHere()
+		if self.friends == nil or self.friends.Parent == nil then
+			return
+		end
+		if #here == 0 then
+			Theme.label({
+				Size = UDim2.new(1, -10, 0, 40),
+				TextSize = 14,
+				TextWrapped = true,
+				TextColor3 = Theme.DIM,
+				LayoutOrder = 2,
+				ZIndex = 5,
+				Text = "None right now — invite someone below.",
+			}, self.friends)
+			return
+		end
+		for i, f in here do
+			local row = Theme.button({
+				Size = UDim2.new(1, -10, 0, Theme.MIN_TAP),
+				Fill = Theme.BLUE,
+				TextSize = 15,
+				LayoutOrder = 1 + i,
+				ZIndex = 5,
+				Text = `JOIN {f.name}`,
+			}, self.friends)
+			row.Activated:Connect(function()
+				social:joinFriend(f.jobId, f.name)
+			end)
+		end
+	end)
+end
+
 function CareerTab:renderMilestones(progress: any)
 	for _, c in self.right:GetChildren() do
 		if not c:IsA("UIListLayout") then

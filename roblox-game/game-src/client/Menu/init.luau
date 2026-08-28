@@ -41,6 +41,15 @@ local TAB_DEFS = {
 function Menu.new(deps: any)
 	local self = setmetatable({}, Menu)
 	self.deps = deps
+	-- Server hopping and friend-joining. Owned here so the shift panel and the
+	-- career tab share one cooldown and one failure handler.
+	local Social = require(script.Parent.Social) :: any
+	self.social = Social.new(function(text)
+		if deps.onToast ~= nil then
+			deps.onToast(text)
+		end
+	end)
+	deps.social = self.social
 	-- Tabs get a superset of the composition root's deps plus the hooks they
 	-- need back into the shell (tab switching, try-on hand-off).
 	deps.onTryOn = function(item)
@@ -84,6 +93,16 @@ function Menu.new(deps: any)
 		end,
 		onToggleBots = function(on)
 			self.remotes.BotFill:FireServer(on)
+		end,
+		onNewServer = function()
+			-- Never mid-shift: walking out on three crewmates is not a button.
+			if self.phase ~= nil and self.phase.phase == "round" and not self.spectating then
+				if deps.onToast ~= nil then
+					deps.onToast("Finish the shift first!")
+				end
+				return
+			end
+			self.social:newServer()
 		end,
 	})
 	self.kitchenCard = KitchenCard.new(gui, {

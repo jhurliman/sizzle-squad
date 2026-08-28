@@ -116,6 +116,24 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		self.deps.onToggleBots(not self.botFill)
 	end)
 
+	-- LEAVING IS AN AFFORDANCE, NOT AN ADMISSION.
+	--
+	-- A player who dislikes a lobby and has no way out closes the app; every
+	-- established Roblox co-op game offers a rematch. Roblox has no
+	-- "anywhere but here" API — Teleport re-runs matchmaking, which prefers
+	-- servers with room, so it usually moves you but is not guaranteed to.
+	self.newServerButton = Theme.button({
+		Size = UDim2.fromOffset(196, Theme.MIN_TAP),
+		Fill = Theme.BROWN_MID,
+		BackgroundTransparency = 0.1,
+		TextSize = 14,
+		LayoutOrder = #TABS + 2,
+		Text = "NEW SERVER",
+	}, self.tabRow)
+	self.newServerButton.Activated:Connect(function()
+		self.deps.onNewServer()
+	end)
+
 	self.progressChip = Theme.chip({
 		Size = UDim2.fromOffset(320, 34),
 		TextSize = 15,
