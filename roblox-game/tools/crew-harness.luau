@@ -99,4 +99,33 @@ check(crew:takenSkins()[wasA] == nil, "a departed player's species is released")
 crew:claimSkin(crew.seats[B].chefId, wasA)
 check(skinOf(B) == wasA, "and the remaining player can then claim it")
 
+-- ---- a bumped human must not stay stunned forever ----------------------
+--
+-- chef.stun is decremented inside moveChef, which a client-authoritative chef
+-- never runs on the server. Without an explicit run-down a single bump froze
+-- the player permanently: applyHuman refuses input while stunned, the
+-- transform packets kept re-freezing the client's mirror, and collidePhase
+-- kept nudging the body — the reported "vibrating and won't move".
+local seat = crew.seats[B]
+local chef = simService.sim.chefs[seat.chefId + 1]
+chef.stun = 0.16
+local before = chef.stun
+for _ = 1, 30 do
+	simService:tick(1 / 60)
+end
+check(chef.stun < before, `a human's stun runs down on the server ({before} -> {chef.stun})`)
+check(chef.stun == 0, "and reaches zero rather than sticking")
+
+-- And once clear, client movement is accepted again. Assert the POSITION
+-- moved, not the reject streak: applyHuman returns before touching the streak
+-- while stunned, so a streak of 0 is equally true of a frozen chef and proves
+-- nothing (it passed against the broken build).
+local from = { x = chef.pos.x, y = chef.pos.y }
+simService:humanMove(seat.chefId, {
+	seq = 1, px = from.x + 0.05, py = from.y, vx = 0, vy = 0, heading = 0, useHeld = false,
+})
+simService:tick(1 / 60)
+check(math.abs(chef.pos.x - (from.x + 0.05)) < 1e-6,
+	`and the server takes the client's position again ({from.x} -> {chef.pos.x})`)
+
 print(if failures > 0 then `{failures} FAILURES` else "PASS: crew")

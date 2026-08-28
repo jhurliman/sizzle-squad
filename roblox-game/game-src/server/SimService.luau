@@ -271,6 +271,22 @@ function SimService:tick(dt: number, _now: number?): ({ any }, number)
 		for _, chef in sim.chefs do
 			if self.humans[chef.id] == nil and self:isActive(chef) then
 				shared.movePhase(sim, chef, inputs[chef.id + 1], sdt)
+			elseif self.humans[chef.id] ~= nil and chef.stun > 0 then
+				-- A HUMAN'S STUN HAS TO BE RUN DOWN HERE, BY HAND.
+				--
+				-- `chef.stun -= dt` lives inside moveChef, and moveChef is
+				-- exactly what a client-authoritative chef never runs on the
+				-- server. So a human bumped once stayed stunned FOREVER:
+				-- applyHuman early-returns on stun > 0, so the server stopped
+				-- accepting client movement; every transform packet carried
+				-- the stale stun, and the client's raise-only mirror kept
+				-- re-freezing itself from it; and collidePhase went on nudging
+				-- the frozen body, which is the vibration.
+				--
+				-- Nothing could bump a human while BOT_FILL was false, which
+				-- is the only reason this survived: turning bots back on is
+				-- what gave it something to trigger it.
+				chef.stun = math.max(0, chef.stun - sdt)
 			end
 		end
 		shared.collidePhase(sim, sdt)
