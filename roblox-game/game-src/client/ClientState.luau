@@ -62,10 +62,48 @@ function ClientState:applySnapshot(snap: any)
 	self.simTime = (snap.score and snap.score.time) or 0
 	for _, chef in snap.chefs do
 		self.skins[chef.id] = chef.skin
-		self.carrying[chef.id] = chef.carrying
+		self:setCarrying(chef.id, chef.carrying)
 		if self.mirror ~= nil and chef.id == self.myChefId then
 			self.mirror.pos.x, self.mirror.pos.y = chef.pos.x, chef.pos.y
 			self.mirror.vel.x, self.mirror.vel.y = 0, 0
+		end
+	end
+	-- The snapshot is the ONLY station news a client gets until something
+	-- changes, so the mirror has to take it. Without this the mirror kept the
+	-- stations `createSim` invented -- notably no pans, because `seedPans` runs
+	-- on the server only -- and every prompt was answered from that fiction.
+	self:syncMirrorStations()
+end
+
+--- WHAT THE PLAYER IS HOLDING IS AN INPUT TO EVERY PROMPT, SO THE MIRROR NEEDS
+--- IT TOO.
+---
+--- `self.carrying` is the display map, read by ChefVisuals to draw the item in
+--- a hand. The mirror chef's own `carrying` was never set from anything, so it
+--- was permanently nil, and `planGrab` -- which the client runs locally to pick
+--- the focus highlight and the button verb -- always took its empty-handed
+--- branch. Measured with tools/focus-harness.luau, the client agreed with the
+--- server on 163 of 1568 station/hand combinations before this: an empty board
+--- offered nothing while you held a tomato, a pan offered nothing while you
+--- held bacon, and a plate rack lit up for a fistful of bacon it would refuse.
+function ClientState:setCarrying(chefId: number, summary: any)
+	self.carrying[chefId] = summary
+	if self.mirror ~= nil and chefId == self.myChefId then
+		self.mirror.carrying = self:rebuildCarryable(summary)
+	end
+end
+
+--- Copy replicated station state onto the mirror sim, so the local planGrab
+--- answers from what the server actually has.
+function ClientState:syncMirrorStations()
+	for _, st in self.mirrorSim.kitchen.stations do
+		local mine = self.stations[st.id]
+		if mine ~= nil then
+			st.active = mine.active or false
+			st.work = mine.work or 0
+			st.cook = mine.cook or 0
+			st.burn = mine.burn or 0
+			st.holding = self:rebuildCarryable(mine.holding)
 		end
 	end
 end
@@ -173,16 +211,7 @@ function ClientState:applyStationDeltas(deltas: { any })
 	end
 	-- keep the mirror sim's stations in step so local planGrab (focus prompt)
 	-- answers from fresh state
-	for _, st in self.mirrorSim.kitchen.stations do
-		local mine = self.stations[st.id]
-		if mine ~= nil then
-			st.active = mine.active or false
-			st.work = mine.work or 0
-			st.cook = mine.cook or 0
-			st.burn = mine.burn or 0
-			st.holding = self:rebuildCarryable(mine.holding)
-		end
-	end
+	self:syncMirrorStations()
 end
 
 --- Rebuild a sim-shaped Carryable from a replicated summary (ids are local

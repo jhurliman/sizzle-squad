@@ -1087,8 +1087,13 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
   switch (st.kind) {
     case 'bin':
       if (held.type === 'ingredient') return 'discard';
-      if (held.type === 'plate' && held.plate.contents.length) return 'discard';
-      if (held.type === 'pan' && held.pan.contents.length) return 'discard';
+      // `.length > 0`, NOT `.length`. TSTL compiles a bare `.length` test to
+      // `#t`, and 0 is TRUTHY in Lua -- so on Roblox the bin advertised
+      // 'discard' for an EMPTY plate or pan and the press then did nothing.
+      // Caught by tools/focus-harness.luau; invisible to the parity harness,
+      // because the divergence is in the prompt and no state changes.
+      if (held.type === 'plate' && held.plate.contents.length > 0) return 'discard';
+      if (held.type === 'pan' && held.pan.contents.length > 0) return 'discard';
       return 'none';
     case 'serve':
       // A wrong plate is not a no-op: it is a refusal with a sound, and since
@@ -1499,7 +1504,9 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       else if (held.type === 'plate') held.plate.contents.pop();
       else if (held.type === 'pan') {
         held.pan.contents.pop();
-        if (!held.pan.contents.length) held.pan.fire = 0;
+        // `=== 0`, not `!...length`: `not #t` is FALSE in Lua for an empty
+        // table, so this inverted on Roblox and the fire was never put out.
+        if (held.pan.contents.length === 0) held.pan.fire = 0;
       }
       emit(s, { t: 'trash', at });
       return true;

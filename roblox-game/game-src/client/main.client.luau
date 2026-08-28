@@ -226,7 +226,7 @@ end)
 
 remotes.CarryDeltas.OnClientEvent:Connect(function(carries)
 	for _, c in carries do
-		state.carrying[c.chefId] = c.carrying
+		state:setCarrying(c.chefId, c.carrying)
 	end
 end)
 
@@ -476,7 +476,15 @@ RunService.RenderStepped:Connect(function(dt)
 	-- focus highlight + verb chip (local planGrab over mirrored state)
 	local focusId, action = state:focusPrompt()
 	input:setVerb(action)
-	local model = focusId ~= nil and stationModels[focusId] or nil
+	-- HIGHLIGHT WHAT THE BUTTON WILL ACT ON, NOT WHAT THE GATE PICKED.
+	--
+	-- findFocus deliberately still returns a station when the press would do
+	-- nothing -- its honesty term ranks dead stations DOWN, it does not drop
+	-- them -- because the prompt needs something to describe. Adorning on
+	-- `focusId ~= nil` therefore lit up stations that would refuse the press:
+	-- reported from play as a plate rack glowing while holding bacon, which it
+	-- will not accept. The verb is the thing that knows.
+	local model = if action ~= "none" and focusId ~= nil then stationModels[focusId] else nil
 	if model ~= nil then
 		highlight.Adornee = model
 		highlight.Enabled = true

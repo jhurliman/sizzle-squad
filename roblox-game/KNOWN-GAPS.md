@@ -313,6 +313,26 @@ spritesheet · device playtests + soft-launch gates.
 
 ---
 
+## F. Tried and reverted — do not re-attempt without reading this
+
+- 🟡 **Bot "thinking beat" (periodic pauses at task boundaries) — REVERTED.**
+  Bots pausing ~0.4s when picking up a new task, to look less relentless. It
+  was shipped once (00dc6d6) on the strength of a 24-seed *average dishes*
+  measurement that showed no cost, and reverted after `tools/soak.mjs` showed
+  the average was the wrong statistic: at **every** non-zero pause rate tried
+  (0.05 → 0.35), between 1 and 6 of 12 seeds finished a full 180s service
+  having **never once used a stove**, and the worst seed fell under the served
+  floor of 10. Holding the replan clock open for the length of the pause (so
+  the beat is a commitment rather than a re-roll) was tried and did not fix it;
+  the failures move around with the rate, which reads as chaotic sensitivity to
+  the perturbation rather than a mechanism with a knob.
+
+  If it is attempted again: the acceptance test is `npm test` (the soak floor
+  and the burner invariant), **not** mean dishes — a change can leave the mean
+  flat while making one service in six a dud, and it is the dud a player
+  remembers. A pause that never applies to a plan whose route includes a stove
+  is the obvious next idea, and is untried.
+
 **Suggested next batches** (roughly by first-impression impact):
 1. 🔴 device pass: the wardrobe preview and the whole menu at 896x414 and at
    375px height, plus a two-client check of the kitchen-cosmetic election and

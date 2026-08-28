@@ -23,3 +23,4 @@ opencloud.json
 .env
 .env.*
 *.apikey
+*.rbxl.lock
