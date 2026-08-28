@@ -91,3 +91,66 @@ The four-player cap is not a handicap and should not be apologised for. Grow a
 Garden caps servers at **four** and has 35.9 billion visits and 11.4 million
 favourites. Across the sample, server cap and popularity are unrelated — caps
 run 4 to 50 with no relationship to concurrents in either direction.
+
+---
+
+## Audience reach — how the 2026 publishing tiers actually work
+
+Roblox rolled out a three-tier publishing system globally in June 2026. It is
+badly signposted in the dashboard, so this is what the Audience Reach page
+(Creator Dashboard → Creations → Sizzle Squad → Audience Reach) actually means.
+
+**Your current reach is the floor of three independent gates:**
+
+| Gate | Shown as | How it is cleared |
+| --- | --- | --- |
+| Account reach | "Publishing reach: All ages" | Creator ID verification + 2FA, **plus a submitted refundable publishing fee** (or Roblox Premium held 2 consecutive months) |
+| Experience reach | "Content rating: Minimal" | The Maturity & Compliance questionnaire, answered accurately |
+| Engagement | "Highly engaged players: 0 / 250" | Earned after launch |
+
+Every new experience starts at **"Ages 16+ and trusted friends"**. That is the
+starting line, not a penalty, and not a content problem.
+
+**The two fees are three orders of magnitude apart and easy to confuse:**
+
+- **Refundable publishing fee — 1,000 Robux.** The one you need. The dashboard
+  row is labelled but prints **no amount**, so the page reads as though the
+  expensive one is the only option. Refunded 90 days after the game becomes
+  eligible, or 90 days after payment if it never does; forfeited only on a
+  permanent moderation action. **Paid 2026-08-27.**
+- **Expedited review — 100,000 Robux (~$1,000).** Optional. It only buys you
+  out of *waiting* for the engagement evaluation. Not needed.
+
+**"Publishing tier at risk. At next publish, your game will lose access to this
+audience reach"** — this string appears nowhere in Roblox's documentation and
+several DevForum threads about it went unanswered. Reading it against the page
+layout, it sits under *Account reach* directly above the unsubmitted fee and
+repeats that row's wording, so it means: *the account-level All-ages reach
+lapses at the next publish until the refundable fee is submitted.* Submitting
+the fee should clear it. If it persists after the next publish, that reading is
+wrong and it is worth re-investigating rather than paying anything further.
+
+**"Highly engaged player" does not mean engaged with this game.** The dashboard
+defines it via play history, account age and *platform expenditure* — it counts
+accounts that have spent money somewhere on Roblox in the last 60 days. 250 of
+those are needed to gain eligibility for Kids/Select, and eligibility can be
+lost again if the figure falls too far.
+
+**Consequence for the launch plan:** the under-16 audience, where Roblox's
+volume actually is, cannot be launched into directly. It has to be earned with
+250 qualifying players inside a 60-day window while the game is visible only to
+16+. Friends-and-family and soft launch are therefore not only quality gates —
+they are the mechanism that unlocks the real audience.
+
+## Other publish settings
+
+- **Server size 4.** Matches `MaxPlayers` in `default.project.json`, which
+  ships with every Rojo build. Bots are NPCs, not Players, so they never
+  consume a join slot.
+- **Gear: off, all categories.** The server calls `vaultCharacter` on join and
+  replaces the Roblox avatar with the captured chef rigs, so gear has nothing
+  to attach to — and a rocket launcher in a co-op cooking game would put the
+  Minimal rating at risk. The "gear genre" dropdown only matters if gear is
+  allowed at all.
+- **Beta mode: off.** Beta omits the experience from "Recommended For You",
+  which is the main algorithmic discovery surface.
