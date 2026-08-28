@@ -69,19 +69,47 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		self.deps.onReady(self.ready)
 	end)
 
+	-- SIX BUTTONS, WRAPPING INTO TWO LINES WHEN ONE WILL NOT FIT.
+	--
+	-- This was a single centred row whose width was computed from #TABS -- four
+	-- -- while the row actually held six children, because BOTS and NEW SERVER
+	-- were added later and never counted. A centred UIListLayout overflows
+	-- symmetrically, so the ends fell off BOTH screen edges: WARDROBE clipped on
+	-- the left, NEW SERVER clipped to "NE" on the right, on any phone.
 	self.tabRow = mk("Frame", {
 		Size = UDim2.fromOffset(600, Theme.MIN_TAP),
 		BackgroundTransparency = 1,
 		LayoutOrder = 2,
 	}, self.root)
 	mk("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
+		FillDirection = Enum.FillDirection.Vertical,
 		Padding = UDim.new(0, 8),
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, self.tabRow)
 
+	self.rows = {}
+	for i = 1, 2 do
+		local row = mk("Frame", {
+			Size = UDim2.fromOffset(600, Theme.MIN_TAP),
+			BackgroundTransparency = 1,
+			LayoutOrder = i,
+		}, self.tabRow)
+		mk("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			Padding = UDim.new(0, 8),
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}, row)
+		self.rows[i] = row
+	end
+
 	self.tabButtons = {}
+	-- Every button in the row, tabs and actions alike, so `relayout` can size
+	-- them as one set. Keeping BOTS and NEW SERVER out of this list is what let
+	-- them keep a hardcoded 196px while the tabs shrank.
+	self.rowButtons = {}
 	for i, t in TABS do
 		local btn = Theme.button({
 			Size = UDim2.fromOffset(140, Theme.MIN_TAP),
@@ -90,11 +118,12 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			TextSize = 14,
 			LayoutOrder = i,
 			Text = t.label,
-		}, self.tabRow)
+		}, self.rows[1])
 		btn.Activated:Connect(function()
 			self.deps.onOpenTab(t.id)
 		end)
 		self.tabButtons[t.id] = btn
+		table.insert(self.rowButtons, btn)
 	end
 
 	-- BOTS ARE OPTIONAL, AND THE LOBBY IS WHERE YOU SAY SO.
@@ -111,10 +140,11 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		TextSize = 14,
 		LayoutOrder = #TABS + 1,
 		Text = "BOTS: ON",
-	}, self.tabRow)
+	}, self.rows[1])
 	self.botButton.Activated:Connect(function()
 		self.deps.onToggleBots(not self.botFill)
 	end)
+	table.insert(self.rowButtons, self.botButton)
 
 	-- LEAVING IS AN AFFORDANCE, NOT AN ADMISSION.
 	--
@@ -129,10 +159,11 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		TextSize = 14,
 		LayoutOrder = #TABS + 2,
 		Text = "NEW SERVER",
-	}, self.tabRow)
+	}, self.rows[1])
 	self.newServerButton.Activated:Connect(function()
 		self.deps.onNewServer()
 	end)
+	table.insert(self.rowButtons, self.newServerButton)
 
 	self.progressChip = Theme.chip({
 		Size = UDim2.fromOffset(320, 34),
@@ -153,7 +184,13 @@ end
 function ShiftPanel:setProgress(progress: any)
 	self.progress = progress
 	local streak = progress.streak or 0
-	local suffix = if streak > 1 then `  ·  🔥{streak}` else ""
+	-- "🔥2" ALONE IS A RIDDLE.
+	--
+	-- The Career tab spells it out; this chip is the one players actually read
+	-- between shifts, and out here -- next to a level and a coin count, both of
+	-- which are self-describing -- a bare flame and a digit reads as a third
+	-- currency rather than a streak. Say the noun.
+	local suffix = if streak > 1 then `  ·  🔥{streak} day streak` else ""
 	-- NOT the coin emoji: FredokaOne has no glyph for it and it renders as a
 	-- hollow box (the 🔥 in the same string is fine).
 	self.progressChip.Text = `Lv {progress.level or 1}  ·  {progress.coins or 0} coins{suffix}`
@@ -216,14 +253,47 @@ function ShiftPanel:step(_dt: number) end
 
 function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	local compact = viewport.X < 720
-	local tabW = if compact then 108 else 140
-	local rowW = tabW * #TABS + 8 * (#TABS - 1)
-	self.root.Size = UDim2.fromOffset(math.max(rowW, 320), 190)
-	self.tabRow.Size = UDim2.fromOffset(rowW, Theme.MIN_TAP)
-	for _, btn in self.tabButtons do
-		btn.Size = UDim2.fromOffset(tabW, Theme.MIN_TAP)
-		btn.TextSize = if compact then 12 else 14
+	local n = #self.rowButtons
+	-- Three tiers, not two: at 108 a 3-wide row needs 340 of the 343 usable
+	-- pixels on the narrowest phone, which is a fit only on paper.
+	local narrow = viewport.X < 480
+	local tabW = if narrow then 96 elseif compact then 108 else 140
+	local gap = 8
+
+	-- How many of these fit on one line inside the screen, not inside an
+	-- imagined 600px panel. The 32px is the same margin the menu panel keeps,
+	-- so the row can never reach further left or right than the panel does.
+	local avail = math.max(320, viewport.X - 32)
+	local perRow = math.max(1, math.floor((avail + gap) / (tabW + gap)))
+	local rows = if perRow >= n then 1 else 2
+	if rows == 2 then
+		-- Balance them: 3+3 reads as deliberate where 5+1 reads as a bug.
+		perRow = math.ceil(n / 2)
 	end
+
+	for i, btn in self.rowButtons do
+		local r = if rows == 1 then 1 else math.min(2, math.ceil(i / perRow))
+		btn.Parent = self.rows[r]
+		btn.LayoutOrder = i
+		btn.Size = UDim2.fromOffset(tabW, Theme.MIN_TAP)
+		btn.TextSize = if narrow then 11 elseif compact then 12 else 14
+	end
+
+	local counts = { 0, 0 }
+	for i = 1, n do
+		local r = if rows == 1 then 1 else math.min(2, math.ceil(i / perRow))
+		counts[r] += 1
+	end
+	for r = 1, 2 do
+		local c = counts[r]
+		self.rows[r].Visible = c > 0
+		self.rows[r].Size = UDim2.fromOffset(math.max(1, tabW * c + gap * math.max(0, c - 1)), Theme.MIN_TAP)
+	end
+
+	local rowsH = rows * Theme.MIN_TAP + (rows - 1) * gap
+	local widest = math.max(self.rows[1].Size.X.Offset, self.rows[2].Size.X.Offset)
+	self.tabRow.Size = UDim2.fromOffset(widest, rowsH)
+	self.root.Size = UDim2.fromOffset(math.max(widest, 320), 142 + rowsH)
 	self.startButton.Size = UDim2.fromOffset(if compact then 260 else 340, if compact then 62 else 72)
 	self.startSize = if compact then 19 else 24
 	self:paint()

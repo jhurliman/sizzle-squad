@@ -46,9 +46,12 @@ function WardrobeTab.new(parent: Instance, deps: any)
 	self.preview.frame.Size = UDim2.new(0, 260, 1, -60)
 	self.preview.frame.Position = UDim2.fromOffset(0, 0)
 
+	-- BOTTOM-left of the preview, not top-left. Hats are on heads, so a button
+	-- in the top corner sat exactly where a tall hat renders and clipped it.
 	self.gaitButton = Theme.button({
+		AnchorPoint = Vector2.new(0, 1),
 		Size = UDim2.fromOffset(110, 30),
-		Position = UDim2.fromOffset(10, 10),
+		Position = UDim2.new(0, 10, 1, -10),
 		Fill = Theme.BROWN_MID,
 		BackgroundTransparency = 0.2,
 		TextSize = 13,
@@ -68,7 +71,13 @@ function WardrobeTab.new(parent: Instance, deps: any)
 		ZIndex = 4,
 	}, parent)
 
-	-- footer
+	-- THE FOOTER EXISTS TO SELL THINGS, SO IT ONLY EXISTS WHEN SOMETHING IS
+	-- FOR SALE.
+	--
+	-- It reserved 60px at the bottom unconditionally, which on a phone is a
+	-- large slice of a short panel -- enough that the species list needed
+	-- scrolling to show four entries. When there is no BUY button the bar
+	-- holds one line of hint text, which is not worth that much screen.
 	self.footer = mk("Frame", {
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.new(0, 0, 1, 0),
@@ -383,6 +392,7 @@ function WardrobeTab:render()
 	if sel ~= nil then
 		local affordable = coins >= sel.cost
 		self.buyButton.Visible = true
+		self.footer.Visible = true
 		self.buyButton.Text = `BUY  {sel.cost}c`
 		self.buyButton.BackgroundColor3 = if affordable then Theme.GOLD else Theme.GREY
 		self.hint.Text = if affordable
@@ -390,18 +400,28 @@ function WardrobeTab:render()
 			else `{sel.name} costs {sel.cost}c — you have {coins}.`
 	else
 		self.buyButton.Visible = false
-		self.hint.Text = "Drag the chef to spin. Tap anything to wear it."
+		self.footer.Visible = false
 	end
+	self:fitColumns()
+end
+
+--- Preview and rail run to the bottom of the panel unless the BUY footer is
+--- there to be cleared. Called from both `render` and `relayout` because
+--- either the selection or the viewport can change which applies.
+function WardrobeTab:fitColumns()
+	local reserve = if self.footer.Visible then 60 else 0
+	self.preview.frame.Size = UDim2.new(0, self.previewW or 260, 1, -reserve)
+	self.rail.Size = UDim2.new(1, -(self.railInset or 270), 1, -reserve)
 end
 
 function WardrobeTab:relayout(L: any, _viewport: Vector2)
 	if L.twoColumn then
 		local w = L.previewW
 		self.preview.frame.Visible = true
-		self.preview.frame.Size = UDim2.new(0, w, 1, -60)
+		self.previewW = w
 		self.gaitButton.Visible = true
 		self.rail.Position = UDim2.fromOffset(w + 10, 0)
-		self.rail.Size = UDim2.new(1, -(w + 10), 1, -60)
+		self.railInset = w + 10
 		self.hint.Size = UDim2.fromOffset(280, 40)
 	else
 		-- No room for a 3D panel AND a readable rail: the rail wins, because
@@ -409,9 +429,10 @@ function WardrobeTab:relayout(L: any, _viewport: Vector2)
 		self.preview.frame.Visible = false
 		self.gaitButton.Visible = false
 		self.rail.Position = UDim2.fromOffset(0, 0)
-		self.rail.Size = UDim2.new(1, 0, 1, -60)
+		self.railInset = 0
 		self.hint.Size = UDim2.fromOffset(120, 40)
 	end
+	self:fitColumns()
 end
 
 return WardrobeTab

@@ -220,10 +220,17 @@ local function nextNeeded(state: any, order: any, held: any): any?
 	return nil
 end
 
+--- IT IS CALLED FIRST SHIFT, SO IT RUNS ON THE FIRST SHIFT.
+---
+--- This used to run for the first THREE rounds (and below level 3), which
+--- meant the coach reappeared at the top of every match for a player who
+--- already knew the game and had to be dismissed each time -- a tax on exactly
+--- the players who had decided to come back. `rounds` is server-persisted and
+--- increments at round end, so `< 1` is true for the whole of the genuine
+--- first shift and false forever after; a player who quits mid-first-round
+--- correctly gets it again, because they never finished one.
 function FirstShift:setEligible(progress: any)
-	self.active = not self.skipped
-		and (progress.level or 1) < 3
-		and (progress.rounds or 0) < 3
+	self.active = not self.skipped and (progress.rounds or 0) < 1
 end
 
 --- One instruction plus the station it refers to. Returns the target station

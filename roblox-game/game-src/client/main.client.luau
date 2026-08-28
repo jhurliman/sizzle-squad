@@ -102,9 +102,32 @@ local function indexStations(stations: { any })
 			table.insert(serveAnchors, Vector3.new((st.cell.x + 0.5) * SCALE, 5.4 * SCALE, st.cell.y * SCALE))
 		end
 	end
-	-- This failing silently is what let the highlights stay gone for weeks.
-	if next(stationModels) == nil then
-		warn("[sizzle] indexStations found no station models — focus highlight and coach glow are dead")
+end
+
+-- THE KITCHEN MAY NOT HAVE REPLICATED YET WHEN THE SNAPSHOT ARRIVES.
+--
+-- Snapshot is sent on join and on reseat -- it is not periodic -- so the
+-- original "index once, on the first snapshot" was a race the client loses
+-- whenever Workspace.Kitchen is still streaming in. It loses it far more often
+-- on a phone, which is exactly where the focus highlight was reported missing.
+-- Losing it left stationModels empty for the whole session with nothing
+-- erroring, because every consumer treats a missing model as "not
+-- highlighted": no focus glow, no coach glow, no station progress bars.
+--
+-- So keep the last snapshot's station list and retry until it takes.
+local pendingStations: { any }? = nil
+local nextIndexTry = 0
+local indexWarned = false
+
+local function ensureStations(clock: number)
+	if next(stationModels) ~= nil or pendingStations == nil or clock < nextIndexTry then
+		return
+	end
+	nextIndexTry = clock + 0.5
+	indexStations(pendingStations)
+	if next(stationModels) == nil and not indexWarned and clock > 15 then
+		indexWarned = true
+		warn("[sizzle] no station models after 15s — focus highlight, coach glow and station progress are dead")
 	end
 end
 
@@ -185,6 +208,7 @@ end)
 
 remotes.Snapshot.OnClientEvent:Connect(function(snap)
 	state:applySnapshot(snap)
+	pendingStations = snap.stations
 	if next(stationModels) == nil then
 		indexStations(snap.stations)
 	end
@@ -445,6 +469,7 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 
 	-- station contents + progress bars
+	ensureStations(state.clock)
 	stationViz:update(state.stations, stationModels)
 	stationViz:updateDishPile(state.stations, state.dirtyPlates)
 

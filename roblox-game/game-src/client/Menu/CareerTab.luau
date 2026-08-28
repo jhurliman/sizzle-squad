@@ -378,15 +378,39 @@ function CareerTab:renderBadges(progress: any)
 	end
 end
 
+-- Height of the FRIENDS PLAYING NOW block. Fixed rather than proportional: the
+-- list is short by nature (three friends online at once is a lot) and a share
+-- of a phone panel would round down to less than one row.
+local FRIENDS_H = 150
+
 function CareerTab:relayout(L: any, _viewport: Vector2)
-	-- One column when there is not enough width for two readable ones.
+	-- LEVEL REWARDS USED TO LAND EXACTLY ON TOP OF FRIENDS PLAYING NOW.
+	--
+	-- The constructor stacks them -- friends at y=86 for 150px, milestones
+	-- from y=244 -- but this function then moved `right` back to y=86 and gave
+	-- it the full column height, which is precisely the friends rect. Both are
+	-- ZIndex 4 and `right` is created later, so it drew over friends and the
+	-- only way to see who was online was to scroll the milestone list down.
+	-- Whatever this branch sets, it has to preserve the split.
 	if L.twoColumn then
 		self.left.Size = UDim2.new(0.5, -6, 1, -140)
-		self.right.Size = UDim2.new(0.5, -6, 1, -140)
-		self.right.Position = UDim2.new(0.5, 6, 0, 86)
+		self.friends.Visible = true
+		self.friends.Position = UDim2.new(0.5, 6, 0, 86)
+		self.friends.Size = UDim2.new(0.5, -6, 0, FRIENDS_H)
 		self.right.Visible = true
+		self.right.Position = UDim2.new(0.5, 6, 0, 86 + FRIENDS_H + 8)
+		self.right.Size = UDim2.new(0.5, -6, 1, -(140 + FRIENDS_H + 8))
 	else
-		self.left.Size = UDim2.new(1, 0, 1, -140)
+		-- One narrow column: goals and career on top, friends pinned to the
+		-- bottom above the invite button. Friends stays visible because it is
+		-- the one part of this tab that is time-sensitive -- a friend online
+		-- now may not be in five minutes -- and hiding it was how the phone
+		-- layout lost the whole social half of the screen.
+		self.left.Position = UDim2.fromOffset(0, 86)
+		self.left.Size = UDim2.new(1, 0, 1, -(140 + FRIENDS_H + 8))
+		self.friends.Visible = true
+		self.friends.Position = UDim2.new(0, 0, 1, -(54 + FRIENDS_H))
+		self.friends.Size = UDim2.new(1, 0, 0, FRIENDS_H)
 		self.right.Visible = false
 	end
 end
