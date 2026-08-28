@@ -55,13 +55,15 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, self.root)
 
-	self.startButton = Theme.button({
+	local cta = Theme.cta({
 		Size = UDim2.fromOffset(320, 72),
 		TextSize = 30,
 		LayoutOrder = 1,
 		Text = "START SHIFT",
 	}, self.root)
-	Theme.stroke(self.startButton, Theme.CREAM, 2)
+	-- `startRoot` is what the column lays out; `startButton` is the face.
+	self.startRoot = cta.root
+	self.startButton = cta.button
 	self.startButton.Activated:Connect(function()
 		-- Toggle, so a player who changes their mind can stand down.
 		self.ready = not self.ready
@@ -239,21 +241,18 @@ function ShiftPanel:paint()
 	local lobby = p == "countdown" or p == "intermission"
 	self.root.Visible = not self.hidden and lobby
 
-	self.startButton.Visible = not self.spectating
+	self.startRoot.Visible = not self.spectating
 	local n, total = self.phase.readyCount, self.phase.readyTotal
 	local crew = total ~= nil and total > 1
 	if self.ready then
-		self.startButton.BackgroundColor3 = Theme.GREY
+		Theme.setCtaFill(self.startButton, Theme.GREY)
 		self.startButton.Text = if crew then `WAITING FOR CREW  {n}/{total}` else "WAITING…"
-		self.startButton.TextSize = if crew then 22 else 30
 	else
-		self.startButton.BackgroundColor3 = Theme.GREEN
-		-- FredokaOne sets very tight at display sizes and Roblox has no
-		-- letter-spacing property, so the headline is spaced by hand. Only
-		-- this state: letter-spacing "WAITING FOR CREW 2/3" would read as a
-		-- glitch rather than a treatment.
-		self.startButton.Text = "S T A R T   S H I F T"
-		self.startButton.TextSize = self.startSize or 24
+		Theme.setCtaFill(self.startButton, Theme.GREEN)
+		-- Plain text, no hand-spacing. DISPLAY_FONT carries its own
+		-- sidebearings; the old "S T A R T   S H I F T" existed only because
+		-- FredokaOne did not, and uniform padding characters are not kerning.
+		self.startButton.Text = "START SHIFT"
 	end
 end
 
@@ -311,8 +310,13 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	local widest = math.max(self.rows[1].Size.X.Offset, self.rows[2].Size.X.Offset)
 	self.tabRow.Size = UDim2.fromOffset(widest, rowsH)
 	self.root.Size = UDim2.fromOffset(math.max(widest, 320), 142 + rowsH)
-	self.startButton.Size = UDim2.fromOffset(if compact then 260 else 340, if compact then 62 else 72)
-	self.startSize = if compact then 19 else 24
+	self.startRoot.Size = UDim2.fromOffset(if compact then 260 else 340, if compact then 62 else 72)
+	-- No per-state TextSize any more: the CTA scales its own label (see
+	-- Theme.cta). Only the ceiling moves with the breakpoint.
+	local cap = self.startButton:FindFirstChildWhichIsA("UITextSizeConstraint")
+	if cap ~= nil then
+		cap.MaxTextSize = if compact then 26 else 32
+	end
 	self:paint()
 end
 
