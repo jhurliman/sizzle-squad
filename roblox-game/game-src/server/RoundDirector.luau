@@ -23,6 +23,7 @@ function RoundDirector.new(
 		onRoundEnd: ((any) -> ())?,
 		onRoundStart: ((number) -> ())?,
 		firstShiftFn: (() -> boolean)?,
+		tutorialFn: (() -> boolean)?,
 	}
 )
 	local self = setmetatable({}, RoundDirector)
@@ -48,6 +49,11 @@ function RoundDirector.new(
 	-- Round index the award already fired for; see the latch in heartbeat.
 	self.awardedRound = -1
 	self.onRoundStart = opts.onRoundStart
+	-- tutorialFn: is this a reserved First Shift server? Injected rather than
+	-- read from game.PrivateServerId so the Lune harness can drive both modes.
+	self.tutorialFn = opts.tutorialFn or function()
+		return false
+	end
 	-- firstShiftFn: is anyone here about to work their first ever shift?
 	self.firstShiftFn = opts.firstShiftFn or function()
 		return false
@@ -88,6 +94,10 @@ function RoundDirector:broadcastPhase()
 	local readyCount, readyTotal = self:readyTally()
 	self.remotes.RoundPhase:FireAllClients({
 		phase = self.phase,
+		-- Lets the client hide the things that would strand a learner: bot
+		-- fill and NEW SERVER both do nothing useful in a solo tutorial, and
+		-- NEW SERVER would teleport them out of it mid-lesson.
+		tutorial = self.tutorialFn(),
 		timer = self.timer,
 		round = self.round,
 		waiting = not self.simService.botFill and self.crew:humanCount() == 0,
@@ -122,6 +132,20 @@ function RoundDirector:applyPacing()
 		knobs.burnTimeMul = a.burnTimeMul
 		knobs.recipeDepthCap = a.recipeDepthCap
 	end
+	-- A TUTORIAL BOARD IS NOT A PACED BOARD.
+	--
+	-- Applied last so it wins over both the crew-size table and assist: one
+	-- ticket at a time, tickets that will not expire while the prompt is being
+	-- read, and no clock or patience fail (see DirectorKnobs.endless). The
+	-- round ends when the dish target is met and nowhere else.
+	if self.tutorialFn() then
+		local t = self.config.TUTORIAL
+		knobs.maxOrdersBonus = t.MAX_ORDERS_BONUS
+		knobs.ticketTimeMul = t.TICKET_TIME_MUL
+		knobs.patienceMissMul = 0
+		knobs.recipeDepthCap = math.huge
+		knobs.endless = true
+	end
 	self.baseGapMul = knobs.orderGapMul
 end
 
@@ -135,9 +159,17 @@ function RoundDirector:startRound()
 	-- all. Passed at CONSTRUCTION because createSim seeds two tickets on the
 	-- spot; setting the knob afterwards misses exactly the tickets that
 	-- matter most.
-	local script = if self.firstShiftFn() then { "salad", "baconroll", "chopped" } else nil
-	self.simService.botFill = self.pendingBotFill
-	self.simService:reset(self.seedFn(), if script ~= nil then { scriptedRecipes = script } else nil)
+	local tutorial = self.tutorialFn()
+	local script = if tutorial
+		then self.config.TUTORIAL.RECIPES
+		elseif self.firstShiftFn() then { "salad", "baconroll", "chopped" }
+		else nil
+	-- Bots are never in a tutorial, whatever the server's bot switch says.
+	self.simService.botFill = not tutorial and self.pendingBotFill
+	self.simService:reset(
+		self.seedFn(),
+		if script ~= nil then { scriptedRecipes = script, endless = tutorial } else nil
+	)
 	self.replicator:resetCaches()
 	self.crew:reseat()
 	self:applyPacing()
@@ -311,6 +343,13 @@ function RoundDirector:heartbeat(dt: number)
 			self:attribute(ev)
 		end
 		self.replicator:flush(self.simService.sim, events, dt)
+		-- The tutorial board is endless, so nothing inside the sim will ever
+		-- set `over`. Two dishes is the whole shift; tripping `over` here means
+		-- results, payout and the career counters all run through the ordinary
+		-- path rather than a parallel one that could drift from it.
+		if self.tutorialFn() and self.simService.sim.score.served >= self.config.TUTORIAL.DISHES then
+			self.simService.sim.over = true
+		end
 		if self.simService.sim.over then
 			self.lastResults = self:buildResults()
 			-- ONE AWARD PER ROUND, EVER.

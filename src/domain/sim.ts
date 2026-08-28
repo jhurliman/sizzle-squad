@@ -92,6 +92,20 @@ export interface DirectorKnobs {
   scriptedRecipes: string[];
   /** How far through `scriptedRecipes` the board has got. */
   scriptedIndex: number;
+  /**
+   * NO CLOCK AND NO FAIL STATE. The service runs until something outside the
+   * sim decides it is finished.
+   *
+   * Written for the First Shift tutorial, which has to be a place a brand-new
+   * player cannot lose: the round must not end because 180 seconds elapsed,
+   * and it must not end because a ticket they had not understood yet ran the
+   * patience meter to zero. Both are lessons for the second shift.
+   *
+   * The caller then owns the exit — see RoundDirector's tutorial completion
+   * check, which sets `over` once the dish target is met so the ordinary
+   * results and payout path still runs.
+   */
+  endless: boolean;
 }
 
 export const DEFAULT_DIRECTOR: DirectorKnobs = {
@@ -104,6 +118,7 @@ export const DEFAULT_DIRECTOR: DirectorKnobs = {
   botServeValueMul: 1,
   scriptedRecipes: [],
   scriptedIndex: 0,
+  endless: false,
 };
 
 // ------------------------------------------------------------------- state
@@ -175,6 +190,7 @@ function buildDirector(over?: Partial<DirectorKnobs>): DirectorKnobs {
   // the spread, so two sims would otherwise consume one another's script.
   d.scriptedRecipes = (over?.scriptedRecipes ?? []).slice();
   d.scriptedIndex = over?.scriptedIndex ?? 0;
+  d.endless = over?.endless ?? false;
   return d;
 }
 
@@ -1787,7 +1803,7 @@ function updateOrders(s: SimState, dt: number) {
 
   s.nextOrderIn -= dt;
   const maxOrders = 3 + Math.floor(s.heat * 2) + s.director.maxOrdersBonus;
-  if (s.nextOrderIn <= 0 && s.orders.length < maxOrders && s.time < TUNING.roundSeconds) {
+  if (s.nextOrderIn <= 0 && s.orders.length < maxOrders && (s.director.endless || s.time < TUNING.roundSeconds)) {
     addOrder(s, pickRecipe(s));
     const gap = 9.5 - 5.0 * s.heat;
     s.nextOrderIn = gap * s.director.orderGapMul * (0.8 + s.rand() * 0.4);
@@ -1807,7 +1823,8 @@ function updateOrders(s: SimState, dt: number) {
 
   // The clock in the HUD counts TUNING.roundSeconds down; service has to
   // actually end when it reaches zero or that number is decoration.
-  if ((s.score.patience <= 0 || s.time >= TUNING.roundSeconds) && !s.over) {
+  // Endless boards (DirectorKnobs.endless) end only when the caller says so.
+  if (!s.director.endless && (s.score.patience <= 0 || s.time >= TUNING.roundSeconds) && !s.over) {
     s.over = true;
     emit(s, { t: 'gameOver', score: s.score.coins });
   }

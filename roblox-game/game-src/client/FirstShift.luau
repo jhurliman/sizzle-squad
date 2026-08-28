@@ -1,8 +1,8 @@
 --!strict
 -- "First Shift" onboarding (plan §2.6): contextual prompts only, layered on
--- the focus-glow system. One instruction on screen at a time, per-player
--- overlay, never pauses the kitchen, skippable, silently retires at level 3
--- or 3 rounds.
+-- the focus-glow system. One instruction on screen at a time, no dismiss, and
+-- it runs exactly once -- on the player's first ever shift, which now happens
+-- alone in a reserved server (see server/Tutorial.luau).
 --
 -- IT POINTS AT A STATION, which is the part that actually teaches. The old
 -- version said things like "grab ingredients from the crates" -- but a new
@@ -26,7 +26,6 @@ local mk = Theme.mk
 function FirstShift.new(gui: Instance)
 	local self = setmetatable({}, FirstShift)
 	self.active = false
-	self.skipped = false
 	self.frame = mk("Frame", {
 		Size = UDim2.fromOffset(420, 54),
 		Position = UDim2.new(0.5, -210, 1, -120),
@@ -35,9 +34,7 @@ function FirstShift.new(gui: Instance)
 	}, gui)
 	mk("UICorner", { CornerRadius = UDim.new(0, 14) }, self.frame)
 	self.label = mk("TextLabel", {
-		-- Clear of the skip button, which sits at -48 and is 40 wide: at -60
-		-- the wrapped text ran to within 12px of it and read as touching.
-		Size = UDim2.new(1, -84, 1, 0),
+		Size = UDim2.new(1, -28, 1, 0),
 		Position = UDim2.new(0, 14, 0, 0),
 		BackgroundTransparency = 1,
 		TextColor3 = Color3.fromRGB(58, 32, 19),
@@ -47,20 +44,13 @@ function FirstShift.new(gui: Instance)
 		TextWrapped = true,
 		Text = "",
 	}, self.frame)
-	local skip = mk("TextButton", {
-		Size = UDim2.fromOffset(40, 28),
-		Position = UDim2.new(1, -48, 0.5, -14),
-		BackgroundColor3 = Color3.fromRGB(200, 190, 170),
-		TextColor3 = Color3.fromRGB(58, 32, 19),
-		TextSize = 14,
-		Font = Enum.Font.GothamBold,
-		Text = "X",
-	}, self.frame)
-	mk("UICorner", { CornerRadius = UDim.new(0, 8) }, skip)
-	skip.Activated:Connect(function()
-		self.skipped = true
-		self.frame.Visible = false
-	end)
+	-- NO DISMISS BUTTON.
+	--
+	-- There was an X here from when these tips were drawn over ordinary public
+	-- rounds and could reappear at the top of every match. They now show in one
+	-- place only -- the solo First Shift server -- where the tip IS the shift:
+	-- dismissing it leaves a brand-new player alone in a kitchen with two
+	-- tickets, no clock, and nothing telling them what any of it does.
 	return self
 end
 
@@ -230,14 +220,14 @@ end
 --- first shift and false forever after; a player who quits mid-first-round
 --- correctly gets it again, because they never finished one.
 function FirstShift:setEligible(progress: any)
-	self.active = not self.skipped and (progress.rounds or 0) < 1
+	self.active = (progress.rounds or 0) < 1
 end
 
 --- One instruction plus the station it refers to. Returns the target station
 --- id so the caller can glow it; priority order matters, because the player is
 --- told what to do with what is in their hands before anything else.
 function FirstShift:update(state: any, flags: number): number?
-	if not self.active or self.skipped or state.phase.phase ~= "round" then
+	if not self.active or state.phase.phase ~= "round" then
 		self.frame.Visible = false
 		return nil
 	end

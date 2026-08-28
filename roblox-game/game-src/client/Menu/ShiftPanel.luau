@@ -216,6 +216,14 @@ end
 function ShiftPanel:setPhase(phase: any, spectating: boolean)
 	self.phase = phase
 	self.spectating = spectating
+	-- A solo tutorial has nobody to add bots alongside and nowhere better to
+	-- go; NEW SERVER in particular would teleport a learner out of the lesson.
+	if phase.tutorial ~= nil then
+		self.tutorial = phase.tutorial == true
+		self.botButton.Visible = not self.tutorial
+		self.newServerButton.Visible = not self.tutorial
+		self:relayoutLast()
+	end
 	local ids = phase.readyIds
 	if ids ~= nil then
 		self.ready = table.find(ids, Players.LocalPlayer.UserId) ~= nil
@@ -252,8 +260,17 @@ end
 function ShiftPanel:step(_dt: number) end
 
 function ShiftPanel:relayout(_L: any, viewport: Vector2)
+	self.lastViewport = viewport
 	local compact = viewport.X < 720
-	local n = #self.rowButtons
+	-- Hidden buttons take no space in the row: a tutorial server shows four,
+	-- not six with two gaps.
+	local visible = {}
+	for _, b in self.rowButtons do
+		if b.Visible then
+			table.insert(visible, b)
+		end
+	end
+	local n = #visible
 	-- Three tiers, not two: at 108 a 3-wide row needs 340 of the 343 usable
 	-- pixels on the narrowest phone, which is a fit only on paper.
 	local narrow = viewport.X < 480
@@ -271,7 +288,7 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 		perRow = math.ceil(n / 2)
 	end
 
-	for i, btn in self.rowButtons do
+	for i, btn in visible do
 		local r = if rows == 1 then 1 else math.min(2, math.ceil(i / perRow))
 		btn.Parent = self.rows[r]
 		btn.LayoutOrder = i
@@ -297,6 +314,13 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	self.startButton.Size = UDim2.fromOffset(if compact then 260 else 340, if compact then 62 else 72)
 	self.startSize = if compact then 19 else 24
 	self:paint()
+end
+
+--- Re-run the last layout after something changed which buttons are visible.
+function ShiftPanel:relayoutLast()
+	if self.lastViewport ~= nil then
+		self:relayout(nil, self.lastViewport)
+	end
 end
 
 return ShiftPanel

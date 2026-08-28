@@ -313,6 +313,24 @@ spritesheet · device playtests + soft-launch gates.
 
 ---
 
+## E2. First Shift — what is NOT yet verified
+
+The tutorial mode itself is covered headlessly by `tools/tutorial-harness.luau`
+(endless board, bots forced off, scripted order, completion at the dish target,
+level-2 payout, eligibility). What that harness **cannot** touch is the pair of
+teleports either side of it, because they are live Roblox service calls:
+
+- 🔴 `ReserveServer` + `TeleportAsync` into the solo instance has never run.
+  The failure path degrades to seating the player normally, so a broken
+  reserve is not fatal — but it has not been observed either way.
+- 🔴 The return teleport into public matchmaking has never run.
+- 🟡 The extra load screen on a first-ever join is unmeasured. It lands at the
+  worst moment in the funnel and should be timed on a real device.
+- 🟡 A player who quits mid-tutorial keeps `rounds == 0`, so they get it again
+  next session. That is intended, but it means a tutorial that is reliably
+  quit becomes a loop nobody escapes; the analytics onboarding funnel should
+  be watched for it once there is traffic.
+
 ## F. Tried and reverted — do not re-attempt without reading this
 
 - 🟡 **Bot "thinking beat" (periodic pauses at task boundaries) — REVERTED.**

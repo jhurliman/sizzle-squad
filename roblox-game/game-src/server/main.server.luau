@@ -12,6 +12,7 @@ local Config = require(gameShared:WaitForChild("Config")) :: any
 local SimService = require(script.Parent.SimService) :: any
 local Replicator = require(script.Parent.Replicator) :: any
 local CrewManager = require(script.Parent.CrewManager) :: any
+local Tutorial = require(script.Parent.Tutorial) :: any
 local RoundDirector = require(script.Parent.RoundDirector) :: any
 local Progression = require(script.Parent.Progression) :: any
 local Leaderboards = require(script.Parent.Leaderboards) :: any
@@ -50,8 +51,21 @@ local director = RoundDirector.new(shared, Config, simService, crew, replicator,
 	firstShiftFn = function()
 		return progression:crewNeedsFirstShift(crew)
 	end,
+	tutorialFn = Tutorial.isTutorialServer,
 	onRoundEnd = function(results)
-		progression:awardRound(crew, results)
+		progression:awardRound(crew, results, Tutorial.isTutorialServer())
+		-- FIRST SHIFT IS OVER, SO THE SERVER IT RAN IN IS OVER TOO.
+		--
+		-- Held until the results ceremony has been seen: the payout that ranks
+		-- them to level 2 is the reward for finishing, and teleporting over the
+		-- top of it would throw away the only moment that pays off the lesson.
+		if Tutorial.isTutorialServer() then
+			task.delay(Config.RESULTS + 1.5, function()
+				for _, p in Players:GetPlayers() do
+					Tutorial.sendHome(p)
+				end
+			end)
+		end
 		badges:onRoundEnd(crew, progression, results)
 		for player in crew.seats do
 			analytics:roundFinished(player, director.round, results, progression.lastAward[player])
@@ -279,6 +293,20 @@ Players.PlayerAdded:Connect(function(player)
 		vaultCharacter(player.Character)
 	end
 	progression:playerAdded(player)
+	-- FIRST SHIFT HAPPENS SOMEWHERE ELSE (see Tutorial.luau).
+	--
+	-- Before seating, before analytics, before anything that would make this
+	-- player part of the room: a learner never takes one of four slots in a
+	-- live kitchen. `arrivedFromTutorial` is the loop guard -- a tutorial that
+	-- failed to pay out must not bounce the player straight back into another.
+	if
+		not Tutorial.isTutorialServer()
+		and not Tutorial.arrivedFromTutorial(player)
+		and Tutorial.needsTutorial(progression.profiles[player])
+		and Tutorial.send(player)
+	then
+		return
+	end
 	monetization:playerAdded(player)
 	analytics:playerAdded(player, progression.profiles[player])
 	badges:backfill(player)

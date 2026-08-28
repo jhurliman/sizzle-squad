@@ -268,7 +268,10 @@ end
 
 -- ------------------------------------------------------------- round awards
 
-function Progression:awardRound(crew: any, results: any)
+--- `tutorial` marks the First Shift payout: a flat bonus on top of the normal
+--- round award, applied BEFORE the level-up loop so it actually ranks the
+--- player up, and a permanent flag so the tutorial can never be paid twice.
+function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 	local config = self.config
 	self.lastAward = {}
 	local humans = math.max(1, crew:humanCount())
@@ -301,6 +304,17 @@ function Progression:awardRound(crew: any, results: any)
 		-- Supporter Pass XP boost (1.0 when nothing is owned / unconfigured).
 		if self.xpMultiplier ~= nil then
 			xp = math.floor(xp * self:xpMultiplier(player))
+		end
+		-- Added after the soft cap, not before: the cap exists to stop a huge
+		-- round paying out forever, and this is a fixed completion bonus, not
+		-- performance. BONUS_XP is exactly LEVEL_CURVE(1), so a player who
+		-- finishes First Shift arrives in their first real kitchen at level 2.
+		if tutorial then
+			local t = config.TUTORIAL
+			xp += t.BONUS_XP
+			coinsEarned += t.BONUS_COINS
+			profile.coins += t.BONUS_COINS
+			profile.tutorialDone = true
 		end
 		profile.xp += xp
 		local levelsGained, granted = 0, {}

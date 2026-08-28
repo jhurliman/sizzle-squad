@@ -125,6 +125,39 @@ Config.LEVEL_CURVE = function(level: number): number
 	return 100 + (level - 1) * 35
 end
 
+-- ---------------------------------------------------------------- tutorial
+--
+-- FIRST SHIFT IS ITS OWN SERVER, NOT A HINT OVERLAY ON A LIVE ONE.
+--
+-- It used to be purely a client-side coach drawn over an ordinary public
+-- round, which meant a brand-new player learned the game with three bots
+-- sprinting around the same kitchen, a 180-second clock, a patience meter that
+-- could end the shift, and any stranger who happened to matchmake in. It also
+-- burned one of four slots in a live server for someone not yet playing the
+-- co-op game.
+--
+-- So a player with no completed shifts is teleported straight into a RESERVED
+-- server, alone, and teleported back into normal matchmaking when they finish.
+Config.TUTORIAL = {
+	-- Two tickets, not three. The funnel is the reason: every extra scripted
+	-- dish is another place to quit before ever seeing a real kitchen.
+	-- `salad` is lettuce + tomato, which teaches chop -> plate -> serve with
+	-- the fewest moving parts; `baconroll` then introduces the stove and the
+	-- plate-scoop, the least discoverable move in the game. Anything beyond
+	-- those two is repetition, and repetition is churn here.
+	RECIPES = { "salad", "baconroll" },
+	DISHES = 2,
+	-- Enough to land level 2 on its own: LEVEL_CURVE(1) is exactly 100.
+	-- Arriving in the first real kitchen already ranked up is the point.
+	BONUS_XP = 100,
+	BONUS_COINS = 120,
+	-- Only ever one ticket on the board. maxOrders is `3 + floor(heat*2) +
+	-- bonus`, and heat is 0 for the first two minutes of an endless board.
+	MAX_ORDERS_BONUS = -2,
+	-- Tickets must not expire while someone reads the prompt.
+	TICKET_TIME_MUL = 100,
+}
+
 Config.AFK_SECONDS = 20
 
 -- "Founding Chef" is only meaningful if it STOPS being awardable. Set this to
