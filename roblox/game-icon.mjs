@@ -139,6 +139,67 @@ const VARIANTS = [
     scale: 0.90, dy: -0.17,
     text: { s: ['COOK', 'TOGETHER'], y: 378, size: 72, fill: '#FFE9A8', stroke: '#5A1508' },
   },
+
+  // ---- FOUR CHEFS, EDGE TO EDGE, ON B's GREEN -------------------------
+  // Same brief three ways: all four species spanning the full tile with the
+  // outer two allowed to break the frame, SIZZLE / SQUAD stacked, and the
+  // green ground from the crew variant — it is the one colour here that no
+  // neighbour in the live top-12 is using.
+  //
+  // Cropping the outer two is what buys the scale: a row of four that has to
+  // fit inside the square renders every face too small to resolve at 150px,
+  // which is exactly how the first crew attempt failed. Letting the ends run
+  // off implies more crew than the tile can hold, which is also true.
+  {
+    id: 'd-row',
+    label: 'Four across, text below',
+    bg: ['#3EA76A', '#166534', '#B6F0C6'],
+    parts: () => [
+      ...dressed('bramble', { hat: 'hat_toque', yaw: 0.40, dx: -3.35, dz: 0.75 }),
+      ...dressed('pip', { hat: 'hat_bandana_red', yaw: 0.16, dx: -1.12 }),
+      ...dressed('mochi', { hat: 'hat_paper', yaw: -0.16, dx: 1.12 }),
+      ...dressed('nori', { hat: 'hat_beret', yaw: -0.40, dx: 3.35, dz: 0.75 }),
+    ],
+    shot: { aim: 0.66, span: 0.56, spanX: 0.43, elev: 0.02, rim: 0xd8ffe4 },
+    scale: 1.00, dy: -0.05,
+    text: { s: ['SIZZLE', 'SQUAD'], y: 372, size: 84, fill: '#FFFFFF', stroke: '#0F3D24' },
+  },
+  {
+    id: 'e-closeup',
+    label: 'Four across, chest-up crop',
+    // Same cast and the same text placement as D — this variant differs only
+    // in how close the camera sits. Cropping at chest height nearly doubles
+    // every face, which is what actually carries a 150px tile, at the cost of
+    // the aprons and the full-body silhouette.
+    bg: ['#3EA76A', '#166534', '#B6F0C6'],
+    parts: () => [
+      ...dressed('bramble', { hat: 'hat_toque', yaw: 0.40, dx: -3.20, dz: 0.70 }),
+      ...dressed('pip', { hat: 'hat_bandana_red', yaw: 0.16, dx: -1.07 }),
+      ...dressed('mochi', { hat: 'hat_paper', yaw: -0.16, dx: 1.07 }),
+      ...dressed('nori', { hat: 'hat_beret', yaw: -0.40, dx: 3.20, dz: 0.70 }),
+    ],
+    shot: { aim: 0.795, span: 0.475, spanX: 0.435, elev: 0.02, rim: 0xd8ffe4 },
+    scale: 1.00, dy: -0.155,
+    text: { s: ['SIZZLE', 'SQUAD'], y: 372, size: 84, fill: '#FFFFFF', stroke: '#0F3D24' },
+  },
+  {
+    id: 'f-huddle',
+    label: 'Staggered huddle',
+    // Depth instead of a line-up: two chefs forward at centre, two set back
+    // and wide. The group reads as a crowd rather than a rank, and the
+    // silhouette gets a peak instead of a flat top — which is what separates
+    // this from D at a glance in the feed.
+    bg: ['#3EA76A', '#166534', '#B6F0C6'],
+    parts: () => [
+      ...dressed('bramble', { hat: 'hat_toque', yaw: 0.42, dx: -2.95, dz: -1.35 }),
+      ...dressed('nori', { hat: 'hat_beret', yaw: -0.42, dx: 2.95, dz: -1.35 }),
+      ...dressed('pip', { hat: 'hat_bandana_red', yaw: 0.18, dx: -1.02, dz: 1.15 }),
+      ...dressed('mochi', { hat: 'hat_paper', yaw: -0.18, dx: 1.02, dz: 1.15 }),
+    ],
+    shot: { aim: 0.68, span: 0.545, spanX: 0.43, elev: 0.03, rim: 0xd8ffe4 },
+    scale: 1.00, dy: -0.075,
+    text: { s: ['SIZZLE', 'SQUAD'], y: 372, size: 84, fill: '#FFFFFF', stroke: '#0F3D24' },
+  },
 ];
 
 const browser = await chromium.launch();
