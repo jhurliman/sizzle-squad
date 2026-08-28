@@ -313,9 +313,13 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	self.startRoot.Size = UDim2.fromOffset(if compact then 260 else 340, if compact then 62 else 72)
 	-- No per-state TextSize any more: the CTA scales its own label (see
 	-- Theme.cta). Only the ceiling moves with the breakpoint.
+	-- Sized off the button, not picked by feel: a chunky display face wants
+	-- roughly 60% of the button's height or it reads as a small label floating
+	-- in a large slab, which is how the first version looked.
+	local h = if compact then 62 else 72
 	local cap = self.startButton:FindFirstChildWhichIsA("UITextSizeConstraint")
 	if cap ~= nil then
-		cap.MaxTextSize = if compact then 26 else 32
+		cap.MaxTextSize = math.floor(h * 0.62)
 	end
 	self:paint()
 end

@@ -104,25 +104,48 @@ end
 --- Repaint a CTA built by `Theme.cta`, keeping its gradient consistent with the
 --- new fill. `paint` swaps green for grey when a player stands down, and a
 --- gradient left on the old hue is worse than no gradient at all.
+--- Repaint a CTA built by `Theme.cta`, keeping its gradient and edge in step
+--- with the new fill. `paint` swaps green for grey when a player stands down,
+--- and a gradient left on the old hue is worse than no gradient at all.
 function Theme.setCtaFill(btn: any, fill: Color3)
-	btn.BackgroundColor3 = fill
-	local grad = btn:FindFirstChild("CtaGradient")
+	local face = btn.Parent and btn.Parent:FindFirstChild("CtaFace")
+	if face == nil then
+		return
+	end
+	face.BackgroundColor3 = fill
+	local grad = face:FindFirstChild("CtaGradient")
 	if grad ~= nil then
-		grad.Color = ColorSequence.new(shade(fill, 0.18), shade(fill, -0.16))
+		grad.Color = ColorSequence.new(shade(fill, 0.20), shade(fill, -0.18))
+	end
+	local edge = face:FindFirstChildWhichIsA("UIStroke")
+	if edge ~= nil then
+		edge.Color = shade(fill, -0.42)
+	end
+	-- The label's own outline is keyed to the fill too, or a grey button keeps
+	-- a green-black outline on its text.
+	local textEdge = btn:FindFirstChildWhichIsA("UIStroke")
+	if textEdge ~= nil then
+		textEdge.Color = shade(fill, -0.55)
 	end
 end
 
 --- THE HERO BUTTON. One per screen, and on this screen it is Start Shift.
 ---
---- A flat rectangle of one colour reads as a placeholder no matter how good the
---- type is, so this adds the three things that make a button look pressable:
---- a vertical gradient (light above, dark below, which is where a lit surface
---- puts its values), a dropped shadow so it sits ABOVE the panel rather than
---- being painted on it, and a press that actually moves.
+--- Built as three stacked pieces rather than one styled TextButton, and the
+--- reason is not tidiness:
+---
+---   * A UIGradient on a TextButton tints its TEXT as well as its background.
+---     The first version put the gradient straight on the button and the label
+---     came out washed green instead of white. The fill lives on its own frame
+---     so the gradient can never reach the glyphs.
+---   * A UIStroke on a text object strokes the TEXT, not the border
+---     (ApplyStrokeMode.Contextual). That is wanted here — a heavy dark outline
+---     is what makes a chunky display face read at a distance — but it means
+---     the button's own edge needs a stroke on the non-text frame instead.
 ---
 --- Returns { root, button }: `root` is the thing to position and size, because
---- the shadow has to live behind the button and a UIListLayout would otherwise
---- treat it as a second item in the column.
+--- the shadow has to sit behind everything and a UIListLayout would otherwise
+--- lay it out as another item in the column.
 function Theme.cta(props: { [string]: any }, parent: Instance?): any
 	local fill = props.Fill or Theme.GREEN
 	props.Fill = nil
@@ -133,6 +156,8 @@ function Theme.cta(props: { [string]: any }, parent: Instance?): any
 	-- shadow and the shadow would draw over it.
 	local z = props.ZIndex or 1
 	props.ZIndex = nil
+	local maxText = props.TextSize or 30
+	props.TextSize = nil
 
 	local root = mk("Frame", {
 		Size = size,
@@ -154,63 +179,62 @@ function Theme.cta(props: { [string]: any }, parent: Instance?): any
 	}, root)
 	Theme.corner(shadow, 14)
 
+	local face = mk("Frame", {
+		Name = "CtaFace",
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = fill,
+		BorderSizePixel = 0,
+		ZIndex = z + 1,
+	}, root)
+	Theme.corner(face, 14)
+	mk("UIGradient", {
+		Name = "CtaGradient",
+		Rotation = 90,
+		Color = ColorSequence.new(shade(fill, 0.20), shade(fill, -0.18)),
+	}, face)
+	Theme.stroke(face, shade(fill, -0.42), 2)
+
 	local btn = mk(
 		"TextButton",
 		Theme.merge({
 			Size = UDim2.new(1, 0, 1, 0),
-			BackgroundColor3 = fill,
+			BackgroundTransparency = 1,
 			TextColor3 = Theme.WHITE,
 			-- THE LABEL FITS ITSELF.
 			--
 			-- This button says "START SHIFT" and also "WAITING FOR CREW 2/3",
-			-- which is nearly twice as long, in a face with wide sidebearings,
-			-- on a button that is 260px on a phone. Hand-picked TextSize per
-			-- state is how that ends up clipped on exactly one device nobody
-			-- tested. TextScaled with a max constraint gives the short label
-			-- the full display size and quietly shrinks the long one.
+			-- nearly twice as long, in a face with wide sidebearings, on a
+			-- button that is 260px on a phone. Hand-picked TextSize per state
+			-- is how that ends up clipped on exactly one device nobody tested.
 			TextScaled = true,
 			Font = Theme.DISPLAY_FONT,
-			-- Our own press response instead: AutoButtonColor tints the
-			-- background, which the gradient then multiplies, and the result
-			-- is a button that changes hue rather than depth.
 			AutoButtonColor = false,
-			BorderSizePixel = 0,
-			ZIndex = z + 1,
+			ZIndex = z + 2,
 		}, props),
 		root
 	)
-	Theme.corner(btn, 14)
-	mk("UITextSizeConstraint", {
-		MaxTextSize = maxText,
-		MinTextSize = 14,
-	}, btn)
+	mk("UITextSizeConstraint", { MaxTextSize = maxText, MinTextSize = 14 }, btn)
+	-- OPTICALLY CENTRED, NOT MATHEMATICALLY CENTRED.
+	--
+	-- All-caps text has no descenders, so its ink sits in the upper part of the
+	-- line box and centring the BOX leaves the letters visibly high — which is
+	-- exactly how this looked. More padding above than below pushes the box
+	-- down until the caps sit on the button's optical centre.
 	mk("UIPadding", {
-		PaddingLeft = UDim.new(0, 14),
-		PaddingRight = UDim.new(0, 14),
-		PaddingTop = UDim.new(0, 8),
-		PaddingBottom = UDim.new(0, 8),
+		PaddingLeft = UDim.new(0, 12),
+		PaddingRight = UDim.new(0, 12),
+		PaddingTop = UDim.new(0, 10),
+		PaddingBottom = UDim.new(0, 2),
 	}, btn)
-	mk("UIGradient", {
-		Name = "CtaGradient",
-		Rotation = 90,
-		Color = ColorSequence.new(shade(fill, 0.18), shade(fill, -0.16)),
-	}, btn)
-	Theme.stroke(btn, shade(fill, -0.35), 2)
-	-- A cream inner line just under the top edge: the highlight a rounded,
-	-- lit surface actually has, and what stops the fill reading as printed on.
-	local gloss = mk("Frame", {
-		Size = UDim2.new(1, -16, 0, 2),
-		Position = UDim2.new(0, 8, 0, 5),
-		BackgroundColor3 = Theme.CREAM,
-		BackgroundTransparency = 0.72,
-		BorderSizePixel = 0,
-		ZIndex = z + 2,
-	}, btn)
-	Theme.corner(gloss, 1)
+	-- Strokes the TEXT, not the border (see the note above). The heavy dark
+	-- outline is what lets a display face hold up against a busy kitchen.
+	Theme.stroke(btn, shade(fill, -0.55), 3)
 
 	local function press(down: boolean)
-		btn.Position = if down then UDim2.fromOffset(0, 3) else UDim2.fromOffset(0, 0)
-		shadow.Position = if down then UDim2.fromOffset(0, 2) else UDim2.fromOffset(0, 5)
+		local dy = if down then 3 else 0
+		face.Position = UDim2.fromOffset(0, dy)
+		btn.Position = UDim2.fromOffset(0, dy)
+		shadow.Position = UDim2.fromOffset(0, if down then 2 else 5)
 	end
 	btn.MouseButton1Down:Connect(function()
 		press(true)
