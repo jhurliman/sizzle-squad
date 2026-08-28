@@ -1789,9 +1789,20 @@ function addOrder(s: SimState, recipe: Recipe) {
  */
 export function seedOrders(s: SimState) {
   const a = addOrder(s, pickRecipe(s));
-  let b = pickRecipe(s);
-  for (let i = 0; i < 4 && b.id === a.recipe.id; i++) b = pickRecipe(s);
-  addOrder(s, b);
+  // ...UNLESS THE BOARD IS ONLY ALLOWED ONE.
+  //
+  // This used to add the second ticket unconditionally, ignoring the
+  // concurrent cap it is the caller's whole means of control. A tutorial board
+  // set to one ticket therefore opened with two, which is how a First Shift
+  // that exists to teach one thing at a time put a salad and a bacon roll up
+  // together and left the coach pointing at whichever it liked.
+  //
+  // `maxOrders` in updateOrders is the same expression; heat is 0 here.
+  if (3 + s.director.maxOrdersBonus >= 2) {
+    let b = pickRecipe(s);
+    for (let i = 0; i < 4 && b.id === a.recipe.id; i++) b = pickRecipe(s);
+    addOrder(s, b);
+  }
   // Long enough that the opening of a run reads as the reference's balanced
   // pair rather than as a board already three deep before the player moves.
   s.nextOrderIn = 13;

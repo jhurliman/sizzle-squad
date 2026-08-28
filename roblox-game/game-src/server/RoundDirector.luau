@@ -166,10 +166,25 @@ function RoundDirector:startRound()
 		else nil
 	-- Bots are never in a tutorial, whatever the server's bot switch says.
 	self.simService.botFill = not tutorial and self.pendingBotFill
-	self.simService:reset(
-		self.seedFn(),
-		if script ~= nil then { scriptedRecipes = script, endless = tutorial } else nil
-	)
+	-- THE TUTORIAL KNOBS HAVE TO BE IN PLACE BEFORE createSim, NOT AFTER.
+	--
+	-- `applyPacing` runs further down, but `createSim` has already called
+	-- seedOrders by then -- so the tickets the player actually opens on were
+	-- built with DEFAULT knobs. That gave First Shift two tickets instead of
+	-- one, each on a ~45s timer instead of the tutorial's, so the very first
+	-- ticket a brand-new player ever saw could expire while they were reading
+	-- the prompt telling them what to do with it.
+	local overrides = nil
+	if script ~= nil then
+		overrides = { scriptedRecipes = script, endless = tutorial }
+		if tutorial then
+			local t = self.config.TUTORIAL
+			overrides.maxOrdersBonus = t.MAX_ORDERS_BONUS
+			overrides.ticketTimeMul = t.TICKET_TIME_MUL
+			overrides.patienceMissMul = 0
+		end
+	end
+	self.simService:reset(self.seedFn(), overrides)
 	self.replicator:resetCaches()
 	self.crew:reseat()
 	self:applyPacing()

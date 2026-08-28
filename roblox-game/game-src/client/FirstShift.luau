@@ -190,9 +190,19 @@ local function nextNeeded(state: any, order: any, held: any): any?
 		end
 		if h.type == "ingredient" then
 			consume(h.kind, h.state)
-		elseif h.type == "plate" or h.type == "pan" then
+		elseif h.type == "plate" then
 			for _, c in h.contents or {} do
 				consume(c.kind, c.state)
+			end
+		elseif h.type == "pan" then
+			-- A PAN FINISHES ITS OWN WORK. Anything in it is already accounted
+			-- for against the ticket's `cooked` line, whatever state it is in
+			-- this instant, because the stove will get it there without the
+			-- player doing anything. That is the difference from a board: raw
+			-- lettuce sitting on one is NOT accounted for, since it needs a
+			-- press, and the chop branch above claims that case anyway.
+			for _, c in h.contents or {} do
+				consume(c.kind, "cooked")
 			end
 		end
 	end
@@ -238,13 +248,20 @@ function FirstShift:update(state: any, flags: number): number?
 	-- Is something sitting cooked in a pan right now? The plate-scoop is the
 	-- game's least discoverable move; it gets its own dedicated coaching.
 	local panId = nil
+	-- ...and is something still COOKING? A different question with a different
+	-- answer: one says "go and collect it", the other says "leave it alone".
+	-- Without the second, a rasher three seconds off being ready looked to the
+	-- coach exactly like no bacon at all, and it sent the player back to the
+	-- crate for more.
+	local cookingId = nil
 	for _, st in state.mirrorSim.kitchen.stations do
 		local h = state.stations[st.id] and state.stations[st.id].holding
 		if h ~= nil and h.type == "pan" then
 			for _, c in h.contents or {} do
 				if c.state == "cooked" then
 					panId = st.id
-					break
+				elseif c.state ~= "burnt" then
+					cookingId = st.id
 				end
 			end
 		end
@@ -314,6 +331,12 @@ function FirstShift:update(state: any, flags: number): number?
 	elseif panId ~= nil then
 		tip = "Food's ready! Press at the glowing pan to take it."
 		target = panId
+	elseif cookingId ~= nil and order ~= nil and nextNeeded(state, order, held) == nil then
+		-- Everything the ticket needs is either plated or in the pan, and the
+		-- pan is not done. There is genuinely nothing to do but wait, and
+		-- saying so is better coaching than inventing an errand.
+		tip = "It's cooking — give it a few seconds."
+		target = cookingId
 	elseif stagedPlateId(state) == nil then
 		-- THE PLATE COMES FIRST. Everything you prepare needs somewhere to go,
 		-- and a player who chops before staging one ends up holding food with

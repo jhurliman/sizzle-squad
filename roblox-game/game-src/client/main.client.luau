@@ -64,6 +64,48 @@ local music = Music.new(game:GetService("SoundService"))
 local stationModels: { [number]: Model } = {}
 local serveAnchors: { Vector3 } = {}
 
+-- THREE STATIONS HAVE NO MODEL, AND A STATION WITH NO MODEL CANNOT GLOW.
+--
+-- The sim builds 23 stations from KITCHEN_MAP; assets/kitchen.rbxm ships 20.
+-- Counter_2_4, Counter_12_4 and Counter_13_7 are real, interactable counters
+-- with no exported geometry of their own -- the bench run covers those cells,
+-- so they look like counters and behave like counters, but there was nothing
+-- for a Highlight to adorn. Reported from play as an empty counter that would
+-- not light up while holding a plate, and a plate on a counter that would not
+-- light up while holding a bun.
+--
+-- So stand in an invisible box the size of the real thing. The dimensions are
+-- MEASURED from Counter_13_1 in the shipped rbxm (centre y=2.25, 5 x 3.5 x 4.3
+-- studs, on a 5-stud cell grid) rather than guessed, so the outline lands on
+-- the bench the player is actually looking at. A fully transparent part still
+-- takes a Highlight.
+local fallbackFolder: Folder? = nil
+
+local function fallbackAdornee(st: any, kindCap: string): Model
+	if fallbackFolder == nil then
+		local f = Instance.new("Folder")
+		f.Name = "SizzleStationProxies"
+		f.Parent = Workspace
+		fallbackFolder = f
+	end
+	local model = Instance.new("Model")
+	model.Name = `{kindCap}_{st.cell.x}_{st.cell.y}_proxy`
+	local part = Instance.new("Part")
+	part.Name = "Proxy"
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Transparency = 1
+	part.Size = Vector3.new(SCALE, 3.5, 4.3)
+	part.CFrame = CFrame.new((st.cell.x + 0.5) * SCALE, 2.25, (st.cell.y + 0.5) * SCALE)
+	part.Parent = model
+	model.PrimaryPart = part
+	model.Parent = fallbackFolder
+	warn(`[sizzle] station {kindCap}_{st.cell.x}_{st.cell.y} has no model in kitchen.rbxm — using a proxy so it can highlight`)
+	return model
+end
+
 local function indexStations(stations: { any })
 	-- THE STATIONS FOLDER IS ONE LEVEL UP FROM WHERE THIS LOOKED.
 	--
@@ -96,6 +138,8 @@ local function indexStations(stations: { any })
 			local m = folder:FindFirstChild(`{kindCap}_{st.cell.x}_{st.cell.y}`)
 			if m ~= nil and m:IsA("Model") then
 				stationModels[st.id] = m
+			else
+				stationModels[st.id] = fallbackAdornee(st, kindCap)
 			end
 		end
 		if st.kind == "serve" then

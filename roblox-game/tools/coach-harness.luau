@@ -121,4 +121,48 @@ local chopped = { name = "Chopped Salad", components = {
 s = world({ [2] = PLATE({ { kind = "lettuce", state = "prepped" }, { kind = "tomato", state = "prepped" } }) })
 check(D.nextNeeded(s, chopped, nil).kind == "tomato", "a second tomato is still owed on Chopped Salad")
 
+-- ---------------------------------------------------------------- the pan
+--
+-- THE REPORTED BUG: "when bacon is cooking it tells me to go pick up more
+-- bacon." A pan finishes its own work, so anything in it is already spoken for
+-- against the ticket's `cooked` line whatever state it is in this instant.
+-- Matching kind AND state meant raw bacon in a hot pan looked exactly like no
+-- bacon at all.
+local PAN = function(contents) return { type = "pan", contents = contents or {} } end
+local roll = { name = "Bacon Roll", components = {
+	{ kind = "bun", state = "raw" },
+	{ kind = "bacon", state = "cooked" },
+} }
+
+local function panWorld(holdings: { [number]: any })
+	local stations = {}
+	local mirror = { kitchen = { stations = {
+		{ id = 1, kind = "plates" }, { id = 2, kind = "counter" },
+		{ id = 3, kind = "board" }, { id = 4, kind = "serve" },
+		{ id = 5, kind = "stove" },
+	} } }
+	for _, st in mirror.kitchen.stations do
+		stations[st.id] = { id = st.id, holding = holdings[st.id] }
+	end
+	return { mirrorSim = mirror, stations = stations }
+end
+
+-- bun plated, bacon raw in the pan: nothing is owed, it is just cooking
+local ps = panWorld({ [2] = PLATE({ { kind = "bun", state = "raw" } }), [5] = PAN({ { kind = "bacon", state = "raw" } }) })
+local pn = D.nextNeeded(ps, roll, nil)
+check(pn == nil, `bacon cooking in a pan is not a reason to fetch more (got {pn and pn.kind or "nothing owed"})`)
+
+-- same, but the bacon has finished: still not owed
+ps = panWorld({ [2] = PLATE({ { kind = "bun", state = "raw" } }), [5] = PAN({ { kind = "bacon", state = "cooked" } }) })
+check(D.nextNeeded(ps, roll, nil) == nil, "cooked bacon in the pan is not owed either")
+
+-- an EMPTY pan owes bacon: there is nothing in flight to wait for
+ps = panWorld({ [2] = PLATE({ { kind = "bun", state = "raw" } }), [5] = PAN({}) })
+local en = D.nextNeeded(ps, roll, nil)
+check(en ~= nil and en.kind == "bacon", `an empty pan still owes bacon (got {en and en.kind})`)
+
+-- a board does NOT get the same benefit: raw lettuce there needs a press
+local bs = world({ [2] = PLATE(), [3] = ING("lettuce", "raw") })
+check(D.nextNeeded(bs, order, nil).kind == "lettuce", "a board is not a pan — raw lettuce on one is still owed")
+
 print(if failures > 0 then `{failures} FAILURES` else "PASS: coach")
