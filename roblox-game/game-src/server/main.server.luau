@@ -62,7 +62,7 @@ local director = RoundDirector.new(shared, Config, simService, crew, replicator,
 		if Tutorial.isTutorialServer() then
 			task.delay(Config.RESULTS + 1.5, function()
 				for _, p in Players:GetPlayers() do
-					Tutorial.sendHome(p)
+					Tutorial.finish(p)
 				end
 			end)
 		end
@@ -303,9 +303,14 @@ Players.PlayerAdded:Connect(function(player)
 		not Tutorial.isTutorialServer()
 		and not Tutorial.arrivedFromTutorial(player)
 		and Tutorial.needsTutorial(progression.profiles[player])
-		and Tutorial.send(player)
 	then
-		return
+		if Tutorial.isStudio() then
+			-- No teleport available; run First Shift right here (Tutorial.luau).
+			Tutorial.forced = true
+			print("[sizzle] First Shift: Studio, running the tutorial in this server")
+		elseif Tutorial.send(player) then
+			return
+		end
 	end
 	monetization:playerAdded(player)
 	analytics:playerAdded(player, progression.profiles[player])

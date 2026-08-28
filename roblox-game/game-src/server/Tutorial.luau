@@ -26,6 +26,21 @@
 -- there and take the harness with it.
 local Tutorial = {}
 
+--- STUDIO CANNOT TELEPORT, SO STUDIO RUNS THE TUTORIAL IN PLACE.
+---
+--- TeleportService refuses to move a player in Studio, which means pressing
+--- Play could never reach First Shift: the reserve failed, the code fell back
+--- to seating normally, and what came up was an ordinary round with three bots
+--- and a coach overlay flickering between them. That is not a bug in the
+--- tutorial, it is the tutorial being unreachable from the only place it can
+--- be iterated on.
+---
+--- So in Studio an eligible player flips this flag instead of being teleported,
+--- and the server it is already in becomes the tutorial server. Cleared on
+--- completion so the next round in the same session is an ordinary one — which
+--- also makes the hand-off testable without a second client.
+Tutorial.forced = false
+
 local function svc(name: string): any
 	local g: any = game
 	if g == nil then
@@ -38,11 +53,19 @@ end
 --- private server also has a PrivateServerId, so the OwnerId is what separates
 --- the tutorial from the free private servers the experience also offers.
 function Tutorial.isTutorialServer(): boolean
+	if Tutorial.forced then
+		return true
+	end
 	local g: any = game
 	if g == nil then
 		return false
 	end
 	return g.PrivateServerId ~= "" and g.PrivateServerOwnerId == 0
+end
+
+function Tutorial.isStudio(): boolean
+	local rs = svc("RunService")
+	return rs ~= nil and rs:IsStudio()
 end
 
 --- Has this player finished a shift? `rounds` is the persisted career counter
@@ -83,6 +106,17 @@ end
 --- matchmaking, which prefers servers that already have people in them -- so
 --- the first real kitchen is usually one with somebody else already in it,
 --- which is the whole point of doing the tutorial somewhere else first.
+--- Where a finished tutorial goes. In Studio there is nowhere to go, so the
+--- flag simply clears and play continues in the same server.
+function Tutorial.finish(player: Player)
+	if Tutorial.isStudio() then
+		Tutorial.forced = false
+		print("[sizzle] First Shift complete — Studio, so staying put instead of teleporting")
+		return
+	end
+	Tutorial.sendHome(player)
+end
+
 function Tutorial.sendHome(player: Player)
 	local options = Instance.new("TeleportOptions")
 	options:SetTeleportData({ fromTutorial = true })

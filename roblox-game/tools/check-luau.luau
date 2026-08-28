@@ -69,6 +69,50 @@ if bundleBad == 0 then
 	print("shared bundle: no array-length truthiness tests")
 end
 
-if failed > 0 or bundleBad > 0 then
+-- ------------------------------------------------------------------------
+-- IS THE PLACE FILE OLDER THAN THE CODE IN IT?
+--
+-- `npm run build` writes SizzleSquad.rbxl, and that file is what Studio opens.
+-- Build it anywhere else -- a scratch path, a temp directory -- and every check
+-- in this repo can pass against source that Studio is not running, which is a
+-- very expensive way to lose a playtest: the report comes back describing bugs
+-- that were fixed hours earlier, and the first instinct is to go looking for
+-- them in the code rather than in the build.
+local PLACE = "SizzleSquad.rbxl"
+local stale = false
+if fs.isFile(PLACE) then
+	local built = fs.metadata(PLACE).modifiedAt.unixTimestamp
+	local newest, newestPath = 0, ""
+	local function scan(dir: string)
+		for _, name in fs.readDir(dir) do
+			local path = `{dir}/{name}`
+			if fs.isDir(path) then
+				scan(path)
+			elseif name:match("%.luau$") or name:match("%.lua$") then
+				local t = fs.metadata(path).modifiedAt.unixTimestamp
+				if t > newest then
+					newest, newestPath = t, path
+				end
+			end
+		end
+	end
+	scan("game-src")
+	if fs.isFile("out/shared-bundle.lua") then
+		local t = fs.metadata("out/shared-bundle.lua").modifiedAt.unixTimestamp
+		if t > newest then
+			newest, newestPath = t, "out/shared-bundle.lua"
+		end
+	end
+	if newest > built then
+		stale = true
+		print(`FAIL {PLACE} is OLDER than {newestPath} — Studio would run stale code. Run: npm run build`)
+	else
+		print(`{PLACE} is up to date with game-src`)
+	end
+else
+	print(`NOTE {PLACE} has not been built yet — run: npm run build`)
+end
+
+if failed > 0 or bundleBad > 0 or stale then
 	process.exit(1)
 end
