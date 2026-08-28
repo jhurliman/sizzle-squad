@@ -64,46 +64,54 @@ local music = Music.new(game:GetService("SoundService"))
 local stationModels: { [number]: Model } = {}
 local serveAnchors: { Vector3 } = {}
 
--- THREE STATIONS HAVE NO MODEL, AND A STATION WITH NO MODEL CANNOT GLOW.
+-- THREE STATIONS HAVE NO MODEL OF THEIR OWN, AND A STATION WITH NO MODEL
+-- CANNOT GLOW.
 --
--- The sim builds 23 stations from KITCHEN_MAP; assets/kitchen.rbxm ships 20.
--- Counter_2_4, Counter_12_4 and Counter_13_7 are real, interactable counters
--- with no exported geometry of their own -- the bench run covers those cells,
--- so they look like counters and behave like counters, but there was nothing
--- for a Highlight to adorn. Reported from play as an empty counter that would
--- not light up while holding a plate, and a plate on a counter that would not
--- light up while holding a bun.
+-- The sim builds 23 stations from KITCHEN_MAP; assets/kitchen.rbxm ships 20
+-- under Stations. Counter_2_4, Counter_12_4 and Counter_13_7 are real,
+-- interactable counters whose geometry lives in the BENCH run instead -- they
+-- look and behave like counters, but there was nothing under Stations for a
+-- Highlight to adorn. Reported from play three times over: an empty counter
+-- that would not light up while holding a plate, and a plate on a counter that
+-- would not light up while holding a bun, bacon, or chopped lettuce.
 --
--- So stand in an invisible box the size of the real thing. The dimensions are
--- MEASURED from Counter_13_1 in the shipped rbxm (centre y=2.25, 5 x 3.5 x 4.3
--- studs, on a 5-stud cell grid) rather than guessed, so the outline lands on
--- the bench the player is actually looking at. A fully transparent part still
--- takes a Highlight.
-local fallbackFolder: Folder? = nil
-
-local function fallbackAdornee(st: any, kindCap: string): Model
-	if fallbackFolder == nil then
-		local f = Instance.new("Folder")
-		f.Name = "SizzleStationProxies"
-		f.Parent = Workspace
-		fallbackFolder = f
+-- Adorn the bench that is actually there. The first attempt at this stood an
+-- invisible proxy part in the gap, which was wrong twice: it depends on
+-- Highlight rendering on a fully transparent part, and its size was measured
+-- from Counter_13_1 (top at y=4.0) while these bench tops sit at y=1.5-2.0 --
+-- so even had it drawn, it would have outlined a box hanging in the air above
+-- the bench. Real geometry has neither problem.
+local function benchFallback(root: Instance, st: any): Model?
+	local benches = root:FindFirstChild("Benches")
+	if benches == nil then
+		return nil
 	end
-	local model = Instance.new("Model")
-	model.Name = `{kindCap}_{st.cell.x}_{st.cell.y}_proxy`
-	local part = Instance.new("Part")
-	part.Name = "Proxy"
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.Transparency = 1
-	part.Size = Vector3.new(SCALE, 3.5, 4.3)
-	part.CFrame = CFrame.new((st.cell.x + 0.5) * SCALE, 2.25, (st.cell.y + 0.5) * SCALE)
-	part.Parent = model
-	model.PrimaryPart = part
-	model.Parent = fallbackFolder
-	warn(`[sizzle] station {kindCap}_{st.cell.x}_{st.cell.y} has no model in kitchen.rbxm — using a proxy so it can highlight`)
-	return model
+	local exact = benches:FindFirstChild(`Bench_{st.cell.x}_{st.cell.y}`)
+	if exact ~= nil and exact:IsA("Model") then
+		return exact
+	end
+	-- No bench named for this cell: a neighbour's run may still cover it
+	-- (cell 13,7 is spanned by Bench_12_7). Take whichever bench has a part
+	-- standing over the cell centre.
+	local wx, wz = (st.cell.x + 0.5) * SCALE, (st.cell.y + 0.5) * SCALE
+	for _, bench in benches:GetChildren() do
+		if not bench:IsA("Model") then
+			continue
+		end
+		for _, part in bench:GetDescendants() do
+			if part:IsA("BasePart") then
+				local p, sz = part.Position, part.Size
+				if
+					math.abs(p.X - wx) <= sz.X / 2 + 0.1
+					and math.abs(p.Z - wz) <= sz.Z / 2 + 0.1
+					and p.Y > 0.6
+				then
+					return bench
+				end
+			end
+		end
+	end
+	return nil
 end
 
 local function indexStations(stations: { any })
@@ -139,7 +147,12 @@ local function indexStations(stations: { any })
 			if m ~= nil and m:IsA("Model") then
 				stationModels[st.id] = m
 			else
-				stationModels[st.id] = fallbackAdornee(st, kindCap)
+				local bench = benchFallback(root, st)
+				if bench ~= nil then
+					stationModels[st.id] = bench
+				else
+					warn(`[sizzle] station {kindCap}_{st.cell.x}_{st.cell.y} has no model and no bench under it — it cannot highlight`)
+				end
 			end
 		end
 		if st.kind == "serve" then

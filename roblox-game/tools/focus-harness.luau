@@ -78,13 +78,17 @@ end
 local CARRIES: { { name: string, make: () -> any } } = {
 	{ name = "nothing", make = function() return nil end },
 	{ name = "raw tomato", make = function() return ing("tomato", "raw") end },
-	{ name = "chopped tomato", make = function() return ing("tomato", "chopped") end },
+	-- "prepped", not "chopped". PrepState is raw|prepped|cooked|burnt; an
+	-- earlier version of this list used a state the game cannot produce, so
+	-- that row exercised nothing at all.
+	{ name = "prepped tomato", make = function() return ing("tomato", "prepped") end },
+	{ name = "prepped lettuce", make = function() return ing("lettuce", "prepped") end },
 	{ name = "raw bacon", make = function() return ing("bacon", "raw") end },
 	{ name = "cooked bacon", make = function() return ing("bacon", "cooked") end },
 	{ name = "burnt bacon", make = function() return ing("bacon", "burnt") end },
 	{ name = "raw bun", make = function() return ing("bun", "raw") end },
 	{ name = "clean empty plate", make = function() return plate(false, {}) end },
-	{ name = "clean plate w/ lettuce", make = function() return plate(false, { { kind = "lettuce", state = "chopped" } }) end },
+	{ name = "clean plate w/ lettuce", make = function() return plate(false, { { kind = "lettuce", state = "prepped" } }) end },
 	{ name = "dirty plate", make = function() return plate(true, {}) end },
 	{ name = "empty pan", make = function() return pan({}) end },
 	{ name = "pan w/ raw bacon", make = function() return pan({ { kind = "bacon", state = "raw" } }) end },
