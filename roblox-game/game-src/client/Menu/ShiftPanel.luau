@@ -18,6 +18,7 @@
 local Players = game:GetService("Players")
 
 local Theme = require(script.Parent.Theme) :: any
+local Loc = require(script.Parent.Loc) :: any
 
 local ShiftPanel = {}
 ShiftPanel.__index = ShiftPanel
@@ -193,10 +194,10 @@ function ShiftPanel:setProgress(progress: any)
 	-- between shifts, and out here -- next to a level and a coin count, both of
 	-- which are self-describing -- a bare flame and a digit reads as a third
 	-- currency rather than a streak. Say the noun.
-	local suffix = if streak > 1 then `  ·  🔥{streak} day streak` else ""
+	local suffix = if streak > 1 then "  ·  " .. Loc.f("fmt.streak", streak) else ""
 	-- NOT the coin emoji: FredokaOne has no glyph for it and it renders as a
 	-- hollow box (the 🔥 in the same string is fine).
-	self.progressChip.Text = `Lv {progress.level or 1}  ·  {progress.coins or 0} coins{suffix}`
+	self.progressChip.Text = Loc.f("fmt.lv_coins", progress.level or 1, progress.coins or 0) .. suffix
 end
 
 function ShiftPanel:setBots(on: boolean, pending: boolean, phase: string?)
@@ -247,7 +248,7 @@ function ShiftPanel:paint()
 	local crew = total ~= nil and total > 1
 	if self.ready then
 		Theme.setCtaFill(self.startButton, Theme.GREY)
-		self.startButton.Text = if crew then `WAITING FOR CREW  {n}/{total}` else "WAITING…"
+		self.startButton.Text = if crew then Loc.f("fmt.waiting_crew", n, total) else "WAITING…"
 	else
 		Theme.setCtaFill(self.startButton, Theme.GREEN)
 		-- Plain text, no hand-spacing. DISPLAY_FONT carries its own

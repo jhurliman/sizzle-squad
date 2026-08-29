@@ -16,6 +16,7 @@
 -- keeps working.
 
 local Theme = require(script.Parent.Menu.Theme) :: any
+local Loc = require(script.Parent.Loc) :: any
 
 local FirstShift = {}
 FirstShift.__index = FirstShift
@@ -336,7 +337,7 @@ function FirstShift:update(state: any, flags: number): number?
 			-- bacon fails `plateable`), and the salad does not want bacon in
 			-- any state. The loop above simply never matched, and `wanted`
 			-- being nil fell into the success branch. Send it back instead.
-			tip = `The ticket doesn't need {held.kind} — put it back in the crate.`
+			tip = Loc.f("fmt.ticket_not_needed", held.kind)
 			target = nearest(state, function(st)
 				return st.kind == "crate" and st.dispenses == held.kind
 			end)
@@ -355,7 +356,7 @@ function FirstShift:update(state: any, flags: number): number?
 		tip = "Press at the glowing board to chop it."
 		target = chopId
 	elseif readyId ~= nil then
-		tip = `That {readyKind} is ready — pick it up and add it to your plate.`
+		tip = Loc.f("fmt.ready_collect", readyKind)
 		target = readyId
 	elseif panId ~= nil then
 		tip = "Food's ready! Press at the glowing pan to take it."
@@ -377,7 +378,7 @@ function FirstShift:update(state: any, flags: number): number?
 		-- ticket still needs.
 		local want = nextNeeded(state, order, held)
 		if want ~= nil then
-			tip = `Ticket: {order.name}. Grab {want.kind} from the glowing crate.`
+			tip = Loc.f("fmt.ticket_grab", order.name, want.kind)
 			target = nearest(state, function(st)
 				return st.kind == "crate" and st.dispenses == want.kind
 			end)
@@ -385,7 +386,7 @@ function FirstShift:update(state: any, flags: number): number?
 		if want == nil then
 			-- Everything the ticket asks for is on the plate: the only move
 			-- left is to run it to the window.
-			tip = `{order.name} is complete — pick up the plate and serve it.`
+			tip = Loc.f("fmt.ticket_complete", order.name)
 			target = stagedPlateId(state) or nearest(state, stationOfKind("serve"))
 		elseif target == nil then
 			tip = `Ticket: {order.name}. Grab what it needs from a crate.`

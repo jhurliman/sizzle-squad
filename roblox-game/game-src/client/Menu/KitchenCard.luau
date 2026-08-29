@@ -15,6 +15,7 @@
 local Players = game:GetService("Players")
 
 local Theme = require(script.Parent.Theme) :: any
+local Loc = require(script.Parent.Loc) :: any
 
 local KitchenCard = {}
 KitchenCard.__index = KitchenCard
@@ -250,9 +251,9 @@ end
 function KitchenCard:setProgress(progress: any)
 	self.progress = progress
 	local player = Players.LocalPlayer
-	self.title.Text = `Welcome back, {player.DisplayName}`
+	self.title.Text = Loc.f("fmt.welcome_named", player.DisplayName)
 	local xp, toNext = progress.xp or 0, progress.xpToNext
-	self.subtitle.Text = `Level {progress.level or 1}  ·  {progress.coins or 0} coins  ·  {progress.rounds or 0} shifts worked`
+	self.subtitle.Text = Loc.f("fmt.level_coins", progress.level or 1, progress.coins or 0, progress.rounds or 0)
 	if toNext ~= nil and toNext > 0 then
 		self.xpFill.Size = UDim2.fromScale(math.clamp(xp / toNext, 0, 1), 1)
 	end
@@ -310,7 +311,7 @@ function KitchenCard:setFriends(friends: { any })
 	end
 	self.joinButton.Visible = f ~= nil
 	if f ~= nil then
-		self.joinButton.Text = `JOIN {f.name}`
+		self.joinButton.Text = Loc.f("fmt.join_name", f.name)
 	end
 end
 

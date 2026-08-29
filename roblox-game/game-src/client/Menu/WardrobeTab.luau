@@ -13,6 +13,7 @@
 -- and the footer offers to buy; buying then wears it automatically.
 
 local Theme = require(script.Parent.Theme) :: any
+local Loc = require(script.Parent.Loc) :: any
 local ChefPreview = require(script.Parent.ChefPreview) :: any
 
 local WardrobeTab = {}
@@ -355,7 +356,7 @@ function WardrobeTab:render()
 			elseif self.pending.hat == item.id
 			then "trying on"
 			elseif owned then "owned"
-			elseif locked then `Lv {item.level}`
+			elseif locked then Loc.f("fmt.level_gate", item.level)
 			else `{item.cost}c`
 		self:card(next_(), item.name, state, locked, nil, function()
 			if locked then
@@ -387,7 +388,7 @@ function WardrobeTab:render()
 			elseif self.pending.palette == item.id
 			then "trying on"
 			elseif owned then "owned"
-			elseif locked then `Lv {item.level}`
+			elseif locked then Loc.f("fmt.level_gate", item.level)
 			else `{item.cost}c`
 		self:card(next_(), item.name, state, locked, tint, function()
 			if locked then
@@ -403,7 +404,7 @@ function WardrobeTab:render()
 		local affordable = coins >= sel.cost
 		self.buyButton.Visible = true
 		self.footer.Visible = true
-		self.buyButton.Text = `BUY  {sel.cost}c`
+		self.buyButton.Text = Loc.f("fmt.buy_cost", sel.cost)
 		self.buyButton.BackgroundColor3 = if affordable then Theme.GOLD else Theme.GREY
 		self.hint.Text = if affordable
 			then `Trying on {sel.name}. Buy it to keep it.`

@@ -9,6 +9,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 
 local Theme = require(script.Parent.Theme) :: any
+local Loc = require(script.Parent.Parent.Loc) :: any
 
 local ShopTab = {}
 ShopTab.__index = ShopTab
@@ -206,7 +207,7 @@ function ShopTab:render()
 			action.Text = "EQUIP"
 			action.BackgroundColor3 = Theme.BLUE
 		elseif locked then
-			action.Text = `Lv {item.level}`
+			action.Text = Loc.f("fmt.level_gate", item.level)
 			action.BackgroundColor3 = Theme.GREY
 		else
 			action.Text = `{item.cost}c`

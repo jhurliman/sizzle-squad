@@ -6,6 +6,7 @@
 local Players = game:GetService("Players")
 
 local Theme = require(script.Parent.Theme) :: any
+local Loc = require(script.Parent.Loc) :: any
 
 local RanksTab = {}
 RanksTab.__index = RanksTab
@@ -200,7 +201,7 @@ function RanksTab:render()
 			TextColor3 = Theme.GOLD,
 			TextSize = 15,
 			ZIndex = 5,
-			Text = `{e.value} {unit}`,
+			Text = Loc.f("fmt.value_unit", e.value, Loc.f(if unit == "coins" then "fmt.coins_unit" else "fmt.dishes_unit")),
 		}, row)
 	end
 end

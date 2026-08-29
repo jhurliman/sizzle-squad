@@ -38,12 +38,21 @@ by default. This is why the table carries a `Source` column for every row, and
 why the English text in the code must stay byte-identical to it.
 
 **By key.** Anything with values interpolated into it (`Level {1} · {2} coins`).
-These cannot be matched by source, because the sentence does not exist until
-runtime and the placeholder order differs by language — German and Japanese put
-them in different places. They need
-`LocalizationService:GetTranslatorForPlayerAsync(player):FormatByKey(key, args)`
-at the call site. The keys are already in the table (`fmt.*`); **wiring the
-call sites is still to do** — see the table below.
+These cannot be matched by source: the finished sentence does not exist until
+runtime, and the placeholder order differs by language — "Level 3 · 120 coins"
+is `Nivel {1} · {2} monedas` in Spanish but `レベル{1} · {2}コイン` in Japanese,
+and German moves them again. Formatting in Lua and hoping the table has the
+result cannot work.
+
+`client/Loc.luau` handles these: `Loc.f("fmt.lv_coins", level, coins)` asks the
+engine to substitute into the TRANSLATED template. All 21 are wired.
+
+**Every failure path renders English, never a key.** The translator comes from a
+yielding web call that can be slow or fail, there is no player in some Studio
+contexts, and a key can be missing from a table that has not been re-imported.
+All three fall back to `shared/LocFallback.luau` — generated from this same
+source of truth, because two hand-maintained copies of a string is how they
+drift.
 
 ## Shipping it
 
@@ -112,6 +121,8 @@ row to match its export and re-import — the rest of the file is unaffected.
 - Excluded on purpose: bare glyphs and digits (`★`, `0`, `3:00`), placeholder
   values overwritten before anyone sees them, and `BLT`, which is a sandwich
   name that survives untranslated in all seven.
-- **Not yet wired: the 21 `fmt.*` templates.** They are translated and in the
-  table, but the call sites still build their strings with interpolation, so
-  they render in English until each one is moved to `FormatByKey`.
+- All 21 `fmt.*` templates are wired to `Loc.f`. `build-loc.mjs` fails if a
+  template is translated but never called, or if `Loc.f` is called with a key
+  the table does not have — both are silent failures otherwise: an uncalled
+  template is seven translations nobody sees, and an unknown key renders English
+  forever while looking exactly like a missing translation.

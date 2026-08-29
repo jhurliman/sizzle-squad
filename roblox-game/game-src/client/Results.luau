@@ -12,6 +12,7 @@
 -- figures are the per-player deltas the server recorded in awardRound.
 
 local Theme = require(script.Parent.Menu.Theme) :: any
+local Loc = require(script.Parent.Loc) :: any
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Game"):WaitForChild("Config")) :: any
 
 local Results = {}
@@ -219,7 +220,7 @@ function Results:step(dt: number)
 		-- bestCombo is a COUNT of consecutive clean serves, and a 7 streak pays
 		-- x1.90, not x7. As an end-of-round record the count is the interesting
 		-- number, so it keeps the count and loses the multiplication sign.
-		self.stats.Text = `{r.served} dishes served  ·  best streak {r.bestCombo}  ·  {r.coins} team coins`
+		self.stats.Text = Loc.f("fmt.results_line", r.served, r.bestCombo, r.coins)
 	end
 
 	-- stars punch in one at a time
@@ -246,7 +247,7 @@ function Results:step(dt: number)
 		if target - self.coins < 1 then
 			self.coins = target
 		end
-		self.coinLabel.Text = `+{math.floor(self.coins + 0.5)} coins`
+		self.coinLabel.Text = Loc.f("fmt.plus_coins", math.floor(self.coins + 0.5))
 	end
 
 	-- then XP, and the level-up if there was one
@@ -256,7 +257,7 @@ function Results:step(dt: number)
 		if target - self.xp < 1 then
 			self.xp = target
 		end
-		self.xpLabel.Text = `+{math.floor(self.xp + 0.5)} XP`
+		self.xpLabel.Text = Loc.f("fmt.plus_xp", math.floor(self.xp + 0.5))
 
 		-- ROLL THE BAR, DO NOT SNAP IT.
 		--
@@ -285,7 +286,7 @@ function Results:step(dt: number)
 		if self.animLevel > self.shownLevel then
 			self.shownLevel = self.animLevel
 			self.levelBurst.Visible = true
-			self.levelBurst.Text = `LEVEL {self.animLevel}!`
+			self.levelBurst.Text = Loc.f("fmt.level_up", self.animLevel)
 			if self.onLevelUp ~= nil then
 				self.onLevelUp()
 			end

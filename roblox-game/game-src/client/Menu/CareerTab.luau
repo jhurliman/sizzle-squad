@@ -6,6 +6,7 @@
 -- FRIENDS button that main.client.luau was building by hand.
 
 local Theme = require(script.Parent.Theme) :: any
+local Loc = require(script.Parent.Loc) :: any
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BadgeDefs = require(ReplicatedStorage:WaitForChild("Game"):WaitForChild("BadgeDefs")) :: any
 
@@ -140,10 +141,10 @@ function CareerTab:setProgress(progress: any)
 	-- rather than boasting about a streak of one.
 	local streak = progress.streak or 0
 	self.statsLabel.Text = if streak >= 2
-		then `{progress.coins or 0} coins   ·   🔥 {streak} day streak`
+		then `{progress.coins or 0} coins   ·   ` .. Loc.f("fmt.streak", streak)
 		else `{progress.coins or 0} coins`
 	self.xpFill.Size = UDim2.fromScale(math.clamp(xp / math.max(1, toNext), 0, 1), 1)
-	self.xpLabel.Text = `{xp} / {toNext} XP to level {level + 1}`
+	self.xpLabel.Text = Loc.f("fmt.xp_to_next", xp, toNext, level + 1)
 	self:renderGoals(progress)
 	self:renderMilestones(progress)
 	self:renderBadges(progress)
@@ -183,7 +184,7 @@ function CareerTab:renderGoals(progress: any)
 			TextSize = 12,
 			TextColor3 = Theme.DIM,
 			ZIndex = 5,
-			Text = `{math.min(d.progress, d.goal)}/{d.goal}  ·  +{d.coins}c  +{d.xp} XP`,
+			Text = Loc.f("fmt.goal_progress", math.min(d.progress, d.goal), d.goal, d.coins, d.xp),
 		}, row)
 		-- Toast on the transition, exactly as the old dailies panel did.
 		if done and not self.claimed[d.id] then
