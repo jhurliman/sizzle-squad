@@ -36,6 +36,31 @@ const out = path.join(ROOT, 'loc/SizzleSquad-localization.csv');
 fs.writeFileSync(out, rows.join('\n') + '\n');
 console.log(`wrote ${path.relative(ROOT, out)} — ${src.entries.length} entries x ${src.locales.length} locales`);
 
+// ------------------------------------------------------------------ chunks
+//
+// THE DASHBOARD IMPORTER TIMES OUT ON A WHOLE TABLE.
+//
+// 133 rows x 8 languages in one file returns HTTP 504 "upstream request
+// timeout" — Roblox's importer takes longer to process the file than its own
+// gateway will wait, so the upload dies with nothing imported and no partial
+// state to reason about. Chunks of ~50 rows go through.
+//
+// The full CSV above is still the one mounted into the place for Studio, which
+// reads it locally and does not care how big it is. These are only for the
+// dashboard. Import them in order; the importer merges by Key.
+const CHUNK = Number(process.env.LOC_CHUNK || 50);
+const dir = path.join(ROOT, 'loc/chunks');
+fs.rmSync(dir, { recursive: true, force: true });
+fs.mkdirSync(dir, { recursive: true });
+const body = rows.slice(1);
+const parts = Math.ceil(body.length / CHUNK);
+for (let i = 0; i < parts; i++) {
+  const slice = body.slice(i * CHUNK, (i + 1) * CHUNK);
+  const name = `SizzleSquad-loc-${String(i + 1).padStart(2, '0')}-of-${String(parts).padStart(2, '0')}.csv`;
+  fs.writeFileSync(path.join(dir, name), [rows[0], ...slice].join('\n') + '\n');
+  console.log(`  ${name}  ${slice.length} rows`);
+}
+
 // -------------------------------------------------------------- coverage
 // Which player-visible strings does the table NOT cover? Silence here is the
 // whole risk: an untranslated string does not error, it just shows up in

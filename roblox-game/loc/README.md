@@ -74,8 +74,26 @@ Roblox falls back from a player's region locale (`ja-jp`) to the base language
 `--verify` is part of the build for this reason. The rejection message says what
 is *not* supported and never what is, so the tool asks.
 
-For the live game, import the same CSV at
-**Creator Dashboard → Sizzle Squad → Localization → Translations → Import**.
+### Import in chunks — the whole table times out
+
+Uploading all 133 rows at once returns **HTTP 504 "upstream request timeout"**:
+Roblox's importer takes longer to process the file than its own gateway will
+wait, so the upload dies with nothing imported. `build-loc.mjs` therefore also
+writes `loc/chunks/`, ~50 rows each with the header repeated:
+
+```
+SizzleSquad-loc-01-of-03.csv   50 rows
+SizzleSquad-loc-02-of-03.csv   50 rows
+SizzleSquad-loc-03-of-03.csv   33 rows
+```
+
+Import them in order at **Creator Dashboard → Sizzle Squad → Localization →
+Translations → Import**. The importer merges by `Key`, so the chunks add up to
+the same table and re-importing one is safe. `LOC_CHUNK=25 node
+tools/build-loc.mjs` splits smaller if 50 still times out.
+
+The full CSV is what gets mounted into the place for Studio — that one is read
+locally and its size does not matter.
 The languages must already be enabled there (they are). If the dashboard export
 uses different locale column names than `fr-fr` / `pt-br` / …, rename the header
 row to match its export and re-import — the rest of the file is unaffected.
