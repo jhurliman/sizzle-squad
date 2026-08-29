@@ -182,7 +182,7 @@ Config.AFK_SECONDS = 20
 -- of November. This is a PERMANENT badge on real accounts: past this date
 -- nobody can earn it again, and before it everyone who finishes a shift does,
 -- so a date that is too late turns it into a participation trophy.
-Config.FOUNDING_CHEF_UNTIL = "2026-11-30"
+Config.FOUNDING_CHEF_UNTIL = "2026-11-08"
 
 
 return Config

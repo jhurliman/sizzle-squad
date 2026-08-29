@@ -89,7 +89,7 @@ Everything here is already tracked; this phase just puts a date on it.
 5. **Confirm "Publishing tier at risk" clears** after the fee and the next
    publish. That reading was inference, not documentation — if it persists, it
    needs re-investigating before anything else ships.
-6. **Set `Config.FOUNDING_CHEF_UNTIL`.** See below; it is still the placeholder.
+6. ~~**Set `Config.FOUNDING_CHEF_UNTIL`.**~~ **DONE** — `2026-11-08`.
 
 ### 12 Sep – 26 Sep · Friends & family (2 weeks)
 
@@ -134,10 +134,8 @@ those recombines machinery that already ships.
 
 ## Founding Chef window
 
-`Config.FOUNDING_CHEF_UNTIL` is `"2026-11-30"` — still the placeholder, and now
-misaligned with these dates.
-
-**Recommend `"2026-11-08"`** (the Sunday after Halloween). That covers everyone
+`Config.FOUNDING_CHEF_UNTIL` is **set to `"2026-11-08"`** — the Sunday after
+Halloween. That covers everyone
 from the soft launch through the Halloween weekend and closes a week later,
 which keeps the badge scarce — scarcity is the only thing that makes it worth
 having. `2026-11-30` stretches the "founding" window to nine weeks, at which

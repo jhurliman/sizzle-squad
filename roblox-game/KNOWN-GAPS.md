@@ -17,27 +17,20 @@ fixed. What remains is either unverifiable without live traffic, or fit and
 finish — which is worth knowing before deciding whether the next work goes into
 the game or into getting people into it.
 
-## Unverified against the live service
+## Waiting on traffic
 
-- 🟡 **No real Robux purchase has ever been made.** Both passes exist and are
-  wired (Supporter 1959138315, Chef's Trunk 1958262313); ownership is checked
-  on join and on `PromptGamePassPurchaseFinished`. The buy flow, the
-  grant-on-purchase path and the +10% multipliers have never run against a real
-  transaction.
-- 🟡 **No analytics data observed on the dashboard yet.** Every event is
-  pcall'd and degrades to a no-op, so silence here is indistinguishable from
-  working. Covered by `tools/analytics-harness.luau` against a fake service.
-- 🟢 **No badge has been observed granting against the live service.** Award
-  state is not persisted in the profile, so Roblox's own profile page is the
-  only place they appear; the Career tab shows the milestone track instead.
-- 🟡 **`Config.FOUNDING_CHEF_UNTIL` is still `2026-11-30`**, a placeholder.
-  LAUNCH.md argues for `2026-11-08` — a nine-week "founding" window stops
-  meaning anything, and scarcity is the only thing that makes that badge worth
-  having.
-- 🟡 **Localized text fit is unchecked.** All 133 strings are translated into
+Not gaps — questions only players can answer. Nothing here is a reason to hold
+a release.
+
+- 🟢 **Analytics has produced no dashboard data yet**, which is expected with
+  almost no users: the events are pcall'd and degrade to a no-op, so silence is
+  indistinguishable from working until there is volume. Covered by
+  `tools/analytics-harness.luau` against a fake service. Check once the soft
+  launch has run a week; the onboarding funnel is the one to read first.
+- 🟢 **Localized text fit is unchecked.** All 133 strings are translated into
   seven languages and wired, but German and Japanese routinely overrun controls
   sized for English. The CTA labels auto-scale; the fixed-width chips do not.
-  Worth one Studio pass per language.
+  One Studio pass per language, whenever.
 
 ## Pacing and balance
 
