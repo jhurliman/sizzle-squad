@@ -74,10 +74,11 @@ still guard the shared sim (including bit-exact determinism).
 
 ## What's NOT done
 
-**[KNOWN-GAPS.md](KNOWN-GAPS.md) is the canonical ledger** of every stub,
-placeholder, and simplification — checked before trusting any feature as
-"done". Highlights: cosmetics don't render yet, chef limbs don't articulate,
-dailies have no UI, food is spheres, everything is silent.
+**[KNOWN-GAPS.md](KNOWN-GAPS.md) lists what is still open** — checked before
+trusting any feature as "done", and pruned as things land rather than kept as a
+changelog. The largest open item is that audio is silent on device (it plays in
+Studio), and the largest unknown is four-human pacing, which no harness here can
+measure.
 
 ## Remaining (user-gated) launch steps
 
@@ -160,7 +161,5 @@ dates — is in [LAUNCH.md](LAUNCH.md).
    Every pass item already renders today — the four pass hats are existing,
    FitLab-tuned assets moved off the coin ladder, not new art. Nothing here
    needs an upload or a new `Hats.build` case.
-4. **Icon spritesheet**: render `src/ui/icons.ts` to a PNG, upload, swap the
-   ticket chips from colored circles to ImageLabels.
-5. **Playtests** (plan P6–P8): friends & family via private links, then soft
+4. **Playtests** (plan P6–P8): friends & family via private links, then soft
    launch against the metric gates (D1 ≥ 25%, session ≥ 12 min, rounds ≥ 3).
