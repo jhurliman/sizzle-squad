@@ -51,28 +51,35 @@ The CSV is mounted into the place under `LocalizationService` by
 `default.project.json`, so **Studio picks it up with no upload**: set the
 language in Studio's Localization tools and the UI switches.
 
-### Locale column names: bare language codes, not region locales
+### The column layout is Roblox's, taken from its own export
 
-The first import was rejected with *"Language(s) not supported: de-de, id-id,
-ja-jp, ko-kr"* — while `fr-fr`, `pt-br` and `es-es` went through, which made it
-look like a format problem that only affected half the file.
-
-It was not. The experience registers its languages with
-`languageCodeType: "Language"` and **bare codes**, which its own API will tell
-you:
-
-```sh
-node tools/build-loc.mjs --verify     # asks the experience what it has enabled
-# experience has enabled: de, en, es, fr, id, ja, ko, pt
+```
+Key, Example, Source, Context, Game Locations, then for each locale a PAIR:
+"<loc>" and "<loc> translator type"
 ```
 
-All eight were enabled the whole time; the importer was comparing `ja-jp`
-against `ja` and rejecting it. Bare codes are also the better runtime answer:
-Roblox falls back from a player's region locale (`ja-jp`) to the base language
-(`ja`), so one column covers every region of that language rather than just one.
+Three things in there are not guessable, and each cost an upload to learn:
 
-`--verify` is part of the build for this reason. The rejection message says what
-is *not* supported and never what is, so the tool asks.
+- **`Example` comes before `Source`.**
+- **Every locale needs a companion `<loc> translator type` column.** `User`
+  marks a human translation, which is what these are — and what stops Roblox
+  replacing them with machine output.
+- **There is no bare `en` column.** English is the source language, so it is
+  not a translation target.
+
+That last one produced the confusing failure. An `en` column generated exactly
+one `Could not apply changes for "X": : .` per row — 50 errors that looked like
+a total rejection, while every other column imported perfectly. The 50 rows were
+in the table the whole time. **If you see a wall of those errors, read the row
+count in the export before assuming nothing landed.**
+
+Locale codes are bare (`es`, `pt`, `ja`, `ko`, `fr`, `de`, `id`). The export also
+carries region columns (`es-mx`, `pt-pt`, `fr-ca`, `en-gb`…) which stay empty;
+Roblox falls back from a region locale to the base language, so one column
+covers every region.
+
+`node tools/build-loc.mjs --verify` checks the columns against the languages the
+experience actually has enabled.
 
 ### Import in chunks — the whole table times out
 

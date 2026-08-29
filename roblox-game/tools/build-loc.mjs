@@ -14,30 +14,34 @@ const HERE = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(HERE, '..');
 const src = JSON.parse(fs.readFileSync(path.join(ROOT, 'loc/source.json'), 'utf8'));
 
-// The source-language column is opt-in. Roblox's importer takes the English
-// text from `Source`; whether it also wants an `en` TRANSLATION column is the
-// open question behind "Could not apply changes" on every row, so it is a flag
-// rather than an assumption. LOC_SOURCE_COL=1 to include it.
-const WITH_SOURCE_COL = process.env.LOC_SOURCE_COL === '1';
-const q = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
-// BARE LANGUAGE CODES, NOT REGION LOCALES.
+// THE CANONICAL COLUMN LAYOUT, TAKEN FROM ROBLOX'S OWN EXPORT.
 //
-// The first import failed with "Language(s) not supported: de-de, id-id,
-// ja-jp, ko-kr" while fr-fr, pt-br and es-es went through. The experience's own
-// API (gameinternationalization/v1/supported-languages) reports all eight
-// languages with languageCodeType=Language and bare codes, and the importer
-// checks the column against that. Bare codes are the better runtime answer too:
-// Roblox falls back from a player's region locale (ja-jp) to the base language
-// (ja), so one column serves every region of that language.
-const header = ['Key', 'Source', 'Context', 'Example', ...(WITH_SOURCE_COL ? ['en'] : []), ...src.locales];
+//   Key, Example, Source, Context, Game Locations, then for each locale a
+//   pair: "<loc>" and "<loc> translator type".
+//
+// Two things in there are not guessable and both cost an upload to learn:
+//
+//   * Example comes BEFORE Source, not after.
+//   * Every locale needs a companion "translator type" column. "User" marks a
+//     human translation, which is what these are and what stops Roblox
+//     overwriting them with machine output.
+//
+// And one thing is an ABSENCE: there is no bare `en` column. English is the
+// source language, so it is not a translation target. Including one produced
+// exactly one "Could not apply changes for X: : ." per row — 50 errors that
+// looked like a total failure while every other column imported fine.
+const q = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+const header = ['Key', 'Example', 'Source', 'Context', 'Game Locations'];
+for (const l of src.locales) header.push(l, `${l} translator type`);
 const rows = [header.map(q).join(',')];
 for (const e of src.entries) {
-  rows.push([
-    q(e.key), q(e.source), q(e.context), q(e.note || ''),
-    ...(WITH_SOURCE_COL ? [q(e.source)] : []),
-    ...src.locales.map((l) => q(e.tr[l] ?? '')),
-  ].join(','));
+  const cells = [q(e.key), q(e.note || ''), q(e.source), q(e.context), q('')];
+  for (const l of src.locales) {
+    cells.push(q(e.tr[l] ?? ''), q(e.tr[l] ? 'User' : ''));
+  }
+  rows.push(cells.join(','));
 }
+
 const out = path.join(ROOT, 'loc/SizzleSquad-localization.csv');
 fs.writeFileSync(out, rows.join('\n') + '\n');
 console.log(`wrote ${path.relative(ROOT, out)} — ${src.entries.length} entries x ${src.locales.length} locales`);
