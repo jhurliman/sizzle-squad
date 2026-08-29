@@ -27,14 +27,26 @@ played it".
 
 Order-of-magnitude, that is the biggest number in this document:
 
-> Roblox payer conversion is commonly put in the low single digits. **Assume
-> 2–5% of unique players qualify** — that implies **5,000–12,500 unique
-> players** to clear 250. *This is an inference from a public rate, not a
-> Roblox-documented figure; treat it as a planning range and correct it against
-> the live counter, which is the only ground truth.*
+> **250 unique plays by highly engaged, AGE-CHECKED users inside a rolling
+> 60-day window.** "Highly engaged" is Roblox's own term and combines account
+> tenure, playtime *in your experience*, and platform spend. Age-checked means
+> the player has completed Roblox's age verification.
 
-A soft launch of "20–50 friends via private links" clears roughly **1–2** of
-the 250. The gate is not something a friends-and-family round can touch.
+Three things in that sentence decide the whole plan, and I had two of them
+wrong from reading the dashboard alone:
+
+- **The window ROLLS.** This is not a lifetime counter. A trickle of three or
+  four a week never arrives, because the early ones age out before the late
+  ones land. It has to be concentrated traffic, not sustained dribble.
+- **Only age-checked users count.** Not every 16+ player is age-checked, so the
+  qualifying pool is narrower than "everyone who can currently see the game".
+- **Under-16s cannot play at all until it is met.** There is no partial
+  unlock — which is exactly why launching *on* Halloween would have wasted it.
+
+Everyone the account owner personally knows on Roblox — partner and two kids —
+was played through in one evening and moved the counter to **0**, because none
+of them clear tenure-plus-spend-plus-playtime as age-checked accounts. Personal
+network is not a strategy here; it is not even a rounding error. The gate is not something a friends-and-family round can touch.
 
 **Therefore: launch publicly in late September, and make Halloween the content
 beat it was always designed to be.** That is not a retreat from the Halloween
@@ -51,6 +63,36 @@ Two supporting reasons the earlier date is better anyway:
   that morning with no history.
 - **31 October is a Saturday.** Weekend peak is the right day to spend the beat
   on, and the wrong day to discover a launch-blocking bug.
+
+## Getting to 250 — the only part of this that is not automatic
+
+Nothing in the build moves this number. It is bought or earned with traffic
+from age-checked 16+ accounts, and there are exactly four sources:
+
+1. **Sponsored ads targeting 17+.** The only lever that is fully under control,
+   and the only one that delivers precisely the population that counts. Run it
+   CONCENTRATED rather than spread thin — the rolling window punishes a drip.
+   Spend against a finished store page or it converts badly; that is why the
+   thumbnail and the video come first.
+2. **Short-form video off-platform.** TikTok and YouTube Shorts drive a large
+   share of Roblox discovery now, cost time rather than Robux, and the ~30s
+   gameplay capture is the same footage. Highest unpaid ROI on this list, and
+   four-chef co-op chaos is natively watchable.
+3. **Roblox's own recommendation surfaces.** These reward retention, not
+   novelty, which is what the metric gates below are really protecting. A game
+   that holds people gets shown to more people for free.
+4. **Communities** — co-op and Overcooked-like Discords, subreddits. Small,
+   but free and honest.
+
+**Watch it in the Audience Reach dashboard**, which updates in real time. If the
+counter is not moving after a week of a paid push, the problem is the store page
+or retention, not the budget — increasing spend against a leaky funnel converts
+Robux into nothing at a very reliable rate.
+
+**If 250 does not land before 31 October, run the Halloween beat anyway.** It
+still works for the 16+ audience the game can already reach; it simply does not
+unlock the under-16 one. That is a smaller Halloween, not a failed one, and it
+is a much better outcome than delaying into November to chase a gate.
 
 ---
 

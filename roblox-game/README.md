@@ -87,8 +87,12 @@ deleted, not ticked** — this section had grown into a record of finished work
 with the how-to for badges nobody needs to create again. The *when* is
 [LAUNCH.md](LAUNCH.md); the *what* is here.
 
-Publish, audio, badges and game passes are all done and verified live, including
-a real Robux purchase. Reference material survives them: badge names,
+Publish, audio, badges, game passes, the device pass and the localization import
+are all done and verified live, including a real Robux purchase.
+
+If a string ever changes, re-import: `node tools/build-loc.mjs`, then upload
+`loc/chunks/*.csv` in order — the importer 504s on a whole table, which is why
+they are ~50 rows each. Reference material survives them: badge names,
 descriptions and ids are in `store/badges.md`, audio ids in
 `../roblox/audio-out/asset-ids.csv`, pass ids in `shared/Monetization.luau`.
 
@@ -100,15 +104,9 @@ descriptions and ids are in `store/badges.md`, audio ids in
    ad). Only 3 of 19 top experiences have one and all three sit in slot one,
    because Roblox auto-promotes an approved video ahead of the stills. It is
    the cheapest differentiator left on the store page.
-3. **Device pass** at 896x414 and at 375px height: the wardrobe preview and the
-   whole menu. Most Roblox play is mobile. Fold the localized text check into
-   the same pass — German and Japanese overrun controls sized for English.
-4. **Import the localization CSVs** if any string changes:
-   `node tools/build-loc.mjs` then upload `loc/chunks/*.csv` in order. The
-   importer 504s on the whole table, which is why they are ~50 rows each.
-5. **Confirm "Publishing tier at risk" has cleared** after the refundable fee
+3. **Confirm "Publishing tier at risk" has cleared** after the refundable fee
    and a publish. That reading was inference, not documentation — if it
    persists it needs re-investigating before anything else ships.
-6. **Playtests** (plan P6-P8): friends and family via private links, then soft
+4. **Playtests** (plan P6-P8): friends and family via private links, then soft
    launch against the metric gates — D1 >= 25%, session >= 12 min, rounds/session
    >= 3, first-round completion >= 90%, like ratio >= 90%.
