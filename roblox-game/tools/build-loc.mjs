@@ -14,6 +14,11 @@ const HERE = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(HERE, '..');
 const src = JSON.parse(fs.readFileSync(path.join(ROOT, 'loc/source.json'), 'utf8'));
 
+// The source-language column is opt-in. Roblox's importer takes the English
+// text from `Source`; whether it also wants an `en` TRANSLATION column is the
+// open question behind "Could not apply changes" on every row, so it is a flag
+// rather than an assumption. LOC_SOURCE_COL=1 to include it.
+const WITH_SOURCE_COL = process.env.LOC_SOURCE_COL === '1';
 const q = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
 // BARE LANGUAGE CODES, NOT REGION LOCALES.
 //
@@ -24,11 +29,12 @@ const q = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
 // checks the column against that. Bare codes are the better runtime answer too:
 // Roblox falls back from a player's region locale (ja-jp) to the base language
 // (ja), so one column serves every region of that language.
-const header = ['Key', 'Source', 'Context', 'Example', 'en', ...src.locales];
+const header = ['Key', 'Source', 'Context', 'Example', ...(WITH_SOURCE_COL ? ['en'] : []), ...src.locales];
 const rows = [header.map(q).join(',')];
 for (const e of src.entries) {
   rows.push([
-    q(e.key), q(e.source), q(e.context), q(e.note || ''), q(e.source),
+    q(e.key), q(e.source), q(e.context), q(e.note || ''),
+    ...(WITH_SOURCE_COL ? [q(e.source)] : []),
     ...src.locales.map((l) => q(e.tr[l] ?? '')),
   ].join(','));
 }
