@@ -51,6 +51,29 @@ The CSV is mounted into the place under `LocalizationService` by
 `default.project.json`, so **Studio picks it up with no upload**: set the
 language in Studio's Localization tools and the UI switches.
 
+### Locale column names: bare language codes, not region locales
+
+The first import was rejected with *"Language(s) not supported: de-de, id-id,
+ja-jp, ko-kr"* — while `fr-fr`, `pt-br` and `es-es` went through, which made it
+look like a format problem that only affected half the file.
+
+It was not. The experience registers its languages with
+`languageCodeType: "Language"` and **bare codes**, which its own API will tell
+you:
+
+```sh
+node tools/build-loc.mjs --verify     # asks the experience what it has enabled
+# experience has enabled: de, en, es, fr, id, ja, ko, pt
+```
+
+All eight were enabled the whole time; the importer was comparing `ja-jp`
+against `ja` and rejecting it. Bare codes are also the better runtime answer:
+Roblox falls back from a player's region locale (`ja-jp`) to the base language
+(`ja`), so one column covers every region of that language rather than just one.
+
+`--verify` is part of the build for this reason. The rejection message says what
+is *not* supported and never what is, so the tool asks.
+
 For the live game, import the same CSV at
 **Creator Dashboard → Sizzle Squad → Localization → Translations → Import**.
 The languages must already be enabled there (they are). If the dashboard export

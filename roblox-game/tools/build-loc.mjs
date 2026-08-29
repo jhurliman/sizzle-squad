@@ -15,7 +15,16 @@ const ROOT = path.resolve(HERE, '..');
 const src = JSON.parse(fs.readFileSync(path.join(ROOT, 'loc/source.json'), 'utf8'));
 
 const q = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
-const header = ['Key', 'Source', 'Context', 'Example', 'en-us', ...src.locales];
+// BARE LANGUAGE CODES, NOT REGION LOCALES.
+//
+// The first import failed with "Language(s) not supported: de-de, id-id,
+// ja-jp, ko-kr" while fr-fr, pt-br and es-es went through. The experience's own
+// API (gameinternationalization/v1/supported-languages) reports all eight
+// languages with languageCodeType=Language and bare codes, and the importer
+// checks the column against that. Bare codes are the better runtime answer too:
+// Roblox falls back from a player's region locale (ja-jp) to the base language
+// (ja), so one column serves every region of that language.
+const header = ['Key', 'Source', 'Context', 'Example', 'en', ...src.locales];
 const rows = [header.map(q).join(',')];
 for (const e of src.entries) {
   rows.push([
@@ -54,4 +63,45 @@ for (const e of src.entries) {
   for (const l of src.locales) if (!e.tr[l]) blanks.push(`${e.key} (${l})`);
 }
 console.log(blanks.length ? `\n${blanks.length} blank translations: ${blanks.slice(0, 8).join(', ')}` : 'no blank translations');
-process.exit(missing.length || blanks.length ? 1 : 0);
+
+// -------------------------------------------------- do these languages exist?
+//
+// `--verify` asks the experience which languages it actually has enabled and
+// compares. The first import was rejected for four of seven columns and the
+// message ("Language(s) not supported") did not say what WAS supported, so this
+// answers that question from the source of truth instead of by trial.
+// Needs ROBLOX_SIZZLE_SQUAD_API_KEY; skipped without it so the build still runs.
+let langMismatch = 0;
+if (process.argv.includes('--verify')) {
+  const key = process.env.ROBLOX_SIZZLE_SQUAD_API_KEY;
+  const universe = process.env.ROBLOX_UNIVERSE_ID || '10761465304';
+  if (!key) {
+    console.log('\n--verify skipped: no API key in the environment');
+  } else {
+    try {
+      const r = await fetch(
+        `https://gameinternationalization.roblox.com/v1/supported-languages/games/${universe}`,
+        { headers: { 'x-api-key': key } },
+      );
+      const body = await r.json();
+      const enabled = new Set((body.data || []).map((l) => l.languageCode));
+      console.log(`\nexperience has enabled: ${[...enabled].sort().join(', ')}`);
+      for (const l of src.locales) {
+        if (!enabled.has(l)) {
+          langMismatch += 1;
+          console.log(`  MISSING on the experience: ${l} — the import will reject this column`);
+        }
+      }
+      for (const l of enabled) {
+        if (l !== 'en' && !src.locales.includes(l)) {
+          console.log(`  note: ${l} is enabled but the table has no column for it`);
+        }
+      }
+      if (!langMismatch) console.log('  every column matches an enabled language');
+    } catch (e) {
+      console.log(`\n--verify failed: ${String(e.message).replace(key, '<redacted>')}`);
+    }
+  }
+}
+
+process.exit(missing.length || blanks.length || langMismatch ? 1 : 0);

@@ -1,4 +1,4 @@
-"Key","Source","Context","Example","en-us","fr-fr","de-de","id-id","ja-jp","ko-kr","pt-br","es-es"
+"Key","Source","Context","Example","en","fr","de","id","ja","ko","pt","es"
 "ui.start_shift","START SHIFT","Main button that begins a round","","START SHIFT","COMMENCER","SCHICHT STARTEN","MULAI SHIFT","シフト開始","근무 시작","INICIAR TURNO","EMPEZAR TURNO"
 "ui.waiting","WAITING…","Button caption after you ready up, waiting on others","","WAITING…","EN ATTENTE…","WARTEN…","MENUNGGU…","待機中…","대기 중…","AGUARDANDO…","ESPERANDO…"
 "ui.play","PLAY","Primary button on the welcome card","","PLAY","JOUER","SPIELEN","MAIN","プレイ","플레이","JOGAR","JUGAR"
