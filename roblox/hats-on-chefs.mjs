@@ -8,6 +8,13 @@ import * as THREE from '../node_modules/three/build/three.module.js';
 import { chromium } from '../node_modules/playwright/index.mjs';
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
+
+// Renders land in a dedicated output directory, never beside the scripts.
+// A tool that writes its PNGs into its own source folder is a tool whose
+// output gets committed by accident — which is exactly what happened to the
+// animation sheets. See roblox/README.md; roblox/preview/ is gitignored.
+const OUT = path.join(DIR, 'preview', 'hats-on-chefs');
+fs.mkdirSync(OUT, { recursive: true });
 const chefs = JSON.parse(fs.readFileSync(path.join(DIR, 'chef-parts.json'), 'utf8')).skins;
 const hats = JSON.parse(fs.readFileSync(path.join(DIR, 'hats-dump.json'), 'utf8'));
 const FITS = JSON.parse(fs.readFileSync(path.join(DIR, 'hat-fits.json'), 'utf8'));
@@ -92,7 +99,7 @@ for (const skin of Object.keys(chefs)) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 960 } });
   await page.goto('file://' + file);
   await page.waitForFunction('typeof window.__shot === "string"', { timeout: 20000 });
-  fs.writeFileSync(path.join(DIR, `hats-on-${skin}.png`), Buffer.from((await page.evaluate(() => window.__shot)).split(',')[1], 'base64'));
+  fs.writeFileSync(path.join(OUT, `hats-on-${skin}.png`), Buffer.from((await page.evaluate(() => window.__shot)).split(',')[1], 'base64'));
   await page.close();
   fs.rmSync(file);
   console.error(`wrote hats-on-${skin}.png`);

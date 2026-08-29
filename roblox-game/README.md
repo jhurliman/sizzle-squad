@@ -45,7 +45,7 @@ photo moment.
 **Characters** — the four procedural species captured from `ChefView` in bind
 pose with skeleton-group attribution (`../roblox/capture-chefs.mjs`) into
 part-rigs (`assets/chef-rigs.rbxm`, ~70 parts each), animated procedurally
-client-side (walk/hop/squash/stun/carry). See `../roblox/chefs-preview.png`.
+client-side (walk/hop/squash/stun/carry). See `../docs/art/chefs-preview.png`.
 
 ## Verification (all headless, no Studio needed)
 

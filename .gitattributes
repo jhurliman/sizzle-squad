@@ -1,9 +1,25 @@
+# IMAGE ASSETS GO THROUGH GIT LFS.
+#
+# The repo carries ~13 MB of art that was uploaded to Roblox (badges, icon,
+# passes, store banners) plus reference and documentation shots. Those are the
+# exact bytes the platform received and are worth keeping — but they are
+# binary, they never diff usefully, and every revision of one is a full copy in
+# the pack. LFS keeps the working tree identical and the history light.
+# What is NOT here is just as deliberate: developer render output is gitignored
+# rather than stored (see .gitignore), so this rule only ever applies to art
+# somebody chose to keep.
+# NOTE: this converts files from the commit that adds it onward. History is not
+# rewritten — the old blobs stay where they are, which costs nothing further
+# and avoids forcing every clone to re-fetch.
 *.png filter=lfs diff=lfs merge=lfs -text
 *.jpg filter=lfs diff=lfs merge=lfs -text
 *.jpeg filter=lfs diff=lfs merge=lfs -text
 *.gif filter=lfs diff=lfs merge=lfs -text
 *.webp filter=lfs diff=lfs merge=lfs -text
+
+# Roblox binary model/place files are the same story.
 *.rbxm filter=lfs diff=lfs merge=lfs -text
 *.rbxl filter=lfs diff=lfs merge=lfs -text
+# Audio sources rendered by roblox/render-audio.mjs and uploaded to Roblox.
 *.wav filter=lfs diff=lfs merge=lfs -text
 *.ogg filter=lfs diff=lfs merge=lfs -text

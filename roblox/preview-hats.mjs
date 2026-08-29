@@ -7,6 +7,13 @@ import * as THREE from '../node_modules/three/build/three.module.js';
 import { chromium } from '../node_modules/playwright/index.mjs';
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
+
+// Renders land in a dedicated output directory, never beside the scripts.
+// A tool that writes its PNGs into its own source folder is a tool whose
+// output gets committed by accident — which is exactly what happened to the
+// animation sheets. See roblox/README.md; roblox/preview/ is gitignored.
+const OUT = path.join(DIR, 'preview', 'preview-hats');
+fs.mkdirSync(OUT, { recursive: true });
 const hats = JSON.parse(fs.readFileSync(path.join(DIR, 'hats-dump.json'), 'utf8'));
 const IDS = Object.keys(hats);
 
@@ -70,12 +77,12 @@ const html = `<!doctype html><meta charset=utf-8><body style="margin:0">
 <script>${fs.readFileSync(path.join(DIR, 'three.iife.js'), 'utf8')}</script>
 <script>window.__PARTS__=${JSON.stringify({ parts: all })}</script>
 <script>${viewer}</script></body>`;
-fs.writeFileSync(path.join(DIR, 'hats-preview.html'), html);
+fs.writeFileSync(path.join(OUT, 'hats-preview.html'), html);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-await page.goto('file://' + path.join(DIR, 'hats-preview.html'));
+await page.goto('file://' + path.join(OUT, 'hats-preview.html'));
 await page.waitForFunction('typeof window.__shot === "string"', { timeout: 20000 });
-fs.writeFileSync(path.join(DIR, 'hats-preview.png'), Buffer.from((await page.evaluate(() => window.__shot)).split(',')[1], 'base64'));
+fs.writeFileSync(path.join(OUT, 'hats-preview.png'), Buffer.from((await page.evaluate(() => window.__shot)).split(',')[1], 'base64'));
 await browser.close();
-fs.rmSync(path.join(DIR, 'hats-preview.html'));
+fs.rmSync(path.join(OUT, 'hats-preview.html'));
 console.error('wrote hats-preview.png');

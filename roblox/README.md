@@ -4,7 +4,31 @@
 open it directly in Roblox Studio. It is generated from the real TypeScript
 world-builder, not hand-ported, so it stays faithful to `src/view/world.ts`.
 
-![preview](preview.png)
+![preview](../docs/art/kitchen-preview.png)
+
+## Where renders go, and what is committed
+
+**No tool writes an image beside its own source.** A batch of animation sheets
+was committed by accident precisely because they did: the script wrote
+`anim-walk-*.png` into `roblox/`, `git add` swept them up, and nobody decided
+anything. Every render tool now writes to a dedicated directory.
+
+| Directory | Contents | Committed? |
+| --- | --- | --- |
+| `badge-art/` `game-icon/` `pass-art/` `game-banner/` | Art uploaded to Roblox, or under review for upload | **Yes**, via Git LFS |
+| `preview/<tool>/` | Developer instruments — hat fits, animation strips, chef sheets, raw viewer renders | No (gitignored) |
+| `audio-out/` | Rendered SFX and music sources, uploaded to Roblox | **Yes**, via Git LFS |
+| any `_*.png` | Contact sheets and intermediates, regenerated with the finals | No (gitignored) |
+
+The rule for the first column is "did this go to the platform, or is it about
+to" — the exact bytes Roblox received are worth keeping. Everything else is
+reproducible by re-running the script that made it, and a repo is not a cache.
+
+Binary assets are stored with **Git LFS** (`.gitattributes`): images, `.rbxm`
+/ `.rbxl`, and audio sources. They never diff usefully and every revision is a
+full copy in the pack. Note that LFS applies from the commit that introduced it
+onward; history was deliberately NOT rewritten, since that would force every
+clone to re-fetch for no benefit.
 
 ## What's in the place
 
