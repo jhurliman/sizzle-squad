@@ -109,24 +109,36 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	end
 
 	self.tabButtons = {}
-	-- Every button in the row, tabs and actions alike, so `relayout` can size
+	-- Every control in the row, tabs and actions alike, so `relayout` can size
 	-- them as one set. Keeping BOTS and NEW SERVER out of this list is what let
 	-- them keep a hardcoded 196px while the tabs shrank.
+	--
+	-- THEY ARE CTAs, NOT FLAT PLATES. From the first multiplayer playtest: the
+	-- second player did not realise WARDROBE / SHOP / CAREER / RANKS could be
+	-- tapped at all, because the only thing on screen that looked pressable was
+	-- Start Shift and the info chip directly beneath them looked identical to
+	-- these. Same gradient, edge and press response as the hero button, just
+	-- smaller and in the panel's brown — the shape is what says "button".
 	self.rowButtons = {}
-	for i, t in TABS do
-		local btn = Theme.button({
+	self.rowRoots = {}
+	local function rowButton(label: string, order: number, fill: Color3?): any
+		local cta = Theme.cta({
 			Size = UDim2.fromOffset(140, Theme.MIN_TAP),
-			Fill = Theme.BROWN_MID,
-			BackgroundTransparency = 0.1,
-			TextSize = 14,
-			LayoutOrder = i,
-			Text = t.label,
+			Fill = fill or Theme.BROWN_MID,
+			TextSize = 15,
+			LayoutOrder = order,
+			Text = label,
 		}, self.rows[1])
-		btn.Activated:Connect(function()
+		table.insert(self.rowButtons, cta.button)
+		table.insert(self.rowRoots, cta.root)
+		return cta
+	end
+	for i, t in TABS do
+		local cta = rowButton(t.label, i)
+		cta.button.Activated:Connect(function()
 			self.deps.onOpenTab(t.id)
 		end)
-		self.tabButtons[t.id] = btn
-		table.insert(self.rowButtons, btn)
+		self.tabButtons[t.id] = cta.button
 	end
 
 	-- BOTS ARE OPTIONAL, AND THE LOBBY IS WHERE YOU SAY SO.
@@ -136,18 +148,12 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	-- preference. The caption states what will happen at the NEXT start, since
 	-- that is when it lands — flipping bots mid-shift would freeze them where
 	-- they stand, mid-carry.
-	self.botButton = Theme.button({
-		Size = UDim2.fromOffset(196, Theme.MIN_TAP),
-		Fill = Theme.BROWN_MID,
-		BackgroundTransparency = 0.1,
-		TextSize = 14,
-		LayoutOrder = #TABS + 1,
-		Text = "BOTS: ON",
-	}, self.rows[1])
+	local botCta = rowButton("BOTS: ON", #TABS + 1)
+	self.botButton = botCta.button
+	self.botRoot = botCta.root
 	self.botButton.Activated:Connect(function()
 		self.deps.onToggleBots(not self.botFill)
 	end)
-	table.insert(self.rowButtons, self.botButton)
 
 	-- LEAVING IS AN AFFORDANCE, NOT AN ADMISSION.
 	--
@@ -155,18 +161,12 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	-- established Roblox co-op game offers a rematch. Roblox has no
 	-- "anywhere but here" API — Teleport re-runs matchmaking, which prefers
 	-- servers with room, so it usually moves you but is not guaranteed to.
-	self.newServerButton = Theme.button({
-		Size = UDim2.fromOffset(196, Theme.MIN_TAP),
-		Fill = Theme.BROWN_MID,
-		BackgroundTransparency = 0.1,
-		TextSize = 14,
-		LayoutOrder = #TABS + 2,
-		Text = "NEW SERVER",
-	}, self.rows[1])
+	local newCta = rowButton("NEW SERVER", #TABS + 2)
+	self.newServerButton = newCta.button
+	self.newServerRoot = newCta.root
 	self.newServerButton.Activated:Connect(function()
 		self.deps.onNewServer()
 	end)
-	table.insert(self.rowButtons, self.newServerButton)
 
 	self.progressChip = Theme.chip({
 		Size = UDim2.fromOffset(320, 34),
@@ -202,7 +202,7 @@ end
 function ShiftPanel:setBots(on: boolean, pending: boolean, phase: string?)
 	self.botFill = pending
 	self.botButton.Text = if pending then "BOTS: ON" else "BOTS: OFF"
-	self.botButton.BackgroundColor3 = if pending then Theme.BROWN_MID else Theme.BROWN_DEEP
+	Theme.setCtaFill(self.botButton, if pending then Theme.BROWN_MID else Theme.BROWN_DEEP)
 	-- "(next shift)" ONLY while a shift is actually running.
 	--
 	-- The qualifier exists because the toggle lands at the next round start
@@ -223,8 +223,8 @@ function ShiftPanel:setPhase(phase: any, spectating: boolean)
 	-- go; NEW SERVER in particular would teleport a learner out of the lesson.
 	if phase.tutorial ~= nil then
 		self.tutorial = phase.tutorial == true
-		self.botButton.Visible = not self.tutorial
-		self.newServerButton.Visible = not self.tutorial
+		self.botRoot.Visible = not self.tutorial
+		self.newServerRoot.Visible = not self.tutorial
 		self:relayoutLast()
 	end
 	local ids = phase.readyIds
@@ -265,9 +265,9 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	-- Hidden buttons take no space in the row: a tutorial server shows four,
 	-- not six with two gaps.
 	local visible = {}
-	for _, b in self.rowButtons do
-		if b.Visible then
-			table.insert(visible, b)
+	for i, root in self.rowRoots do
+		if root.Visible then
+			table.insert(visible, { root = root, button = self.rowButtons[i] })
 		end
 	end
 	local n = #visible
@@ -288,12 +288,15 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 		perRow = math.ceil(n / 2)
 	end
 
-	for i, btn in visible do
+	for i, v in visible do
 		local r = if rows == 1 then 1 else math.min(2, math.ceil(i / perRow))
-		btn.Parent = self.rows[r]
-		btn.LayoutOrder = i
-		btn.Size = UDim2.fromOffset(tabW, Theme.MIN_TAP)
-		btn.TextSize = if narrow then 11 elseif compact then 12 else 14
+		v.root.Parent = self.rows[r]
+		v.root.LayoutOrder = i
+		v.root.Size = UDim2.fromOffset(tabW, Theme.MIN_TAP + Theme.SHADOW_DY)
+		local cap = v.button:FindFirstChildWhichIsA("UITextSizeConstraint")
+		if cap ~= nil then
+			cap.MaxTextSize = if narrow then 12 elseif compact then 13 else 15
+		end
 	end
 
 	local counts = { 0, 0 }
@@ -304,10 +307,10 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	for r = 1, 2 do
 		local c = counts[r]
 		self.rows[r].Visible = c > 0
-		self.rows[r].Size = UDim2.fromOffset(math.max(1, tabW * c + gap * math.max(0, c - 1)), Theme.MIN_TAP)
+		self.rows[r].Size = UDim2.fromOffset(math.max(1, tabW * c + gap * math.max(0, c - 1)), Theme.MIN_TAP + Theme.SHADOW_DY)
 	end
 
-	local rowsH = rows * Theme.MIN_TAP + (rows - 1) * gap
+	local rowsH = rows * (Theme.MIN_TAP + Theme.SHADOW_DY) + (rows - 1) * gap
 	local widest = math.max(self.rows[1].Size.X.Offset, self.rows[2].Size.X.Offset)
 	self.tabRow.Size = UDim2.fromOffset(widest, rowsH)
 	-- Height comes from the column's own contents (AutomaticSize.Y), not from a

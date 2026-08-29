@@ -230,7 +230,13 @@ end
 --- first shift and false forever after; a player who quits mid-first-round
 --- correctly gets it again, because they never finished one.
 function FirstShift:setEligible(progress: any)
-	self.active = (progress.rounds or 0) < 1
+	-- `tutorialDone` as well as `rounds`, because the two can disagree. A
+	-- player teleported out of First Shift arrives in a live server while the
+	-- profile is still loading, and for those few frames `rounds` reads 0 --
+	-- long enough to put the coach back on screen in a real round, where it
+	-- narrated bots completing tickets and could not be dismissed. The flag is
+	-- set the moment the tutorial pays out and never clears.
+	self.active = (progress.rounds or 0) < 1 and progress.tutorialDone ~= true
 end
 
 --- One instruction plus the station it refers to. Returns the target station

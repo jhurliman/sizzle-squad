@@ -1096,6 +1096,19 @@ function ChefVisuals:update(id: number, skin: string, pose: any, flags: number, 
 	end
 
 	-- ---- nametag -----------------------------------------------------------
+	-- A NAMETAG THAT NEVER CHANGES ITS TEXT IS A NAMETAG THAT LIES.
+	--
+	-- There was no branch here for "tag exists, name differs", so the first
+	-- label a chef model was ever given stuck to it forever. Chef ids are
+	-- reshuffled by CrewManager:reseat every round, so after one round a model
+	-- could be carrying the previous occupant's name — which is how a second
+	-- player ended up labelled "⭐ jhurliman" on their own screen.
+	if label ~= nil and entry.nameGui ~= nil then
+		local text = entry.nameGui:FindFirstChildWhichIsA("TextLabel")
+		if text ~= nil and text.Text ~= label then
+			text.Text = label
+		end
+	end
 	if label ~= nil and entry.nameGui == nil then
 		local anchor = entry.headAnchor or model.PrimaryPart
 		if anchor ~= nil then

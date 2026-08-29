@@ -190,9 +190,17 @@ function Hud.new(catalog: any)
 	-- The band between the score chip and the action button is short on a
 	-- phone (~206px on iPhone landscape) while the board can hold 5 tickets,
 	-- so the whole rail auto-scales down to fit (see updateOrders).
+	-- ANCHORED TOP-RIGHT, BECAUSE UIScale SHRINKS TOWARDS THE ANCHOR.
+	--
+	-- With the default (0,0) anchor the rail scaled towards its top-LEFT, so
+	-- the moment a fifth ticket forced the scale below 1 the whole column
+	-- pulled away from the screen edge and sat in the middle of the kitchen
+	-- with a growing gap to its right. Anchoring right pins the edge that is
+	-- meant to stay put.
 	self.ticketRail = mk("Frame", {
+		AnchorPoint = Vector2.new(1, 0),
 		Size = UDim2.new(0, TICKET_W, 1, -(TICKET_RESERVE - 56)),
-		Position = UDim2.new(1, -(TICKET_W + 6), 0, 6),
+		Position = UDim2.new(1, -6, 0, 6),
 		BackgroundTransparency = 1,
 	}, gui)
 	self.ticketScale = mk("UIScale", { Scale = 1 }, self.ticketRail)

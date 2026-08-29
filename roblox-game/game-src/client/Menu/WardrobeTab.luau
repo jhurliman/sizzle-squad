@@ -309,8 +309,18 @@ function WardrobeTab:render()
 		local owner = self.taken and self.taken[s.id]
 		local byOther = owner ~= nil and owner ~= LOCAL_USER_ID
 		local state = if self.pending.skin == s.id then "WORN" elseif byOther then "IN USE" else "pick"
-		local sub = if byOther then "Another chef here is this one — try it on, wear it next time" else nil
-		self:card(next_(), s.label, state, false, sub, function()
+		-- A STRING WENT INTO THE COLOUR SLOT AND TOOK THE LIST WITH IT.
+		--
+		-- `card`'s fifth argument is `tint: Color3?`, and this used to pass a
+		-- sentence of explanatory text. `BackgroundColor3 = "Another chef here
+		-- is this one…"` throws, which aborted :render midway through the
+		-- species loop — so in any server where somebody else was already a
+		-- species, half the wardrobe simply did not draw and the list trailed
+		-- off into a blank row. It only ever showed up in multiplayer, because
+		-- `taken` is empty on your own.
+		--
+		-- The "IN USE" chip already says what the sentence said.
+		self:card(next_(), s.label, state, false, nil, function()
 			self.pending.skin = s.id
 			-- Palettes are species-bound; a palette from another species does
 			-- nothing at all, so drop it rather than silently no-op.

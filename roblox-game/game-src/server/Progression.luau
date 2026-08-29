@@ -245,6 +245,11 @@ function Progression:push(player: any)
 		badges = profile.badges or {},
 		-- The client used to infer species from EquipDeltas.skin; send it.
 		species = profile.species,
+		-- FirstShift gates on this, not only on `rounds`: a player teleported
+		-- out of the tutorial reaches a live server before the profile lands,
+		-- and `rounds` reads 0 for long enough to put the coach back on screen
+		-- in a real round.
+		tutorialDone = profile.tutorialDone == true,
 	})
 end
 
