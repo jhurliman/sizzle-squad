@@ -315,8 +315,13 @@ function ShopTab:renderPremium(progress: any, standalone: boolean?): number
 			TextColor3 = Theme.DIM,
 			LayoutOrder = 1,
 			ZIndex = 5,
-			Text = "No passes are set up yet.\nCreate them on the Creator Dashboard and put their ids in shared/Monetization.luau.",
+			-- The player half only. The second sentence used to name a Luau
+			-- file on screen, which is a note to us, not to them — and it is
+			-- the one string in the game a translator could not do anything
+			-- sensible with. It belongs in the output window.
+			Text = "No passes are set up yet.",
 		}, self.list)
+		warn("[sizzle] no game passes configured — create them on the Creator Dashboard and put their ids in shared/Monetization.luau")
 	end
 	return order
 end

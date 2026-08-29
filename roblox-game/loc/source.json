@@ -1,0 +1,2008 @@
+{
+  "locales": [
+    "fr-fr",
+    "de-de",
+    "id-id",
+    "ja-jp",
+    "ko-kr",
+    "pt-br",
+    "es-es"
+  ],
+  "entries": [
+    {
+      "key": "ui.start_shift",
+      "source": "START SHIFT",
+      "context": "Main button that begins a round",
+      "note": "",
+      "tr": {
+        "fr-fr": "COMMENCER",
+        "de-de": "SCHICHT STARTEN",
+        "id-id": "MULAI SHIFT",
+        "ja-jp": "シフト開始",
+        "ko-kr": "근무 시작",
+        "pt-br": "INICIAR TURNO",
+        "es-es": "EMPEZAR TURNO"
+      }
+    },
+    {
+      "key": "ui.waiting",
+      "source": "WAITING…",
+      "context": "Button caption after you ready up, waiting on others",
+      "note": "",
+      "tr": {
+        "fr-fr": "EN ATTENTE…",
+        "de-de": "WARTEN…",
+        "id-id": "MENUNGGU…",
+        "ja-jp": "待機中…",
+        "ko-kr": "대기 중…",
+        "pt-br": "AGUARDANDO…",
+        "es-es": "ESPERANDO…"
+      }
+    },
+    {
+      "key": "ui.play",
+      "source": "PLAY",
+      "context": "Primary button on the welcome card",
+      "note": "",
+      "tr": {
+        "fr-fr": "JOUER",
+        "de-de": "SPIELEN",
+        "id-id": "MAIN",
+        "ja-jp": "プレイ",
+        "ko-kr": "플레이",
+        "pt-br": "JOGAR",
+        "es-es": "JUGAR"
+      }
+    },
+    {
+      "key": "ui.ready",
+      "source": "READY!",
+      "context": "Primary button when a round is about to start",
+      "note": "",
+      "tr": {
+        "fr-fr": "PRÊT !",
+        "de-de": "BEREIT!",
+        "id-id": "SIAP!",
+        "ja-jp": "準備完了！",
+        "ko-kr": "준비 완료!",
+        "pt-br": "PRONTO!",
+        "es-es": "¡LISTO!"
+      }
+    },
+    {
+      "key": "ui.buy",
+      "source": "BUY",
+      "context": "Shop button",
+      "note": "",
+      "tr": {
+        "fr-fr": "ACHETER",
+        "de-de": "KAUFEN",
+        "id-id": "BELI",
+        "ja-jp": "購入",
+        "ko-kr": "구매",
+        "pt-br": "COMPRAR",
+        "es-es": "COMPRAR"
+      }
+    },
+    {
+      "key": "ui.equip",
+      "source": "EQUIP",
+      "context": "Wear a cosmetic you own",
+      "note": "",
+      "tr": {
+        "fr-fr": "ÉQUIPER",
+        "de-de": "ANLEGEN",
+        "id-id": "PAKAI",
+        "ja-jp": "装備",
+        "ko-kr": "착용",
+        "pt-br": "EQUIPAR",
+        "es-es": "EQUIPAR"
+      }
+    },
+    {
+      "key": "ui.equipped",
+      "source": "EQUIPPED",
+      "context": "State badge on the item you are wearing",
+      "note": "",
+      "tr": {
+        "fr-fr": "ÉQUIPÉ",
+        "de-de": "ANGELEGT",
+        "id-id": "DIPAKAI",
+        "ja-jp": "装備中",
+        "ko-kr": "착용 중",
+        "pt-br": "EQUIPADO",
+        "es-es": "EQUIPADO"
+      }
+    },
+    {
+      "key": "ui.try_it",
+      "source": "TRY IT",
+      "context": "Preview an item you do not own yet",
+      "note": "",
+      "tr": {
+        "fr-fr": "ESSAYER",
+        "de-de": "ANPROBIEREN",
+        "id-id": "COBA",
+        "ja-jp": "試着",
+        "ko-kr": "입어보기",
+        "pt-br": "EXPERIMENTAR",
+        "es-es": "PROBAR"
+      }
+    },
+    {
+      "key": "ui.wardrobe",
+      "source": "👕 WARDROBE",
+      "context": "Tab: change how your chef looks",
+      "note": "",
+      "tr": {
+        "fr-fr": "👕 GARDE-ROBE",
+        "de-de": "👕 GARDEROBE",
+        "id-id": "👕 LEMARI",
+        "ja-jp": "👕 ワードローブ",
+        "ko-kr": "👕 옷장",
+        "pt-br": "👕 GUARDA-ROUPA",
+        "es-es": "👕 VESTUARIO"
+      }
+    },
+    {
+      "key": "ui.shop",
+      "source": "🛒 SHOP",
+      "context": "Tab: buy cosmetics",
+      "note": "",
+      "tr": {
+        "fr-fr": "🛒 BOUTIQUE",
+        "de-de": "🛒 SHOP",
+        "id-id": "🛒 TOKO",
+        "ja-jp": "🛒 ショップ",
+        "ko-kr": "🛒 상점",
+        "pt-br": "🛒 LOJA",
+        "es-es": "🛒 TIENDA"
+      }
+    },
+    {
+      "key": "ui.career",
+      "source": "⭐ CAREER",
+      "context": "Tab: level, goals, badges",
+      "note": "",
+      "tr": {
+        "fr-fr": "⭐ CARRIÈRE",
+        "de-de": "⭐ KARRIERE",
+        "id-id": "⭐ KARIER",
+        "ja-jp": "⭐ キャリア",
+        "ko-kr": "⭐ 커리어",
+        "pt-br": "⭐ CARREIRA",
+        "es-es": "⭐ CARRERA"
+      }
+    },
+    {
+      "key": "ui.ranks",
+      "source": "🏆 RANKS",
+      "context": "Tab: leaderboards",
+      "note": "",
+      "tr": {
+        "fr-fr": "🏆 CLASSEMENT",
+        "de-de": "🏆 RANGLISTE",
+        "id-id": "🏆 PERINGKAT",
+        "ja-jp": "🏆 ランキング",
+        "ko-kr": "🏆 순위",
+        "pt-br": "🏆 RANKING",
+        "es-es": "🏆 CLASIFICACIÓN"
+      }
+    },
+    {
+      "key": "ui.bots_on",
+      "source": "BOTS: ON",
+      "context": "Toggle: bots fill empty chef slots",
+      "note": "",
+      "tr": {
+        "fr-fr": "BOTS : OUI",
+        "de-de": "BOTS: AN",
+        "id-id": "BOT: AKTIF",
+        "ja-jp": "ボット: オン",
+        "ko-kr": "봇: 켜기",
+        "pt-br": "BOTS: LIG.",
+        "es-es": "BOTS: SÍ"
+      }
+    },
+    {
+      "key": "ui.bots_off",
+      "source": "BOTS: OFF",
+      "context": "Toggle: no bots, humans only",
+      "note": "",
+      "tr": {
+        "fr-fr": "BOTS : NON",
+        "de-de": "BOTS: AUS",
+        "id-id": "BOT: MATI",
+        "ja-jp": "ボット: オフ",
+        "ko-kr": "봇: 끄기",
+        "pt-br": "BOTS: DESL.",
+        "es-es": "BOTS: NO"
+      }
+    },
+    {
+      "key": "ui.new_server",
+      "source": "NEW SERVER",
+      "context": "Leave this kitchen and find another",
+      "note": "",
+      "tr": {
+        "fr-fr": "NOUVELLE PARTIE",
+        "de-de": "NEUER SERVER",
+        "id-id": "SERVER BARU",
+        "ja-jp": "新しいサーバー",
+        "ko-kr": "새 서버",
+        "pt-br": "NOVO SERVIDOR",
+        "es-es": "NUEVO SERVIDOR"
+      }
+    },
+    {
+      "key": "ui.invite_friend",
+      "source": "＋ INVITE A FRIEND",
+      "context": "Opens the Roblox invite sheet",
+      "note": "",
+      "tr": {
+        "fr-fr": "＋ INVITER UN AMI",
+        "de-de": "＋ FREUND EINLADEN",
+        "id-id": "＋ UNDANG TEMAN",
+        "ja-jp": "＋ フレンドを招待",
+        "ko-kr": "＋ 친구 초대",
+        "pt-br": "＋ CONVIDAR AMIGO",
+        "es-es": "＋ INVITAR AMIGO"
+      }
+    },
+    {
+      "key": "ui.invite_friends",
+      "source": "＋ INVITE FRIENDS",
+      "context": "Same, on the Career tab",
+      "note": "",
+      "tr": {
+        "fr-fr": "＋ INVITER DES AMIS",
+        "de-de": "＋ FREUNDE EINLADEN",
+        "id-id": "＋ UNDANG TEMAN",
+        "ja-jp": "＋ フレンドを招待",
+        "ko-kr": "＋ 친구 초대",
+        "pt-br": "＋ CONVIDAR AMIGOS",
+        "es-es": "＋ INVITAR AMIGOS"
+      }
+    },
+    {
+      "key": "ui.join_friend",
+      "source": "JOIN A FRIEND",
+      "context": "Jump into a friend's kitchen",
+      "note": "",
+      "tr": {
+        "fr-fr": "REJOINDRE UN AMI",
+        "de-de": "FREUND BEITRETEN",
+        "id-id": "GABUNG TEMAN",
+        "ja-jp": "フレンドに参加",
+        "ko-kr": "친구 참가",
+        "pt-br": "ENTRAR COM AMIGO",
+        "es-es": "UNIRSE A UN AMIGO"
+      }
+    },
+    {
+      "key": "ui.walk",
+      "source": "▶ WALK",
+      "context": "Wardrobe: make the preview chef walk",
+      "note": "",
+      "tr": {
+        "fr-fr": "▶ MARCHER",
+        "de-de": "▶ LAUFEN",
+        "id-id": "▶ JALAN",
+        "ja-jp": "▶ 歩く",
+        "ko-kr": "▶ 걷기",
+        "pt-br": "▶ ANDAR",
+        "es-es": "▶ CAMINAR"
+      }
+    },
+    {
+      "key": "ui.idle",
+      "source": "⏸ IDLE",
+      "context": "Wardrobe: stop the preview chef walking",
+      "note": "",
+      "tr": {
+        "fr-fr": "⏸ PAUSE",
+        "de-de": "⏸ STOPP",
+        "id-id": "⏸ DIAM",
+        "ja-jp": "⏸ 停止",
+        "ko-kr": "⏸ 정지",
+        "pt-br": "⏸ PARADO",
+        "es-es": "⏸ QUIETO"
+      }
+    },
+    {
+      "key": "ui.drag_to_spin",
+      "source": "Drag the chef to spin.",
+      "context": "Wardrobe hint",
+      "note": "",
+      "tr": {
+        "fr-fr": "Faites glisser pour tourner.",
+        "de-de": "Zum Drehen ziehen.",
+        "id-id": "Geser untuk memutar.",
+        "ja-jp": "ドラッグして回転。",
+        "ko-kr": "드래그해서 돌려보세요.",
+        "pt-br": "Arraste para girar.",
+        "es-es": "Arrastra para girar."
+      }
+    },
+    {
+      "key": "ui.drag_and_tap",
+      "source": "Drag the chef to spin. Tap anything to wear it.",
+      "context": "Wardrobe hint, longer form",
+      "note": "",
+      "tr": {
+        "fr-fr": "Faites glisser pour tourner. Touchez un objet pour le porter.",
+        "de-de": "Zum Drehen ziehen. Zum Anlegen antippen.",
+        "id-id": "Geser untuk memutar. Ketuk untuk memakai.",
+        "ja-jp": "ドラッグして回転。タップで着替え。",
+        "ko-kr": "드래그해서 돌리고, 탭해서 착용하세요.",
+        "pt-br": "Arraste para girar. Toque para vestir.",
+        "es-es": "Arrastra para girar. Toca para ponértelo."
+      }
+    },
+    {
+      "key": "ui.todays_goals",
+      "source": "TODAY'S GOALS",
+      "context": "Section heading for daily challenges",
+      "note": "",
+      "tr": {
+        "fr-fr": "OBJECTIFS DU JOUR",
+        "de-de": "TAGESZIELE",
+        "id-id": "TARGET HARI INI",
+        "ja-jp": "今日の目標",
+        "ko-kr": "오늘의 목표",
+        "pt-br": "METAS DE HOJE",
+        "es-es": "OBJETIVOS DE HOY"
+      }
+    },
+    {
+      "key": "ui.welcome_back",
+      "source": "Welcome back, chef",
+      "context": "Greeting on the join card",
+      "note": "",
+      "tr": {
+        "fr-fr": "Bon retour, chef",
+        "de-de": "Willkommen zurück, Chef",
+        "id-id": "Selamat datang kembali, koki",
+        "ja-jp": "おかえりなさい、シェフ",
+        "ko-kr": "돌아오셨군요, 셰프",
+        "pt-br": "Bem-vindo de volta, chef",
+        "es-es": "Bienvenido de nuevo, chef"
+      }
+    },
+    {
+      "key": "ui.shift_over",
+      "source": "SHIFT OVER",
+      "context": "Round has ended",
+      "note": "",
+      "tr": {
+        "fr-fr": "SERVICE TERMINÉ",
+        "de-de": "SCHICHT VORBEI",
+        "id-id": "SHIFT SELESAI",
+        "ja-jp": "シフト終了",
+        "ko-kr": "근무 종료",
+        "pt-br": "FIM DO TURNO",
+        "es-es": "TURNO TERMINADO"
+      }
+    },
+    {
+      "key": "ui.loading_ranks",
+      "source": "Loading rankings…",
+      "context": "Leaderboard is still fetching",
+      "note": "",
+      "tr": {
+        "fr-fr": "Chargement du classement…",
+        "de-de": "Rangliste wird geladen…",
+        "id-id": "Memuat peringkat…",
+        "ja-jp": "ランキング読み込み中…",
+        "ko-kr": "순위 불러오는 중…",
+        "pt-br": "Carregando ranking…",
+        "es-es": "Cargando clasificación…"
+      }
+    },
+    {
+      "key": "ui.no_ranks",
+      "source": "No rankings yet — cook something!",
+      "context": "Leaderboard is genuinely empty",
+      "note": "",
+      "tr": {
+        "fr-fr": "Pas encore de classement — à vos fourneaux !",
+        "de-de": "Noch keine Rangliste — koch was!",
+        "id-id": "Belum ada peringkat — masak dulu!",
+        "ja-jp": "まだランキングがありません — 何か作ろう！",
+        "ko-kr": "아직 순위가 없어요 — 요리해 보세요!",
+        "pt-br": "Ainda sem ranking — cozinhe algo!",
+        "es-es": "Aún no hay clasificación: ¡a cocinar!"
+      }
+    },
+    {
+      "key": "ui.no_friends",
+      "source": "None right now — invite someone below.",
+      "context": "No friends currently playing",
+      "note": "",
+      "tr": {
+        "fr-fr": "Personne pour l'instant — invitez quelqu'un.",
+        "de-de": "Gerade niemand — lade jemanden ein.",
+        "id-id": "Belum ada — undang teman di bawah.",
+        "ja-jp": "今は誰もいません — 下から招待しよう。",
+        "ko-kr": "지금은 없어요 — 아래에서 초대하세요.",
+        "pt-br": "Ninguém agora — convide alguém abaixo.",
+        "es-es": "Nadie ahora mismo: invita a alguien."
+      }
+    },
+    {
+      "key": "ui.nothing_here",
+      "source": "Nothing here yet.",
+      "context": "Empty list placeholder",
+      "note": "",
+      "tr": {
+        "fr-fr": "Rien ici pour l'instant.",
+        "de-de": "Noch nichts hier.",
+        "id-id": "Belum ada apa-apa.",
+        "ja-jp": "まだ何もありません。",
+        "ko-kr": "아직 아무것도 없어요.",
+        "pt-br": "Nada aqui ainda.",
+        "es-es": "Aquí no hay nada todavía."
+      }
+    },
+    {
+      "key": "ui.spectating",
+      "source": "You're up next round — watch the kitchen!",
+      "context": "Joined mid-round, waiting for a seat",
+      "note": "",
+      "tr": {
+        "fr-fr": "À vous au prochain service — observez la cuisine !",
+        "de-de": "Nächste Schicht bist du dran — schau zu!",
+        "id-id": "Giliranmu ronde berikutnya — perhatikan dapurnya!",
+        "ja-jp": "次のシフトであなたの番です — 厨房を見ていて！",
+        "ko-kr": "다음 라운드에 참여합니다 — 주방을 지켜보세요!",
+        "pt-br": "Você entra na próxima — observe a cozinha!",
+        "es-es": "Entras en la próxima ronda: ¡observa la cocina!"
+      }
+    },
+    {
+      "key": "ui.preview_unavailable",
+      "source": "Preview unavailable — chef rigs not loaded.",
+      "context": "Wardrobe could not build the 3D preview",
+      "note": "",
+      "tr": {
+        "fr-fr": "Aperçu indisponible — modèles non chargés.",
+        "de-de": "Vorschau nicht verfügbar — Modelle fehlen.",
+        "id-id": "Pratinjau tidak tersedia — model belum dimuat.",
+        "ja-jp": "プレビュー利用不可 — モデル未読み込み。",
+        "ko-kr": "미리보기 불가 — 모델을 불러오지 못했습니다.",
+        "pt-br": "Prévia indisponível — modelos não carregados.",
+        "es-es": "Vista previa no disponible: modelos no cargados."
+      }
+    },
+    {
+      "key": "ui.no_passes",
+      "source": "No passes are set up yet.",
+      "context": "Shop premium tab with no game passes configured",
+      "note": "",
+      "tr": {
+        "fr-fr": "Aucun pass disponible pour l'instant.",
+        "de-de": "Noch keine Pässe eingerichtet.",
+        "id-id": "Belum ada pass yang tersedia.",
+        "ja-jp": "パスはまだありません。",
+        "ko-kr": "아직 이용권이 없습니다.",
+        "pt-br": "Nenhum passe disponível ainda.",
+        "es-es": "Aún no hay pases disponibles."
+      }
+    },
+    {
+      "key": "coach.one_button",
+      "source": "One button does everything: walk to a glowing station and press it.",
+      "context": "Tutorial: the only control",
+      "note": "",
+      "tr": {
+        "fr-fr": "Un seul bouton suffit : approchez un poste qui brille et appuyez.",
+        "de-de": "Ein Knopf für alles: Geh zu einer leuchtenden Station und drück.",
+        "id-id": "Satu tombol untuk semua: dekati stasiun yang menyala lalu tekan.",
+        "ja-jp": "ボタン1つで全部：光った台に近づいて押すだけ。",
+        "ko-kr": "버튼 하나면 됩니다: 빛나는 조리대로 가서 누르세요.",
+        "pt-br": "Um botão faz tudo: vá até a estação brilhante e aperte.",
+        "es-es": "Un botón lo hace todo: acércate a la estación que brilla y pulsa."
+      }
+    },
+    {
+      "key": "coach.start_plate",
+      "source": "Start with a plate: take one from the stack and set it on a counter.",
+      "context": "Tutorial: first action",
+      "note": "",
+      "tr": {
+        "fr-fr": "Commencez par une assiette : prenez-en une et posez-la sur un plan de travail.",
+        "de-de": "Fang mit einem Teller an: nimm einen vom Stapel und stell ihn auf die Theke.",
+        "id-id": "Mulai dengan piring: ambil satu dari tumpukan dan taruh di meja.",
+        "ja-jp": "まずはお皿：積み重ねから1枚取って台に置こう。",
+        "ko-kr": "접시부터: 쌓인 접시를 하나 집어 조리대에 올리세요.",
+        "pt-br": "Comece com um prato: pegue um da pilha e ponha no balcão.",
+        "es-es": "Empieza con un plato: coge uno de la pila y ponlo en la encimera."
+      }
+    },
+    {
+      "key": "coach.chop",
+      "source": "Press at the glowing board to chop it.",
+      "context": "Tutorial: chopping",
+      "note": "",
+      "tr": {
+        "fr-fr": "Appuyez sur la planche qui brille pour couper.",
+        "de-de": "Am leuchtenden Brett drücken zum Schneiden.",
+        "id-id": "Tekan di talenan yang menyala untuk memotong.",
+        "ja-jp": "光ったまな板で押して切ろう。",
+        "ko-kr": "빛나는 도마에서 눌러 썰으세요.",
+        "pt-br": "Aperte na tábua brilhante para cortar.",
+        "es-es": "Pulsa en la tabla que brilla para cortar."
+      }
+    },
+    {
+      "key": "coach.take_to_station",
+      "source": "Take it to the glowing station and press.",
+      "context": "Tutorial: carry it somewhere",
+      "note": "",
+      "tr": {
+        "fr-fr": "Apportez-le au poste qui brille et appuyez.",
+        "de-de": "Bring es zur leuchtenden Station und drück.",
+        "id-id": "Bawa ke stasiun yang menyala lalu tekan.",
+        "ja-jp": "光った台まで運んで押そう。",
+        "ko-kr": "빛나는 조리대로 가져가 누르세요.",
+        "pt-br": "Leve até a estação brilhante e aperte.",
+        "es-es": "Llévalo a la estación que brilla y pulsa."
+      }
+    },
+    {
+      "key": "coach.ready_plate",
+      "source": "That's ready — put it on your plate.",
+      "context": "Tutorial: ingredient is prepped",
+      "note": "",
+      "tr": {
+        "fr-fr": "C'est prêt — mettez-le dans l'assiette.",
+        "de-de": "Fertig — leg es auf den Teller.",
+        "id-id": "Sudah siap — taruh di piringmu.",
+        "ja-jp": "できあがり — お皿にのせよう。",
+        "ko-kr": "다 됐어요 — 접시에 올리세요.",
+        "pt-br": "Pronto — ponha no seu prato.",
+        "es-es": "Ya está: ponlo en tu plato."
+      }
+    },
+    {
+      "key": "coach.pan_scoop",
+      "source": "Food's ready — press at the glowing pan to scoop it onto your plate.",
+      "context": "Tutorial: plate-scoop from the pan",
+      "note": "",
+      "tr": {
+        "fr-fr": "C'est cuit — appuyez sur la poêle qui brille pour servir dans l'assiette.",
+        "de-de": "Essen fertig — an der leuchtenden Pfanne drücken, um es auf den Teller zu geben.",
+        "id-id": "Masakan siap — tekan di wajan yang menyala untuk memindahkan ke piring.",
+        "ja-jp": "できた — 光ったフライパンで押してお皿へ。",
+        "ko-kr": "다 익었어요 — 빛나는 팬에서 눌러 접시에 담으세요.",
+        "pt-br": "Ficou pronto — aperte na frigideira brilhante para pôr no prato.",
+        "es-es": "Ya está hecho: pulsa en la sartén que brilla para pasarlo al plato."
+      }
+    },
+    {
+      "key": "coach.pan_take",
+      "source": "Food's ready! Press at the glowing pan to take it.",
+      "context": "Tutorial: take cooked food bare-handed",
+      "note": "",
+      "tr": {
+        "fr-fr": "C'est cuit ! Appuyez sur la poêle qui brille pour le prendre.",
+        "de-de": "Essen fertig! An der leuchtenden Pfanne drücken zum Nehmen.",
+        "id-id": "Masakan siap! Tekan di wajan yang menyala untuk mengambilnya.",
+        "ja-jp": "できた！光ったフライパンで押して取ろう。",
+        "ko-kr": "다 익었어요! 빛나는 팬에서 눌러 집으세요.",
+        "pt-br": "Ficou pronto! Aperte na frigideira brilhante para pegar.",
+        "es-es": "¡Ya está! Pulsa en la sartén que brilla para cogerlo."
+      }
+    },
+    {
+      "key": "coach.cooking",
+      "source": "It's cooking — give it a few seconds.",
+      "context": "Tutorial: wait for the pan",
+      "note": "",
+      "tr": {
+        "fr-fr": "Ça cuit — patientez quelques secondes.",
+        "de-de": "Es kocht — gib ihm ein paar Sekunden.",
+        "id-id": "Sedang dimasak — tunggu beberapa detik.",
+        "ja-jp": "調理中 — 数秒待とう。",
+        "ko-kr": "익는 중이에요 — 몇 초만 기다리세요.",
+        "pt-br": "Está cozinhando — espere alguns segundos.",
+        "es-es": "Se está cocinando: espera unos segundos."
+      }
+    },
+    {
+      "key": "coach.set_plate_down",
+      "source": "Set the plate down on a free counter — that's where the dish gets built.",
+      "context": "Tutorial: park the plate",
+      "note": "",
+      "tr": {
+        "fr-fr": "Posez l'assiette sur un plan libre — c'est là qu'on monte le plat.",
+        "de-de": "Stell den Teller auf eine freie Theke — dort wird das Gericht gebaut.",
+        "id-id": "Taruh piring di meja kosong — di situ hidangan disusun.",
+        "ja-jp": "空いた台にお皿を置こう — そこで料理を組み立てる。",
+        "ko-kr": "빈 조리대에 접시를 놓으세요 — 거기서 요리를 완성합니다.",
+        "pt-br": "Ponha o prato num balcão livre — é ali que o prato é montado.",
+        "es-es": "Deja el plato en una encimera libre: ahí se monta el plato."
+      }
+    },
+    {
+      "key": "coach.serve",
+      "source": "Plate in hand. Take it to the serve window when the ticket is complete.",
+      "context": "Tutorial: deliver",
+      "note": "",
+      "tr": {
+        "fr-fr": "Assiette en main. Apportez-la au passe quand la commande est complète.",
+        "de-de": "Teller in der Hand. Bring ihn zur Ausgabe, wenn die Bestellung komplett ist.",
+        "id-id": "Piring di tangan. Bawa ke jendela saji saat pesanan lengkap.",
+        "ja-jp": "お皿を持った。注文が揃ったら受け渡し口へ。",
+        "ko-kr": "접시를 들었어요. 주문이 완성되면 서빙 창구로.",
+        "pt-br": "Prato na mão. Leve à janela de entrega quando o pedido estiver completo.",
+        "es-es": "Plato en mano. Llévalo a la ventanilla cuando el pedido esté completo."
+      }
+    },
+    {
+      "key": "coach.working",
+      "source": "Working! Stay put — or press again to stop.",
+      "context": "Tutorial: mid-task",
+      "note": "",
+      "tr": {
+        "fr-fr": "En cours ! Restez là — ou appuyez à nouveau pour arrêter.",
+        "de-de": "Läuft! Bleib stehen — oder nochmal drücken zum Abbrechen.",
+        "id-id": "Sedang bekerja! Tetap di situ — atau tekan lagi untuk berhenti.",
+        "ja-jp": "作業中！そのまま — もう一度押すと中断。",
+        "ko-kr": "작업 중! 그대로 계세요 — 다시 누르면 중단.",
+        "pt-br": "Trabalhando! Fique aí — ou aperte de novo para parar.",
+        "es-es": "¡Trabajando! Quédate ahí o pulsa otra vez para parar."
+      }
+    },
+    {
+      "key": "coach.dirty_plate",
+      "source": "That plate's dirty — take it to the sink and press to wash it.",
+      "context": "Tutorial: washing up",
+      "note": "",
+      "tr": {
+        "fr-fr": "Cette assiette est sale — allez à l'évier et appuyez pour la laver.",
+        "de-de": "Der Teller ist schmutzig — ab zur Spüle und drücken zum Spülen.",
+        "id-id": "Piring itu kotor — bawa ke wastafel dan tekan untuk mencuci.",
+        "ja-jp": "そのお皿は汚れている — シンクで押して洗おう。",
+        "ko-kr": "접시가 더러워요 — 싱크대로 가서 눌러 씻으세요.",
+        "pt-br": "Esse prato está sujo — leve à pia e aperte para lavar.",
+        "es-es": "Ese plato está sucio: llévalo al fregadero y pulsa para lavarlo."
+      }
+    },
+    {
+      "key": "coach.out_of_plates",
+      "source": "Out of clean plates! Wash up at the sink to get more.",
+      "context": "Tutorial: plate economy",
+      "note": "",
+      "tr": {
+        "fr-fr": "Plus d'assiettes propres ! Lavez à l'évier pour en avoir.",
+        "de-de": "Keine sauberen Teller! Spül welche in der Spüle.",
+        "id-id": "Piring bersih habis! Cuci di wastafel untuk menambah.",
+        "ja-jp": "きれいなお皿がない！シンクで洗って補充しよう。",
+        "ko-kr": "깨끗한 접시가 없어요! 싱크대에서 설거지하세요.",
+        "pt-br": "Acabaram os pratos limpos! Lave na pia para ter mais.",
+        "es-es": "¡No quedan platos limpios! Lava en el fregadero para tener más."
+      }
+    },
+    {
+      "key": "recipe.salad",
+      "source": "Garden Salad",
+      "context": "Recipe name on an order ticket",
+      "note": "",
+      "tr": {
+        "fr-fr": "Salade du jardin",
+        "de-de": "Gartensalat",
+        "id-id": "Salad Kebun",
+        "ja-jp": "ガーデンサラダ",
+        "ko-kr": "가든 샐러드",
+        "pt-br": "Salada da Horta",
+        "es-es": "Ensalada de la Huerta"
+      }
+    },
+    {
+      "key": "recipe.chopped",
+      "source": "Chopped Salad",
+      "context": "Recipe name",
+      "note": "",
+      "tr": {
+        "fr-fr": "Salade composée",
+        "de-de": "Bunter Salat",
+        "id-id": "Salad Cincang",
+        "ja-jp": "チョップドサラダ",
+        "ko-kr": "찹 샐러드",
+        "pt-br": "Salada Picada",
+        "es-es": "Ensalada Picada"
+      }
+    },
+    {
+      "key": "recipe.baconroll",
+      "source": "Bacon Roll",
+      "context": "Recipe name",
+      "note": "",
+      "tr": {
+        "fr-fr": "Sandwich au bacon",
+        "de-de": "Bacon-Brötchen",
+        "id-id": "Roti Isi Bacon",
+        "ja-jp": "ベーコンロール",
+        "ko-kr": "베이컨 롤",
+        "pt-br": "Pão com Bacon",
+        "es-es": "Bocadillo de Bacon"
+      }
+    },
+    {
+      "key": "recipe.blt",
+      "source": "BLT",
+      "context": "Recipe name (bacon, lettuce, tomato)",
+      "note": "Keep the acronym; it is understood as a sandwich name.",
+      "tr": {
+        "fr-fr": "BLT",
+        "de-de": "BLT",
+        "id-id": "BLT",
+        "ja-jp": "BLT",
+        "ko-kr": "BLT",
+        "pt-br": "BLT",
+        "es-es": "BLT"
+      }
+    },
+    {
+      "key": "recipe.deluxe",
+      "source": "Deluxe Stack",
+      "context": "Recipe name",
+      "note": "",
+      "tr": {
+        "fr-fr": "Le Double Deluxe",
+        "de-de": "Deluxe-Turm",
+        "id-id": "Tumpuk Deluxe",
+        "ja-jp": "デラックススタック",
+        "ko-kr": "디럭스 스택",
+        "pt-br": "Torre Deluxe",
+        "es-es": "Torre Deluxe"
+      }
+    },
+    {
+      "key": "badge.first_dish",
+      "source": "First Dish",
+      "context": "Badge name",
+      "note": "",
+      "tr": {
+        "fr-fr": "Premier plat",
+        "de-de": "Erstes Gericht",
+        "id-id": "Hidangan Pertama",
+        "ja-jp": "初めての一皿",
+        "ko-kr": "첫 요리",
+        "pt-br": "Primeiro Prato",
+        "es-es": "Primer Plato"
+      }
+    },
+    {
+      "key": "badge.first_dish.desc",
+      "source": "Your first plate over the pass.",
+      "context": "Badge description",
+      "note": "",
+      "tr": {
+        "fr-fr": "Votre première assiette au passe.",
+        "de-de": "Dein erster Teller über die Ausgabe.",
+        "id-id": "Piring pertamamu lewat jendela saji.",
+        "ja-jp": "初めて出した一皿。",
+        "ko-kr": "서빙 창구를 넘긴 첫 접시.",
+        "pt-br": "Seu primeiro prato na janela.",
+        "es-es": "Tu primer plato en la ventanilla."
+      }
+    },
+    {
+      "key": "badge.clean_service",
+      "source": "Clean Service",
+      "context": "Badge name: no missed tickets",
+      "note": "",
+      "tr": {
+        "fr-fr": "Service impeccable",
+        "de-de": "Saubere Schicht",
+        "id-id": "Layanan Bersih",
+        "ja-jp": "ノーミス営業",
+        "ko-kr": "완벽한 서비스",
+        "pt-br": "Serviço Impecável",
+        "es-es": "Servicio Impecable"
+      }
+    },
+    {
+      "key": "badge.clean_service.desc",
+      "source": "A whole shift without missing a ticket.",
+      "context": "Badge description",
+      "note": "",
+      "tr": {
+        "fr-fr": "Un service entier sans rater une commande.",
+        "de-de": "Eine ganze Schicht ohne verpasste Bestellung.",
+        "id-id": "Satu shift penuh tanpa pesanan terlewat.",
+        "ja-jp": "一度も注文を逃さずシフト完走。",
+        "ko-kr": "한 번도 주문을 놓치지 않은 근무.",
+        "pt-br": "Um turno inteiro sem perder pedidos.",
+        "es-es": "Un turno entero sin perder ningún pedido."
+      }
+    },
+    {
+      "key": "badge.three_stars",
+      "source": "Three Stars",
+      "context": "Badge name",
+      "note": "",
+      "tr": {
+        "fr-fr": "Trois étoiles",
+        "de-de": "Drei Sterne",
+        "id-id": "Tiga Bintang",
+        "ja-jp": "三つ星",
+        "ko-kr": "별 셋",
+        "pt-br": "Três Estrelas",
+        "es-es": "Tres Estrellas"
+      }
+    },
+    {
+      "key": "badge.three_stars.desc",
+      "source": "Finish a shift with all three stars.",
+      "context": "Badge description",
+      "note": "",
+      "tr": {
+        "fr-fr": "Terminez un service avec trois étoiles.",
+        "de-de": "Beende eine Schicht mit drei Sternen.",
+        "id-id": "Selesaikan shift dengan tiga bintang.",
+        "ja-jp": "三つ星でシフトを終える。",
+        "ko-kr": "별 셋으로 근무를 마치세요.",
+        "pt-br": "Termine um turno com três estrelas.",
+        "es-es": "Termina un turno con tres estrellas."
+      }
+    },
+    {
+      "key": "badge.full_house",
+      "source": "Full House",
+      "context": "Badge name: 3 stars with 4 humans",
+      "note": "",
+      "tr": {
+        "fr-fr": "Salle comble",
+        "de-de": "Volles Haus",
+        "id-id": "Rumah Penuh",
+        "ja-jp": "満席",
+        "ko-kr": "풀 하우스",
+        "pt-br": "Casa Cheia",
+        "es-es": "Lleno Total"
+      }
+    },
+    {
+      "key": "badge.full_house.desc",
+      "source": "Three stars with a full crew of four.",
+      "context": "Badge description",
+      "note": "",
+      "tr": {
+        "fr-fr": "Trois étoiles avec une brigade complète de quatre.",
+        "de-de": "Drei Sterne mit vollem Team aus vier.",
+        "id-id": "Tiga bintang dengan tim lengkap berempat.",
+        "ja-jp": "4人フルメンバーで三つ星。",
+        "ko-kr": "4인 풀 크루로 별 셋.",
+        "pt-br": "Três estrelas com equipe completa de quatro.",
+        "es-es": "Tres estrellas con un equipo completo de cuatro."
+      }
+    },
+    {
+      "key": "badge.head_chef",
+      "source": "Head Chef",
+      "context": "Badge name: reach level 10",
+      "note": "",
+      "tr": {
+        "fr-fr": "Chef de cuisine",
+        "de-de": "Küchenchef",
+        "id-id": "Kepala Koki",
+        "ja-jp": "料理長",
+        "ko-kr": "총주방장",
+        "pt-br": "Chefe de Cozinha",
+        "es-es": "Jefe de Cocina"
+      }
+    },
+    {
+      "key": "badge.head_chef.desc",
+      "source": "Reach level 10.",
+      "context": "Badge description",
+      "note": "",
+      "tr": {
+        "fr-fr": "Atteignez le niveau 10.",
+        "de-de": "Erreiche Level 10.",
+        "id-id": "Capai level 10.",
+        "ja-jp": "レベル10に到達。",
+        "ko-kr": "레벨 10 달성.",
+        "pt-br": "Alcance o nível 10.",
+        "es-es": "Alcanza el nivel 10."
+      }
+    },
+    {
+      "key": "badge.century",
+      "source": "Century",
+      "context": "Badge name: 100 dishes",
+      "note": "",
+      "tr": {
+        "fr-fr": "Centenaire",
+        "de-de": "Hundert",
+        "id-id": "Seratus",
+        "ja-jp": "100皿",
+        "ko-kr": "센추리",
+        "pt-br": "Centenário",
+        "es-es": "Centenario"
+      }
+    },
+    {
+      "key": "badge.century.desc",
+      "source": "Serve 100 dishes.",
+      "context": "Badge description",
+      "note": "",
+      "tr": {
+        "fr-fr": "Servez 100 plats.",
+        "de-de": "Serviere 100 Gerichte.",
+        "id-id": "Sajikan 100 hidangan.",
+        "ja-jp": "100皿を提供。",
+        "ko-kr": "100개의 요리를 서빙하세요.",
+        "pt-br": "Sirva 100 pratos.",
+        "es-es": "Sirve 100 platos."
+      }
+    },
+    {
+      "key": "badge.thousand",
+      "source": "Thousand Plates",
+      "context": "Badge name: 1000 dishes",
+      "note": "",
+      "tr": {
+        "fr-fr": "Mille assiettes",
+        "de-de": "Tausend Teller",
+        "id-id": "Seribu Piring",
+        "ja-jp": "千皿",
+        "ko-kr": "천 개의 접시",
+        "pt-br": "Mil Pratos",
+        "es-es": "Mil Platos"
+      }
+    },
+    {
+      "key": "badge.thousand.desc",
+      "source": "Serve 1,000 dishes.",
+      "context": "Badge description",
+      "note": "",
+      "tr": {
+        "fr-fr": "Servez 1 000 plats.",
+        "de-de": "Serviere 1.000 Gerichte.",
+        "id-id": "Sajikan 1.000 hidangan.",
+        "ja-jp": "1,000皿を提供。",
+        "ko-kr": "1,000개의 요리를 서빙하세요.",
+        "pt-br": "Sirva 1.000 pratos.",
+        "es-es": "Sirve 1.000 platos."
+      }
+    },
+    {
+      "key": "badge.founding",
+      "source": "Founding Chef",
+      "context": "Badge name: played during launch",
+      "note": "",
+      "tr": {
+        "fr-fr": "Chef fondateur",
+        "de-de": "Gründungskoch",
+        "id-id": "Koki Perintis",
+        "ja-jp": "創業シェフ",
+        "ko-kr": "창립 셰프",
+        "pt-br": "Chef Fundador",
+        "es-es": "Chef Fundador"
+      }
+    },
+    {
+      "key": "badge.founding.desc",
+      "source": "Worked the line during the launch window.",
+      "context": "Badge description",
+      "note": "",
+      "tr": {
+        "fr-fr": "A tenu le poste pendant le lancement.",
+        "de-de": "War beim Start am Herd.",
+        "id-id": "Bertugas saat masa peluncuran.",
+        "ja-jp": "ローンチ期間に厨房に立った。",
+        "ko-kr": "출시 기간에 주방을 지켰습니다.",
+        "pt-br": "Trabalhou na linha durante o lançamento.",
+        "es-es": "Estuvo en la cocina durante el lanzamiento."
+      }
+    },
+    {
+      "key": "item.hat_paper",
+      "source": "Paper Hat",
+      "context": "Cosmetic hat",
+      "note": "",
+      "tr": {
+        "fr-fr": "Toque en papier",
+        "de-de": "Papierhut",
+        "id-id": "Topi Kertas",
+        "ja-jp": "紙の帽子",
+        "ko-kr": "종이 모자",
+        "pt-br": "Chapéu de Papel",
+        "es-es": "Gorro de Papel"
+      }
+    },
+    {
+      "key": "item.hat_toque",
+      "source": "Classic Toque",
+      "context": "Cosmetic hat: the classic chef's hat",
+      "note": "",
+      "tr": {
+        "fr-fr": "Toque classique",
+        "de-de": "Klassische Kochmütze",
+        "id-id": "Toque Klasik",
+        "ja-jp": "クラシックコック帽",
+        "ko-kr": "클래식 셰프 모자",
+        "pt-br": "Toque Clássico",
+        "es-es": "Gorro Clásico"
+      }
+    },
+    {
+      "key": "item.hat_bandana_red",
+      "source": "Red Bandana",
+      "context": "Cosmetic hat",
+      "note": "",
+      "tr": {
+        "fr-fr": "Bandana rouge",
+        "de-de": "Rotes Bandana",
+        "id-id": "Bandana Merah",
+        "ja-jp": "赤いバンダナ",
+        "ko-kr": "빨간 반다나",
+        "pt-br": "Bandana Vermelha",
+        "es-es": "Pañuelo Rojo"
+      }
+    },
+    {
+      "key": "item.hat_bandana_green",
+      "source": "Green Bandana",
+      "context": "Cosmetic hat",
+      "note": "",
+      "tr": {
+        "fr-fr": "Bandana vert",
+        "de-de": "Grünes Bandana",
+        "id-id": "Bandana Hijau",
+        "ja-jp": "緑のバンダナ",
+        "ko-kr": "초록 반다나",
+        "pt-br": "Bandana Verde",
+        "es-es": "Pañuelo Verde"
+      }
+    },
+    {
+      "key": "item.hat_beret",
+      "source": "Beret",
+      "context": "Cosmetic hat",
+      "note": "",
+      "tr": {
+        "fr-fr": "Béret",
+        "de-de": "Baskenmütze",
+        "id-id": "Baret",
+        "ja-jp": "ベレー帽",
+        "ko-kr": "베레모",
+        "pt-br": "Boina",
+        "es-es": "Boina"
+      }
+    },
+    {
+      "key": "item.hat_mushroom",
+      "source": "Mushroom Cap",
+      "context": "Cosmetic hat shaped like a mushroom",
+      "note": "",
+      "tr": {
+        "fr-fr": "Chapeau champignon",
+        "de-de": "Pilzhut",
+        "id-id": "Topi Jamur",
+        "ja-jp": "きのこ帽",
+        "ko-kr": "버섯 모자",
+        "pt-br": "Chapéu Cogumelo",
+        "es-es": "Sombrero Champiñón"
+      }
+    },
+    {
+      "key": "item.hat_paperboat",
+      "source": "Paper Boat",
+      "context": "Cosmetic hat: folded paper boat",
+      "note": "",
+      "tr": {
+        "fr-fr": "Bateau en papier",
+        "de-de": "Papierschiffchen",
+        "id-id": "Perahu Kertas",
+        "ja-jp": "紙の船",
+        "ko-kr": "종이배",
+        "pt-br": "Barquinho de Papel",
+        "es-es": "Barquito de Papel"
+      }
+    },
+    {
+      "key": "item.hat_panlid",
+      "source": "Pan Lid Cap",
+      "context": "Cosmetic hat: a saucepan lid",
+      "note": "",
+      "tr": {
+        "fr-fr": "Couvercle de casserole",
+        "de-de": "Topfdeckel-Mütze",
+        "id-id": "Tutup Panci",
+        "ja-jp": "鍋ぶた帽",
+        "ko-kr": "냄비 뚜껑 모자",
+        "pt-br": "Tampa de Panela",
+        "es-es": "Tapa de Cazuela"
+      }
+    },
+    {
+      "key": "item.hat_colander",
+      "source": "Colander Helm",
+      "context": "Cosmetic hat: a colander worn as a helmet",
+      "note": "",
+      "tr": {
+        "fr-fr": "Casque passoire",
+        "de-de": "Sieb-Helm",
+        "id-id": "Helm Saringan",
+        "ja-jp": "ざるヘルム",
+        "ko-kr": "체 투구",
+        "pt-br": "Elmo de Escorredor",
+        "es-es": "Casco Colador"
+      }
+    },
+    {
+      "key": "item.hat_butter_crown",
+      "source": "Butter Crown",
+      "context": "Cosmetic hat",
+      "note": "",
+      "tr": {
+        "fr-fr": "Couronne de beurre",
+        "de-de": "Butterkrone",
+        "id-id": "Mahkota Mentega",
+        "ja-jp": "バタークラウン",
+        "ko-kr": "버터 왕관",
+        "pt-br": "Coroa de Manteiga",
+        "es-es": "Corona de Mantequilla"
+      }
+    },
+    {
+      "key": "item.hat_top",
+      "source": "Top Hat",
+      "context": "Cosmetic hat",
+      "note": "",
+      "tr": {
+        "fr-fr": "Haut-de-forme",
+        "de-de": "Zylinder",
+        "id-id": "Topi Tinggi",
+        "ja-jp": "シルクハット",
+        "ko-kr": "실크햇",
+        "pt-br": "Cartola",
+        "es-es": "Chistera"
+      }
+    },
+    {
+      "key": "item.hat_halo",
+      "source": "Sous-Chef Halo",
+      "context": "Cosmetic hat: a glowing halo",
+      "note": "",
+      "tr": {
+        "fr-fr": "Auréole de sous-chef",
+        "de-de": "Sous-Chef-Heiligenschein",
+        "id-id": "Lingkaran Sous-Chef",
+        "ja-jp": "スーシェフの光輪",
+        "ko-kr": "수셰프 후광",
+        "pt-br": "Auréola de Sous-Chef",
+        "es-es": "Aureola de Sous-Chef"
+      }
+    },
+    {
+      "key": "emote.sizzle",
+      "source": "Sizzle!",
+      "context": "Emote, matches the game's name",
+      "note": "",
+      "tr": {
+        "fr-fr": "Ça grésille !",
+        "de-de": "Zisch!",
+        "id-id": "Sizzle!",
+        "ja-jp": "ジュージュー！",
+        "ko-kr": "치이익!",
+        "pt-br": "Chiando!",
+        "es-es": "¡Chsss!"
+      }
+    },
+    {
+      "key": "emote.boom",
+      "source": "Boom!",
+      "context": "Emote",
+      "note": "",
+      "tr": {
+        "fr-fr": "Boum !",
+        "de-de": "Bumm!",
+        "id-id": "Boom!",
+        "ja-jp": "ドーン！",
+        "ko-kr": "쾅!",
+        "pt-br": "Bum!",
+        "es-es": "¡Bum!"
+      }
+    },
+    {
+      "key": "emote.cheer",
+      "source": "Cheer",
+      "context": "Emote: celebrate",
+      "note": "",
+      "tr": {
+        "fr-fr": "Bravo",
+        "de-de": "Jubel",
+        "id-id": "Sorak",
+        "ja-jp": "歓声",
+        "ko-kr": "환호",
+        "pt-br": "Comemorar",
+        "es-es": "Ánimo"
+      }
+    },
+    {
+      "key": "emote.facepalm",
+      "source": "Facepalm",
+      "context": "Emote: exasperation",
+      "note": "",
+      "tr": {
+        "fr-fr": "Facepalm",
+        "de-de": "Facepalm",
+        "id-id": "Tepuk Jidat",
+        "ja-jp": "がっくり",
+        "ko-kr": "이마 짚기",
+        "pt-br": "Facepalm",
+        "es-es": "Facepalm"
+      }
+    },
+    {
+      "key": "emote.chefs_kiss",
+      "source": "Chef's Kiss",
+      "context": "Emote: perfection",
+      "note": "",
+      "tr": {
+        "fr-fr": "Baiser du chef",
+        "de-de": "Chef's Kiss",
+        "id-id": "Ciuman Koki",
+        "ja-jp": "シェフのキス",
+        "ko-kr": "셰프의 키스",
+        "pt-br": "Beijo de Chef",
+        "es-es": "Beso de Chef"
+      }
+    },
+    {
+      "key": "emote.on_fire",
+      "source": "On Fire!",
+      "context": "Emote: on a hot streak",
+      "note": "",
+      "tr": {
+        "fr-fr": "En feu !",
+        "de-de": "In Flammen!",
+        "id-id": "Lagi Panas!",
+        "ja-jp": "絶好調！",
+        "ko-kr": "불붙었어!",
+        "pt-br": "Pegando Fogo!",
+        "es-es": "¡En Racha!"
+      }
+    },
+    {
+      "key": "emote.zzz",
+      "source": "Zzz",
+      "context": "Emote: bored or idle",
+      "note": "",
+      "tr": {
+        "fr-fr": "Zzz",
+        "de-de": "Zzz",
+        "id-id": "Zzz",
+        "ja-jp": "Zzz",
+        "ko-kr": "Zzz",
+        "pt-br": "Zzz",
+        "es-es": "Zzz"
+      }
+    },
+    {
+      "key": "item.plates_blue",
+      "source": "Blue China",
+      "context": "Cosmetic: plate set",
+      "note": "",
+      "tr": {
+        "fr-fr": "Porcelaine bleue",
+        "de-de": "Blaues Porzellan",
+        "id-id": "Porselen Biru",
+        "ja-jp": "青い磁器",
+        "ko-kr": "블루 차이나",
+        "pt-br": "Porcelana Azul",
+        "es-es": "Porcelana Azul"
+      }
+    },
+    {
+      "key": "item.plates_gilded",
+      "source": "Gilded Plates",
+      "context": "Cosmetic: plate set",
+      "note": "",
+      "tr": {
+        "fr-fr": "Assiettes dorées",
+        "de-de": "Vergoldete Teller",
+        "id-id": "Piring Berlapis Emas",
+        "ja-jp": "金彩の皿",
+        "ko-kr": "금테 접시",
+        "pt-br": "Pratos Dourados",
+        "es-es": "Platos Dorados"
+      }
+    },
+    {
+      "key": "item.plates_supporter",
+      "source": "Supporter Plates",
+      "context": "Cosmetic: plate set from the pass",
+      "note": "",
+      "tr": {
+        "fr-fr": "Assiettes du soutien",
+        "de-de": "Unterstützer-Teller",
+        "id-id": "Piring Pendukung",
+        "ja-jp": "サポータープレート",
+        "ko-kr": "서포터 접시",
+        "pt-br": "Pratos do Apoiador",
+        "es-es": "Platos de Mecenas"
+      }
+    },
+    {
+      "key": "item.pan_copper",
+      "source": "Copper Pans",
+      "context": "Cosmetic: pan set",
+      "note": "",
+      "tr": {
+        "fr-fr": "Poêles en cuivre",
+        "de-de": "Kupferpfannen",
+        "id-id": "Wajan Tembaga",
+        "ja-jp": "銅のフライパン",
+        "ko-kr": "구리 팬",
+        "pt-br": "Frigideiras de Cobre",
+        "es-es": "Sartenes de Cobre"
+      }
+    },
+    {
+      "key": "item.pan_obsidian",
+      "source": "Obsidian Pans",
+      "context": "Cosmetic: pan set",
+      "note": "",
+      "tr": {
+        "fr-fr": "Poêles obsidienne",
+        "de-de": "Obsidianpfannen",
+        "id-id": "Wajan Obsidian",
+        "ja-jp": "黒曜石のフライパン",
+        "ko-kr": "흑요석 팬",
+        "pt-br": "Frigideiras de Obsidiana",
+        "es-es": "Sartenes de Obsidiana"
+      }
+    },
+    {
+      "key": "item.bell_deep",
+      "source": "Deep Serve Bell",
+      "context": "Cosmetic: the bell rung when serving",
+      "note": "",
+      "tr": {
+        "fr-fr": "Cloche grave",
+        "de-de": "Tiefe Serviceglocke",
+        "id-id": "Bel Saji Berat",
+        "ja-jp": "低音のベル",
+        "ko-kr": "낮은음 벨",
+        "pt-br": "Sino Grave",
+        "es-es": "Campana Grave"
+      }
+    },
+    {
+      "key": "item.bell_chime",
+      "source": "Chime Serve Bell",
+      "context": "Cosmetic: the bell rung when serving",
+      "note": "",
+      "tr": {
+        "fr-fr": "Carillon de service",
+        "de-de": "Helle Serviceglocke",
+        "id-id": "Bel Saji Nyaring",
+        "ja-jp": "チャイムベル",
+        "ko-kr": "차임 벨",
+        "pt-br": "Sino Agudo",
+        "es-es": "Campana Aguda"
+      }
+    },
+    {
+      "key": "pass.supporter",
+      "source": "Supporter Pass",
+      "context": "Game pass name",
+      "note": "",
+      "tr": {
+        "fr-fr": "Pass Soutien",
+        "de-de": "Unterstützer-Pass",
+        "id-id": "Paket Pendukung",
+        "ja-jp": "サポーターパス",
+        "ko-kr": "서포터 패스",
+        "pt-br": "Passe de Apoiador",
+        "es-es": "Pase de Mecenas"
+      }
+    },
+    {
+      "key": "pass.supporter.desc",
+      "source": "+10% XP and coins forever, four Gilded coats, the Sizzle! emote, Supporter Plates, and a star on your nametag.",
+      "context": "Game pass description",
+      "note": "",
+      "tr": {
+        "fr-fr": "+10 % d'XP et de pièces à vie, quatre tenues dorées, l'emote Ça grésille !, les assiettes du soutien et une étoile sur votre pseudo.",
+        "de-de": "Dauerhaft +10 % XP und Münzen, vier vergoldete Outfits, die Zisch!-Emote, Unterstützer-Teller und ein Stern am Namensschild.",
+        "id-id": "+10% XP dan koin selamanya, empat jubah emas, emote Sizzle!, Piring Pendukung, dan bintang di namamu.",
+        "ja-jp": "XP・コイン永久+10%、金の衣装4種、ジュージュー！エモート、サポータープレート、名札に星。",
+        "ko-kr": "XP·코인 영구 +10%, 금빛 의상 4종, 치이익! 이모트, 서포터 접시, 이름표에 별.",
+        "pt-br": "+10% de XP e moedas para sempre, quatro trajes dourados, a emote Chiando!, Pratos do Apoiador e uma estrela no nome.",
+        "es-es": "+10 % de XP y monedas para siempre, cuatro trajes dorados, la emote ¡Chsss!, Platos de Mecenas y una estrella en tu nombre."
+      }
+    },
+    {
+      "key": "pass.trunk",
+      "source": "Chef's Trunk",
+      "context": "Game pass name",
+      "note": "",
+      "tr": {
+        "fr-fr": "Malle du chef",
+        "de-de": "Chefkoch-Truhe",
+        "id-id": "Koper Koki",
+        "ja-jp": "シェフのトランク",
+        "ko-kr": "셰프의 트렁크",
+        "pt-br": "Baú do Chef",
+        "es-es": "Baúl del Chef"
+      }
+    },
+    {
+      "key": "pass.trunk.desc",
+      "source": "Four Midnight coats, the Boom! emote and Obsidian Pans.",
+      "context": "Game pass description",
+      "note": "",
+      "tr": {
+        "fr-fr": "Quatre tenues Minuit, l'emote Boum ! et les poêles obsidienne.",
+        "de-de": "Vier Mitternachts-Outfits, die Bumm!-Emote und Obsidianpfannen.",
+        "id-id": "Empat jubah Tengah Malam, emote Boom!, dan Wajan Obsidian.",
+        "ja-jp": "ミッドナイト衣装4種、ドーン！エモート、黒曜石のフライパン。",
+        "ko-kr": "미드나이트 의상 4종, 쾅! 이모트, 흑요석 팬.",
+        "pt-br": "Quatro trajes Meia-Noite, a emote Bum! e Frigideiras de Obsidiana.",
+        "es-es": "Cuatro trajes Medianoche, la emote ¡Bum! y Sartenes de Obsidiana."
+      }
+    },
+    {
+      "key": "pal.bramble_panda",
+      "source": "Panda Bramble",
+      "context": "Coat colour for the bear chef Bramble",
+      "note": "",
+      "tr": {
+        "fr-fr": "Bramble panda",
+        "de-de": "Panda-Bramble",
+        "id-id": "Bramble Panda",
+        "ja-jp": "パンダのブランブル",
+        "ko-kr": "판다 브램블",
+        "pt-br": "Bramble Panda",
+        "es-es": "Bramble Panda"
+      }
+    },
+    {
+      "key": "pal.bramble_polar",
+      "source": "Polar Bramble",
+      "context": "Coat colour",
+      "note": "",
+      "tr": {
+        "fr-fr": "Bramble polaire",
+        "de-de": "Polar-Bramble",
+        "id-id": "Bramble Kutub",
+        "ja-jp": "ポーラーブランブル",
+        "ko-kr": "폴라 브램블",
+        "pt-br": "Bramble Polar",
+        "es-es": "Bramble Polar"
+      }
+    },
+    {
+      "key": "pal.bramble_gilded",
+      "source": "Gilded Bramble",
+      "context": "Coat colour (pass item)",
+      "note": "",
+      "tr": {
+        "fr-fr": "Bramble doré",
+        "de-de": "Vergoldeter Bramble",
+        "id-id": "Bramble Emas",
+        "ja-jp": "ゴールドのブランブル",
+        "ko-kr": "골드 브램블",
+        "pt-br": "Bramble Dourado",
+        "es-es": "Bramble Dorado"
+      }
+    },
+    {
+      "key": "pal.bramble_midnight",
+      "source": "Midnight Bramble",
+      "context": "Coat colour (pass item)",
+      "note": "",
+      "tr": {
+        "fr-fr": "Bramble minuit",
+        "de-de": "Mitternachts-Bramble",
+        "id-id": "Bramble Tengah Malam",
+        "ja-jp": "ミッドナイトのブランブル",
+        "ko-kr": "미드나이트 브램블",
+        "pt-br": "Bramble Meia-Noite",
+        "es-es": "Bramble Medianoche"
+      }
+    },
+    {
+      "key": "pal.pip_tree",
+      "source": "Tree Frog Pip",
+      "context": "Coat colour for the frog chef Pip",
+      "note": "",
+      "tr": {
+        "fr-fr": "Pip rainette",
+        "de-de": "Laubfrosch-Pip",
+        "id-id": "Pip Katak Pohon",
+        "ja-jp": "アマガエルのピップ",
+        "ko-kr": "청개구리 핍",
+        "pt-br": "Pip Perereca",
+        "es-es": "Pip Rana Arborícola"
+      }
+    },
+    {
+      "key": "pal.pip_axolotl",
+      "source": "Axolotl Pip",
+      "context": "Coat colour",
+      "note": "",
+      "tr": {
+        "fr-fr": "Pip axolotl",
+        "de-de": "Axolotl-Pip",
+        "id-id": "Pip Aksolotl",
+        "ja-jp": "ウーパールーパーのピップ",
+        "ko-kr": "아홀로틀 핍",
+        "pt-br": "Pip Axolote",
+        "es-es": "Pip Ajolote"
+      }
+    },
+    {
+      "key": "pal.pip_gilded",
+      "source": "Gilded Pip",
+      "context": "Coat colour (pass item)",
+      "note": "",
+      "tr": {
+        "fr-fr": "Pip doré",
+        "de-de": "Vergoldeter Pip",
+        "id-id": "Pip Emas",
+        "ja-jp": "ゴールドのピップ",
+        "ko-kr": "골드 핍",
+        "pt-br": "Pip Dourado",
+        "es-es": "Pip Dorado"
+      }
+    },
+    {
+      "key": "pal.pip_midnight",
+      "source": "Midnight Pip",
+      "context": "Coat colour (pass item)",
+      "note": "",
+      "tr": {
+        "fr-fr": "Pip minuit",
+        "de-de": "Mitternachts-Pip",
+        "id-id": "Pip Tengah Malam",
+        "ja-jp": "ミッドナイトのピップ",
+        "ko-kr": "미드나이트 핍",
+        "pt-br": "Pip Meia-Noite",
+        "es-es": "Pip Medianoche"
+      }
+    },
+    {
+      "key": "pal.nori_calico",
+      "source": "Calico Nori",
+      "context": "Coat colour for the cat chef Nori",
+      "note": "",
+      "tr": {
+        "fr-fr": "Nori tricolore",
+        "de-de": "Glückskatze Nori",
+        "id-id": "Nori Belang Tiga",
+        "ja-jp": "三毛のノリ",
+        "ko-kr": "삼색 노리",
+        "pt-br": "Nori Tricolor",
+        "es-es": "Nori Carey"
+      }
+    },
+    {
+      "key": "pal.nori_void",
+      "source": "Void Nori",
+      "context": "Coat colour",
+      "note": "",
+      "tr": {
+        "fr-fr": "Nori du vide",
+        "de-de": "Schatten-Nori",
+        "id-id": "Nori Kelam",
+        "ja-jp": "ヴォイドのノリ",
+        "ko-kr": "보이드 노리",
+        "pt-br": "Nori Sombrio",
+        "es-es": "Nori Sombra"
+      }
+    },
+    {
+      "key": "pal.nori_gilded",
+      "source": "Gilded Nori",
+      "context": "Coat colour (pass item)",
+      "note": "",
+      "tr": {
+        "fr-fr": "Nori doré",
+        "de-de": "Vergoldeter Nori",
+        "id-id": "Nori Emas",
+        "ja-jp": "ゴールドのノリ",
+        "ko-kr": "골드 노리",
+        "pt-br": "Nori Dourado",
+        "es-es": "Nori Dorado"
+      }
+    },
+    {
+      "key": "pal.nori_midnight",
+      "source": "Midnight Nori",
+      "context": "Coat colour (pass item)",
+      "note": "",
+      "tr": {
+        "fr-fr": "Nori minuit",
+        "de-de": "Mitternachts-Nori",
+        "id-id": "Nori Tengah Malam",
+        "ja-jp": "ミッドナイトのノリ",
+        "ko-kr": "미드나이트 노리",
+        "pt-br": "Nori Meia-Noite",
+        "es-es": "Nori Medianoche"
+      }
+    },
+    {
+      "key": "pal.mochi_bluejay",
+      "source": "Blue Jay Mochi",
+      "context": "Coat colour for the bird chef Mochi",
+      "note": "",
+      "tr": {
+        "fr-fr": "Mochi geai bleu",
+        "de-de": "Blauhäher-Mochi",
+        "id-id": "Mochi Jay Biru",
+        "ja-jp": "アオカケスのモチ",
+        "ko-kr": "블루제이 모찌",
+        "pt-br": "Mochi Gaio-Azul",
+        "es-es": "Mochi Arrendajo"
+      }
+    },
+    {
+      "key": "pal.mochi_cardinal",
+      "source": "Cardinal Mochi",
+      "context": "Coat colour",
+      "note": "",
+      "tr": {
+        "fr-fr": "Mochi cardinal",
+        "de-de": "Kardinal-Mochi",
+        "id-id": "Mochi Kardinal",
+        "ja-jp": "カーディナルのモチ",
+        "ko-kr": "카디널 모찌",
+        "pt-br": "Mochi Cardeal",
+        "es-es": "Mochi Cardenal"
+      }
+    },
+    {
+      "key": "pal.mochi_gilded",
+      "source": "Gilded Mochi",
+      "context": "Coat colour (pass item)",
+      "note": "",
+      "tr": {
+        "fr-fr": "Mochi doré",
+        "de-de": "Vergoldeter Mochi",
+        "id-id": "Mochi Emas",
+        "ja-jp": "ゴールドのモチ",
+        "ko-kr": "골드 모찌",
+        "pt-br": "Mochi Dourado",
+        "es-es": "Mochi Dorado"
+      }
+    },
+    {
+      "key": "pal.mochi_midnight",
+      "source": "Midnight Mochi",
+      "context": "Coat colour (pass item)",
+      "note": "",
+      "tr": {
+        "fr-fr": "Midnight Mochi",
+        "de-de": "Mitternachts-Mochi",
+        "id-id": "Mochi Tengah Malam",
+        "ja-jp": "ミッドナイトのモチ",
+        "ko-kr": "미드나이트 모찌",
+        "pt-br": "Mochi Meia-Noite",
+        "es-es": "Mochi Medianoche"
+      }
+    },
+    {
+      "key": "fmt.level_coins",
+      "source": "Level {1}  ·  {2} coins  ·  {3} shifts worked",
+      "context": "Career header: level, coins, rounds",
+      "note": "",
+      "tr": {
+        "fr-fr": "Niveau {1}  ·  {2} pièces  ·  {3} services",
+        "de-de": "Level {1}  ·  {2} Münzen  ·  {3} Schichten",
+        "id-id": "Level {1}  ·  {2} koin  ·  {3} shift",
+        "ja-jp": "レベル{1}  ·  {2}コイン  ·  {3}シフト",
+        "ko-kr": "레벨 {1}  ·  {2} 코인  ·  {3}회 근무",
+        "pt-br": "Nível {1}  ·  {2} moedas  ·  {3} turnos",
+        "es-es": "Nivel {1}  ·  {2} monedas  ·  {3} turnos"
+      }
+    },
+    {
+      "key": "fmt.lv_coins",
+      "source": "Lv {1}  ·  {2} coins",
+      "context": "Compact info chip",
+      "note": "",
+      "tr": {
+        "fr-fr": "Nv {1}  ·  {2} pièces",
+        "de-de": "Lv {1}  ·  {2} Münzen",
+        "id-id": "Lv {1}  ·  {2} koin",
+        "ja-jp": "Lv{1}  ·  {2}コイン",
+        "ko-kr": "Lv {1}  ·  {2} 코인",
+        "pt-br": "Nv {1}  ·  {2} moedas",
+        "es-es": "Nv {1}  ·  {2} monedas"
+      }
+    },
+    {
+      "key": "fmt.streak",
+      "source": "🔥{1} day streak",
+      "context": "Consecutive days played",
+      "note": "",
+      "tr": {
+        "fr-fr": "🔥{1} jours d'affilée",
+        "de-de": "🔥{1} Tage in Folge",
+        "id-id": "🔥{1} hari beruntun",
+        "ja-jp": "🔥{1}日連続",
+        "ko-kr": "🔥{1}일 연속",
+        "pt-br": "🔥{1} dias seguidos",
+        "es-es": "🔥{1} días seguidos"
+      }
+    },
+    {
+      "key": "fmt.xp_to_next",
+      "source": "{1} / {2} XP to level {3}",
+      "context": "XP progress bar caption",
+      "note": "",
+      "tr": {
+        "fr-fr": "{1} / {2} XP jusqu'au niveau {3}",
+        "de-de": "{1} / {2} XP bis Level {3}",
+        "id-id": "{1} / {2} XP ke level {3}",
+        "ja-jp": "レベル{3}まで {1} / {2} XP",
+        "ko-kr": "레벨 {3}까지 {1} / {2} XP",
+        "pt-br": "{1} / {2} XP para o nível {3}",
+        "es-es": "{1} / {2} XP para el nivel {3}"
+      }
+    },
+    {
+      "key": "fmt.plus_coins",
+      "source": "+{1} coins",
+      "context": "Results: coins earned",
+      "note": "",
+      "tr": {
+        "fr-fr": "+{1} pièces",
+        "de-de": "+{1} Münzen",
+        "id-id": "+{1} koin",
+        "ja-jp": "+{1}コイン",
+        "ko-kr": "+{1} 코인",
+        "pt-br": "+{1} moedas",
+        "es-es": "+{1} monedas"
+      }
+    },
+    {
+      "key": "fmt.plus_xp",
+      "source": "+{1} XP",
+      "context": "Results: xp earned",
+      "note": "",
+      "tr": {
+        "fr-fr": "+{1} XP",
+        "de-de": "+{1} XP",
+        "id-id": "+{1} XP",
+        "ja-jp": "+{1} XP",
+        "ko-kr": "+{1} XP",
+        "pt-br": "+{1} XP",
+        "es-es": "+{1} XP"
+      }
+    },
+    {
+      "key": "fmt.level_up",
+      "source": "LEVEL {1}!",
+      "context": "Results: level-up burst",
+      "note": "",
+      "tr": {
+        "fr-fr": "NIVEAU {1} !",
+        "de-de": "LEVEL {1}!",
+        "id-id": "LEVEL {1}!",
+        "ja-jp": "レベル{1}！",
+        "ko-kr": "레벨 {1}!",
+        "pt-br": "NÍVEL {1}!",
+        "es-es": "¡NIVEL {1}!"
+      }
+    },
+    {
+      "key": "fmt.buy_cost",
+      "source": "BUY  {1}c",
+      "context": "Buy button with a price",
+      "note": "",
+      "tr": {
+        "fr-fr": "ACHETER  {1}c",
+        "de-de": "KAUFEN  {1}c",
+        "id-id": "BELI  {1}c",
+        "ja-jp": "購入  {1}c",
+        "ko-kr": "구매  {1}c",
+        "pt-br": "COMPRAR  {1}c",
+        "es-es": "COMPRAR  {1}c"
+      }
+    },
+    {
+      "key": "fmt.level_gate",
+      "source": "Lv {1}",
+      "context": "Shop: locked until this level",
+      "note": "",
+      "tr": {
+        "fr-fr": "Nv {1}",
+        "de-de": "Lv {1}",
+        "id-id": "Lv {1}",
+        "ja-jp": "Lv{1}",
+        "ko-kr": "Lv {1}",
+        "pt-br": "Nv {1}",
+        "es-es": "Nv {1}"
+      }
+    },
+    {
+      "key": "fmt.join_name",
+      "source": "JOIN {1}",
+      "context": "Join a named friend's server",
+      "note": "",
+      "tr": {
+        "fr-fr": "REJOINDRE {1}",
+        "de-de": "{1} BEITRETEN",
+        "id-id": "GABUNG {1}",
+        "ja-jp": "{1}に参加",
+        "ko-kr": "{1} 참가",
+        "pt-br": "ENTRAR COM {1}",
+        "es-es": "UNIRSE A {1}"
+      }
+    },
+    {
+      "key": "fmt.welcome_named",
+      "source": "Welcome back, {1}",
+      "context": "Greeting with the player's display name",
+      "note": "",
+      "tr": {
+        "fr-fr": "Bon retour, {1}",
+        "de-de": "Willkommen zurück, {1}",
+        "id-id": "Selamat datang kembali, {1}",
+        "ja-jp": "おかえりなさい、{1}",
+        "ko-kr": "돌아오셨군요, {1}",
+        "pt-br": "Bem-vindo de volta, {1}",
+        "es-es": "Bienvenido de nuevo, {1}"
+      }
+    },
+    {
+      "key": "fmt.results_line",
+      "source": "{1} dishes served  ·  best streak {2}  ·  {3} team coins",
+      "context": "Results summary line",
+      "note": "",
+      "tr": {
+        "fr-fr": "{1} plats servis  ·  meilleure série {2}  ·  {3} pièces d'équipe",
+        "de-de": "{1} Gerichte serviert  ·  beste Serie {2}  ·  {3} Team-Münzen",
+        "id-id": "{1} hidangan disajikan  ·  rentetan terbaik {2}  ·  {3} koin tim",
+        "ja-jp": "{1}皿提供  ·  最高連続{2}  ·  チームコイン{3}",
+        "ko-kr": "{1}개 서빙  ·  최고 연속 {2}  ·  팀 코인 {3}",
+        "pt-br": "{1} pratos servidos  ·  melhor sequência {2}  ·  {3} moedas da equipe",
+        "es-es": "{1} platos servidos  ·  mejor racha {2}  ·  {3} monedas de equipo"
+      }
+    },
+    {
+      "key": "fmt.goal_progress",
+      "source": "{1}/{2}  ·  +{3}c  +{4} XP",
+      "context": "Daily goal progress and reward",
+      "note": "",
+      "tr": {
+        "fr-fr": "{1}/{2}  ·  +{3}c  +{4} XP",
+        "de-de": "{1}/{2}  ·  +{3}c  +{4} XP",
+        "id-id": "{1}/{2}  ·  +{3}c  +{4} XP",
+        "ja-jp": "{1}/{2}  ·  +{3}c  +{4} XP",
+        "ko-kr": "{1}/{2}  ·  +{3}c  +{4} XP",
+        "pt-br": "{1}/{2}  ·  +{3}c  +{4} XP",
+        "es-es": "{1}/{2}  ·  +{3}c  +{4} XP"
+      }
+    },
+    {
+      "key": "fmt.waiting_crew",
+      "source": "WAITING FOR CREW  {1}/{2}",
+      "context": "Ready button while others are not ready",
+      "note": "",
+      "tr": {
+        "fr-fr": "EN ATTENTE  {1}/{2}",
+        "de-de": "WARTE AUF TEAM  {1}/{2}",
+        "id-id": "MENUNGGU TIM  {1}/{2}",
+        "ja-jp": "仲間を待機中  {1}/{2}",
+        "ko-kr": "동료 대기 중  {1}/{2}",
+        "pt-br": "AGUARDANDO EQUIPE  {1}/{2}",
+        "es-es": "ESPERANDO AL EQUIPO  {1}/{2}"
+      }
+    },
+    {
+      "key": "fmt.value_unit",
+      "source": "{1} {2}",
+      "context": "Leaderboard row: a number and its unit",
+      "note": "",
+      "tr": {
+        "fr-fr": "{1} {2}",
+        "de-de": "{1} {2}",
+        "id-id": "{1} {2}",
+        "ja-jp": "{1} {2}",
+        "ko-kr": "{1} {2}",
+        "pt-br": "{1} {2}",
+        "es-es": "{1} {2}"
+      }
+    },
+    {
+      "key": "fmt.coins_unit",
+      "source": "coins",
+      "context": "Leaderboard unit",
+      "note": "",
+      "tr": {
+        "fr-fr": "pièces",
+        "de-de": "Münzen",
+        "id-id": "koin",
+        "ja-jp": "コイン",
+        "ko-kr": "코인",
+        "pt-br": "moedas",
+        "es-es": "monedas"
+      }
+    },
+    {
+      "key": "fmt.dishes_unit",
+      "source": "dishes",
+      "context": "Leaderboard unit",
+      "note": "",
+      "tr": {
+        "fr-fr": "plats",
+        "de-de": "Gerichte",
+        "id-id": "hidangan",
+        "ja-jp": "皿",
+        "ko-kr": "요리",
+        "pt-br": "pratos",
+        "es-es": "platos"
+      }
+    },
+    {
+      "key": "fmt.ticket_grab",
+      "source": "Ticket: {1}. Grab {2} from the glowing crate.",
+      "context": "Tutorial: fetch an ingredient for a named recipe",
+      "note": "",
+      "tr": {
+        "fr-fr": "Commande : {1}. Prenez {2} dans la caisse qui brille.",
+        "de-de": "Bestellung: {1}. Hol {2} aus der leuchtenden Kiste.",
+        "id-id": "Pesanan: {1}. Ambil {2} dari peti yang menyala.",
+        "ja-jp": "注文：{1}。光った木箱から{2}を取ろう。",
+        "ko-kr": "주문: {1}. 빛나는 상자에서 {2}을(를) 가져오세요.",
+        "pt-br": "Pedido: {1}. Pegue {2} na caixa brilhante.",
+        "es-es": "Pedido: {1}. Coge {2} de la caja que brilla."
+      }
+    },
+    {
+      "key": "fmt.ticket_complete",
+      "source": "{1} is complete — pick up the plate and serve it.",
+      "context": "Tutorial: order finished",
+      "note": "",
+      "tr": {
+        "fr-fr": "{1} est prêt — prenez l'assiette et servez.",
+        "de-de": "{1} ist fertig — nimm den Teller und serviere.",
+        "id-id": "{1} sudah lengkap — ambil piringnya dan sajikan.",
+        "ja-jp": "{1}が完成 — お皿を持って提供しよう。",
+        "ko-kr": "{1} 완성 — 접시를 들고 서빙하세요.",
+        "pt-br": "{1} está pronto — pegue o prato e sirva.",
+        "es-es": "{1} está listo: coge el plato y sírvelo."
+      }
+    },
+    {
+      "key": "fmt.ticket_not_needed",
+      "source": "The ticket doesn't need {1} — put it back in the crate.",
+      "context": "Tutorial: wrong ingredient in hand",
+      "note": "",
+      "tr": {
+        "fr-fr": "La commande n'a pas besoin de {1} — remettez-le dans la caisse.",
+        "de-de": "Die Bestellung braucht kein {1} — leg es zurück in die Kiste.",
+        "id-id": "Pesanan tidak butuh {1} — kembalikan ke peti.",
+        "ja-jp": "この注文に{1}は不要 — 木箱に戻そう。",
+        "ko-kr": "이 주문에는 {1}이(가) 필요 없어요 — 상자에 돌려놓으세요.",
+        "pt-br": "O pedido não precisa de {1} — devolva à caixa.",
+        "es-es": "El pedido no necesita {1}: devuélvelo a la caja."
+      }
+    },
+    {
+      "key": "fmt.ready_collect",
+      "source": "That {1} is ready — pick it up and add it to your plate.",
+      "context": "Tutorial: prepped item waiting",
+      "note": "",
+      "tr": {
+        "fr-fr": "Ce {1} est prêt — prenez-le et ajoutez-le à l'assiette.",
+        "de-de": "Das {1} ist fertig — nimm es und leg es auf den Teller.",
+        "id-id": "{1} sudah siap — ambil dan tambahkan ke piringmu.",
+        "ja-jp": "{1}ができた — 取ってお皿に加えよう。",
+        "ko-kr": "{1}이(가) 준비됐어요 — 집어서 접시에 올리세요.",
+        "pt-br": "O {1} está pronto — pegue e ponha no prato.",
+        "es-es": "El {1} está listo: cógelo y añádelo al plato."
+      }
+    }
+  ]
+}
