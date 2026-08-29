@@ -107,6 +107,21 @@ Kept because each one cost real time and would bite again.
   rubber-banded everyone between rounds. SimService keeps a monotonic
   `self.clock` advanced by both paths. If chefs snap between rounds again, look
   here first.
+- **A wrong `require(script.Parent.X)` compiles fine and kills the client.**
+  It is a runtime instance lookup, so every static check passes. Five menu
+  modules asked `Menu` for a sibling that lives one level up; the client died on
+  its first require, and because the SERVER was untouched it kept writing
+  DataStore profiles and looked perfectly healthy while players got an empty
+  blue sky and Roblox's default controls. Two guards now: check-luau resolves
+  these paths against the directory tree, and `npm run smoke:live` requires
+  every module inside a real server of the published place. Note the shape —
+  `script.Parent` is the file's own container, so the FIRST `.Parent` costs
+  nothing and each one after goes up.
+- **A silent publish failure looks exactly like a broken build.** Studio's
+  uploader retried forever on "Server is busy" and never landed, so the live
+  place was empty while every local check was green. `npm run publish` goes
+  through Open Cloud instead: same 409 when Roblox is busy, but it says so,
+  backs off, and prints the version number it published.
 - **`Highlight` does not render on a part nobody can see** — 0.99 transparency
   no better than 1. Three attempts at highlighting an invisible proxy failed
   before the cell pads were drawn as real geometry.
