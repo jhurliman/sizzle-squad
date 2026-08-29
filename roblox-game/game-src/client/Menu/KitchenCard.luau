@@ -52,7 +52,7 @@ function KitchenCard.new(gui: Instance, deps: any)
 		Active = true,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(420, 330),
+		Size = UDim2.fromOffset(420, 392),
 		BackgroundTransparency = 0.02,
 		Visible = false,
 		ZIndex = 7,
@@ -117,7 +117,8 @@ function KitchenCard.new(gui: Instance, deps: any)
 
 	local row = mk("Frame", {
 		Size = UDim2.new(1, -32, 0, Theme.MIN_TAP),
-		Position = UDim2.new(0, 16, 1, -(Theme.MIN_TAP + 16)),
+		-- Two stacked rows now: actions here, "who with" underneath.
+		Position = UDim2.new(0, 16, 1, -(Theme.MIN_TAP * 2 + 24)),
 		BackgroundTransparency = 1,
 		ZIndex = 8,
 	}, self.card)
@@ -166,6 +167,69 @@ function KitchenCard.new(gui: Instance, deps: any)
 	shop.Activated:Connect(function()
 		self:hide()
 		self.deps.onOpenTab("shop")
+	end)
+
+	-- PLAYING WITH SOMEBODY IS THE POINT, SO IT GETS A BUTTON.
+	--
+	-- From the first multiplayer playtest: "as a returning user the main thing
+	-- I want to do is jump into a server with a friend but there is no direct
+	-- call to action to join or invite a friend." The invite lived only in the
+	-- Career tab, three taps deep, which is where you put something you do not
+	-- want people to find. This is a four-player co-op game; the second seat
+	-- is the product.
+	--
+	-- It sits on its own row under the primary actions rather than beside them,
+	-- because it is a different KIND of action -- everything above changes what
+	-- happens next for you, this changes who it happens with.
+	local socialRow = mk("Frame", {
+		Size = UDim2.new(1, -40, 0, Theme.MIN_TAP),
+		Position = UDim2.new(0, 20, 1, -(Theme.MIN_TAP + 16)),
+		BackgroundTransparency = 1,
+		ZIndex = 9,
+	}, self.card)
+	mk("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 8),
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, socialRow)
+
+	local invite = Theme.button({
+		Size = UDim2.fromOffset(182, Theme.MIN_TAP),
+		Fill = Theme.BLUE,
+		TextSize = 16,
+		LayoutOrder = 1,
+		ZIndex = 9,
+		Text = "＋ INVITE A FRIEND",
+	}, socialRow)
+	invite.Activated:Connect(function()
+		-- pcall: PromptGameInvite throws outright if the platform cannot show
+		-- the invite sheet, and a dead button is better than a broken card.
+		pcall(function()
+			local SocialService = game:GetService("SocialService")
+			local Players = game:GetService("Players")
+			SocialService:PromptGameInvite(Players.LocalPlayer)
+		end)
+	end)
+
+	-- Only rendered when there is somebody to join; an empty "friends playing"
+	-- affordance advertises that nobody is here, which is worse than silence.
+	self.joinButton = Theme.button({
+		Size = UDim2.fromOffset(182, Theme.MIN_TAP),
+		Fill = Theme.GREEN,
+		TextSize = 16,
+		LayoutOrder = 2,
+		ZIndex = 9,
+		Visible = false,
+		Text = "JOIN A FRIEND",
+	}, socialRow)
+	self.joinButton.Activated:Connect(function()
+		local f = self.friend
+		if f == nil then
+			return
+		end
+		self:hide()
+		self.deps.onJoinFriend(f.jobId, f.name)
 	end)
 
 	local close = Theme.button({
@@ -236,6 +300,20 @@ function KitchenCard:maybeShow()
 	self.card.Visible = true
 end
 
+--- Offer to join whoever is already in a kitchen. `friends` is the list from
+--- Social:friendsHere(); the first entry wins, because a card is not a browser.
+function KitchenCard:setFriends(friends: { any })
+	local f = friends ~= nil and friends[1] or nil
+	self.friend = f
+	if self.joinButton == nil then
+		return
+	end
+	self.joinButton.Visible = f ~= nil
+	if f ~= nil then
+		self.joinButton.Text = `JOIN {f.name}`
+	end
+end
+
 function KitchenCard:hide()
 	if not self.shown then
 		return
@@ -256,10 +334,20 @@ function KitchenCard:step(dt: number)
 	end
 end
 
+-- The card's contents are laid out against a fixed 420x392 and both action
+-- rows are pinned to the bottom, so squashing the FRAME on a short screen
+-- would slide them off it. Scale the whole card instead and it stays correct
+-- at any height -- 392 does not fit a 375px viewport, and that is the phone
+-- most likely to be someone's first session.
+local CARD_W, CARD_H = 420, 392
+
 function KitchenCard:relayout(_L: any, viewport: Vector2)
-	local w = math.min(420, viewport.X - 40)
-	local h = math.min(330, viewport.Y - 40)
-	self.card.Size = UDim2.fromOffset(w, h)
+	self.card.Size = UDim2.fromOffset(CARD_W, CARD_H)
+	if self.cardScale == nil then
+		self.cardScale = Theme.mk("UIScale", { Scale = 1 }, self.card)
+	end
+	local fit = math.min(1, (viewport.X - 32) / CARD_W, (viewport.Y - 32) / CARD_H)
+	self.cardScale.Scale = math.clamp(fit, 0.62, 1)
 end
 
 return KitchenCard

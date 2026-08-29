@@ -207,6 +207,17 @@ function StationVisuals:updateDishPile(stations: { [number]: any }, count: numbe
 	self.pile = holder
 end
 
+--- The model of whatever is SITTING ON a station right now, or nil.
+---
+--- The focus highlight prefers this over the bench: a plate on a counter is
+--- what the button is about to act on, and outlining the furniture underneath
+--- it says the wrong thing (and, on a bench that runs three cells, says it
+--- across the whole worktop).
+function StationVisuals:itemModel(id: number): Model?
+	local e = self.entries and self.entries[id]
+	return e ~= nil and e.item or nil
+end
+
 function StationVisuals:update(stations: { [number]: any }, models: { [number]: Model })
 	self:applyPlateTint(stations, models)
 	for id, st in stations do

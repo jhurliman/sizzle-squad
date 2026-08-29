@@ -24,6 +24,7 @@ local Music = require(script.Parent.Music) :: any
 local Menu = require(script.Parent.Menu) :: any
 local ItemViz = require(script.Parent.ItemViz) :: any
 local Results = require(script.Parent.Results) :: any
+local BinDress = require(script.Parent.BinDress) :: any
 
 local SCALE = 5
 local Config = require(gameShared:WaitForChild("Config")) :: any
@@ -64,54 +65,104 @@ local music = Music.new(game:GetService("SoundService"))
 local stationModels: { [number]: Model } = {}
 local serveAnchors: { Vector3 } = {}
 
--- THREE STATIONS HAVE NO MODEL OF THEIR OWN, AND A STATION WITH NO MODEL
--- CANNOT GLOW.
+-- THREE STATIONS HAVE NO MODEL OF THEIR OWN, AND A BENCH IS THREE CELLS WIDE.
 --
 -- The sim builds 23 stations from KITCHEN_MAP; assets/kitchen.rbxm ships 20
 -- under Stations. Counter_2_4, Counter_12_4 and Counter_13_7 are real,
--- interactable counters whose geometry lives in the BENCH run instead -- they
--- look and behave like counters, but there was nothing under Stations for a
--- Highlight to adorn. Reported from play three times over: an empty counter
--- that would not light up while holding a plate, and a plate on a counter that
--- would not light up while holding a bun, bacon, or chopped lettuce.
+-- interactable counters whose geometry lives in the BENCH run instead.
 --
--- Adorn the bench that is actually there. The first attempt at this stood an
--- invisible proxy part in the gap, which was wrong twice: it depends on
--- Highlight rendering on a fully transparent part, and its size was measured
--- from Counter_13_1 (top at y=4.0) while these bench tops sit at y=1.5-2.0 --
--- so even had it drawn, it would have outlined a box hanging in the air above
--- the bench. Real geometry has neither problem.
-local function benchFallback(root: Instance, st: any): Model?
+-- Adorning the bench worked but said far too much: Bench_2_4 spans x=5.0-20.5,
+-- which is cells 1, 2 and 3, so focusing one counter lit up the whole worktop.
+-- Reported from the first multiplayer playtest. The 20 stations that DO have
+-- their own model are already cell-sized, which is why the serve windows always
+-- looked right and these never did.
+--
+-- So build one box per station, clipped to that station's cell, matching the
+-- bench's own height and depth. Measured off the bench at runtime rather than
+-- hardcoded, because the benches sit at different heights around the room.
+--
+-- Transparency is 0.99, NOT 1: Highlight does not render on a part that is
+-- fully transparent, and 0.99 is invisible in practice while still being drawn.
+-- One part per missing station, three in total.
+local proxyFolder: Folder? = nil
+
+local function benchBounds(bench: Instance): (Vector3?, Vector3?)
+	local lo, hi
+	for _, part in bench:GetDescendants() do
+		if part:IsA("BasePart") then
+			local p, sz = part.Position, part.Size
+			local a = p - sz / 2
+			local b = p + sz / 2
+			lo = if lo == nil then a else Vector3.new(math.min(lo.X, a.X), math.min(lo.Y, a.Y), math.min(lo.Z, a.Z))
+			hi = if hi == nil then b else Vector3.new(math.max(hi.X, b.X), math.max(hi.Y, b.Y), math.max(hi.Z, b.Z))
+		end
+	end
+	return lo, hi
+end
+
+--- The bench standing over this station's cell, if any.
+local function benchFor(root: Instance, st: any): Instance?
 	local benches = root:FindFirstChild("Benches")
 	if benches == nil then
 		return nil
 	end
 	local exact = benches:FindFirstChild(`Bench_{st.cell.x}_{st.cell.y}`)
-	if exact ~= nil and exact:IsA("Model") then
+	if exact ~= nil then
 		return exact
 	end
-	-- No bench named for this cell: a neighbour's run may still cover it
-	-- (cell 13,7 is spanned by Bench_12_7). Take whichever bench has a part
-	-- standing over the cell centre.
 	local wx, wz = (st.cell.x + 0.5) * SCALE, (st.cell.y + 0.5) * SCALE
 	for _, bench in benches:GetChildren() do
-		if not bench:IsA("Model") then
-			continue
-		end
 		for _, part in bench:GetDescendants() do
 			if part:IsA("BasePart") then
 				local p, sz = part.Position, part.Size
-				if
-					math.abs(p.X - wx) <= sz.X / 2 + 0.1
-					and math.abs(p.Z - wz) <= sz.Z / 2 + 0.1
-					and p.Y > 0.6
-				then
+				if math.abs(p.X - wx) <= sz.X / 2 + 0.1 and math.abs(p.Z - wz) <= sz.Z / 2 + 0.1 and p.Y > 0.6 then
 					return bench
 				end
 			end
 		end
 	end
 	return nil
+end
+
+local function cellProxy(root: Instance, st: any): Model?
+	local bench = benchFor(root, st)
+	if bench == nil then
+		return nil
+	end
+	local lo, hi = benchBounds(bench)
+	if lo == nil or hi == nil then
+		return nil
+	end
+	-- Clip the bench's own extent to this cell, on both floor axes.
+	local x0 = math.max(lo.X, st.cell.x * SCALE)
+	local x1 = math.min(hi.X, (st.cell.x + 1) * SCALE)
+	local z0 = math.max(lo.Z, st.cell.y * SCALE)
+	local z1 = math.min(hi.Z, (st.cell.y + 1) * SCALE)
+	if x1 - x0 < 0.5 or z1 - z0 < 0.5 then
+		return nil
+	end
+	if proxyFolder == nil then
+		local f = Instance.new("Folder")
+		f.Name = "SizzleCellProxies"
+		f.Parent = Workspace
+		proxyFolder = f
+	end
+	local model = Instance.new("Model")
+	model.Name = `Cell_{st.cell.x}_{st.cell.y}`
+	local part = Instance.new("Part")
+	part.Name = "Cell"
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Transparency = 0.99
+	part.Size = Vector3.new(x1 - x0, hi.Y - lo.Y, z1 - z0)
+	part.CFrame = CFrame.new((x0 + x1) / 2, (lo.Y + hi.Y) / 2, (z0 + z1) / 2)
+	part.Parent = model
+	model.PrimaryPart = part
+	model.Parent = proxyFolder
+	return model
 end
 
 local function indexStations(stations: { any })
@@ -140,6 +191,12 @@ local function indexStations(stations: { any })
 		end
 	end
 	local folder = root and root:FindFirstChild("Stations")
+	if folder ~= nil then
+		local bin = folder:FindFirstChild("Bin_13_4")
+		if bin ~= nil then
+			BinDress.apply(bin)
+		end
+	end
 	for _, st in stations do
 		local kindCap = st.kind:sub(1, 1):upper() .. st.kind:sub(2)
 		if folder ~= nil then
@@ -147,9 +204,9 @@ local function indexStations(stations: { any })
 			if m ~= nil and m:IsA("Model") then
 				stationModels[st.id] = m
 			else
-				local bench = benchFallback(root, st)
-				if bench ~= nil then
-					stationModels[st.id] = bench
+				local proxy = cellProxy(root, st)
+				if proxy ~= nil then
+					stationModels[st.id] = proxy
 				else
 					warn(`[sizzle] station {kindCap}_{st.cell.x}_{st.cell.y} has no model and no bench under it — it cannot highlight`)
 				end
@@ -541,7 +598,13 @@ RunService.RenderStepped:Connect(function(dt)
 	-- `focusId ~= nil` therefore lit up stations that would refuse the press:
 	-- reported from play as a plate rack glowing while holding bacon, which it
 	-- will not accept. The verb is the thing that knows.
-	local model = if action ~= "none" and focusId ~= nil then stationModels[focusId] else nil
+	-- WHAT IS ON THE BENCH BEATS THE BENCH. A plate sitting on a counter is
+	-- what the press acts on, so outline the plate; the furniture underneath is
+	-- not the subject, and on a shared worktop it is not even specific.
+	local model = nil
+	if action ~= "none" and focusId ~= nil then
+		model = stationViz:itemModel(focusId) or stationModels[focusId]
+	end
 	if model ~= nil then
 		highlight.Adornee = model
 		highlight.Enabled = true

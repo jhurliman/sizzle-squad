@@ -112,7 +112,27 @@ function Menu.new(deps: any)
 		onReady = function()
 			self.remotes.ReadyUp:FireServer(true)
 		end,
+		onJoinFriend = function(jobId: string, who: string?)
+			if self.social ~= nil then
+				self.social:joinFriend(jobId, who)
+			end
+		end,
 	})
+
+	-- Who is already playing, asked once when the card goes up. friendsHere is
+	-- a pcall'd web call on its own thread, so it must not be on the path that
+	-- builds the card.
+	task.spawn(function()
+		if self.social == nil then
+			return
+		end
+		local ok, here = pcall(function()
+			return self.social:friendsHere()
+		end)
+		if ok and here ~= nil then
+			self.kitchenCard:setFriends(here)
+		end
+	end)
 
 	-- Gameplay, so it lives in the HUD gui and survives the menu's phase gate
 	-- (you can still ping mid-round); it only hides behind an open panel.
