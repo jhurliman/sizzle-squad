@@ -82,84 +82,33 @@ brain's failure mode.
 
 ## Remaining (user-gated) launch steps
 
-These are the *what*. The **when** — the dated campaign calendar backwards from
-the Halloween 2026 target, and the audience-reach reasoning that sets those
-dates — is in [LAUNCH.md](LAUNCH.md).
+Things only the account owner can do. Same rule as KNOWN-GAPS: **done items are
+deleted, not ticked** — this section had grown into a record of finished work
+with the how-to for badges nobody needs to create again. The *when* is
+[LAUNCH.md](LAUNCH.md); the *what* is here.
 
-1. **Publish** the place to a universe (Studio → File → Publish), enable
-   **free private servers**, and enable Studio API access for DataStores.
-   `MaxPlayers = 4`, `PreferredPlayers = 4` and
-   `TextChatService.ChatVersion = TextChatService` are place PROPERTIES and are
-   set in `default.project.json`, so they ship with every build — do not set
-   them by hand in Studio, a rebuild would revert that.
-2. ~~**Audio**~~ — DONE: 50 SFX (3 variants/event) and 4 adaptive music stems
-   are rendered, uploaded and wired; ids recorded in
-   `roblox/audio-out/asset-ids.csv`. Only `washDone` lacks a dedicated upload
-   (falls back to the chop chime).
-3. ~~**Badges**~~ — DONE: all 8 created on experience `10761465304` and wired
-   into `Badges.IDS`. Record of ids, names, descriptions and icons is in
-   `roblox-game/store/badges.md`. **One thing still open: set
-   `Config.FOUNDING_CHEF_UNTIL` to your real launch-window end date** (it is a
-   placeholder). Original instructions kept below for any future badge.
+Publish, audio, badges and game passes are all done and verified live, including
+a real Robux purchase. Reference material survives them: badge names,
+descriptions and ids are in `store/badges.md`, audio ids in
+`../roblox/audio-out/asset-ids.csv`, pass ids in `shared/Monetization.luau`.
 
-   Create each at **Creator Dashboard → your experience → Engagement → Badges
-   → Create Badge**. Roblox charges **100 Robux per badge** (800 total), and
-   the icon is a square PNG (512x512 is the safe size, same as a game pass).
-   After creating one, open it and take the number out of the URL
-   (`.../badges/<ID>/configure`) — that is the id.
-
-   Icons are pre-rendered in `roblox/badge-art/` (512x512, regenerate with
-   `node roblox/badge-art.mjs`). **Names, descriptions and the icon for each
-   key are in `roblox-game/store/badges.md`** — copy-paste ready.
-
-   Then paste each id into `game-src/server/Badges.luau` -> `Badges.IDS`.
-   A key left at `0` is silently skipped, so you can create them one at a time.
-
-   | `Badges.IDS` key | Suggested name | Description | Awarded when |
-   |---|---|---|---|
-   | `firstDish` | First Dish | Serve your very first dish. | any shift where you serve >= 1 dish |
-   | `perfectRound` | Clean Service | Finish a shift without missing a single ticket. | `missed == 0` and `served > 0` |
-   | `firstThreeStar` | Three Stars | Finish a shift with all three stars. | `stars >= 3` |
-   | `fullHumanCrewThreeStar` | Full House | Earn three stars with a full crew of four chefs. | `stars >= 3` and 4 humans seated |
-   | `levelTen` | Head Chef | Reach level 10. | `profile.level >= 10` |
-   | `hundredDishes` | Century | Serve 100 dishes. | `totalDishes >= 100` |
-   | `thousandDishes` | Thousand Plates | Serve 1,000 dishes. | `totalDishes >= 1000` |
-   | `foundingChef` | Founding Chef | Play during the launch window. | end of any shift, **while `Config.FOUNDING_CHEF_UNTIL` has not passed** |
-
-   Two things worth knowing before you spend the Robux:
-
-   - **Set `Config.FOUNDING_CHEF_UNTIL`** (UTC `YYYY-MM-DD`) to the last day of
-     your launch window. Past that date nobody can earn it again, which is the
-     only thing that makes it worth having. Empty string disables it.
-   - Award conditions are re-checked at the end of EVERY shift. Roblox treats
-     re-awarding an owned badge as a no-op, and the server also de-dupes per
-     session, so nothing is double-granted and no call is wasted.
-
-   Badges are awarded on the SERVER at round end and need API access enabled on
-   the published place -- the same switch DataStores need.
-3b. **Game passes** (monetization is wired but inert until these exist).
-   On the Creator Dashboard → your experience → Monetization → Passes, create:
-
-   | Pass | Suggested price | Grants |
-   |---|---|---|
-   | Supporter Pass | 199 R$ | Top Hat + Sous-Chef Halo, +10% XP and coins, 4 Gilded coats, Sizzle! emote, Supporter Plates, star nametag |
-   | Chef's Trunk | 149 R$ | Beret + Mushroom Cap, 4 Midnight coats, Boom! emote, Obsidian Pans |
-
-   Four of the twelve hats (a third) are pass-only; the other eight stay on the
-   coin ladder so there is still something to grind toward. Level milestones
-   only ever grant coin-track items -- handing out pass content free would
-   undercut the thing people paid for.
-
-   **DONE** — Supporter Pass `1959138315`, Chef's Trunk `1958262313`, both
-   wired in `game-src/shared/Monetization.luau`. Icons for each are in
-   `roblox/pass-art/` (512x512, regenerate with `node roblox/pass-art.mjs`).
-   For future passes: put the id into `PRODUCTS[n].gamePassId`. A pass whose id is still `0` is hidden from the
-   shop and can never be granted, so shipping without them is safe. Ownership
-   is checked on join and again on `PromptGamePassPurchaseFinished`, so a
-   purchase applies without a rejoin.
-
-   Every pass item already renders today — the four pass hats are existing,
-   FitLab-tuned assets moved off the coin ladder, not new art. Nothing here
-   needs an upload or a new `Hats.build` case.
-4. **Playtests** (plan P6–P8): friends & family via private links, then soft
-   launch against the metric gates (D1 ≥ 25%, session ≥ 12 min, rounds ≥ 3).
+1. **Thumbnails — 6 to 8, not 10.** One is uploaded. Three 1920x1080
+   detail-page variants are rendered in `../roblox/game-banner/` and need one
+   picking. Priority order for the rest is in `STORE-LISTING.md`. Filling all
+   ten correlates *negatively* with CCU in the sampled top-19.
+2. **Gameplay video** (~30s, no voice-over, no overlay text that reads as an
+   ad). Only 3 of 19 top experiences have one and all three sit in slot one,
+   because Roblox auto-promotes an approved video ahead of the stills. It is
+   the cheapest differentiator left on the store page.
+3. **Device pass** at 896x414 and at 375px height: the wardrobe preview and the
+   whole menu. Most Roblox play is mobile. Fold the localized text check into
+   the same pass — German and Japanese overrun controls sized for English.
+4. **Import the localization CSVs** if any string changes:
+   `node tools/build-loc.mjs` then upload `loc/chunks/*.csv` in order. The
+   importer 504s on the whole table, which is why they are ~50 rows each.
+5. **Confirm "Publishing tier at risk" has cleared** after the refundable fee
+   and a publish. That reading was inference, not documentation — if it
+   persists it needs re-investigating before anything else ships.
+6. **Playtests** (plan P6-P8): friends and family via private links, then soft
+   launch against the metric gates — D1 >= 25%, session >= 12 min, rounds/session
+   >= 3, first-round completion >= 90%, like ratio >= 90%.

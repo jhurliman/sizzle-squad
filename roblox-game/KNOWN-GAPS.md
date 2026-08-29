@@ -58,15 +58,9 @@ a release.
   CAVITY behind the lip line — the jaw hinges onto nothing.
 - 🟢 **Photo moment is a camera push-in** — no team pose at the pass, no
   confetti, no framed score layout.
-- 🟢 **Emote row, not a wheel.** Four pings plus owned emote cosmetics.
-- 🟢 **No haptics.** Roblox has no reliable phone-vibration API; gamepad-only
-  via HapticService is possible later.
-- 🟢 **Kitchen Card** has no entrance animation and no "don't show again".
-- 🟢 **Menu is an overlay**; the planned walk-up stations (shop board, wardrobe
-  mirror, leaderboard wall) are a later pass.
-- 🟢 **Leaderboards are a tab, not the physical in-world board.** Each server
-  reads OrderedDataStores directly — fine at launch scale; the
-  MemoryStore/MessagingService cache from plan §2.4 is unbuilt.
+- 🟢 **Leaderboards scalability** Each server reads OrderedDataStores directly —
+  fine at launch scale; the MemoryStore/MessagingService cache from plan §2.4 is
+  unbuilt.
 - 🟢 **Wardrobe has no search or sort.** At 42 items the flat rails still read,
   but they will not survive a content cadence.
 - 🟢 **Dailies auto-claim** rather than offering a claim ceremony.
@@ -78,14 +72,10 @@ a release.
   backstop.
 - 🟢 **No per-player ready pips** on the shift panel.
 - 🟢 **First Shift does not own its own trigger** — `Menu:maybeAutoStart` still
-  starts a first-ever player's round. The planned demonstrating sous-chef is
-  moot with bots off in the tutorial.
-- 🟡 **A player who quits mid-tutorial keeps `rounds == 0`** and gets it again
-  next session. Intended, but a tutorial that is reliably quit becomes a loop
-  nobody escapes; watch the onboarding funnel once there is traffic.
-- 🟡 **The extra load screen on a first-ever join is unmeasured.** First Shift
-  teleports into a reserved server; that lands at the worst moment in the
-  funnel and should be timed on a real device.
+  starts a first-ever player's round.
+- 🟡 **The extra load screen on a first-ever join needs more measurement.**
+  First Shift teleports into a reserved server; that lands at the worst moment
+  in the funnel and should be timed on multiple real devices.
 - 🟢 **ReadyUp is not rate limited** (it re-broadcasts phase on every call).
   Emote is allowlisted by id; GrabEdge is capped at 3 queued.
 - 🟢 **No packet-loss extrapolation** beyond hold-last-sample for remote chefs.
