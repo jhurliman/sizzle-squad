@@ -76,9 +76,9 @@ still guard the shared sim (including bit-exact determinism).
 
 **[KNOWN-GAPS.md](KNOWN-GAPS.md) lists what is still open** — checked before
 trusting any feature as "done", and pruned as things land rather than kept as a
-changelog. The largest open item is that audio is silent on device (it plays in
-Studio), and the largest unknown is four-human pacing, which no harness here can
-measure.
+changelog. The largest unknown is four-human pacing, which no harness here can
+measure — bots leave the kitchen uncontended, and humans do not have the bot
+brain's failure mode.
 
 ## Remaining (user-gated) launch steps
 

@@ -12,17 +12,10 @@ calendar these feed into is LAUNCH.md.
 Legend: 🔴 blocks a good first impression · 🟡 noticeable, playable around ·
 🟢 fit and finish / debt.
 
-## Blocking
-
-- 🔴 **Audio is silent on device.** Studio plays music and SFX; a real iPhone
-  plays neither, only Roblox's own default character sounds. The assets were
-  re-uploaded under the owner's account, so the remaining suspect is the
-  experience's **audio permissions** — private audio plays for its owner in
-  Studio and for nobody else until the experience is granted use of it.
-  `store/audio-asset-ids.txt` has all 59 ids for that page. Sfx and Music now
-  raise a HUD toast when a sound bank fails to load, so the next device run
-  should say which it is; if no toast appears and it is still silent, the next
-  suspect is 3D rolloff from the fixed camera, not the assets.
+**Nothing is 🔴 right now.** Audio on device was the last one and is verified
+fixed. What remains is either unverifiable without live traffic, or fit and
+finish — which is worth knowing before deciding whether the next work goes into
+the game or into getting people into it.
 
 ## Unverified against the live service
 

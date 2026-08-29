@@ -75,24 +75,21 @@ Everything here is already tracked; this phase just puts a date on it.
    First Shift teleport out and back, drop-in seating, nametags, the wardrobe
    and the shared kitchen all behave. This was the single largest unknown in
    the project and it is no longer open.
-2. 🔴 **Audio is silent on device.** It plays in Studio and not on a phone —
-   see KNOWN-GAPS. A cooking game whose pans make no sound is not shippable,
-   and this is now the biggest open item in the phase.
-3. **Device pass** at 896×414 and at 375px height — the wardrobe preview and
+2. **Device pass** at 896×414 and at 375px height — the wardrobe preview and
    the full menu. Most Roblox play is mobile; this is a first-impression gate.
    Localized text fit (German, Japanese) belongs in the same pass.
-4. **Thumbnails: 6–8 total.** One is uploaded, and three 1920×1080 detail-page
+3. **Thumbnails: 6–8 total.** One is uploaded, and three 1920×1080 detail-page
    variants are rendered in `roblox/game-banner/`. Priority order is in
    `STORE-LISTING.md`. Do not fill all ten — that correlates *negatively* with
    CCU in the sampled top-19.
-5. **Gameplay video** (~30s, no voice-over, no overlay text reading as an ad).
+4. **Gameplay video** (~30s, no voice-over, no overlay text reading as an ad).
    Only 3 of 19 top experiences have one, and all three sit in slot one because
    Roblox auto-promotes an approved video ahead of the stills. This is the
    cheapest available differentiator on the whole store page.
-6. **Confirm "Publishing tier at risk" clears** after the fee and the next
+5. **Confirm "Publishing tier at risk" clears** after the fee and the next
    publish. That reading was inference, not documentation — if it persists, it
    needs re-investigating before anything else ships.
-7. **Set `Config.FOUNDING_CHEF_UNTIL`.** See below; it is still the placeholder.
+6. **Set `Config.FOUNDING_CHEF_UNTIL`.** See below; it is still the placeholder.
 
 ### 12 Sep – 26 Sep · Friends & family (2 weeks)
 
@@ -171,11 +168,13 @@ soft-launch players earn it simply by being early. That is the intended reward.
 
 ## The one thing that can break this calendar
 
-Not multiplayer any more — that has run, and held. The open risk is now
-**audio on device**: it works in Studio and not on a phone, and the likely cause
-(experience-level audio permissions) is a dashboard action nobody has confirmed
-yet. A silent cooking game is not something to soft-launch, so this sits in
-front of the 26 Sep public date rather than beside it.
+Not multiplayer, and no longer audio — both have run and held. What is left is
+the thing this whole calendar was built around: **the 250 highly engaged
+players**. Nothing in the build affects it, no harness can measure it, and it is
+the only gate between the game and the audience where Roblox's volume actually
+is. Five weeks of organic soft launch is the plan's entire answer, and if the
+counter tracks well below the 5,000–12,500 unique players that gate implies,
+the response is to pull the paid push earlier rather than to add features.
 
 There is roughly **two weeks of slack** in this plan against the 31 October
-beat. Spend it there first.
+beat. Spend it on the device pass and the video, not on scope.
