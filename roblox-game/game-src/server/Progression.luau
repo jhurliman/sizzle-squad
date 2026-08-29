@@ -321,6 +321,13 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 			profile.coins += t.BONUS_COINS
 			profile.tutorialDone = true
 		end
+		-- WHERE THE BAR WAS BEFORE THIS SHIFT.
+		--
+		-- The results screen wants to run the bar UP from where the player left
+		-- it and roll through each level they gained on the way. It cannot
+		-- reconstruct that from the after-state: `level` and `xp` are post-award
+		-- and the curve is not invertible once more than one level went by.
+		local xpBefore, levelBefore = profile.xp, profile.level
 		profile.xp += xp
 		local levelsGained, granted = 0, {}
 		while profile.xp >= config.LEVEL_CURVE(profile.level) do
@@ -344,6 +351,8 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 		self.lastAward[player] = {
 			coins = coinsEarned,
 			xp = xp,
+			xpBefore = xpBefore,
+			levelBefore = levelBefore,
 			levels = levelsGained,
 			level = profile.level,
 			granted = granted,

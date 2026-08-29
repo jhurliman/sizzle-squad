@@ -12,6 +12,7 @@
 -- figures are the per-player deltas the server recorded in awardRound.
 
 local Theme = require(script.Parent.Menu.Theme) :: any
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Game"):WaitForChild("Config")) :: any
 
 local Results = {}
 Results.__index = Results
@@ -36,6 +37,11 @@ function Results.new(gui: Instance)
 	self.t = -1 -- <0 means "not showing"
 	self.coins = 0
 	self.xp = 0
+	-- The running bar: where it is NOW as the award pays out, not where it
+	-- ended up. See setAward.
+	self.animXp = 0
+	self.animLevel = 1
+	self.shownLevel = 0
 	self.shownStars = 0
 	self.shownCards = 0
 
@@ -182,6 +188,11 @@ function Results:show(results: any, cards: any?)
 	self.xpLabel.Text = ""
 	self.xpFill.Size = UDim2.fromScale(0, 1)
 	self.levelBurst.Visible = false
+	-- Start the bar where the player left it, so the fill they watch is the
+	-- one they earned rather than a number that was already there.
+	self.animXp = (self.award ~= nil and self.award.xpBefore) or 0
+	self.animLevel = (self.award ~= nil and self.award.levelBefore) or 1
+	self.shownLevel = self.animLevel
 	for _, c in self.cards do
 		c.Visible = false
 	end
@@ -246,13 +257,35 @@ function Results:step(dt: number)
 			self.xp = target
 		end
 		self.xpLabel.Text = `+{math.floor(self.xp + 0.5)} XP`
-		local prog = self.progress
-		if prog ~= nil and (prog.xpToNext or 0) > 0 then
-			self.xpFill.Size = UDim2.fromScale(math.clamp((prog.xp or 0) / prog.xpToNext, 0, 1), 1)
+
+		-- ROLL THE BAR, DO NOT SNAP IT.
+		--
+		-- This used to read the POST-award progress straight off the profile,
+		-- so the bar was already where it would end up before the counter had
+		-- finished ticking, and a player who gained two levels saw one burst
+		-- naming only the last of them. Now the earned XP is poured into the
+		-- bar at the same rate the counter climbs, and each level it crosses
+		-- announces itself on the way past.
+		local poured = math.floor(self.xp + 0.5)
+		local want = (award.xpBefore or 0) + poured
+		self.animXp = want
+		local guard = 0
+		while guard < 20 do
+			guard += 1
+			local need = Config.LEVEL_CURVE(self.animLevel)
+			if need <= 0 or self.animXp < need then
+				break
+			end
+			self.animXp -= need
+			self.animLevel += 1
 		end
-		if (award.levels or 0) > 0 and not self.levelBurst.Visible then
+		local need = math.max(1, Config.LEVEL_CURVE(self.animLevel))
+		self.xpFill.Size = UDim2.fromScale(math.clamp(self.animXp / need, 0, 1), 1)
+
+		if self.animLevel > self.shownLevel then
+			self.shownLevel = self.animLevel
 			self.levelBurst.Visible = true
-			self.levelBurst.Text = `LEVEL {award.level}!`
+			self.levelBurst.Text = `LEVEL {self.animLevel}!`
 			if self.onLevelUp ~= nil then
 				self.onLevelUp()
 			end

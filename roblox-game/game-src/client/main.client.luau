@@ -42,6 +42,15 @@ local input = Input.new(hud.gui)
 local firstShift = FirstShift.new(hud.gui)
 local results = Results.new(hud.gui)
 local sfx = Sfx.new()
+-- A phone has no output window, so a broken sound bank has to announce itself
+-- where the player (and the person debugging it) can actually see it.
+sfx.onFailure = function(msg: string)
+	task.defer(function()
+		pcall(function()
+			hud:toast(`⚠ Audio: {msg}`)
+		end)
+	end)
+end
 -- Beats need a sound or the ceremony reads as a screenshot: each star and the
 -- level-up borrow the serve chime's combo tiers.
 results.onStar = function(n)
@@ -63,6 +72,8 @@ local music = Music.new(game:GetService("SoundService"))
 -- ---------------------------------------------------------- station lookup
 
 local stationModels: { [number]: Model } = {}
+-- Stations with no model of their own get a drawn pad instead of an adornee.
+local cellPads: { [number]: BasePart } = {}
 local serveAnchors: { Vector3 } = {}
 
 -- THREE STATIONS HAVE NO MODEL OF THEIR OWN, AND A BENCH IS THREE CELLS WIDE.
@@ -124,7 +135,7 @@ local function benchFor(root: Instance, st: any): Instance?
 	return nil
 end
 
-local function cellProxy(root: Instance, st: any): Model?
+local function cellPad(root: Instance, st: any): BasePart?
 	local bench = benchFor(root, st)
 	if bench == nil then
 		return nil
@@ -143,26 +154,36 @@ local function cellProxy(root: Instance, st: any): Model?
 	end
 	if proxyFolder == nil then
 		local f = Instance.new("Folder")
-		f.Name = "SizzleCellProxies"
+		f.Name = "SizzleCellPads"
 		f.Parent = Workspace
 		proxyFolder = f
 	end
-	local model = Instance.new("Model")
-	model.Name = `Cell_{st.cell.x}_{st.cell.y}`
-	local part = Instance.new("Part")
-	part.Name = "Cell"
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
-	part.Transparency = 0.99
-	part.Size = Vector3.new(x1 - x0, hi.Y - lo.Y, z1 - z0)
-	part.CFrame = CFrame.new((x0 + x1) / 2, (lo.Y + hi.Y) / 2, (z0 + z1) / 2)
-	part.Parent = model
-	model.PrimaryPart = part
-	model.Parent = proxyFolder
-	return model
+	-- A PAD YOU CAN SEE, NOT A BOX YOU HOPE HIGHLIGHT WILL FIND.
+	--
+	-- Two attempts at this adorned an invisible proxy with a Highlight and both
+	-- were reported as still not highlighting. The evidence is now conclusive:
+	-- a plate sitting on the same counter DOES highlight (that adorns the
+	-- plate's real model), while the empty counter next to it does not. So
+	-- Highlight will not draw on a part nobody can see, at 0.99 any more than
+	-- at 1.
+	--
+	-- Draw the thing instead. A thin warm quad laid on the countertop at that
+	-- cell is what the player asked for in the first place -- "a square on the
+	-- countertop" -- and it cannot fail to render, because it is just geometry.
+	local pad = Instance.new("Part")
+	pad.Name = `Pad_{st.cell.x}_{st.cell.y}`
+	pad.Anchored = true
+	pad.CanCollide = false
+	pad.CanQuery = false
+	pad.CanTouch = false
+	pad.CastShadow = false
+	pad.Material = Enum.Material.Neon
+	pad.Color = Color3.fromRGB(255, 214, 120)
+	pad.Transparency = 1 -- hidden until focused
+	pad.Size = Vector3.new(x1 - x0 - 0.3, 0.12, z1 - z0 - 0.3)
+	pad.CFrame = CFrame.new((x0 + x1) / 2, hi.Y + 0.07, (z0 + z1) / 2)
+	pad.Parent = proxyFolder
+	return pad
 end
 
 local function indexStations(stations: { any })
@@ -204,9 +225,9 @@ local function indexStations(stations: { any })
 			if m ~= nil and m:IsA("Model") then
 				stationModels[st.id] = m
 			else
-				local proxy = cellProxy(root, st)
-				if proxy ~= nil then
-					stationModels[st.id] = proxy
+				local pad = cellPad(root, st)
+				if pad ~= nil then
+					cellPads[st.id] = pad
 				else
 					warn(`[sizzle] station {kindCap}_{st.cell.x}_{st.cell.y} has no model and no bench under it — it cannot highlight`)
 				end
@@ -602,14 +623,26 @@ RunService.RenderStepped:Connect(function(dt)
 	-- what the press acts on, so outline the plate; the furniture underneath is
 	-- not the subject, and on a shared worktop it is not even specific.
 	local model = nil
+	local pad = nil
 	if action ~= "none" and focusId ~= nil then
-		model = stationViz:itemModel(focusId) or stationModels[focusId]
+		-- What is ON the bench beats the bench, and a real model beats a pad:
+		-- a plate has geometry worth outlining, an empty counter cell does not.
+		model = stationViz:itemModel(focusId)
+		if model == nil then
+			model = stationModels[focusId]
+			if model == nil then
+				pad = cellPads[focusId]
+			end
+		end
 	end
 	if model ~= nil then
 		highlight.Adornee = model
 		highlight.Enabled = true
 	else
 		highlight.Enabled = false
+	end
+	for id, p in cellPads do
+		p.Transparency = if p == pad then 0.45 else 1
 	end
 
 	-- HUD. Orders exist only during a shift.

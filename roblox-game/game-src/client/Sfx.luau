@@ -125,10 +125,20 @@ function Sfx:verify()
 			end
 		end
 		if #bad > 0 then
+			local msg = `{#bad}/{#list} sounds failed to load`
 			warn(
-				`[sizzle] audio: {#bad}/{#list} sfx FAILED to load — check ownership/moderation. First few: `
+				`[sizzle] audio: {msg} — check ownership/moderation. First few: `
 					.. table.concat(bad, ", ", 1, math.min(5, #bad))
 			)
+			-- ON SCREEN, NOT JUST IN THE OUTPUT WINDOW.
+			--
+			-- This is silent in Studio and silent on a phone, and a phone has
+			-- no output window — which is exactly where it has been reported
+			-- from twice. If the audio is broken the player's device has to be
+			-- able to say so on its own.
+			if self.onFailure ~= nil then
+				self.onFailure(msg)
+			end
 		else
 			print(`[sizzle] audio: all {#list} sfx loaded`)
 		end
