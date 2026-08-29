@@ -80,10 +80,69 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	-- were added later and never counted. A centred UIListLayout overflows
 	-- symmetrically, so the ends fell off BOTH screen edges: WARDROBE clipped on
 	-- the left, NEW SERVER clipped to "NE" on the right, on any phone.
+	-- PLAYING WITH SOMEBODY LIVES ON THE SCREEN YOU ACTUALLY SIT ON.
+	--
+	-- These were on the Kitchen Card, which shows once per session and
+	-- auto-dismisses after twelve seconds. That is a poster, not a control. This
+	-- panel is the between-rounds home screen — it is up every time a shift
+	-- ends — so the one action that grows a four-player co-op game belongs here,
+	-- directly under Start and above the tabs.
+	--
+	-- Above the tabs and not among them on purpose: the tab row changes what YOU
+	-- are looking at, this changes who you are playing WITH.
+	self.friendRow = mk("Frame", {
+		Size = UDim2.fromOffset(600, Theme.MIN_TAP + Theme.SHADOW_DY),
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+	}, self.root)
+	mk("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 8),
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, self.friendRow)
+
+	local inviteCta = Theme.cta({
+		Size = UDim2.fromOffset(230, Theme.MIN_TAP),
+		Fill = Theme.BLUE,
+		TextSize = 17,
+		LayoutOrder = 1,
+		Text = "＋ INVITE A FRIEND",
+	}, self.friendRow)
+	self.inviteRoot = inviteCta.root
+	inviteCta.button.Activated:Connect(function()
+		-- pcall: PromptGameInvite throws outright where the platform cannot show
+		-- the invite sheet, and a dead button beats a broken panel.
+		pcall(function()
+			local SocialService = game:GetService("SocialService")
+			SocialService:PromptGameInvite(Players.LocalPlayer)
+		end)
+	end)
+
+	-- Only rendered when somebody is actually reachable. An always-on "join a
+	-- friend" that never has anybody behind it advertises an empty game.
+	local joinCta = Theme.cta({
+		Size = UDim2.fromOffset(230, Theme.MIN_TAP),
+		Fill = Theme.GREEN,
+		TextSize = 17,
+		LayoutOrder = 2,
+		Text = "JOIN A FRIEND",
+	}, self.friendRow)
+	self.joinRoot = joinCta.root
+	self.joinButton = joinCta.button
+	self.joinRoot.Visible = false
+	self.joinButton.Activated:Connect(function()
+		local f = self.friend
+		if f ~= nil then
+			self.deps.onJoinFriend(f.jobId, f.name)
+		end
+	end)
+
 	self.tabRow = mk("Frame", {
 		Size = UDim2.fromOffset(600, Theme.MIN_TAP),
 		BackgroundTransparency = 1,
-		LayoutOrder = 2,
+		LayoutOrder = 3,
 	}, self.root)
 	mk("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
@@ -173,11 +232,26 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		Size = UDim2.fromOffset(320, 34),
 		TextSize = 15,
 		Font = Theme.BOLD_FONT,
-		LayoutOrder = 3,
+		LayoutOrder = 4,
 		Text = "Lv 1  ·  0 coins",
 	}, self.root)
 
 	return self
+end
+
+--- Whoever is already in a kitchen, from Social:friendsHere(). First entry
+--- wins: this is a button, not a browser.
+function ShiftPanel:setFriends(friends: { any })
+	local f = friends ~= nil and friends[1] or nil
+	self.friend = f
+	if self.joinRoot == nil then
+		return
+	end
+	self.joinRoot.Visible = f ~= nil
+	if f ~= nil then
+		self.joinButton.Text = Loc.f("fmt.join_name", f.name)
+	end
+	self:relayoutLast()
 end
 
 function ShiftPanel:setHidden(on: boolean)
@@ -311,8 +385,21 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 		self.rows[r].Size = UDim2.fromOffset(math.max(1, tabW * c + gap * math.max(0, c - 1)), Theme.MIN_TAP + Theme.SHADOW_DY)
 	end
 
+	-- The friend row is sized from the space it actually has, not from a
+	-- breakpoint table: with both buttons up, a fixed 200 each overflows a
+	-- 414-wide phone, and the pair has to fit or the second one falls off the
+	-- screen exactly the way the six-button row used to.
+	local pair = self.joinRoot.Visible
+	local want = if narrow then 200 elseif compact then 215 else 230
+	local room = if pair then math.floor((avail - gap) / 2) else avail
+	local inviteW = math.max(120, math.min(want, room))
+	self.inviteRoot.Size = UDim2.fromOffset(inviteW, Theme.MIN_TAP + Theme.SHADOW_DY)
+	self.joinRoot.Size = UDim2.fromOffset(inviteW, Theme.MIN_TAP + Theme.SHADOW_DY)
+	local friendW = if pair then inviteW * 2 + gap else inviteW
+	self.friendRow.Size = UDim2.fromOffset(friendW, Theme.MIN_TAP + Theme.SHADOW_DY)
+
 	local rowsH = rows * (Theme.MIN_TAP + Theme.SHADOW_DY) + (rows - 1) * gap
-	local widest = math.max(self.rows[1].Size.X.Offset, self.rows[2].Size.X.Offset)
+	local widest = math.max(self.rows[1].Size.X.Offset, self.rows[2].Size.X.Offset, friendW)
 	self.tabRow.Size = UDim2.fromOffset(widest, rowsH)
 	-- Height comes from the column's own contents (AutomaticSize.Y), not from a
 	-- hand-summed constant: the old `142 + rowsH` had to be re-derived by hand

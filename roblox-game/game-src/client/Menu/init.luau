@@ -104,6 +104,11 @@ function Menu.new(deps: any)
 			end
 			self.social:newServer()
 		end,
+		onJoinFriend = function(jobId: string, who: string?)
+			if self.social ~= nil then
+				self.social:joinFriend(jobId, who)
+			end
+		end,
 	})
 	self.kitchenCard = KitchenCard.new(gui, {
 		onOpenTab = function(tab)
@@ -130,7 +135,10 @@ function Menu.new(deps: any)
 			return self.social:friendsHere()
 		end)
 		if ok and here ~= nil then
+			-- Both surfaces: the card is the one-off greeting, the shift panel
+			-- is the screen that is up between every round.
 			self.kitchenCard:setFriends(here)
+			self.shiftPanel:setFriends(here)
 		end
 	end)
 
