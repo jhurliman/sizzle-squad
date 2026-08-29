@@ -119,6 +119,7 @@ local VERB_LABEL: { [string]: string } = {
 	discard = "BIN",
 	prep = "WORK",
 	unload = "TAKE",
+	rinse = "RINSE",
 }
 
 function Input:setVerb(action: string)

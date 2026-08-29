@@ -113,6 +113,64 @@ else
 	print(`NOTE {PLACE} has not been built yet — run: npm run build`)
 end
 
-if failed > 0 or bundleBad > 0 or stale then
+-- ------------------------------------------------------------------------
+-- IS THE AUDIO OURS, AND IS IT ALL THERE?
+--
+-- Roblox audio is PRIVATE TO ITS UPLOADER. An asset owned by another account
+-- does not play in this experience and does not error either -- it is simply
+-- silent, on every client, forever. The first multiplayer playtest was
+-- completely mute because all 55 sound effects and 4 music stems had been
+-- uploaded by a different account (7880886259) to the one that owns the
+-- experience (4262376699), and nothing in the build could see it.
+--
+-- So: every id referenced by Sfx or Music must appear in asset-ids.csv, and
+-- every row of that file must be owned by us.
+local OWNER = "4262376699"
+local CSV = "../roblox/audio-out/asset-ids.csv"
+local audioBad = 0
+if fs.isFile(CSV) then
+	local known: { [string]: boolean } = {}
+	local foreign = 0
+	local firstForeign = ""
+	local n = 0
+	for line in fs.readFile(CSV):gmatch("[^\n]+") do
+		n += 1
+		if n > 1 then
+			local name, id, _kind, creator = line:match("^([^,]*),([^,]*),([^,]*),([^,]*)$")
+			if id ~= nil then
+				known[id] = true
+				if creator ~= OWNER then
+					foreign += 1
+					if firstForeign == "" then
+						firstForeign = `{name} (creator {creator})`
+					end
+				end
+			end
+		end
+	end
+	if foreign > 0 then
+		audioBad += 1
+		print(`FAIL {CSV}: {foreign} asset(s) not owned by {OWNER} — they will be SILENT in this experience. First: {firstForeign}`)
+	end
+	for _, file in { "game-src/client/Sfx.luau", "game-src/client/Music.luau" } do
+		if not fs.isFile(file) then
+			continue
+		end
+		local src = fs.readFile(file)
+		-- Only the id tables carry bare 10+ digit literals; volumes and
+		-- timings are all short or fractional.
+		for id in src:gmatch("(%d%d%d%d%d%d%d%d%d%d+)") do
+			if not known[id] then
+				audioBad += 1
+				print(`FAIL {file}: asset id {id} is not in {CSV} — unknown provenance, may not be ours`)
+			end
+		end
+	end
+end
+if audioBad == 0 then
+	print(`audio: every referenced id is present and owned by {OWNER}`)
+end
+
+if failed > 0 or bundleBad > 0 or stale or audioBad > 0 then
 	process.exit(1)
 end

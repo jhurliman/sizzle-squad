@@ -944,6 +944,23 @@ export type GrabKind =
    * must never watch dinner burn. */
   | 'unload'
   /**
+   * A PLATE OF THE WRONG THING, SCRAPED CLEAN AT THE SINK, STILL IN YOUR HANDS.
+   *
+   * From the first multiplayer playtest: you drop a bun onto a plate that
+   * already has a prepped tomato, and now you are holding the beginnings of a
+   * BLT nobody ordered. The bin will take it apart one item per press — it is
+   * an undo, deliberately — but when the whole plate is wrong that is three
+   * presses at the far corner of the kitchen while tickets expire.
+   *
+   * The sink already existed and did nothing a new player would ever see (it
+   * only takes DIRTY plates, and plates only go dirty once all eight clean ones
+   * are gone). Letting it take a wrongly-loaded plate gives it a job from the
+   * first minute, and it is strictly better than a bin run: the food goes, the
+   * plate stays clean in your hands, and you are already standing where you can
+   * start again.
+   */
+  | 'rinse'
+  /**
    * HOLD THIS ONE — it is what makes a single action button possible.
    *
    * A board with raw food on it, or a sink with a dirty plate in it, is a
@@ -1190,6 +1207,9 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
        * and the ask was explicit: fewer useless actions. Dirty plates only.
        */
       if (held.type === 'plate' && held.plate.dirty && !st.holding) return 'place';
+      // See GrabKind 'rinse'. Checked after the dirty-plate case because a
+      // dirty plate is always empty, so the two can never both apply.
+      if (held.type === 'plate' && held.plate.contents.length > 0) return 'rinse';
       return 'none';
     default: {
       if (!st.holding) return 'place';
@@ -1526,6 +1546,16 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       }
       emit(s, { t: 'trash', at });
       return true;
+    case 'rinse': {
+      // The WHOLE plate, in one press. The bin's one-item-per-press rhythm is
+      // an undo for a single mis-drop; this is for when the plate is simply
+      // wrong and the fastest correct move is to start over.
+      if (held?.type !== 'plate' || held.plate.contents.length === 0) return false;
+      held.plate.contents = [];
+      held.plate.dirty = false;
+      emit(s, { t: 'trash', at });
+      return true;
+    }
     case 'serve':
       // A refused plate is not a miss: `trySer` emits its own serveWrong, which
       // is a louder and more specific answer than the generic thunk.

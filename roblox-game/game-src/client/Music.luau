@@ -20,10 +20,10 @@ Music.__index = Music
 -- Uploaded stems (roblox/audio-out/music/*.wav); ids also in
 -- roblox/audio-out/asset-ids.csv
 local STEM_IDS: { [string]: number } = {
-	base = 128130823879250,
-	groove = 134595002652690,
-	melody = 104344176105731,
-	tension = 80995053701346,
+	base = 129864158072696,
+	groove = 118440772838108,
+	melody = 102104965215015,
+	tension = 83239315866871,
 }
 
 -- The stems are rendered at the web engine's own note gains, which are quiet
