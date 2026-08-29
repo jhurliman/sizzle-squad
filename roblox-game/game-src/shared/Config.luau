@@ -122,7 +122,21 @@ Config.XP_PER_STAR = 25
 Config.XP_SOFT_CAP = 200
 Config.LEVEL_CURVE = function(level: number): number
 	-- XP required to advance FROM this level.
-	return 100 + (level - 1) * 35
+	--
+	-- SUPERLINEAR, BECAUSE THE OLD ONE HANDED OVER THE WHOLE GAME IN A WEEK.
+	--
+	-- At `100 + (level-1)*35` the entire fifteen-level ladder cost 4,585 XP.
+	-- A good round pays the 200 soft cap plus ~40 from daily goals, so every
+	-- milestone the catalog has — including the level 15 crown — was reachable
+	-- in twenty rounds, and level 5 in three. Measured, and matching a real
+	-- profile: level 6 and 2,000 coins after fewer than six rounds.
+	--
+	-- `100 * level^1.35` keeps the first level-up at exactly 100 (so First
+	-- Shift's flat 100 XP still lands level 2 on the nose, which is the one
+	-- place a fast level is the point) and stretches the rest: level 5 at ~7
+	-- rounds, level 10 at ~36, level 15 at ~95. Sweep it with
+	-- tools/ramp-probe.luau rather than by feel.
+	return math.floor(100 * level ^ 1.35)
 end
 
 -- ---------------------------------------------------------------- tutorial

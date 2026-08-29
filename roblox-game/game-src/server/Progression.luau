@@ -276,6 +276,32 @@ end
 --- `tutorial` marks the First Shift payout: a flat bonus on top of the normal
 --- round award, applied BEFORE the level-up loop so it actually ranks the
 --- player up, and a permanent flag so the tutorial can never be paid twice.
+--- Advance today's goals and pay out any that completed. Returns the coins and
+--- XP earned so `awardRound` can fold them into the one figure it reports —
+--- this deliberately does NOT touch profile.coins or profile.xp itself.
+function Progression:settleDailies(profile: any, results: any, stats: any, today: string): (number, number)
+	if profile.daily.day ~= today then
+		profile.daily = { day = today, progress = {}, claimed = {} }
+	end
+	local counters = table.clone(stats)
+	counters.stars3 = if results.stars >= 3 then 1 else 0
+	counters.combo8 = if results.bestCombo >= 8 then 1 else 0
+	local coins, xp = 0, 0
+	for _, d in self:todaysDailies() do
+		if not profile.daily.claimed[d.id] then
+			local p = (profile.daily.progress[d.id] or 0) + (counters[d.stat] or 0)
+			profile.daily.progress[d.id] = p
+			if p >= d.goal then
+				profile.daily.claimed[d.id] = true
+				local streakMul = math.min(1.5, 1 + 0.1 * math.max(0, profile.streak.count - 1))
+				coins += math.floor(d.coins * streakMul)
+				xp += d.xp
+			end
+		end
+	end
+	return coins, xp
+end
+
 function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 	local config = self.config
 	self.lastAward = {}
@@ -327,14 +353,30 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 		-- it and roll through each level they gained on the way. It cannot
 		-- reconstruct that from the after-state: `level` and `xp` are post-award
 		-- and the curve is not invertible once more than one level went by.
+		-- DAILIES ARE PART OF THIS SHIFT'S PAY, SO THEY ARE SETTLED HERE.
+		--
+		-- They used to be resolved AFTER the level-up loop and after the award
+		-- record was written, which broke three things at once: their coins
+		-- never appeared in the figure the results screen showed, their XP
+		-- could not contribute to a level gained this round (it sat above the
+		-- curve until the NEXT round's loop happened to consume it, so the
+		-- level-up arrived a round late and unexplained), and analytics logged
+		-- an income source it could not see.
+		local dailyCoins, dailyXp = self:settleDailies(profile, results, stats, today)
+		xp += dailyXp
+
 		local xpBefore, levelBefore = profile.xp, profile.level
 		profile.xp += xp
+		-- Level-up cash is real income and has to be reported as such: five
+		-- levels is 500 coins arriving with nothing on screen accounting for
+		-- it, which is most of "how do I have 2,000 coins?".
+		local levelCoins = 0
 		local levelsGained, granted = 0, {}
 		while profile.xp >= config.LEVEL_CURVE(profile.level) do
 			profile.xp -= config.LEVEL_CURVE(profile.level)
 			profile.level += 1
 			levelsGained += 1
-			profile.coins += profile.level * 25
+			levelCoins += profile.level * 25
 			local grant = self.catalog.milestones[profile.level]
 			if grant ~= nil then
 				profile.owned[grant] = true
@@ -348,8 +390,16 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 		-- What this shift was worth, per player. The results ceremony counts
 		-- these up on screen, and analytics logs them as an economy source --
 		-- both need the DELTA, which nothing was recording.
+		-- Everything earned this shift, credited in one place and reported as
+		-- one number. Coins used to be added to the profile from three separate
+		-- lines and only one of them was ever shown.
+		profile.coins += levelCoins + dailyCoins
 		self.lastAward[player] = {
-			coins = coinsEarned,
+			coins = coinsEarned + levelCoins + dailyCoins,
+			roundCoins = coinsEarned,
+			levelCoins = levelCoins,
+			dailyCoins = dailyCoins,
+			dailyXp = dailyXp,
 			xp = xp,
 			xpBefore = xpBefore,
 			levelBefore = levelBefore,
@@ -374,26 +424,6 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 				streak.count = 1
 			end
 			streak.lastDay = today
-		end
-
-		-- dailies
-		if profile.daily.day ~= today then
-			profile.daily = { day = today, progress = {}, claimed = {} }
-		end
-		local counters = table.clone(stats)
-		counters.stars3 = if results.stars >= 3 then 1 else 0
-		counters.combo8 = if results.bestCombo >= 8 then 1 else 0
-		for _, d in self:todaysDailies() do
-			if not profile.daily.claimed[d.id] then
-				local p = (profile.daily.progress[d.id] or 0) + (counters[d.stat] or 0)
-				profile.daily.progress[d.id] = p
-				if p >= d.goal then
-					profile.daily.claimed[d.id] = true
-					local streakMul = math.min(1.5, 1 + 0.1 * math.max(0, profile.streak.count - 1))
-					profile.coins += math.floor(d.coins * streakMul)
-					profile.xp += d.xp
-				end
-			end
 		end
 
 		self.dirty[player] = true
