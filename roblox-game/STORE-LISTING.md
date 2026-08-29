@@ -70,6 +70,34 @@ Alternates live beside it and regenerate with `cd roblox && node game-icon.mjs`:
 `_feed-test.png` composites the current set into a grid with the real top-12 at
 150px — the only test that answers "does this stand out".
 
+## Detail-page thumbnail (1920x1080) — VARIANTS FOR REVIEW
+
+The wide image, not the square icon. Roblox uses it as the experience page
+backdrop and in the scrollable listings that dominate iPad, so it is seen
+larger and more often than the icon — a raw gameplay screenshot wastes it.
+
+Regenerate with `node roblox/game-banner.mjs` (add `--recapture` to take a
+fresh kitchen shot; the capture is ~30s of real browser and is cached).
+
+Two things this can afford that the icon cannot at 150px:
+
+- **The kitchen.** It is the most expensive thing in the project and it is
+  better than most of what it sits beside on Roblox. The backdrop is captured
+  from the ACTUAL running game — round started, board filled, bots spread out,
+  then the DOM overlay stripped so the composited title and crew are the only
+  interface in the frame.
+- **All four chefs at size.** The icon crops two of them to buy scale; at 1920
+  wide they all fit with the room behind them.
+
+| Variant | What it leads on |
+| --- | --- |
+| `a-kitchen-title` | Crew large, kitchen behind, SIZZLE SQUAD on one line |
+| `b-kitchen-clean` | Same, no text — Roblox overlays its own name and buttons on the detail page, so a wordless image never fights the chrome |
+| `c-wide-room` | The room forward, crew smaller and lower; worth testing because at listing size a legible ROOM may out-read four figures |
+
+`_sheet.png` stacks all three at listing height, which is how they actually
+compete. `_kitchen-raw.png` is the unmodified capture.
+
 ## Still to do
 
 - **Thumbnails: ship 6–8, not 10.** Filling all ten correlates *negatively*
