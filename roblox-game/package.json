@@ -12,7 +12,9 @@
     "smoke:ts": "node tools/smoke-ts.mjs",
     "parity": "node tools/parity-ts.mjs && lune run tools/parity.luau && node tools/parity-compare.mjs",
     "publish": "npm run build && node tools/publish-place.mjs",
-    "smoke:live": "node tools/opencloud.mjs luau tools/place-smoke.luau"
+    "smoke:live": "node tools/opencloud.mjs luau tools/place-smoke.luau",
+    "publish:staging": "npm run build && ROBLOX_PLACE_ID=$SIZZLE_STAGING_PLACE_ID node tools/publish-place.mjs",
+    "smoke:staging": "ROBLOX_PLACE_ID=$SIZZLE_STAGING_PLACE_ID node tools/opencloud.mjs luau tools/place-smoke.luau"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

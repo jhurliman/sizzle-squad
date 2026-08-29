@@ -101,6 +101,37 @@ land" is answerable.
 `npm run publish` builds first, so the freshness guard and the place upload
 cannot disagree. `--saved` uploads a version without making it live.
 
+### Staging — Roblox has no blue/green, so make one
+
+There is no traffic-splitting deploy on Roblox. `versionType=Saved` stores a
+version without serving it, but nothing can PLAY a saved version, so it is a
+backup rather than a staging slot. Reverting in Studio's version history is a
+rollback, not a canary.
+
+What works is a **second place inside the same universe**, joinable by its own
+id and invisible in search:
+
+```sh
+export SIZZLE_STAGING_PLACE_ID=<the staging place id>
+npm run publish:staging     # build + upload to staging only
+npm run smoke:live -- ...   # or: npm run smoke:staging
+npm run publish             # only after staging is green
+```
+
+Create it once at **Creator Dashboard → Sizzle Squad → Places → Create Place**
+(Open Cloud cannot create places, only publish to them).
+
+**The one caveat, and it is sharp:** places in the same universe share
+DataStores and badges. Loading checks are safe — `place-smoke.luau` only
+requires modules, it never writes — but a full playthrough on staging writes to
+real player profiles and can grant real badges. For that, either point
+`Config`'s store names at a `-staging` suffix or use a separate universe and
+accept a second API key.
+
+Given the failure this was built for was "the client could not even start",
+staging plus `smoke:live` catches that class outright and does not need the
+data isolation.
+
 **Publishing is live and outward-facing, so it happens on explicit approval —
 never as a side effect of a build.**
 

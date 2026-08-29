@@ -21,7 +21,17 @@ WardrobeTab.__index = WardrobeTab
 
 local mk = Theme.mk
 
-local LOCAL_USER_ID = game:GetService("Players").LocalPlayer.UserId
+-- READ LAZILY, NOT AT MODULE SCOPE.
+--
+-- `Players.LocalPlayer` is nil anywhere that is not a real client — including
+-- the Open Cloud smoke test, which requires every client module inside a server
+-- to prove the published place can load them. Reading it up here made this the
+-- one module that could not be checked that way, and a module you cannot load
+-- in the test is exactly the kind that takes the client down in production.
+local function localUserId(): number?
+	local p = game:GetService("Players").LocalPlayer
+	return p and p.UserId or nil
+end
 
 local SPECIES = {
 	{ id = "bramble", label = "🐻 Bramble" },
@@ -308,7 +318,7 @@ function WardrobeTab:render()
 		-- is free — the server simply will not hand you a duplicate here. The
 		-- label is what stops that reading as the wardrobe being broken.
 		local owner = self.taken and self.taken[s.id]
-		local byOther = owner ~= nil and owner ~= LOCAL_USER_ID
+		local byOther = owner ~= nil and owner ~= localUserId()
 		local state = if self.pending.skin == s.id then "WORN" elseif byOther then "IN USE" else "pick"
 		-- A STRING WENT INTO THE COLOUR SLOT AND TOOK THE LIST WITH IT.
 		--
