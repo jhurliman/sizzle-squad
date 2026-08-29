@@ -6,7 +6,7 @@
 local Players = game:GetService("Players")
 
 local Theme = require(script.Parent.Theme) :: any
-local Loc = require(script.Parent.Loc) :: any
+local Loc = require(script.Parent.Parent.Loc) :: any
 
 local RanksTab = {}
 RanksTab.__index = RanksTab

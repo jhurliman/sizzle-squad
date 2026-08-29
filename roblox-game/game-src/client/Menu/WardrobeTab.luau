@@ -13,7 +13,7 @@
 -- and the footer offers to buy; buying then wears it automatically.
 
 local Theme = require(script.Parent.Theme) :: any
-local Loc = require(script.Parent.Loc) :: any
+local Loc = require(script.Parent.Parent.Loc) :: any
 local ChefPreview = require(script.Parent.ChefPreview) :: any
 
 local WardrobeTab = {}

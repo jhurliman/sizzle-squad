@@ -11,7 +11,8 @@
     "smoke": "lune run tools/smoke.luau",
     "smoke:ts": "node tools/smoke-ts.mjs",
     "parity": "node tools/parity-ts.mjs && lune run tools/parity.luau && node tools/parity-compare.mjs",
-    "publish": "npm run build && node tools/publish-place.mjs"
+    "publish": "npm run build && node tools/publish-place.mjs",
+    "smoke:live": "node tools/opencloud.mjs luau tools/place-smoke.luau"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

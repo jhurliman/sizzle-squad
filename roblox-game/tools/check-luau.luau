@@ -70,6 +70,81 @@ if bundleBad == 0 then
 end
 
 -- ------------------------------------------------------------------------
+-- DO `require(script.Parent...)` PATHS POINT AT A MODULE THAT EXISTS?
+--
+-- Luau compiles `require(script.Parent.Loc)` happily whether or not `Loc` is
+-- there — it is a runtime instance lookup, so every static check in this repo
+-- passed while five menu modules pointed one level too shallow. The client
+-- script died on the first require, which meant no camera rig and no input
+-- handling, so the published game showed an empty blue sky and Roblox's default
+-- controls while the SERVER carried on perfectly happily. It cost a live game
+-- and an afternoon.
+--
+-- Rojo maps a directory to a container, so `script.Parent` is the file's own
+-- directory and each extra `.Parent` is one level up. That is checkable here.
+local pathBad = 0
+
+--- Walk a `script.A.B.C` chain the way Roblox would: `Parent` goes up a level,
+--- anything else goes down into a child. Returns the directory the final name
+--- should live in, or nil if the chain leaves the tree.
+local function resolveDir(base: string, chain: string): string?
+	-- `script` is the FILE; `script.Parent` is the container it sits in, which
+	-- is its own directory. So the first `.Parent` costs nothing and each one
+	-- after it goes up a level. Getting that backwards makes every require in
+	-- the project look broken, which is how the first version of this check
+	-- reported 54 false failures.
+	local dir = base
+	local firstParent = true
+	for seg in chain:gmatch("[%w_]+") do
+		if seg == "Parent" then
+			if firstParent then
+				firstParent = false
+			else
+				local up = dir:match("^(.*)/[^/]*$")
+				if up == nil then
+					return nil
+				end
+				dir = up
+			end
+		else
+			-- Descending into a module folder: `Menu` is Menu/ on disk.
+			dir = `{dir}/{seg}`
+		end
+	end
+	return dir
+end
+
+local function checkRequires(dir: string)
+	for _, entry in fs.readDir(dir) do
+		local path = `{dir}/{entry}`
+		if fs.isDir(path) then
+			checkRequires(path)
+		elseif entry:match("%.luau$") then
+			-- `init.luau` IS its directory, so its own parent is one level up.
+			local base = if entry == "init.luau" then (dir:match("^(.*)/[^/]*$") or dir) else dir
+			local n = 0
+			for line in fs.readFile(path):gmatch("[^\n]+") do
+				n += 1
+				-- Only the fully static `script.<chain>.<Name>` shape is
+				-- resolvable here; anything computed is left alone.
+				local chain, target = line:match("require%(script%.([%w_%.]-)%.?([%w_]+)%)")
+				if target ~= nil and chain ~= nil and chain:match("Parent") then
+					local d = resolveDir(base, chain)
+					if d ~= nil and not (fs.isFile(`{d}/{target}.luau`) or fs.isDir(`{d}/{target}`)) then
+						pathBad += 1
+						print(`FAIL {path}:{n}: require points at '{target}', which is not in {d}/`)
+					end
+				end
+			end
+		end
+	end
+end
+checkRequires("game-src")
+if pathBad == 0 then
+	print("every script.Parent require resolves to a module on disk")
+end
+
+-- ------------------------------------------------------------------------
 -- IS THE PLACE FILE OLDER THAN THE CODE IN IT?
 --
 -- `npm run build` writes SizzleSquad.rbxl, and that file is what Studio opens.
@@ -171,6 +246,6 @@ if audioBad == 0 then
 	print(`audio: every referenced id is present and owned by {OWNER}`)
 end
 
-if failed > 0 or bundleBad > 0 or stale or audioBad > 0 then
+if failed > 0 or bundleBad > 0 or stale or audioBad > 0 or pathBad > 0 then
 	process.exit(1)
 end

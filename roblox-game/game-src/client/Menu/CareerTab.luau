@@ -6,7 +6,7 @@
 -- FRIENDS button that main.client.luau was building by hand.
 
 local Theme = require(script.Parent.Theme) :: any
-local Loc = require(script.Parent.Loc) :: any
+local Loc = require(script.Parent.Parent.Loc) :: any
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BadgeDefs = require(ReplicatedStorage:WaitForChild("Game"):WaitForChild("BadgeDefs")) :: any
 
