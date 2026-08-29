@@ -64,6 +64,32 @@ Two supporting reasons the earlier date is better anyway:
 - **31 October is a Saturday.** Weekend peak is the right day to spend the beat
   on, and the wrong day to discover a launch-blocking bug.
 
+## Campaign log
+
+Kept because "did the spend do anything" is answerable only against what was
+running at the time, and three campaigns from now nobody will remember.
+
+| Started | Campaign | Length | Notes |
+|---|---|---|---|
+| 29 Aug 2026 | `8c4e27a0-5b6f-40f2-9ee9-ad8ce04d4879` | 3 days | First ever. Queued the day the store page completed — thumbnails, 1920×1080 detail image and the 30s video all in place. Pending review at submission. |
+
+**What to read off the first one**, in priority order. It is a small test, not
+the push; its job is to tell you whether to scale or to fix.
+
+1. **Did the Highly Engaged counter move at all?** This is the only number that
+   matters for reach. If a three-day campaign moves it from 0 to something, the
+   channel works and the question becomes budget. If it stays at 0, paid traffic
+   is not reaching age-checked spenders and more of it will not help.
+2. **First-round completion.** If people arrive and do not finish one shift, the
+   funnel leaks before retention is even measurable, and that is a game problem,
+   not a marketing one. The onboarding analytics were built for exactly this
+   question — it is the first dashboard to open.
+3. **D1 retention and rounds/session.** These decide whether Roblox's own
+   recommendation surfaces will carry traffic for free. They matter more than
+   raw installs.
+4. **Cost per *retained* player**, not per click. A cheap click into a leaky
+   funnel is the most expensive thing on this list.
+
 ## Getting to 250 — the only part of this that is not automatic
 
 Nothing in the build moves this number. It is bought or earned with traffic
@@ -101,67 +127,46 @@ is a much better outcome than delaying into November to chase a gate.
 Five phases, each with a gate that must pass before the next begins. Dates are
 the *start* of each phase.
 
+**PULLED FORWARD — the 60-day window ending at Halloween opens 1 September.**
+
+Anything earned before 1 Sep does not count toward being eligible on 31 Oct.
+Phase 1 finished about two weeks early (store page complete, first ad campaign
+queued), and the original 26 Sep soft launch would have used only 35 of the 60
+available days. Every day public before Halloween is a day the counter can
+move, so the public date moves up.
+
 | From | Phase | Purpose | Gate to advance |
 |---|---|---|---|
-| **Thu 27 Aug** | **Close the blockers** | The unshipped work below | Two-client test green; device pass green |
-| **Sat 12 Sep** | **Friends & family** | Funnel diagnosis, not reach | First-round completion ≥ 90% |
-| **Sat 26 Sep** | **Soft launch** — public, no spend | Earn the 250; prove retention | D1 ≥ 25%, session ≥ 12 min, rounds/session ≥ 3, like ratio ≥ 90% |
-| **Sat 17 Oct** | **Paid push** — sponsored spend begins | Buy volume into a funnel now known to hold | Cost per retained player is sane |
-| **Sat 31 Oct** | **Halloween beat** — "Spooky Shift" | The event, at full audience reach | — |
+| ~~Thu 27 Aug~~ | ~~Close the blockers~~ | **DONE** — build, store page, video, first campaign queued | — |
+| **Sat 29 Aug** | **Friends & family** | Funnel diagnosis, not reach | First-round completion ≥ 90% |
+| **Sat 5 Sep** | **Soft launch** — public | Earn the 250; prove retention | D1 ≥ 25%, session ≥ 12 min, rounds/session ≥ 3, like ratio ≥ 90% |
+| **rolling** | **Paid pushes** | Concentrated, against a page that converts | Cost per *retained* player is sane |
+| **Sat 31 Oct** | **Halloween beat** — "Spooky Shift" | The event, at whatever reach has been earned | — |
 
-### 27 Aug – 12 Sep · Close the blockers (2.2 weeks)
+A 5 Sep public date puts **56 of the 60 window days** to work instead of 35.
+That is the single largest lever left, it costs nothing, and it is available
+only because the build finished early.
 
-Everything here is already tracked; this phase just puts a date on it.
+### Now · Friends & family (about a week)
 
-1. ~~**Two real clients.**~~ **DONE.** Several multiplayer sessions run: the
-   First Shift teleport out and back, drop-in seating, nametags, the wardrobe
-   and the shared kitchen all behave. This was the single largest unknown in
-   the project and it is no longer open.
-2. **Device pass** at 896×414 and at 375px height — the wardrobe preview and
-   the full menu. Most Roblox play is mobile; this is a first-impression gate.
-   Localized text fit (German, Japanese) belongs in the same pass.
-3. **Thumbnails: 6–8 total.** One is uploaded, and three 1920×1080 detail-page
-   variants are rendered in `roblox/game-banner/`. Priority order is in
-   `STORE-LISTING.md`. Do not fill all ten — that correlates *negatively* with
-   CCU in the sampled top-19.
-4. **Gameplay video** (~30s, no voice-over, no overlay text reading as an ad).
-   Only 3 of 19 top experiences have one, and all three sit in slot one because
-   Roblox auto-promotes an approved video ahead of the stills. This is the
-   cheapest available differentiator on the whole store page.
-5. **Confirm "Publishing tier at risk" clears** after the fee and the next
-   publish. That reading was inference, not documentation — if it persists, it
-   needs re-investigating before anything else ships.
-6. ~~**Set `Config.FOUNDING_CHEF_UNTIL`.**~~ **DONE** — `2026-11-08`.
+20–50 players via private links. **This cannot move the 250** — the owner's
+entire personal Roblox network was played through and left the counter at 0 —
+and should not be judged on reach. Its only job is to find the biggest drop in
+join → first round → second round while the audience is small enough to talk to.
 
-### 12 Sep – 26 Sep · Friends & family (2 weeks)
+### From 5 Sep · Soft launch (public)
 
-20–50 players via private links. **This phase cannot move the 250 counter and
-should not be judged on reach.** Its only job is to find the biggest drop in
-join → first round → second round, while the audience is small enough to
-actually talk to.
+Two jobs at once:
 
-### 26 Sep – 17 Oct · Soft launch (3 weeks)
+- **Earn the 250.** This is why the date moved up: 56 window days instead of 35.
+- **Prove the funnel holds** against the metric gates before scaling spend.
 
-Public, listed, **no paid spend**. Two jobs at once:
+Paid pushes run against this rather than waiting for a separate phase — the
+rolling window punishes saving budget for later, and the store page is already
+finished, which was the actual reason to wait.
 
-- **Earn the 250.** Five weeks of organic traffic before Halloween is the
-  entire reason this date is where it is.
-- **Prove the funnel holds** before any money goes into it, against the metric
-  gates in the table.
-
-Watch the highly-engaged counter weekly. If it is tracking far below the
-5,000–12,500 estimate implied above, that is the signal to pull the paid push
-earlier rather than later — paid traffic feeds the same counter.
-
-### 17 Oct – 31 Oct · Paid push (2 weeks)
-
-Sponsored spend starts **only after the retention gates pass**. The gates are
-not bureaucracy; they are the leak detector. Paying to pour traffic into a
-funnel with a 40% first-round completion rate converts Robux into nothing at a
-very reliable rate, and the D1 number is what tells you the difference.
-
-Start small, measure cost per *retained* player rather than per click, and
-scale only that.
+Watch the Audience Reach dashboard weekly. If the counter is not moving after a
+funded week, the problem is the page or retention, not the budget.
 
 ### 31 Oct · Halloween beat
 
