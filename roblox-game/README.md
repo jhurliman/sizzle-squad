@@ -101,6 +101,36 @@ land" is answerable.
 `npm run publish` builds first, so the freshness guard and the place upload
 cannot disagree. `--saved` uploads a version without making it live.
 
+### Seeing it before publishing — Studio MCP
+
+Roblox has no headless renderer, but Studio ships an **MCP server** that gives a
+real one, and it is strictly better than any of it we could approximate:
+
+| Tool | Why it matters here |
+| --- | --- |
+| `screen_capture` | An actual viewport screenshot — the thing "does this layout work" needs |
+| `get_console_output` | Reads the client's errors. The blue-sky outage was ONE error in the client log and took an afternoon to find without this |
+| `start_stop_play` | Starts a playtest without touching the mouse |
+| `execute_luau` | Runs code in Edit, Client or Server context |
+| `user_keyboard_input`, `character_navigation` | Drives a chef around to reach the screen you want to look at |
+
+Turn it on once: **Studio → Assistant Settings → Manage MCP Servers → Enable
+Studio as MCP server.** `.mcp.json` in the repo root already points at the macOS
+binary, so any MCP client opened on this project picks it up.
+
+**The pre-publish flow this unlocks:**
+
+1. Open `SizzleSquad.rbxl`, `start_stop_play`
+2. `get_console_output` — any red line is a bug that would have shipped
+3. `screen_capture` — look at the panel rather than reasoning about UDim2 maths
+4. `npm run publish`
+5. `npm run smoke:live` against the published place
+
+Steps 2 and 3 are the ones this project keeps needing: every layout bug shipped
+so far (Level Rewards drawn over Friends Playing Now, the ticket rail sliding
+off the right edge, a six-button row overflowing both screen edges) was visible
+in a single screenshot, and the one outage was visible in a single console line.
+
 ### Staging — Roblox has no blue/green, so make one
 
 There is no traffic-splitting deploy on Roblox. `versionType=Saved` stores a
