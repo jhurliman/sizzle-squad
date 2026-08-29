@@ -165,4 +165,43 @@ check(en ~= nil and en.kind == "bacon", `an empty pan still owes bacon (got {en 
 local bs = world({ [2] = PLATE(), [3] = ING("lettuce", "raw") })
 check(D.nextNeeded(bs, order, nil).kind == "lettuce", "a board is not a pan — raw lettuce on one is still owed")
 
+-- ------------------------------------------------- a board is for cutting
+--
+-- THE REPORTED BUG: "if you then put that raw bacon on a cutting board in the
+-- tutorial it says to chop it." Bacon is chopSeconds 0, so the press does
+-- nothing. planGrab now refuses to put it there at all, and the coach must not
+-- call it unfinished work even if a swap gets one onto a board anyway.
+local shared = require("../out/shared-bundle")
+local boardWorld = world({ [2] = PLATE(), [3] = ING("bacon", "raw") })
+boardWorld.shared = shared
+check(D.unfinishedAt(boardWorld, "board", "prepped") == nil,
+	"raw bacon on a board is not unfinished work — it cannot be cut")
+
+local lettuceWorld = world({ [2] = PLATE(), [3] = ING("lettuce", "raw") })
+lettuceWorld.shared = shared
+check(D.unfinishedAt(lettuceWorld, "board", "prepped") == 3, "raw lettuce on a board still is")
+
+-- and the sim refuses to put it there in the first place
+local sim = shared.createSim({ seed = 3 })
+local chef = sim.chefs[1]
+local board, counter
+for _, st in sim.kitchen.stations do
+	if st.kind == "board" and board == nil then
+		board = st
+	end
+	if st.kind == "counter" and counter == nil then
+		counter = st
+	end
+end
+local function hold(kind: string, state: string)
+	chef.carrying = { type = "ingredient", ingredient = { id = 1, kind = kind, state = state, progress = 0, overcook = 0 } }
+end
+hold("bacon", "raw")
+check(shared.planGrab(sim, chef, board) == "none", `a board refuses raw bacon (got '{shared.planGrab(sim, chef, board)}')`)
+check(shared.planGrab(sim, chef, counter) == "place", "but a counter still takes it")
+hold("lettuce", "raw")
+check(shared.planGrab(sim, chef, board) == "place", "a board still takes raw lettuce")
+hold("lettuce", "prepped")
+check(shared.planGrab(sim, chef, board) == "place", "and still lets you park prepped lettuce")
+
 print(if failures > 0 then `{failures} FAILURES` else "PASS: coach")

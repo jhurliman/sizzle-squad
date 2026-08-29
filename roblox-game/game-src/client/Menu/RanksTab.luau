@@ -66,7 +66,58 @@ function RanksTab.new(parent: Instance, _deps: any)
 		Text = "No rankings yet — cook something!",
 	}, parent)
 
+	-- "NO RANKINGS YET" AND "NOT LOADED YET" ARE DIFFERENT SENTENCES.
+	--
+	-- The boards arrive on a ~90s server poll, so opening this tab early meant
+	-- staring at "No rankings yet — cook something!" and then watching a full
+	-- board appear underneath it. The empty state was telling a confident lie
+	-- about data it did not have. `boards == nil` is unknown; an empty table is
+	-- knowledge.
+	self.loading = mk("Frame", {
+		Size = UDim2.new(1, 0, 0, 60),
+		Position = UDim2.fromOffset(0, 100),
+		BackgroundTransparency = 1,
+		ZIndex = 5,
+		Visible = true,
+	}, parent)
+	Theme.label({
+		Size = UDim2.new(1, 0, 0, 22),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextSize = 16,
+		TextColor3 = Theme.DIM,
+		ZIndex = 6,
+		Text = "Loading rankings…",
+	}, self.loading)
+	-- An indeterminate bar rather than a spinner glyph: the UI font has holes
+	-- (the coin emoji renders as a box), and geometry cannot be missing.
+	local track = mk("Frame", {
+		Size = UDim2.fromOffset(160, 4),
+		Position = UDim2.new(0.5, -80, 0, 30),
+		BackgroundColor3 = Theme.BROWN_LIGHT,
+		BorderSizePixel = 0,
+		ZIndex = 6,
+	}, self.loading)
+	Theme.corner(track, 2)
+	self.spinner = mk("Frame", {
+		Size = UDim2.fromOffset(52, 4),
+		BackgroundColor3 = Theme.GOLD,
+		BorderSizePixel = 0,
+		ZIndex = 7,
+	}, track)
+	Theme.corner(self.spinner, 2)
+	self.spinT = 0
+
 	return self
+end
+
+function RanksTab:step(dt: number)
+	if self.loading == nil or not self.loading.Visible then
+		return
+	end
+	self.spinT += dt
+	-- Ping-pong across the track; eased so it reads as motion, not a metronome.
+	local u = (math.sin(self.spinT * 2.2) + 1) / 2
+	self.spinner.Position = UDim2.fromOffset(math.floor(u * (160 - 52)), 0)
 end
 
 function RanksTab:setLeaderboards(boards: any)
@@ -95,6 +146,13 @@ function RanksTab:render()
 			unit = b.unit
 		end
 	end
+	-- nil = the server has not answered yet; {} = it answered, nobody is on it
+	if self.boards == nil then
+		self.loading.Visible = true
+		self.empty.Visible = false
+		return
+	end
+	self.loading.Visible = false
 	if rows == nil or #rows == 0 then
 		self.empty.Visible = true
 		return

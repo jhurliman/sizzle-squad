@@ -87,7 +87,52 @@ function Sfx.new()
 			self.byId[id] = s
 		end
 	end
+	self:verify()
 	return self
+end
+
+--- SILENCE IS THE ONE FAILURE NOTHING HERE CAN SEE.
+---
+--- An audio asset that will not load -- wrong owner, still in moderation, a
+--- typo'd id -- does not error. Sound:Play() succeeds, nothing is heard, and
+--- every check in this repo stays green. That is how the game shipped to a
+--- two-player playtest completely mute with 59 perfectly valid-looking ids in
+--- the source.
+---
+--- PreloadAsync resolves each asset and IsLoaded then tells the truth, so the
+--- failure finally has somewhere to show up.
+function Sfx:verify()
+	task.spawn(function()
+		local list = {}
+		for _, s in self.byId do
+			table.insert(list, s)
+		end
+		if #list == 0 then
+			warn("[sizzle] audio: no sound templates were built at all")
+			return
+		end
+		local ok = pcall(function()
+			game:GetService("ContentProvider"):PreloadAsync(list)
+		end)
+		if not ok then
+			warn("[sizzle] audio: PreloadAsync threw; cannot verify sfx")
+			return
+		end
+		local bad = {}
+		for id, s in self.byId do
+			if not s.IsLoaded then
+				table.insert(bad, tostring(id))
+			end
+		end
+		if #bad > 0 then
+			warn(
+				`[sizzle] audio: {#bad}/{#list} sfx FAILED to load — check ownership/moderation. First few: `
+					.. table.concat(bad, ", ", 1, math.min(5, #bad))
+			)
+		else
+			print(`[sizzle] audio: all {#list} sfx loaded`)
+		end
+	end)
 end
 
 --- Serve-bell cosmetics. There is no separate bell upload, so the variant is

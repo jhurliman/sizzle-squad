@@ -103,11 +103,21 @@ end
 --- you to fetch lettuce from the crate -- while the lettuce you had just
 --- delivered sat there unchopped, one press from done. Work already started
 --- outranks starting anything new.
+--- Work in flight at a station of `kind`. A board only counts if the thing on
+--- it can actually be cut: a bun or a rasher is chopSeconds 0, so calling it
+--- unfinished made the coach point at a board and say "chop it" for a press
+--- that does nothing.
 local function unfinishedAt(state: any, kind: string, doneState: string): number?
 	for _, st in state.mirrorSim.kitchen.stations do
 		if st.kind == kind then
 			local h = state.stations[st.id] and state.stations[st.id].holding
-			if h ~= nil and h.type == "ingredient" and h.state ~= doneState then
+			local defs = state.shared ~= nil and state.shared.INGREDIENT_DEFS or nil
+			local cuttable = h == nil
+				or h.type ~= "ingredient"
+				or kind ~= "board"
+				or defs == nil
+				or (defs[h.kind] ~= nil and defs[h.kind].chopSeconds > 0)
+			if h ~= nil and h.type == "ingredient" and h.state ~= doneState and cuttable then
 				return st.id
 			end
 		end
@@ -317,7 +327,20 @@ function FirstShift:update(state: any, flags: number): number?
 				end
 			end
 		end
-		if wanted ~= nil and wanted ~= held.state then
+		if wanted == nil then
+			-- THE TICKET NEVER ASKED FOR THIS.
+			--
+			-- Reported from the tutorial: pick up raw bacon as your first move
+			-- on a Garden Salad ticket and the coach said "that's ready — put
+			-- it on your plate". It is not ready and it cannot be plated (raw
+			-- bacon fails `plateable`), and the salad does not want bacon in
+			-- any state. The loop above simply never matched, and `wanted`
+			-- being nil fell into the success branch. Send it back instead.
+			tip = `The ticket doesn't need {held.kind} — put it back in the crate.`
+			target = nearest(state, function(st)
+				return st.kind == "crate" and st.dispenses == held.kind
+			end)
+		elseif wanted ~= held.state then
 			local kind, line = processingFor(wanted)
 			tip = line
 			target = nearest(state, stationOfKind(kind))

@@ -59,6 +59,30 @@ function Music.new(parent: Instance)
 			s.TimePosition = 0
 			s:Play()
 		end
+		-- See Sfx:verify. A stem that will not load plays silently forever and
+		-- nothing anywhere says so.
+		task.spawn(function()
+			local list = {}
+			for _, s in self.sounds do
+				table.insert(list, s)
+			end
+			local ok = pcall(function()
+				game:GetService("ContentProvider"):PreloadAsync(list)
+			end)
+			if not ok then
+				warn("[sizzle] audio: PreloadAsync threw; cannot verify music")
+				return
+			end
+			for name, s in self.sounds do
+				if not s.IsLoaded then
+					warn(`[sizzle] audio: music stem '{name}' ({s.SoundId}) FAILED to load`)
+				elseif not s.IsPlaying then
+					warn(`[sizzle] audio: music stem '{name}' loaded but is not playing`)
+				end
+			end
+		end)
+	else
+		warn("[sizzle] audio: no music stems configured (all STEM_IDS are 0)")
 	end
 	return self
 end

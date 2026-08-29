@@ -1212,6 +1212,27 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
       if (held.type === 'plate' && held.plate.contents.length > 0) return 'rinse';
       return 'none';
     default: {
+      /**
+       * A BOARD IS FOR CUTTING, SO IT ONLY TAKES THINGS THAT CUT.
+       *
+       * Reported from the tutorial: put raw bacon on a chopping board and the
+       * coach dutifully told you to chop it — bacon is chopSeconds 0, so the
+       * press did nothing and the rasher sat there. `planGrab` already refuses
+       * to CHOP it (see the 'prep' rung); refusing to PUT IT DOWN there in the
+       * first place is the same rule applied one step earlier, and it is the
+       * one a player actually sees.
+       *
+       * Only ingredients, and only ones with nothing to cut: a plate still
+       * parks on a board (that is what `affordance` tiers it down for), and
+       * anything already prepped can still be set down.
+       */
+      if (
+        st.kind === 'board' &&
+        !st.holding &&
+        held.type === 'ingredient' &&
+        INGREDIENT_DEFS[held.ingredient.kind].chopSeconds <= 0
+      )
+        return 'none';
       if (!st.holding) return 'place';
       if (
         st.holding.type === 'plate' &&
