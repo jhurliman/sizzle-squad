@@ -330,10 +330,26 @@ function SimService:tickMovementOnly(dt: number, _now: number?)
 		self.clock += shared.SIM_DT
 		local t = self.clock
 		for _, chef in sim.chefs do
+			-- BETWEEN ROUNDS, NOBODY IS STUNNED. NOT EVEN A BOT.
+			--
+			-- This used to clear working/stun only for HUMANS, and the bots'
+			-- stun had nothing to run it down: movePhase is what decrements it
+			-- and this path never calls movePhase for anyone. So a bump during
+			-- the lobby left a bot stunned FOREVER — the flag rode every
+			-- transform packet, the client played the wobble and the 0.9 flail
+			-- on a loop, and collidePhase went on shoving the frozen body
+			-- around as the humans skated past it. Reported as a bot vibrating
+			-- while still drifting around the level, which is exactly what
+			-- that is.
+			--
+			-- Same shape as the human freeze fixed in `tick`: a chef whose
+			-- stun is set by a path that cannot clear it. Between rounds there
+			-- is no gameplay for a stun to mean anything about, so clear it
+			-- for every chef rather than decrementing it.
+			chef.working = nil
+			chef.stun = 0
 			local slot = self.humans[chef.id]
 			if slot then
-				chef.working = nil
-				chef.stun = 0
 				self:applyHuman(chef, slot, shared.SIM_DT, t)
 			end
 		end

@@ -128,4 +128,35 @@ simService:tick(1 / 60)
 check(math.abs(chef.pos.x - (from.x + 0.05)) < 1e-6,
 	`and the server takes the client's position again ({from.x} -> {chef.pos.x})`)
 
+-- ---- and a BOT must not stay stunned between rounds --------------------
+--
+-- THE REPORTED BUG: with three humans and one bot, the bot got into a
+-- vibrating body state during the lobby while still drifting around the level.
+-- tickMovementOnly (the between-rounds path) cleared working/stun for HUMANS
+-- only, and nothing else can clear a bot's — movePhase is what decrements it
+-- and this path never calls movePhase for anyone. So a lobby bump left the bot
+-- stunned forever: the flag rode every transform, the client looped the wobble
+-- and flail, and collidePhase kept shoving the frozen body around.
+--
+-- Exactly the same shape as the human freeze above, one code path over.
+local bot
+for _, c in simService.sim.chefs do
+	if simService.humans[c.id] == nil then
+		bot = c
+		break
+	end
+end
+check(bot ~= nil, "there is a bot chef to test")
+if bot ~= nil then
+	bot.stun = 0.16
+	bot.working = 7
+	for _ = 1, 4 do
+		simService:tickMovementOnly(1 / 60)
+	end
+	check(bot.stun == 0, `a bot's stun clears between rounds ({bot.stun})`)
+	check(bot.working == nil, "and it is not left holding work either")
+	-- the flag is what the client actually renders from
+	check(bit32.band(simService:chefFlags(bot), 1) == 0, "so no FLAG_STUN reaches the client")
+end
+
 print(if failures > 0 then `{failures} FAILURES` else "PASS: crew")

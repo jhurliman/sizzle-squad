@@ -62,11 +62,31 @@ local function substitute(template: string, args: { any }): string
 end
 
 --- Translated, formatted text for a `fmt.*` key.
+--- NUMBERS GO IN AS STRINGS.
+---
+--- Translator:FormatByKey applies locale number formatting to numeric
+--- arguments, which turned "WAITING FOR CREW 2/3" into "WAITING FOR CREW
+--- 2.00/3.00" — and would have done the same to every level, coin count, price
+--- and dish tally the moment a translator was available. These are COUNTS, not
+--- measurements; two decimal places is never right for them. Formatting them
+--- here keeps the engine from having an opinion.
+local function asText(v: any): any
+	if type(v) ~= "number" then
+		return v
+	end
+	if v % 1 == 0 then
+		return string.format("%d", v)
+	end
+	-- Non-integers are rare here (nothing in the table asks for one) but must
+	-- not silently become "3.00" either.
+	return tostring(v)
+end
+
 function Loc.f(key: string, ...): string
 	local args = table.pack(...)
 	local list = {}
 	for i = 1, args.n do
-		list[i] = args[i]
+		list[i] = asText(args[i])
 	end
 	if translator ~= nil then
 		local ok, text = pcall(function()
