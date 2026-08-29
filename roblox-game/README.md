@@ -80,6 +80,30 @@ changelog. The largest unknown is four-human pacing, which no harness here can
 measure — bots leave the kitchen uncontended, and humans do not have the bot
 brain's failure mode.
 
+## Publishing
+
+```sh
+npm run publish        # build, then upload the place through Open Cloud
+```
+
+**Not through Studio.** Studio's uploader failed repeatedly with *"Server is
+busy and unable to process your request right now. Retrying…"* and left the live
+experience running an empty place — joining gave a blue sky, no kitchen and
+Roblox's default controls. Nothing was wrong with the build; it had simply never
+arrived, and the retry dialog gave no way to tell the difference.
+
+Open Cloud returns the same 409 when Roblox is busy, which is how we know it is
+their side and not Studio's, but it says so in one line and `publish-place.mjs`
+backs off and retries — the failure above cleared on the fifth attempt after
+about 75 seconds. It also prints the version number it published, so "did it
+land" is answerable.
+
+`npm run publish` builds first, so the freshness guard and the place upload
+cannot disagree. `--saved` uploads a version without making it live.
+
+**Publishing is live and outward-facing, so it happens on explicit approval —
+never as a side effect of a build.**
+
 ## Remaining (user-gated) launch steps
 
 Things only the account owner can do. Same rule as KNOWN-GAPS: **done items are
