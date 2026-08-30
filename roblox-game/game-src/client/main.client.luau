@@ -25,6 +25,7 @@ local Menu = require(script.Parent.Menu) :: any
 local ItemViz = require(script.Parent.ItemViz) :: any
 local Results = require(script.Parent.Results) :: any
 local BinDress = require(script.Parent.BinDress) :: any
+local HearthFire = require(script.Parent.HearthFire) :: any
 
 local SCALE = 5
 local Config = require(gameShared:WaitForChild("Config")) :: any
@@ -211,6 +212,11 @@ local function indexStations(stations: { any })
 		if nested ~= nil then
 			root = nested
 		end
+	end
+	if root ~= nil then
+		-- The hearth is the biggest thing in the room and the lobby closeup
+		-- frames it dead centre behind the crew. An unlit one is conspicuous.
+		HearthFire.apply(root)
 	end
 	local folder = root and root:FindFirstChild("Stations")
 	if folder ~= nil then
@@ -644,6 +650,7 @@ RunService.RenderStepped:Connect(function(dt)
 	results:step(dt)
 	cameraRig:update(dt)
 	vfx:tick(dt)
+	HearthFire.tick(state.clock)
 	state:advanceClock(dt, state.phase.phase == "round")
 	-- heat mirrors the sim's ramp (min(1, time/240)); tension is 1 - patience
 	music:update(

@@ -20,6 +20,7 @@ local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Game"):WaitForChild("Config")) :: any
 local Theme = require(script.Theme) :: any
 local ShiftPanel = require(script.ShiftPanel) :: any
 local KitchenCard = require(script.KitchenCard) :: any
@@ -111,6 +112,14 @@ function Menu.new(deps: any)
 			end
 		end,
 	})
+	-- IN STUDIO, GO STRAIGHT TO THE LOBBY.
+	--
+	-- The returning-player shim sets sessions >= 2, which is what a returning
+	-- player is -- and the Kitchen Card is what a returning player sees first,
+	-- a full-screen welcome-back over the Start Shift panel that clears itself
+	-- after twelve seconds. Correct in production, and in Studio it is twelve
+	-- seconds of nothing in front of the screen being worked on.
+	self.skipCard = RunService:IsStudio() and Config.STUDIO_RETURNING_PLAYER
 	self.kitchenCard = KitchenCard.new(gui, {
 		onOpenTab = function(tab)
 			self:openTab(tab)
@@ -444,6 +453,9 @@ end
 function Menu:setProgress(progress: any)
 	self.progress = progress
 	self.shiftPanel:setProgress(progress)
+	if self.skipCard then
+		self.kitchenCard.consumed = true
+	end
 	self.kitchenCard:setProgress(progress)
 	self.emoteBar:setProgress(progress)
 	self:maybeAutoStart()
