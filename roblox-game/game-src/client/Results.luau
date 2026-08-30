@@ -175,13 +175,21 @@ function Results.new(gui: Instance)
 	-- a game trying to be found, so do Messages and TikTok.
 	local shareCta = Theme.cta({
 		Size = UDim2.fromOffset(200, 44),
-		Position = UDim2.new(0.5, -100, 1, -56),
 		Fill = Theme.BLUE,
 		TextSize = 18,
 		ZIndex = 11,
 		Text = "SHARE PHOTO",
 	}, self.card)
 	self.shareRoot = shareCta.root
+	-- POSITION GOES ON THE ROOT, NOT THROUGH Theme.cta.
+	--
+	-- cta() builds its own root frame and copies across exactly Size,
+	-- BackgroundTransparency and LayoutOrder -- a Position in its props is
+	-- dropped without a word. Every other caller lays cta roots out with a
+	-- UIListLayout so nobody had noticed; this one is absolutely positioned,
+	-- and shipped sitting in the top-left corner of the results card.
+	self.shareRoot.AnchorPoint = Vector2.new(0.5, 1)
+	self.shareRoot.Position = UDim2.new(0.5, 0, 1, -12)
 	self.shareRoot.Visible = false
 	shareCta.button.Activated:Connect(function()
 		if self.onShare ~= nil then

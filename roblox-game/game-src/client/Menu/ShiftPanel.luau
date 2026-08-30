@@ -314,8 +314,18 @@ function ShiftPanel:renderRoster()
 			slot.face.Visible = true
 			slot.cta.root.Visible = false
 			slot.name.Text = seat.name or "Chef"
-			slot.state.Text = if seat.ready then "✅ ready" else "…"
-			slot.state.TextColor3 = if seat.ready then Theme.GREEN else Theme.DIM
+			-- Three states, each said in words. The not-ready one used to be a
+			-- bare "…", which is not a state, it is a shrug.
+			if seat.afk then
+				slot.state.Text = "away"
+				slot.state.TextColor3 = Theme.DIM
+			elseif seat.ready then
+				slot.state.Text = "✅ ready"
+				slot.state.TextColor3 = Theme.GREEN
+			else
+				slot.state.Text = "choosing"
+				slot.state.TextColor3 = Theme.DIM
+			end
 		elseif bots then
 			-- A bot in the chair IS the crew setting, stated as its effect.
 			slot.face.Visible = true

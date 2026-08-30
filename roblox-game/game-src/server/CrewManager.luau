@@ -9,6 +9,16 @@ CrewManager.__index = CrewManager
 
 local AFK_SECONDS = 20
 
+-- A LOBBY IS NOT A KITCHEN, AND STANDING STILL MEANS SOMETHING DIFFERENT IN IT.
+--
+-- 20s of no input during a shift means you are not cooking, and the sooner a
+-- bot covers for you the better. 20s of no input in the lobby means you are
+-- reading the panel -- and since the lobby now deliberately walks you onto a
+-- mark and parks you there for the crew shot, being motionless is the NORMAL
+-- state rather than evidence of anything. At 20s that combination marked
+-- present players away while they stood on their own marks.
+local AFK_LOBBY_SECONDS = 90
+
 -- Velocity quantizes to i8 over +/-8 cells/s, so one unit is ~0.063 cells/s and
 -- a released stick packs to exactly 0. Anything above half a quantum is real
 -- movement rather than rounding.
@@ -41,6 +51,7 @@ function CrewManager.new(
 	self.replicator = replicator
 	self.now = now
 	self.skinFor = skinFor
+	self.lobby = false
 	self.seats = {} :: { [any]: Seat } -- keyed by Player
 	self.byChef = {} :: { [number]: Seat }
 
@@ -204,10 +215,16 @@ end
 --- Called each heartbeat: AFK chefs fall back to bot control (silently;
 --- resuming is instant on any input via touch()), and any chef the server
 --- had to overrule this tick gets snapped back authoritatively.
+--- Between rounds the AFK window is longer; see AFK_LOBBY_SECONDS.
+function CrewManager:setLobby(on: boolean)
+	self.lobby = on == true
+end
+
 function CrewManager:heartbeat()
 	local t = self.now()
+	local limit = if self.lobby then AFK_LOBBY_SECONDS else AFK_SECONDS
 	for _, seat in self.seats do
-		if not seat.afk and t - seat.lastInputAt > AFK_SECONDS then
+		if not seat.afk and t - seat.lastInputAt > limit then
 			seat.afk = true
 			self.simService:setHuman(seat.chefId, false)
 		end

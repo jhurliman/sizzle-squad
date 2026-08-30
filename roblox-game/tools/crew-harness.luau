@@ -229,6 +229,45 @@ check(seatA.afk == true, "a seat with no input at all does go AFK")
 remotes.GrabEdge:receive(C)
 check(seatA.afk == false, "and a grab press wakes it")
 
+-- ---- standing on your mark in the lobby is not being away ----------------
+--
+-- THE REPORTED BUG, and it was an interaction between two things that were
+-- each correct alone. The lobby walks you onto a mark and parks you there so
+-- the crew shot has somebody in it; AFK detection reads motionless as idle. At
+-- the round threshold of 20s that meant a player who was standing right there,
+-- looking at the panel, was marked away -- and since the roster dropped AFK
+-- seats at the time, their chair turned into a bot in front of them.
+clock += 1000
+crew:touch(seatA)
+crew:setLobby(true)
+for _ = 1, 60 do
+	clock += 1
+	remotes.MoveStream:receive(C, idle)
+	crew:heartbeat()
+end
+check(seatA.afk == false, "a minute parked on your mark in the lobby is NOT away")
+
+-- but genuinely gone is still genuinely gone, or one dead tab holds the lobby
+for _ = 1, 60 do
+	clock += 1
+	remotes.MoveStream:receive(C, idle)
+	crew:heartbeat()
+end
+check(seatA.afk == true, `two minutes idle in the lobby still goes away ({clock}s)`)
+
+-- and a round is unforgiving again: nobody is covering your station
+crew:setLobby(false)
+remotes.MoveStream:receive(C, moving)
+check(seatA.afk == false, "movement brings them back")
+for _ = 1, 30 do
+	clock += 1
+	remotes.MoveStream:receive(C, idle)
+	crew:heartbeat()
+end
+check(seatA.afk == true, "30s idle DURING a shift is still away -- a bot should be cooking")
+crew:setLobby(false)
+remotes.MoveStream:receive(C, moving)
+
 -- ---- the seat handshake must be re-sendable ------------------------------
 --
 -- ChefAssign and Snapshot are one-shot RemoteEvents and Roblox drops them for

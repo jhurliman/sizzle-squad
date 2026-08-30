@@ -72,6 +72,8 @@ function RoundDirector.new(
 end
 
 function RoundDirector:setPhase(phase: Phase, timer: number)
+	-- The AFK window is longer between rounds: see CrewManager.AFK_LOBBY_SECONDS.
+	self.crew:setLobby(phase ~= "round")
 	self.phase = phase
 	self.timer = timer
 	-- A fresh lobby always starts un-readied, so nobody is dragged into the
@@ -103,18 +105,23 @@ function RoundDirector:broadcastPhase()
 	-- roster built from it would render "3/2".
 	local seats = {}
 	for player, seat in self.crew.seats do
-		if not seat.afk then
-			table.insert(seats, {
-				chefId = seat.chefId,
-				userId = player.UserId,
-				ready = self.ready[player] == true,
-				-- The name rides along rather than being joined client-side.
-				-- EquipDeltas already carries one keyed by chefId, but pairing
-				-- the two payloads to draw one row is how the UserId->chefId
-				-- inference this replaced got fragile in the first place.
-				name = player.DisplayName or player.Name,
-			})
-		end
+		table.insert(seats, {
+			chefId = seat.chefId,
+			userId = player.UserId,
+			ready = self.ready[player] == true,
+			-- AFK seats STAY on the roster, flagged. Dropping them made the
+			-- lobby lie: the panel parks you on a mark, standing still used
+			-- to count as idle, and a present player watched their own chair
+			-- turn into a bot. The roster answers "who is in this room",
+			-- which is not the same question as readyTally's "who can still
+			-- answer", and conflating them is what produced that.
+			afk = seat.afk == true,
+			-- The name rides along rather than being joined client-side.
+			-- EquipDeltas already carries one keyed by chefId, but pairing
+			-- the two payloads to draw one row is how the UserId->chefId
+			-- inference this replaced got fragile in the first place.
+			name = player.DisplayName or player.Name,
+		})
 	end
 	table.sort(seats, function(a, b)
 		return a.chefId < b.chefId

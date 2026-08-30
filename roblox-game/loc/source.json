@@ -2123,6 +2123,36 @@
         "de": "Foto konnte nicht aufgenommen werden",
         "id": "Tidak dapat mengambil foto"
       }
+    },
+    {
+      "key": "ui.roster_away",
+      "source": "away",
+      "context": "Status under a player's name on a lobby chair when they have stopped responding and the crew can start without them. Lower case caption on a fixed-width chip; keep it to one short word.",
+      "note": "",
+      "tr": {
+        "es": "ausente",
+        "pt": "ausente",
+        "ja": "離席中",
+        "ko": "자리 비움",
+        "fr": "absent",
+        "de": "abwesend",
+        "id": "pergi"
+      }
+    },
+    {
+      "key": "ui.roster_choosing",
+      "source": "choosing",
+      "context": "Status under a player's name on a lobby chair when they are present but have not pressed Ready yet -- deciding, browsing the wardrobe, not gone. Lower case caption on a fixed-width chip; keep it short.",
+      "note": "",
+      "tr": {
+        "es": "decidiendo",
+        "pt": "decidindo",
+        "ja": "検討中",
+        "ko": "고민 중",
+        "fr": "hésite",
+        "de": "überlegt",
+        "id": "memilih"
+      }
     }
   ],
   "note": "Bare language codes, not region locales. The experience registers its languages as languageCodeType=Language (en, fr, de, id, ja, ko, pt, es) and the dashboard importer rejects de-de/id-id/ja-jp/ko-kr against that. Bare codes are also the better runtime choice: Roblox falls back from a player's region locale (ja-jp) to the base language (ja), so one column covers every region of that language."

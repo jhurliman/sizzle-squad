@@ -282,20 +282,30 @@ if seatA ~= nil then
 	check(seatA.ready == true, "and their ready state")
 end
 
--- AFK-and-ready: the case that used to render 3/2
+-- AFK SEATS STAY ON THE ROSTER, FLAGGED.
+--
+-- The first version of this dropped them, on the theory that it fixed the 3/2
+-- bug. It did, and it broke something worse: the lobby parks you on a mark for
+-- the crew shot, standing still counted as idle, and a present player watched
+-- their own chair turn into a bot and back. The roster answers "who is in this
+-- room"; readyTally answers "who can still answer". Different questions, and
+-- conflating them is what produced both bugs.
 crew.seats[playerA].afk = true
 director:broadcastPhase()
 local afkPay = lastPhasePayload()
 local n, total = director:readyTally()
-check(#afkPay.seats == total, `an AFK seat leaves the roster ({#afkPay.seats} rows, readyTotal {total})`)
-local anyAfk = false
+local afkRow = nil
 for _, st in afkPay.seats do
 	if st.userId == playerA.UserId then
-		anyAfk = true
+		afkRow = st
 	end
 end
-check(not anyAfk, "an AFK-but-ready player is not counted as a ready chair")
-check(#afkPay.seats >= n, `roster rows never undercount the ready tally ({#afkPay.seats} >= {n})`)
+check(afkRow ~= nil, "an AFK player is still on the roster -- the lobby must not deny they are here")
+if afkRow ~= nil then
+	check(afkRow.afk == true, "and is flagged so the chair can say 'away'")
+end
+check(total == 0, `but readyTally still excludes them ({total} seats can answer)`)
+check(n == 0, "so an AFK-but-ready player cannot start the round on their own")
 crew.seats[playerA].afk = false
 director:broadcastPhase()
 
