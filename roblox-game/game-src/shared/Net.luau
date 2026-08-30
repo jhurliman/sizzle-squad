@@ -18,6 +18,7 @@ Net.REMOTES = {
 	-- client -> server
 	MoveStream = "UnreliableRemoteEvent", -- buffer: seq,pos,vel,heading,useHeld
 	GrabEdge = "RemoteEvent", -- seq (reliable: a press must never be lost)
+	ClientReady = "RemoteEvent", -- client -> server: my listeners are connected, re-send the join state
 	-- server -> client
 	Transforms = "UnreliableRemoteEvent", -- buffer: per-chef transform+flags
 	SimEvents = "RemoteEvent", -- { SimEvent, ... } batched per heartbeat

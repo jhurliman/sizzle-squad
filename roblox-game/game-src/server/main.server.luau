@@ -327,6 +327,41 @@ Players.PlayerAdded:Connect(function(player)
 	broadcastEquips()
 end)
 
+-- THE JOIN SEND IS BEST-EFFORT; THIS IS THE ONE THAT COUNTS.
+--
+-- Everything PlayerAdded hands a new client -- ChefAssign, Snapshot,
+-- RoundPhase, Leaderboards, EquipDeltas, Progress -- is a one-shot
+-- RemoteEvent, and Roblox does not hold those for a listener that connects
+-- later. PlayerAdded runs behind a yielding DataStore claim, while the client
+-- is still requiring modules and loading 55 sounds before it reaches its
+-- OnClientEvent lines, so which side wins is a coin toss on a cold phone.
+--
+-- Losing it was silent and total: no chefId means no mirror, no mirror means
+-- the client never sends a move packet, and the player sits as a spectator
+-- until the next reseat happens to re-send everything. So the client now says
+-- when it is actually listening, and we send the lot again.
+local lastReadyAt: { [any]: number } = {}
+remotes.ClientReady.OnServerEvent:Connect(function(player)
+	-- Cheap guard: snapshotFor walks the whole sim, so this must not be a free
+	-- amplifier for a client that fires it in a loop.
+	local now = os.clock()
+	if now - (lastReadyAt[player] or -math.huge) < 1 then
+		return
+	end
+	lastReadyAt[player] = now
+
+	local seat = crew.seats[player]
+	if seat ~= nil then
+		crew:sendSeat(player, seat)
+	elseif pendingJoins[player] then
+		remotes.Snapshot:FireClient(player, replicator:snapshotFor(simService.sim))
+	end
+	director:broadcastPhase()
+	leaderboards:pushTo(player)
+	broadcastEquips()
+	progression:push(player)
+end)
+
 -- Roblox gives us ~30s at shutdown; without this, everything since the last
 -- 60s autosave is lost -- up to a whole round of coins, XP and unlocks.
 game:BindToClose(function()
@@ -335,6 +370,7 @@ end)
 
 Players.PlayerRemoving:Connect(function(player)
 	pendingJoins[player] = nil
+	lastReadyAt[player] = nil
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
 	monetization:playerRemoving(player)

@@ -526,6 +526,19 @@ remotes.SimEvents.OnClientEvent:Connect(function(events)
 	end
 end)
 
+-- EVERY LISTENER IS UP; ASK FOR THE JOIN STATE AGAIN.
+--
+-- The server sends ChefAssign, Snapshot, RoundPhase, Leaderboards and Progress
+-- once, from PlayerAdded. Those are one-shot RemoteEvents and Roblox drops
+-- them for a listener that is not connected yet -- and this script spends the
+-- whole race requiring modules and loading 55 sounds before it reaches the
+-- connections above. Lose it and there is no chefId, so no mirror, so no move
+-- packets ever leave: an ordinary join that silently becomes a spectator.
+--
+-- Sending this AFTER the connections is the entire point; it must be the last
+-- thing the remotes section does.
+remotes.ClientReady:FireServer()
+
 -- --------------------------------------------------------------- main loop
 
 local acc = 0

@@ -176,6 +176,56 @@ for _, kind in KINDS do
 	end
 end
 
+-- ------------------------------------------------ D. THE RACKS RUN DRY
+--
+-- Everything above runs with a full plate rack, which is the one state where
+-- the client cannot be wrong about plates: the mirror sim is CONSTRUCTED with
+-- TUNING.plateStock, so it agrees with the server by accident.
+--
+-- Drain the racks and the accident stops. applyScore used to write the counts
+-- to display fields only, while focusPrompt plans against mirrorSim -- whose
+-- plateStock stayed at its opening value forever. The empty rack went on
+-- glowing and advertising 'dispense' while the server answered 'none': a
+-- highlighted prompt that did nothing when pressed.
+for _, drained in { { stock = 0, dirty = 0 }, { stock = 0, dirty = 3 }, { stock = 2, dirty = 0 } } do
+	local sim = newServerSim()
+	sim.plateStock = drained.stock
+	sim.dirtyPlates = drained.dirty
+	local st = stationByKind(sim)["plates"]
+	local chef = sim.chefs[1]
+
+	local rep = Replicator.new(shared, Net, remotes, function()
+		return 0
+	end)
+	local client = ClientState.new(shared, Net)
+	client:assign({ chefId = chef.id, skin = "bramble" })
+	client:applySnapshot(rep:snapshotFor(sim))
+	client:applyScore(rep:scoreSummary(sim))
+
+	local mst = nil
+	for _, sst in client.mirrorSim.kitchen.stations do
+		if sst.id == st.id then
+			mst = sst
+			break
+		end
+	end
+
+	check(
+		client.mirrorSim.plateStock == drained.stock,
+		`mirror sim carries plateStock {drained.stock} (got {tostring(client.mirrorSim.plateStock)})`
+	)
+	check(
+		client.mirrorSim.dirtyPlates == drained.dirty,
+		`mirror sim carries dirtyPlates {drained.dirty} (got {tostring(client.mirrorSim.dirtyPlates)})`
+	)
+	local want = shared.planGrab(sim, chef, st)
+	local got = shared.planGrab(client.mirrorSim, client.mirror, mst)
+	check(
+		want == got,
+		`plates stock={drained.stock} dirty={drained.dirty}: server says '{want}', client says '{got}'`
+	)
+end
+
 local nMis = 0
 for _ in mismatch do
 	nMis += 1

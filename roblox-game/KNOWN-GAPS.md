@@ -67,9 +67,13 @@ a release.
 
 ## Systems
 
-- 🟢 **AFK stage 2 missing.** 20s → bot/park coverage works; "two idle rounds →
-  non-ready spectator" is not implemented. Roblox's 20-minute kick is the only
-  backstop.
+- 🟢 **AFK stage 2 missing.** 20s → bot/park coverage works — *now*; it did
+  not until the touch gate landed, and this entry claimed otherwise for weeks.
+  The client streams a move packet 30 times a second whether or not anyone is
+  playing, the server counted every one as input, and the threshold was
+  arithmetically unreachable. What is still missing is stage 2: "two idle
+  rounds → non-ready spectator" is not implemented, and Roblox's 20-minute
+  kick remains the only backstop for that.
 - 🟢 **No per-player ready pips** on the shift panel.
 - 🟢 **First Shift does not own its own trigger** — `Menu:maybeAutoStart` still
   starts a first-ever player's round.

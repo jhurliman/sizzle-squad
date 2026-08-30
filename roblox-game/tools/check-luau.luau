@@ -246,6 +246,37 @@ if audioBad == 0 then
 	print(`audio: every referenced id is present and owned by {OWNER}`)
 end
 
-if failed > 0 or bundleBad > 0 or stale or audioBad > 0 or pathBad > 0 then
+-- ------------------------------------------------------------------------
+-- BOTH ENDS OF EVERY CLIENT->SERVER REMOTE, OR IT IS A DEAD LETTER.
+--
+-- A client that fires into a remote nobody listens to fails silently and
+-- totally -- the same shape as the wrong require path above, and just as
+-- invisible to a syntax check. ClientReady is the one that matters most: it is
+-- the handshake that re-sends a joiner's seat, so if it ever stops being
+-- answered the failure is an ordinary player quietly becoming a spectator,
+-- which is exactly the bug it was added to fix.
+local wiringBad = 0
+local netSrc = fs.readFile("game-src/shared/Net.luau")
+local serverSrc = fs.readFile("game-src/server/main.server.luau")
+local clientSrc = fs.readFile("game-src/client/main.client.luau")
+for _, name in { "ClientReady" } do
+	if not string.find(netSrc, `{name} = "RemoteEvent"`, 1, true) then
+		wiringBad += 1
+		print(`FAIL Net.REMOTES has no '{name}' entry`)
+	end
+	if not string.find(serverSrc, `remotes.{name}.OnServerEvent`, 1, true) then
+		wiringBad += 1
+		print(`FAIL nothing on the server listens to '{name}' -- the client fires into a dead letter`)
+	end
+	if not string.find(clientSrc, `remotes.{name}:FireServer`, 1, true) then
+		wiringBad += 1
+		print(`FAIL the client never fires '{name}' -- the server handler can never run`)
+	end
+end
+if wiringBad == 0 then
+	print("client->server handshake remotes are wired at both ends")
+end
+
+if failed > 0 or bundleBad > 0 or stale or audioBad > 0 or pathBad > 0 or wiringBad > 0 then
 	process.exit(1)
 end

@@ -150,6 +150,14 @@ function Replicator:scoreSummary(sim: any): any
 		bestCombo = s.bestCombo,
 		patience = s.patience,
 		time = sim.time,
+		-- Plate counts belong on the score: they change on exactly the same
+		-- events (a serve, a dispense, a wash) and a remote for two integers
+		-- would be silly. They live HERE rather than only on the delta so the
+		-- JOIN SNAPSHOT carries them too -- snapshotFor calls this, and a
+		-- joiner used to get no plate counts at all until the next score
+		-- change happened to fire, which in a quiet intermission is a while.
+		plateStock = sim.plateStock,
+		dirtyPlates = sim.dirtyPlates,
 	}
 end
 
@@ -250,11 +258,6 @@ function Replicator:flush(sim: any, events: { any }, dt: number, carryingChanged
 		end
 		-- score
 		local score = self:scoreSummary(sim)
-		-- Plate counts ride the score delta: they change on exactly the same
-		-- events (a serve, a dispense, a wash) and adding a remote for two
-		-- integers would be silly.
-		score.plateStock = sim.plateStock
-		score.dirtyPlates = sim.dirtyPlates
 		local sk = `{score.coins}|{score.served}|{score.missed}|{score.combo}|{math.floor(score.patience * 50)}|{sim.plateStock}|{sim.dirtyPlates}`
 		if sk ~= self.scoreCache then
 			self.scoreCache = sk

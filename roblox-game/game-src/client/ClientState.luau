@@ -34,9 +34,11 @@ function ClientState.new(shared: any, net: any)
 	self.orders = {} :: { any }
 	self.score = { coins = 0, served = 0, missed = 0, combo = 0, bestCombo = 0, patience = 1, time = 0 }
 	-- Mirrored plate economy: clean plates left on the racks, dirty ones
-	-- stacked at the wash-up.
-	self.plateStock = 0
-	self.dirtyPlates = 0
+	-- stacked at the wash-up. Seeded FROM the mirror sim rather than to zero,
+	-- so the display and the sim the prompts are planned against do not start
+	-- the round already disagreeing (the sim opens with TUNING.plateStock).
+	self.plateStock = self.mirrorSim.plateStock or 0
+	self.dirtyPlates = self.mirrorSim.dirtyPlates or 0
 	-- Round clock, advanced locally (see advanceClock).
 	self.simTime = 0
 	self.phase = { phase = "countdown", timer = 0, round = 0, results = nil }
@@ -59,6 +61,7 @@ function ClientState:applySnapshot(snap: any)
 	end
 	self.orders = snap.orders
 	self.score = snap.score
+	self:setPlates(snap.score and snap.score.plateStock, snap.score and snap.score.dirtyPlates)
 	self.simTime = (snap.score and snap.score.time) or 0
 	for _, chef in snap.chefs do
 		self.skins[chef.id] = chef.skin
@@ -255,12 +258,29 @@ function ClientState:advanceClock(dt: number, playing: boolean)
 	end
 end
 
+--- THE PROMPT IS PLANNED AGAINST THE MIRROR, SO THE MIRROR NEEDS THE COUNTS.
+---
+--- These used to land on the display fields only. But `focusPrompt` runs the
+--- real `planGrab` over `mirrorSim`, and the plate rack's branch there asks
+--- `s.plateStock > 0 or s.dirtyPlates > 0` -- of the SIM, which kept the
+--- constructor's opening stock forever. So once the racks ran dry the local
+--- rack went on glowing and advertising "dispense" while the authoritative
+--- server answered "none": a highlighted prompt that did nothing when pressed.
+---
+--- Both copies are written here and nowhere else.
+function ClientState:setPlates(stock: number?, dirty: number?)
+	if stock == nil then
+		return
+	end
+	self.plateStock = stock
+	self.dirtyPlates = dirty or 0
+	self.mirrorSim.plateStock = self.plateStock
+	self.mirrorSim.dirtyPlates = self.dirtyPlates
+end
+
 function ClientState:applyScore(score: any)
 	self.score = score
-	if score.plateStock ~= nil then
-		self.plateStock = score.plateStock
-		self.dirtyPlates = score.dirtyPlates or 0
-	end
+	self:setPlates(score.plateStock, score.dirtyPlates)
 	if score.time ~= nil then
 		self.simTime = score.time
 	end

@@ -9,6 +9,16 @@ CrewManager.__index = CrewManager
 
 local AFK_SECONDS = 20
 
+-- Velocity quantizes to i8 over +/-8 cells/s, so one unit is ~0.063 cells/s and
+-- a released stick packs to exactly 0. Anything above half a quantum is real
+-- movement rather than rounding.
+local MOVE_EPSILON = 0.03
+
+--- Does this packet represent a player actually doing something?
+local function isActive(p: any): boolean
+	return math.abs(p.vx) > MOVE_EPSILON or math.abs(p.vy) > MOVE_EPSILON or p.useHeld == true
+end
+
 export type Seat = {
 	player: any, -- Player
 	chefId: number,
@@ -43,7 +53,24 @@ function CrewManager.new(
 		if p == nil then
 			return
 		end
-		self:touch(seat)
+		-- ARRIVING IS NOT ACTIVITY.
+		--
+		-- The client streams a move packet every 1/30s for as long as it has a
+		-- mirror, whether or not anybody is touching the controls. Touching the
+		-- seat on every packet reset lastInputAt thirty times a second, so
+		-- `t - lastInputAt > AFK_SECONDS` was arithmetically unreachable and
+		-- the whole AFK path below was dead code: no bot ever took over, and
+		-- because readyTally counts non-AFK seats, one abandoned tab held the
+		-- ready lobby open for everyone else indefinitely. A round never starts
+		-- on a timer, so there was nothing else to break the deadlock.
+		--
+		-- Velocity is the honest signal: it is derived from the player's own
+		-- input on the client and quantizes to exactly zero when they let go.
+		-- `useHeld` covers standing still on purpose -- working a station is
+		-- input even though nothing moves.
+		if isActive(p) then
+			self:touch(seat)
+		end
 		simService:humanMove(seat.chefId, p)
 	end)
 
@@ -128,6 +155,23 @@ function CrewManager:takenSkins(): { [string]: number }
 	return taken
 end
 
+--- Everything a client needs to take its seat, in one place.
+---
+--- These are one-shot RemoteEvents: Roblox does not hold them for a listener
+--- that connects later, so a client still wiring itself up when this fires
+--- simply never learns its chefId, never builds a mirror, and never sends a
+--- move packet again. It looks exactly like a player who joined as a
+--- spectator. main.server.luau re-sends this when the client announces itself,
+--- which is what makes the send above best-effort rather than the only chance.
+function CrewManager:sendSeat(player: any, seat: Seat)
+	local chef = self.simService.sim.chefs[seat.chefId + 1]
+	self.remotes.ChefAssign:FireClient(player, {
+		chefId = seat.chefId,
+		skin = chef and chef.skin or "bramble",
+	})
+	self.remotes.Snapshot:FireClient(player, self.replicator:snapshotFor(self.simService.sim))
+end
+
 function CrewManager:playerAdded(player: any)
 	local chefId = self.simService:freeChef()
 	if chefId == nil then
@@ -135,18 +179,14 @@ function CrewManager:playerAdded(player: any)
 		-- this, but never crash on the race).
 		return nil
 	end
-	local chef = self.simService:setHuman(chefId, true)
+	self.simService:setHuman(chefId, true)
 	local seat: Seat = { player = player, chefId = chefId, lastInputAt = self.now(), afk = false }
 	self.seats[player] = seat
 	self.byChef[chefId] = seat
 	-- Seat FIRST, then claim: claimSkin consults byChef to decide which
 	-- species are spoken for, and this seat has to be in it.
 	self:claimSkin(chefId, self.skinFor and self.skinFor(player))
-	self.remotes.ChefAssign:FireClient(player, {
-		chefId = chefId,
-		skin = chef and chef.skin or "bramble",
-	})
-	self.remotes.Snapshot:FireClient(player, self.replicator:snapshotFor(self.simService.sim))
+	self:sendSeat(player, seat)
 	return seat
 end
 
@@ -201,15 +241,11 @@ function CrewManager:reseat()
 	for player, seat in self.seats do
 		local chefId = self.simService:freeChef()
 		if chefId ~= nil then
-			local chef = self.simService:setHuman(chefId, true)
+			self.simService:setHuman(chefId, true)
 			seat.chefId = chefId
 			self.byChef[chefId] = seat
 			self:claimSkin(chefId, self.skinFor and self.skinFor(player))
-			self.remotes.ChefAssign:FireClient(player, {
-				chefId = chefId,
-				skin = chef and chef.skin or "bramble",
-			})
-			self.remotes.Snapshot:FireClient(player, self.replicator:snapshotFor(self.simService.sim))
+			self:sendSeat(player, seat)
 		end
 	end
 end
