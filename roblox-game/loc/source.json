@@ -2050,21 +2050,6 @@
       }
     },
     {
-      "key": "ui.roster_bot_sub",
-      "source": "filling in",
-      "context": "Caption under 'Bot' on a lobby chair: this bot is standing in for a missing player and will give the seat up when somebody joins. Short, lower case, fixed-width chip.",
-      "note": "",
-      "tr": {
-        "es": "cubriendo",
-        "pt": "reserva",
-        "ja": "代役で参加",
-        "ko": "대신 참여",
-        "fr": "en renfort",
-        "de": "springt ein",
-        "id": "pengganti"
-      }
-    },
-    {
       "key": "ui.ready_pledge",
       "source": "READY",
       "context": "The main lobby button WHEN OTHER PEOPLE ARE PRESENT. It is a pledge -- 'I am ready, start when everyone else is' -- not a command to begin. When the player is alone the button says START SHIFT instead (ui.start_shift), because then it really does start the round. NOTE: ui.ready is a DIFFERENT string, 'READY!' with an exclamation mark, still used on the Kitchen Card. This one has no exclamation mark because it alternates with START SHIFT on the same button and they should be punctuated alike.",
@@ -2155,33 +2140,63 @@
       }
     },
     {
-      "key": "ui.chair_take_bot",
-      "source": "tap to play",
-      "context": "Caption under 'Bot' on a lobby chair: tapping the chair makes you play as that character instead, and the bot takes the one you left. Imperative, lower case, fixed-width chip.",
+      "key": "ui.chair_you",
+      "source": "you",
+      "context": "Caption on the lobby chair the local player is sitting in. The chair's headline is the CHARACTER (Bramble, Pip, Nori, Mochi); this line says who is in it, and for yourself that is simply 'you'. Lower case, fixed-width chip.",
       "note": "",
       "tr": {
-        "es": "toca para jugar",
-        "pt": "toque para jogar",
-        "ja": "タップで交代",
-        "ko": "탭하여 플레이",
-        "fr": "toucher pour jouer",
-        "de": "tippen zum Spielen",
-        "id": "ketuk untuk main"
+        "es": "tú",
+        "pt": "você",
+        "ja": "あなた",
+        "ko": "나",
+        "fr": "vous",
+        "de": "du",
+        "id": "kamu"
       }
     },
     {
-      "key": "ui.chair_take_empty",
-      "source": "or tap to play",
-      "context": "Caption on an EMPTY lobby chair, under the invite button. The 'or' matters: the first offer is to invite somebody into the chair, and this is the alternative -- take that character yourself.",
+      "key": "ui.chair_you_ready",
+      "source": "✅ you, ready",
+      "context": "Caption on your own lobby chair once you have pressed Ready. Same line as ui.chair_you with the readiness added. Keep it short; the chip is fixed width.",
       "note": "",
       "tr": {
-        "es": "o toca para jugar",
-        "pt": "ou toque para jogar",
-        "ja": "または自分で使う",
-        "ko": "또는 직접 플레이",
-        "fr": "ou jouer ce chef",
-        "de": "oder selbst spielen",
-        "id": "atau main sendiri"
+        "es": "✅ tú, listo",
+        "pt": "✅ você, pronto",
+        "ja": "✅ あなた・準備OK",
+        "ko": "✅ 나, 준비 완료",
+        "fr": "✅ vous, prêt",
+        "de": "✅ du, bereit",
+        "id": "✅ kamu, siap"
+      }
+    },
+    {
+      "key": "ui.chair_bot",
+      "source": "bot · tap to play",
+      "context": "Caption on a lobby chair a computer-controlled chef is filling. Two parts either side of a middle dot: what is in the chair, and the offer -- tapping the chair makes YOU play that character instead and the bot takes the one you left. Lower case, fixed-width chip.",
+      "note": "",
+      "tr": {
+        "es": "bot · toca para jugar",
+        "pt": "bot · toque para jogar",
+        "ja": "ボット・タップで交代",
+        "ko": "봇 · 탭하여 플레이",
+        "fr": "bot · toucher pour jouer",
+        "de": "Bot · tippen zum Spielen",
+        "id": "bot · ketuk untuk main"
+      }
+    },
+    {
+      "key": "ui.chair_empty",
+      "source": "empty · tap to play",
+      "context": "Caption on a lobby chair nobody is in -- no player and no bot. Same shape as ui.chair_bot: the state, then the offer. A separate + button in the corner invites somebody into it instead.",
+      "note": "",
+      "tr": {
+        "es": "vacío · toca para jugar",
+        "pt": "vazio · toque para jogar",
+        "ja": "空席・タップで参加",
+        "ko": "빈자리 · 탭하여 플레이",
+        "fr": "libre · toucher pour jouer",
+        "de": "frei · tippen zum Spielen",
+        "id": "kosong · ketuk untuk main"
       }
     }
   ],

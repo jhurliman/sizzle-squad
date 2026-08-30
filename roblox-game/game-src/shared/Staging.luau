@@ -28,13 +28,48 @@
 
 local Staging = {}
 
---- Lobby lineup, in seat order. Index is chefId + 1.
+--- THE CHARACTERS, LEFT TO RIGHT, AND THEY DO NOT MOVE.
+---
+--- Order matches the sim's own spawn list (sim.ts: bramble, pip, nori, mochi)
+--- so chair 1 in the panel is the leftmost chef in the shot and stays that way.
+Staging.ORDER = { "bramble", "pip", "nori", "mochi" }
+
+--- Lobby lineup, indexed the same as ORDER: a mark belongs to a CHARACTER.
+---
+--- It used to be indexed by chefId, which was the wrong half to hold still.
+--- Claiming a character swaps species between two chefs, so with marks pinned
+--- to chef ids the CHARACTERS shuffled along the line while the bodies stayed
+--- put -- Bramble was wherever the swap left him, and the panel had to shuffle
+--- to match. Pinned to characters instead, the line-up is a fixed row of four
+--- known faces and it is the PEOPLE who move between them, which is both what
+--- actually happens and what a player is tracking.
 Staging.LINEUP = {
-	{ x = 5.9, y = 8.45 }, -- outer left, stepped forward
-	{ x = 6.9, y = 7.45 }, -- inner left, back
-	{ x = 8.1, y = 7.45 }, -- inner right, back
-	{ x = 9.1, y = 8.45 }, -- outer right, stepped forward
+	{ x = 5.9, y = 8.45 }, -- bramble: outer left, stepped forward
+	{ x = 6.9, y = 7.45 }, -- pip:     inner left, back
+	{ x = 8.1, y = 7.45 }, -- nori:    inner right, back
+	{ x = 9.1, y = 8.45 }, -- mochi:   outer right, stepped forward
 }
+
+--- Where this character stands. Falls back to the first mark for a species the
+--- list has never heard of, which beats parking them inside the oven.
+function Staging.markFor(species: string?): { x: number, y: number }
+	for i, name in Staging.ORDER do
+		if name == species then
+			return Staging.LINEUP[i]
+		end
+	end
+	return Staging.LINEUP[1]
+end
+
+--- Where this character sits in the row, 1-4.
+function Staging.indexOf(species: string?): number
+	for i, name in Staging.ORDER do
+		if name == species then
+			return i
+		end
+	end
+	return #Staging.ORDER + 1
+end
 
 --- The end-of-shift photo uses the same marks. Standing somewhere different
 --- for the celebration than for the lobby would mean two walks, and the second

@@ -146,8 +146,8 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		}, slot)
 		Theme.corner(face, 10)
 		local name = mk("TextLabel", {
-			Size = UDim2.new(1, -10, 0, 18),
-			Position = UDim2.fromOffset(5, 13),
+			Size = UDim2.new(1, -28, 0, 18),
+			Position = UDim2.fromOffset(5, 6),
 			BackgroundTransparency = 1,
 			Font = Theme.BOLD_FONT,
 			TextSize = 15,
@@ -156,8 +156,8 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			Text = "",
 		}, face)
 		local state = mk("TextLabel", {
-			Size = UDim2.new(1, -10, 0, 14),
-			Position = UDim2.fromOffset(5, 31),
+			Size = UDim2.new(1, -10, 0, 15),
+			Position = UDim2.fromOffset(5, 26),
 			BackgroundTransparency = 1,
 			Font = Theme.BODY_FONT,
 			TextSize = 13,
@@ -170,34 +170,37 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			Text = "",
 		}, face)
 
-		-- The character whose chair this is. Small, above the occupant, because
-		-- it is the constant and the occupant is not.
-		local species = mk("TextLabel", {
-			Size = UDim2.new(1, -10, 0, 12),
-			Position = UDim2.fromOffset(5, 2),
-			BackgroundTransparency = 1,
-			Font = Theme.BODY_FONT,
-			TextSize = 11,
-			TextColor3 = Theme.GOLD,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			Text = "",
-		}, face)
+		-- Not built any more: the character IS the name label now. It was a
+		-- tiny gold eyebrow above a big "Bot", which put the constant in the
+		-- small type and the variable in the large -- exactly backwards for a
+		-- row you are meant to read as four fixed faces.
+		local species = name
 
-		-- Dismissing a bot is a separate, smaller act than taking its chair, so
-		-- it gets its own corner rather than a second meaning for the same tap.
+		-- THE CORNER IS THE SECOND VERB.
+		--
+		-- Tapping the chair always means "I will play this character". The
+		-- other thing you might want to do with it -- send the bot away, or
+		-- invite a person into it -- is a different act and gets its own
+		-- target rather than a second meaning for the same tap. That was the
+		-- reported bug: an empty chair said "＋ INVITE" across the whole face
+		-- while tapping it swapped your skin, so the label described one
+		-- action and the tap performed another.
+		--
+		-- "x" and "+" rather than U+2715 or U+2717: KNOWN-GAPS records both
+		-- shipping as empty boxes, because they depend on the TEXT font and
+		-- FredokaOne has neither.
 		local dismiss = mk("TextButton", {
-			Size = UDim2.fromOffset(20, 20),
-			Position = UDim2.new(1, -22, 0, 2),
-			BackgroundTransparency = 1,
+			Size = UDim2.fromOffset(22, 22),
+			Position = UDim2.new(1, -24, 0, 3),
+			BackgroundColor3 = Theme.BROWN_DEEP,
+			BorderSizePixel = 0,
 			Font = Theme.BOLD_FONT,
 			TextSize = 15,
-			TextColor3 = Theme.DIM,
-			-- Not U+2715 or U+2717: KNOWN-GAPS records both shipping as empty
-			-- boxes, because they depend on the TEXT font and FredokaOne has
-			-- neither. A lower-case x always renders.
+			TextColor3 = Theme.CREAM,
 			Text = "x",
 			Visible = false,
 		}, face)
+		Theme.corner(dismiss, 6)
 
 		local idx = i
 		face.Activated:Connect(function()
@@ -208,10 +211,6 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			if seat.kind == "player" then
 				return -- somebody is sitting there
 			end
-			if seat.kind == "empty" and self.friend ~= nil then
-				self.deps.onJoinFriend(self.friend.jobId, self.friend.name)
-				return
-			end
 			self.deps.onSeatAction(seat.chefId, "claim")
 		end)
 		dismiss.Activated:Connect(function()
@@ -219,7 +218,22 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			if seat == nil then
 				return
 			end
-			self.deps.onSeatAction(seat.chefId, if seat.kind == "bot" then "dismiss" else "fill")
+			if seat.kind == "bot" then
+				self.deps.onSeatAction(seat.chefId, "dismiss")
+				return
+			end
+			-- Empty chair: the corner is how you offer it to a person.
+			local f = self.friend
+			if f ~= nil then
+				self.deps.onJoinFriend(f.jobId, f.name)
+				return
+			end
+			-- pcall: PromptGameInvite throws outright where the platform cannot
+			-- show the invite sheet, and a dead button beats a broken panel.
+			pcall(function()
+				local SocialService = game:GetService("SocialService")
+				SocialService:PromptGameInvite(Players.LocalPlayer)
+			end)
 		end)
 
 		self.slots[i] =
@@ -338,6 +352,19 @@ end
 ---
 --- This replaces a global BOTS: ON button that could not say "three bots but
 --- not a fourth", and whose scope (everyone in the server) was invisible.
+--- Paint the four chairs from the last roster the server sent.
+---
+--- FOUR FIXED CHARACTERS; THE PEOPLE MOVE BETWEEN THEM. The chair is Bramble
+--- or Pip or Nori or Mochi and it never moves or relabels. What changes is who
+--- is standing in it, which is also literally true in the room behind the
+--- panel -- the lineup marks belong to the characters too, so claiming one
+--- walks you to their spot.
+---
+--- The name is the CHARACTER. The caption underneath is the occupant:
+---   you     -- "you"
+---   player  -- their name, and whether they are ready
+---   bot     -- "bot", tap the chair to take over, x to send it away
+---   empty   -- "empty", tap to take it, + to invite somebody
 function ShiftPanel:renderRoster()
 	local seats = self.seats or {}
 	local me = Players.LocalPlayer.UserId
@@ -347,37 +374,35 @@ function ShiftPanel:renderRoster()
 			slot.root.Visible = false
 		else
 			slot.root.Visible = true
-			slot.species.Text = string.upper(seat.species or "")
+			slot.name.Text = string.upper(seat.species or "")
 			local mine = seat.userId == me
-			slot.dismiss.Visible = seat.kind == "bot"
+			-- The corner offers the other verb: dismiss a bot, or invite into
+			-- an empty chair. A person's chair has neither.
+			slot.dismiss.Visible = seat.kind == "bot" or seat.kind == "empty"
+			slot.dismiss.Text = if seat.kind == "bot" then "x" else "+"
 			if seat.kind == "player" then
-				slot.name.Text = seat.name or "Chef"
 				slot.face.BackgroundColor3 = if mine then Theme.BROWN_LIGHT else Theme.BROWN_MID
-				-- Three states, each said in words. The not-ready one used to be a
-				-- bare "…", which is not a state, it is a shrug.
-				if seat.afk then
-					slot.state.Text = "away"
+				if mine then
+					slot.state.Text = if seat.ready then "✅ you, ready" else "you"
+					slot.state.TextColor3 = if seat.ready then Theme.GREEN else Theme.GOLD
+				elseif seat.afk then
+					slot.state.Text = `{seat.name or "Chef"} · away`
 					slot.state.TextColor3 = Theme.DIM
 				elseif seat.ready then
-					slot.state.Text = "✅ ready"
+					slot.state.Text = `✅ {seat.name or "Chef"}`
 					slot.state.TextColor3 = Theme.GREEN
 				else
-					slot.state.Text = "choosing"
-					slot.state.TextColor3 = Theme.DIM
+					slot.state.Text = seat.name or "Chef"
+					slot.state.TextColor3 = Theme.CREAM
 				end
 			elseif seat.kind == "bot" then
-				slot.name.Text = "Bot"
-				slot.state.Text = "tap to play"
+				slot.state.Text = "bot · tap to play"
 				slot.state.TextColor3 = Theme.DIM
 				slot.face.BackgroundColor3 = Theme.BROWN_MID
 			else
-				-- Empty. Offer the friend if there is one, because filling a chair
-				-- with a person beats filling it with yourself.
-				local f = self.friend
-				slot.name.Text = if f ~= nil then Loc.f("fmt.join_name", f.name) else "＋ INVITE"
-				slot.state.Text = "or tap to play"
+				slot.state.Text = "empty · tap to play"
 				slot.state.TextColor3 = Theme.DIM
-				slot.face.BackgroundColor3 = Theme.BLUE
+				slot.face.BackgroundColor3 = Theme.BROWN_DEEP
 			end
 		end
 	end

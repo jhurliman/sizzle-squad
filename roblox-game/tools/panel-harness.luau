@@ -186,8 +186,8 @@ for _, w in { 1920, 1280, 1024, 820, 720, 640, 480, 414, 360, 320 } do
 	check(ok, `relayout at {w}px` .. (if ok then "" else ` -- {tostring(err)}`))
 end
 
--- --------------------------------------------------- B. the four chair states
-print("B. every chair state renders and says something")
+-- --------------------------------------------------- B. four fixed characters
+print("B. the chairs are four fixed characters, and people move between them")
 local function setSeats(seats: { any })
 	panel:setPhase({ phase = "intermission", seats = seats, readyCount = 0, readyTotal = #seats }, false)
 end
@@ -198,29 +198,48 @@ setSeats({
 	{ chefId = 2, species = "nori", kind = "bot" },
 	{ chefId = 3, species = "mochi", kind = "empty" },
 })
-check(panel.slots[1].name.Text == "Me", `chair 1 is me ({panel.slots[1].name.Text})`)
-check(panel.slots[1].state.Text == "choosing", `and says what I am doing ({panel.slots[1].state.Text})`)
-check(panel.slots[2].state.Text == "✅ ready", `chair 2 is ready ({panel.slots[2].state.Text})`)
-check(panel.slots[3].name.Text == "Bot", "chair 3 is a bot")
-check(panel.slots[3].dismiss.Visible == true, "and offers an x to send it away")
-check(panel.slots[4].dismiss.Visible == false, "an empty chair has no x -- there is nothing to dismiss")
-check(panel.slots[1].dismiss.Visible == false, "and neither does a person's chair")
 for i, want in { "BRAMBLE", "PIP", "NORI", "MOCHI" } do
-	check(panel.slots[i].species.Text == want, `chair {i} is labelled {want}`)
+	check(panel.slots[i].name.Text == want, `chair {i} is {want} -- the character is the headline`)
 end
+check(panel.slots[1].state.Text == "you", `and the caption is the occupant ({panel.slots[1].state.Text})`)
+check(panel.slots[2].state.Text == "✅ Sam", `a ready crewmate is named and ticked ({panel.slots[2].state.Text})`)
+check(panel.slots[3].state.Text == "bot · tap to play", `a bot chair offers itself ({panel.slots[3].state.Text})`)
+check(panel.slots[4].state.Text == "empty · tap to play", `and so does an empty one ({panel.slots[4].state.Text})`)
+
+-- THE CHAIRS DO NOT MOVE WHEN PEOPLE DO. Swap who is in bramble and nori: the
+-- labels must be identical afterwards, only the captions change.
+setSeats({
+	{ chefId = 2, species = "bramble", kind = "bot" },
+	{ chefId = 1, species = "pip", kind = "player", userId = 2002, name = "Sam", ready = true, afk = false },
+	{ chefId = 0, species = "nori", kind = "player", userId = 1001, name = "Me", ready = false, afk = false },
+	{ chefId = 3, species = "mochi", kind = "empty" },
+})
+for i, want in { "BRAMBLE", "PIP", "NORI", "MOCHI" } do
+	check(panel.slots[i].name.Text == want, `chair {i} is STILL {want} after a swap`)
+end
+check(panel.slots[3].state.Text == "you", "and I am now in the chair I claimed")
+check(panel.slots[1].state.Text == "bot · tap to play", "with a bot in the one I left")
+
+-- the corner is only offered where there is a second verb to perform
+check(panel.slots[1].dismiss.Visible == true and panel.slots[1].dismiss.Text == "x", "a bot chair offers x")
+check(panel.slots[4].dismiss.Visible == true and panel.slots[4].dismiss.Text == "+", "an empty chair offers +")
+check(panel.slots[2].dismiss.Visible == false, "somebody else's chair offers neither")
+check(panel.slots[3].dismiss.Visible == false, "and neither does mine")
 
 -- an AFK player is still on their chair, said out loud
 setSeats({
-	{ chefId = 0, species = "bramble", kind = "player", userId = 1001, name = "Me", ready = false, afk = true },
+	{ chefId = 0, species = "bramble", kind = "player", userId = 2002, name = "Sam", ready = false, afk = true },
 	{ chefId = 1, species = "pip", kind = "bot" },
 	{ chefId = 2, species = "nori", kind = "bot" },
 	{ chefId = 3, species = "mochi", kind = "bot" },
 })
-check(panel.slots[1].name.Text == "Me", "an AFK player keeps their chair rather than turning into a bot")
-check(panel.slots[1].state.Text == "away", `and it says away ({panel.slots[1].state.Text})`)
+check(
+	string.find(panel.slots[1].state.Text, "away", 1, true) ~= nil,
+	`an AFK player keeps their chair and it says away ({panel.slots[1].state.Text})`
+)
 
 -- ------------------------------------------------------- C. tapping a chair
-print("C. a tap does the obvious thing for the chair it is on")
+print("C. the face claims; the corner does the other thing")
 setSeats({
 	{ chefId = 0, species = "bramble", kind = "player", userId = 1001, name = "Me", ready = false, afk = false },
 	{ chefId = 1, species = "pip", kind = "player", userId = 2002, name = "Sam", ready = false, afk = false },
@@ -232,23 +251,26 @@ panel.slots[3].face.__press()
 check(#acted == 1 and acted[1].kind == "claim" and acted[1].chefId == 2, "tapping a bot chair claims that character")
 acted = {}
 panel.slots[3].dismiss.__press()
-check(#acted == 1 and acted[1].kind == "dismiss" and acted[1].chefId == 2, "and its x dismisses the bot")
+check(#acted == 1 and acted[1].kind == "dismiss" and acted[1].chefId == 2, "its x dismisses the bot")
+
+-- THE REPORTED BUG: the empty chair said INVITE across its whole face and
+-- tapping it swapped your skin. The label described one action and the tap
+-- performed another. Face claims, corner invites, and they are different
+-- targets.
 acted = {}
 panel.slots[4].face.__press()
-check(#acted == 1 and acted[1].kind == "claim" and acted[1].chefId == 3, "tapping an empty chair takes it")
+check(#acted == 1 and acted[1].kind == "claim" and acted[1].chefId == 3, "tapping an empty chair takes the character")
+panel:setFriends({ { name = "Kim", jobId = "abc" } })
+acted = {}
+panel.slots[4].dismiss.__press()
+check(#acted == 1 and acted[1].kind == "join", "and its + offers the chair to a reachable friend")
+panel:setFriends({})
 acted = {}
 panel.slots[2].face.__press()
 check(#acted == 0, "tapping somebody else's chair does nothing")
 acted = {}
 panel.slots[1].face.__press()
 check(#acted == 0, "and neither does tapping your own")
-
--- an empty chair offers the friend first, when there is one
-panel:setFriends({ { name = "Kim", jobId = "abc" } })
-acted = {}
-panel.slots[4].face.__press()
-check(#acted == 1 and acted[1].kind == "join", "an empty chair offers a reachable friend before offering itself")
-panel:setFriends({})
 
 -- ------------------------------------------------- D. the pre-press verb
 print("D. the button says which situation you are in, before you commit")

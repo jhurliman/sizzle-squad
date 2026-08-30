@@ -669,7 +669,7 @@ RunService.RenderStepped:Connect(function(dt)
 	-- Touching the stick wins instantly and completely. The lobby is still a
 	-- place you can walk around; it just tidies itself up when you stop.
 	if stagingActive() and mx == 0 and my == 0 and state.mirror ~= nil and state.myChefId ~= nil then
-		local mark = Staging.LINEUP[(state.myChefId % #Staging.LINEUP) + 1]
+		local mark = Staging.markFor(state.skins[state.myChefId])
 		local sx, sy, arrived = Staging.moveToward(state.mirror.pos, mark)
 		if arrived then
 			-- Turn to face the lens. movePhase only advances heading while

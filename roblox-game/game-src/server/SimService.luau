@@ -355,8 +355,9 @@ function SimService:walkToMark(chef: any, dt: number)
 	if staging == nil or not self:isActive(chef) then
 		return
 	end
-	local marks = staging.LINEUP
-	local mark = marks[(chef.id % #marks) + 1]
+	-- By character, not by slot index: the marks belong to the four faces and
+	-- the bodies move between them.
+	local mark = staging.markFor(chef.skin)
 	local mx, my, arrived = staging.moveToward(chef.pos, mark)
 	if arrived then
 		chef.vel.x, chef.vel.y = 0, 0

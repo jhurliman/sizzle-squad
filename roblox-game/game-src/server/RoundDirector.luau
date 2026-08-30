@@ -143,7 +143,19 @@ function RoundDirector:broadcastPhase()
 			afk = seat ~= nil and seat.afk == true,
 		})
 	end
+	-- BY CHARACTER, so the four chairs never move. Ordering by chefId kept the
+	-- chairs in step with the bodies, but claiming a character swaps species
+	-- between chefs, so the LABELS slid along the row every time anybody picked
+	-- somebody -- the chair you were about to tap was somewhere else by the
+	-- time you tapped it. The marks are pinned to characters now too, so the
+	-- panel and the room agree without either of them shuffling.
+	-- Staging comes off SimService because it is injected there; requiring it
+	-- here would put a Roblox lookup inside a module the harnesses drive.
+	local staging = self.simService.staging
 	table.sort(seats, function(a, b)
+		if staging ~= nil then
+			return staging.indexOf(a.species) < staging.indexOf(b.species)
+		end
 		return a.chefId < b.chefId
 	end)
 	local readyCount, readyTotal = self:readyTally()

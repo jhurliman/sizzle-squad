@@ -112,7 +112,9 @@ const IGNORE = new Set(['0', '0 coins', '3:00', 'X', '★', '☆', '🍳 ', '�
   // The dismiss glyph on a bot chair. A lower-case x rather than U+2715 or
   // U+2717, both of which KNOWN-GAPS records shipping as empty boxes because
   // they depend on the TEXT font and FredokaOne has neither.
-  'x']);
+  'x',
+  // The invite glyph on an empty chair's corner button, next to 'x'.
+  '+']);
 const missing = [];
 for (const kind of ['static', 'content']) {
   for (const e of found[kind]) {
