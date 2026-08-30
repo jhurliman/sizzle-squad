@@ -295,6 +295,25 @@ Players.PlayerAdded:Connect(function(player)
 		vaultCharacter(player.Character)
 	end
 	progression:playerAdded(player)
+	-- STUDIO GETS A RETURNING PLAYER'S PROFILE (Config.STUDIO_RETURNING_PLAYER).
+	--
+	-- Nothing persists in Studio, so every session looks like a first-ever
+	-- visit and both of the things that key off that fire: First Shift runs
+	-- again, and maybeAutoStart readies you automatically and drops you into a
+	-- shift without ever showing the lobby.
+	--
+	-- Shimming the profile rather than special-casing each of them means one
+	-- switch, and means the two stay consistent -- skipping only the tutorial
+	-- is what let the auto-start through and hid the lobby entirely.
+	if Tutorial.isStudio() and Config.STUDIO_RETURNING_PLAYER then
+		local shim = progression.profiles[player]
+		if shim ~= nil then
+			shim.sessions = math.max(shim.sessions or 1, 2)
+			shim.rounds = math.max(shim.rounds or 0, 1)
+			progression:push(player)
+			print("[sizzle] Studio: profile shimmed to a returning player (Config.STUDIO_RETURNING_PLAYER)")
+		end
+	end
 	-- FIRST SHIFT HAPPENS SOMEWHERE ELSE (see Tutorial.luau).
 	--
 	-- Before seating, before analytics, before anything that would make this
@@ -307,16 +326,9 @@ Players.PlayerAdded:Connect(function(player)
 		and Tutorial.needsTutorial(progression.profiles[player])
 	then
 		if Tutorial.isStudio() then
-			if Config.STUDIO_SKIP_TUTORIAL then
-				-- Every Studio session looks like a brand-new player (PlaceId 0
-				-- means no DataStore, so `rounds` never persists), which turned
-				-- First Shift into a toll on every single playtest.
-				print("[sizzle] First Shift SKIPPED (Config.STUDIO_SKIP_TUTORIAL); set it false to test the tutorial")
-			else
-				-- No teleport available; run First Shift right here (Tutorial.luau).
-				Tutorial.forced = true
-				print("[sizzle] First Shift: Studio, running the tutorial in this server")
-			end
+			-- No teleport available; run First Shift right here (Tutorial.luau).
+			Tutorial.forced = true
+			print("[sizzle] First Shift: Studio, running the tutorial in this server")
 		elseif Tutorial.send(player) then
 			return
 		end
