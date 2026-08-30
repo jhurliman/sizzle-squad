@@ -286,6 +286,56 @@ local menu = Menu.new({
 	end,
 })
 
+-- HAND THE SHOT TO THE PLATFORM, BECAUSE WE CANNOT REACH THE CAMERA ROLL.
+--
+-- Checked against the running Studio rather than assumed. On this build
+-- (0.736) CaptureService has no PromptSaveCapturesToGalleryAsync at all, and
+-- SaveScreenshotCapture refuses anything without the RobloxScript capability
+-- ("lacking capability RobloxScript"), so a game cannot put a picture in
+-- Photos by itself. PromptShareCapture opens the platform share sheet instead,
+-- which on iOS carries Save Image -- and also Messages and TikTok, which for a
+-- game that needs to be found is the better half of the deal.
+--
+-- The signature was recovered the same way, by asking: it wants four arguments
+-- (content id, launch data, and two callbacks), and the enums the documented
+-- form mentions do not exist on this build.
+--
+-- UI COMES OFF FIRST. CaptureScreenshot grabs what is on the screen, so
+-- photographing the results card would produce a picture of a scoreboard with
+-- a SHARE button on it. One frame with the HUD and the menu hidden is enough.
+local function shareTheShot()
+	local captureService = game:GetService("CaptureService")
+	local hudWas, menuWas = hud.gui.Enabled, menu.gui.Enabled
+	hud.gui.Enabled = false
+	menu.gui.Enabled = false
+	task.spawn(function()
+		-- Two frames: one for the hide to be composited, one to be safe.
+		RunService.RenderStepped:Wait()
+		RunService.RenderStepped:Wait()
+		local ok = pcall(function()
+			captureService:CaptureScreenshot(function(contentId)
+				hud.gui.Enabled = hudWas
+				menu.gui.Enabled = menuWas
+				local shared2 = pcall(function()
+					captureService:PromptShareCapture(contentId, "", function() end, function() end)
+				end)
+				if not shared2 then
+					-- Sharing can be off for younger accounts, and there is no
+					-- in-game gallery to fall back to. Say so rather than
+					-- leaving a button that visibly does nothing.
+					hud:toast("Sharing is not available on this account")
+				end
+			end)
+		end)
+		if not ok then
+			hud.gui.Enabled = hudWas
+			menu.gui.Enabled = menuWas
+			hud:toast("Could not take the photo")
+		end
+	end)
+end
+results.onShare = shareTheShot
+
 -- The coach's target, distinct from the focus glow: focus is "this is what
 -- the button will act on right now", coach is "this is where you should be
 -- going next". Two different questions, so two different colours.
@@ -440,6 +490,10 @@ remotes.RoundPhase.OnClientEvent:Connect(function(phase)
 			cameraRig:cutTo("gameplay", 0.9, "out")
 		elseif phase.phase == "results" then
 			cameraRig:cutTo("photo", 1.1, "smooth")
+			-- Confetti over the crew, scaled by stars rather than gated on
+			-- them. The old push-in fired only at three, so two finishes in
+			-- three ended on nothing at all.
+			vfx:celebrate(Staging.POSE, (phase.results and phase.results.stars) or 0)
 		else
 			-- countdown / intermission: the lobby closeup on the crew.
 			cameraRig:cutTo("lobby", if lastPhase == "" then 0 else 1.2, "smooth")
