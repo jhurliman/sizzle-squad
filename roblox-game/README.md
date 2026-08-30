@@ -202,16 +202,31 @@ but has no create operation, and running CreatePlaceAsync through the Open
 Cloud Luau sandbox is refused outright (HTTP 403), because that session is not
 the owner.
 
-So it runs from Studio's command bar, as you:
+So it runs from Studio's command bar, as you — **with the LIVE place open, not
+the local `.rbxl`**:
 
-```lua
-print(game:GetService("AssetService"):CreatePlaceAsync("Sizzle Squad — Staging", 113028832194057, "Staging"))
-```
+1. Studio → **File → Open from Roblox…** → Sizzle Squad. (Or the Edit button on
+   the experience page.) This matters: `CreatePlaceAsync` refuses on a file
+   whose own `game.PlaceId` is 0, which is every rojo-built local place, with
+   *"CreatePlaceAsync called on a Place with id <= 0, place should be opened
+   with Edit button to access CreatePlace"*. Passing the live id as the
+   template argument does not help — it checks the place you are standing in,
+   not the one you are copying.
+2. Command bar:
 
-The template id is live, so staging starts as a copy of what players have
-rather than an empty baseplate; `publish:staging` overwrites it from the next
-build anyway, so this only decides where it begins. Then export the printed id
-as `SIZZLE_STAGING_PLACE_ID`.
+   ```lua
+   print(game:GetService("AssetService"):CreatePlaceAsync("Sizzle Squad — Staging", game.PlaceId, "Staging"))
+   ```
+
+3. Copy the printed id, then **close without saving or publishing.** That
+   session is the live place; nothing needs to be written back to it, and
+   Ctrl+S there publishes to players.
+4. `export SIZZLE_STAGING_PLACE_ID=<the printed id>` in `~/.zshrc`, then
+   `npm run places` to confirm it is pointed at the right thing.
+
+Templating off live means staging starts as a copy of what players have rather
+than an empty baseplate; `publish:staging` overwrites it from the next build
+anyway, so this only decides where it begins.
 
 `npm run places` lists the universe's places and says which is live, which is
 staging, and which nothing points at — handy for reading the new id back

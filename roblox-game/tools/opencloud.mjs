@@ -241,10 +241,15 @@ async function cmdPlaces() {
   }
   if (rows.length === 1) {
     console.log(
-      "\nOnly the live place exists. To add a staging one, open Studio and run\n" +
-        "this in the command bar (it creates a copy of live, in the same universe):\n\n" +
-        `  print(game:GetService("AssetService"):CreatePlaceAsync("Sizzle Squad — Staging", ${placeId}, "Staging"))\n\n` +
-        "then export SIZZLE_STAGING_PLACE_ID=<the printed id> in ~/.zshrc.",
+      "\nOnly the live place exists. To add a staging one:\n\n" +
+        "  1. Studio -> File -> Open from Roblox -> Sizzle Squad.\n" +
+        "     NOT the local .rbxl: CreatePlaceAsync refuses on a file whose own\n" +
+        "     PlaceId is 0, which every rojo build is. Passing the live id as the\n" +
+        "     template does not help; it checks the place you are standing in.\n" +
+        "  2. Command bar:\n\n" +
+        '     print(game:GetService("AssetService"):CreatePlaceAsync("Sizzle Squad — Staging", game.PlaceId, "Staging"))\n\n' +
+        "  3. Copy the printed id and close WITHOUT saving -- that session is live.\n" +
+        "  4. export SIZZLE_STAGING_PLACE_ID=<id> in ~/.zshrc, then re-run this.",
     );
   }
 }
