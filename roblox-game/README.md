@@ -195,38 +195,34 @@ npm run smoke:staging       # module load check against staging
 npm run publish             # only after staging is green
 ```
 
-**Creating the place, once.** The dashboard no longer offers a button for it and
-points at the Create and Save Place API instead — which is a LUAU api, not an
-HTTP one: `AssetService:CreatePlaceAsync`. Open Cloud v2 exposes a place by id
-but has no create operation, and running CreatePlaceAsync through the Open
-Cloud Luau sandbox is refused outright (HTTP 403), because that session is not
-the owner.
+**Creating the place, once.** Studio's publish dialog, from whatever file you
+already have open:
 
-So it runs from Studio's command bar, as you — **with the LIVE place open, not
-the local `.rbxl`**:
+**File → Publish to Roblox As… → click the Sizzle Squad tile → Add as a new
+place → Create.**
 
-1. Studio → **File → Open from Roblox…** → Sizzle Squad. (Or the Edit button on
-   the experience page.) This matters: `CreatePlaceAsync` refuses on a file
-   whose own `game.PlaceId` is 0, which is every rojo-built local place, with
-   *"CreatePlaceAsync called on a Place with id <= 0, place should be opened
-   with Edit button to access CreatePlace"*. Passing the live id as the
-   template argument does not help — it checks the place you are standing in,
-   not the one you are copying.
-2. Command bar:
+That makes the place *and* publishes the current build into it, so staging
+starts life as whatever you were just working on rather than an empty
+baseplate.
 
-   ```lua
-   print(game:GetService("AssetService"):CreatePlaceAsync("Sizzle Squad — Staging", game.PlaceId, "Staging"))
-   ```
+> **The dangerous click is right next to the safe one.** The same dialog will
+> happily publish over the EXISTING place, which is live. "Add as a new place"
+> is the option; the game tile on its own is not.
 
-3. Copy the printed id, then **close without saving or publishing.** That
-   session is the live place; nothing needs to be written back to it, and
-   Ctrl+S there publishes to players.
-4. `export SIZZLE_STAGING_PLACE_ID=<the printed id>` in `~/.zshrc`, then
-   `npm run places` to confirm it is pointed at the right thing.
+**Why not the API.** The dashboard points at a "Create and Save Place API", and
+it is real, but it will not do this:
 
-Templating off live means staging starts as a copy of what players have rather
-than an empty baseplate; `publish:staging` overwrites it from the next build
-anyway, so this only decides where it begins.
+- Open Cloud has no create-place operation. v2 can GET and PATCH a place by id;
+  there is no POST to a places collection. `develop.roblox.com/v1/universes/
+  {id}/places` lists them, which is what `npm run places` uses, and that is all.
+- Creating one is `AssetService:CreatePlaceAsync`, a **Luau** call, and it is
+  fenced three ways: it refuses on a file whose own `game.PlaceId` is 0 (every
+  rojo build), it refuses outside a server script (the Edit-mode command bar is
+  not one), and with both of those satisfied — live place open, running server,
+  owner authenticated, Studio API services on — it still returns **HTTP 403**.
+  The same 403 comes back through the Open Cloud Luau execution path. Two
+  independent authenticated routes refusing it is a platform restriction, not a
+  context mistake, so stop trying to find the right context.
 
 `npm run places` lists the universe's places and says which is live, which is
 staging, and which nothing points at — handy for reading the new id back

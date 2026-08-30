@@ -241,15 +241,18 @@ async function cmdPlaces() {
   }
   if (rows.length === 1) {
     console.log(
-      "\nOnly the live place exists. To add a staging one:\n\n" +
-        "  1. Studio -> File -> Open from Roblox -> Sizzle Squad.\n" +
-        "     NOT the local .rbxl: CreatePlaceAsync refuses on a file whose own\n" +
-        "     PlaceId is 0, which every rojo build is. Passing the live id as the\n" +
-        "     template does not help; it checks the place you are standing in.\n" +
-        "  2. Command bar:\n\n" +
-        '     print(game:GetService("AssetService"):CreatePlaceAsync("Sizzle Squad — Staging", game.PlaceId, "Staging"))\n\n' +
-        "  3. Copy the printed id and close WITHOUT saving -- that session is live.\n" +
-        "  4. export SIZZLE_STAGING_PLACE_ID=<id> in ~/.zshrc, then re-run this.",
+      "\nOnly the live place exists. To add a staging one, use Studio's publish\n" +
+        "dialog -- NOT the API. Open Cloud has no create-place operation, and\n" +
+        "AssetService:CreatePlaceAsync returns HTTP 403 even from an owner's\n" +
+        "server session on the live place. Two authenticated routes refusing it\n" +
+        "is a platform restriction, not a context mistake.\n\n" +
+        "  File -> Publish to Roblox As... -> the Sizzle Squad tile ->\n" +
+        "  Add as a new place -> Create\n\n" +
+        "It publishes whatever you have open into the new place, so staging\n" +
+        "starts as your current build. Careful: the same dialog will publish\n" +
+        "over the EXISTING place, which is live -- 'Add as a new place' is the\n" +
+        "option, the tile on its own is not.\n\n" +
+        "Then export SIZZLE_STAGING_PLACE_ID=<id> in ~/.zshrc and re-run this.",
     );
   }
 }
