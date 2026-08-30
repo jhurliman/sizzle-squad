@@ -800,4 +800,5 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
+print(`[sizzle] build {require(gameShared:WaitForChild("BuildInfo")).summary}`)
 print("[sizzle] client up")

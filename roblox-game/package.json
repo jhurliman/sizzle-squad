@@ -6,7 +6,7 @@
   "scripts": {
     "sync": "node sync-shared.mjs",
     "sync:check": "node sync-shared.mjs --check",
-    "build": "npm run sync && tstl && rojo build -o SizzleSquad.rbxl",
+    "build": "npm run sync && node tools/stamp-build.mjs && tstl && rojo build -o SizzleSquad.rbxl",
     "watch": "tstl --watch",
     "smoke": "lune run tools/smoke.luau",
     "smoke:ts": "node tools/smoke-ts.mjs",

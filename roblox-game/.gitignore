@@ -3,3 +3,7 @@ out/
 src/shared/domain/
 src/shared/bots/
 SizzleSquad.rbxl
+
+# Generated at build time by tools/stamp-build.mjs; never committed, because it
+# changes on every build and its whole job is to describe THIS build.
+game-src/shared/BuildInfo.luau

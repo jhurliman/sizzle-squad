@@ -410,4 +410,10 @@ RunService.Heartbeat:Connect(function(dt)
 	leaderboards:heartbeat(os.clock())
 end)
 
+-- WHICH BUILD IS THIS? Studio holds the .rbxl it was opened with for the whole
+-- session, so a rebuilt place on disk changes nothing in an open window. Say
+-- it out loud rather than leaving people to infer it from whether a feature
+-- they expected is present.
+local BuildInfo = require(gameShared:WaitForChild("BuildInfo")) :: any
+print(`[sizzle] build {BuildInfo.summary}`)
 print("[sizzle] server up — kitchen open")
