@@ -400,7 +400,18 @@ function ShiftPanel:paint()
 	-- Lobby phases only. `results` is a ceremony with its own full-screen
 	-- overlay, and showing a Start button (or a stray "Results 7s" chip) on
 	-- top of it was pure noise.
-	local lobby = p == "countdown" or p == "intermission"
+	--
+	-- A SPECTATOR IS THE EXCEPTION, because otherwise they are locked out
+	-- entirely. Menu:setPhase already permits the menu for anyone without a
+	-- chef (`phase ~= "round" or spectating`) -- but permission was all they
+	-- had. Every surface that can OPEN a tab is this panel or the Kitchen
+	-- Card, both hidden during a round, and there is no hotkey anywhere. So
+	-- somebody who joined past the late-join cutoff sat and watched for up to
+	-- three minutes with the wardrobe theoretically available and genuinely
+	-- unreachable. They have no Start button either way (see startRoot below),
+	-- so what appears is the tabs and nothing that could take a press it
+	-- cannot honour.
+	local lobby = p == "countdown" or p == "intermission" or (self.spectating and p == "round")
 	self.root.Visible = not self.hidden and lobby
 
 	self.startRoot.Visible = not self.spectating
