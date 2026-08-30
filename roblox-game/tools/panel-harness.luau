@@ -186,6 +186,53 @@ for _, w in { 1920, 1280, 1024, 820, 720, 640, 480, 414, 360, 320 } do
 	check(ok, `relayout at {w}px` .. (if ok then "" else ` -- {tostring(err)}`))
 end
 
+-- ------------------------------------------- A2. does the panel clear the emotes?
+--
+-- REAL COLLISION, REPORTED ON MOBILE: the panel grew a roster row and the info
+-- chip at its bottom landed on top of the emote row. Removing the global BOTS
+-- button afterwards took the tab row from six buttons to five, which can
+-- collapse it from two rows to one -- so the collision may already be gone,
+-- and that is arithmetic rather than a matter of opinion.
+--
+-- Panel: AnchorPoint (0.5, 0.5) at 0.58 of the height, AutomaticSize.Y, so its
+-- height is its four children plus three 18px gaps.
+-- EmoteBar: AnchorPoint (0.5, 1) at (1, -8), 26 tall, so its top is H - 34.
+print("A2. the Start Shift panel clears the emote row")
+local function clearance(w: number, h: number): (number, number, number)
+	panel:relayout(nil, Vector2.new(w, h))
+	local children = panel.startRoot.Size.Y.Offset
+		+ panel.friendRow.Size.Y.Offset
+		+ panel.tabRow.Size.Y.Offset
+		+ panel.progressChip.Size.Y.Offset
+	local panelH = children + 18 * 3
+	-- relayout may have lifted the panel; read where it actually put it.
+	local centre = panel.root.Position.Y.Offset
+	if centre == 0 then
+		centre = 0.58 * h
+	end
+	local panelBottom = centre + panelH / 2
+	local emoteTop = h - 34
+	return emoteTop - panelBottom, panelH, panel.tabRow.Size.Y.Offset
+end
+
+for _, vp in
+	{
+		{ w = 1920, h = 1080, name = "desktop" },
+		{ w = 1366, h = 768, name = "laptop" },
+		{ w = 1024, h = 768, name = "iPad 4:3" },
+		{ w = 896, h = 414, name = "phone landscape" },
+		{ w = 844, h = 390, name = "small phone landscape" },
+		{ w = 740, h = 360, name = "very small phone" },
+	}
+do
+	local gap, panelH, rowsH = clearance(vp.w, vp.h)
+	local rows = if rowsH > 60 then 2 else 1
+	check(
+		gap >= 0,
+		`{vp.name} {vp.w}x{vp.h}: panel {panelH}px, tabs {rows} row(s), clears the emote row by {string.format("%.0f", gap)}px`
+	)
+end
+
 -- --------------------------------------------------- B. four fixed characters
 print("B. the chairs are four fixed characters, and people move between them")
 local function setSeats(seats: { any })

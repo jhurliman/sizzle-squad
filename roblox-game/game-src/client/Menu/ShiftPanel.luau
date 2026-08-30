@@ -29,6 +29,12 @@ local mk = Theme.mk
 -- between the four, so this is only what they are built at.
 local SLOT_W = 150
 
+-- Vertical padding between the panel's four rows. Named because relayout has
+-- to reproduce the column's height to know whether it is sitting on the emote
+-- row, and reaching for the wrong gap there under-lifts it by exactly this
+-- much -- which is how the first attempt at that clamp failed.
+local COLUMN_GAP = 18
+
 local TABS = {
 	{ id = "wardrobe", label = "👕 WARDROBE" },
 	{ id = "shop", label = "🛒 SHOP" },
@@ -55,7 +61,7 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	}, gui)
 	mk("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
-		Padding = UDim.new(0, 18),
+		Padding = UDim.new(0, COLUMN_GAP),
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
@@ -563,6 +569,26 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	self.friendRow.Size = UDim2.fromOffset(friendW, Theme.MIN_TAP + Theme.SHADOW_DY)
 
 	local rowsH = rows * (Theme.MIN_TAP + Theme.SHADOW_DY) + (rows - 1) * gap
+	-- KEEP OFF THE EMOTE ROW.
+	--
+	-- The panel sits at 0.58 of the height, which was chosen when it was
+	-- shorter. It has since grown a roster row, and on a phone the info chip at
+	-- its bottom landed on top of the emote buttons -- reported from mobile,
+	-- and measured afterwards at -3px on a 844x390 screen and -16px at
+	-- 740x360. It clears by 7px at 896x414, which is not a margin, it is luck.
+	--
+	-- The emote row is anchored (0.5, 1) at (1, -8) and is 26 tall, so its top
+	-- is viewport.Y - 34. Rather than hide one of them, the panel lifts only as
+	-- far as it must to clear, and stays where it was designed to be whenever
+	-- there is room -- which on anything laptop-sized and up is always.
+	local panelH = self.startRoot.Size.Y.Offset
+		+ self.friendRow.Size.Y.Offset
+		+ rowsH
+		+ self.progressChip.Size.Y.Offset
+		+ COLUMN_GAP * 3
+	local wantY = 0.58 * viewport.Y
+	local maxCentre = (viewport.Y - 34 - 8) - panelH / 2
+	self.root.Position = UDim2.new(0.5, 0, 0, math.floor(math.min(wantY, maxCentre)))
 	local widest = math.max(self.rows[1].Size.X.Offset, self.rows[2].Size.X.Offset, friendW)
 	self.tabRow.Size = UDim2.fromOffset(widest, rowsH)
 	-- Height comes from the column's own contents (AutomaticSize.Y), not from a
