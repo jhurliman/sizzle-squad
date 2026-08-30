@@ -36,6 +36,21 @@ local crew = CrewManager.new(simService, Net, remotes, replicator, os.clock, fun
 	return profile and profile.species or nil
 end)
 progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("Catalog")))
+-- STUDIO LOOKS LIKE A FIRST-EVER VISIT, FOREVER, AND TWO THINGS KEY OFF THAT.
+--
+-- Nothing persists from a rojo-built local file (PlaceId 0, so no DataStore),
+-- so `rounds` and `sessions` reset every session. needsTutorial is
+-- `rounds == 0` and Menu:maybeAutoStart readies a `sessions <= 1` player
+-- automatically -- between them, every playtest was either the tutorial again
+-- or being dropped straight into a shift with three bots, never the lobby.
+--
+-- Progression applies this to the profile BEFORE the first push, which is the
+-- part that matters: the client acts on that push, so correcting it afterwards
+-- is already too late.
+progression.studioReturning = Tutorial.isStudio() and Config.STUDIO_RETURNING_PLAYER
+if progression.studioReturning then
+	print("[sizzle] Studio: profiles shimmed to a returning player (Config.STUDIO_RETURNING_PLAYER)")
+end
 
 local Catalog = require(gameShared:WaitForChild("Catalog")) :: any
 local leaderboards = Leaderboards.new(progression, remotes)
@@ -293,25 +308,6 @@ Players.PlayerAdded:Connect(function(player)
 		vaultCharacter(player.Character)
 	end
 	progression:playerAdded(player)
-	-- STUDIO GETS A RETURNING PLAYER'S PROFILE (Config.STUDIO_RETURNING_PLAYER).
-	--
-	-- Nothing persists in Studio, so every session looks like a first-ever
-	-- visit and both of the things that key off that fire: First Shift runs
-	-- again, and maybeAutoStart readies you automatically and drops you into a
-	-- shift without ever showing the lobby.
-	--
-	-- Shimming the profile rather than special-casing each of them means one
-	-- switch, and means the two stay consistent -- skipping only the tutorial
-	-- is what let the auto-start through and hid the lobby entirely.
-	if Tutorial.isStudio() and Config.STUDIO_RETURNING_PLAYER then
-		local shim = progression.profiles[player]
-		if shim ~= nil then
-			shim.sessions = math.max(shim.sessions or 1, 2)
-			shim.rounds = math.max(shim.rounds or 0, 1)
-			progression:push(player)
-			print("[sizzle] Studio: profile shimmed to a returning player (Config.STUDIO_RETURNING_PLAYER)")
-		end
-	end
 	-- FIRST SHIFT HAPPENS SOMEWHERE ELSE (see Tutorial.luau).
 	--
 	-- Before seating, before analytics, before anything that would make this

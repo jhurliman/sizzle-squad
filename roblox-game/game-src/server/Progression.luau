@@ -247,6 +247,18 @@ function Progression:playerAdded(player: any)
 	if profile.sessions == 1 and profile.equipped.hat == nil and profile.owned.hat_paper then
 		profile.equipped.hat = "hat_paper"
 	end
+	-- STUDIO RETURNING-PLAYER SHIM, APPLIED BEFORE THE FIRST PUSH.
+	--
+	-- Set by main.server when Config.STUDIO_RETURNING_PLAYER is on. It has to
+	-- land here rather than after playerAdded returns, because push() is the
+	-- thing the client's maybeAutoStart reacts to: shimming afterwards and
+	-- pushing again means the client has already seen sessions = 1, already
+	-- decided this is somebody's first ever visit, and already readied them
+	-- into a round before the correction arrives.
+	if self.studioReturning then
+		profile.sessions = math.max(profile.sessions or 1, 2)
+		profile.rounds = math.max(profile.rounds or 0, 1)
+	end
 	self.dirty[player] = true
 	self.profiles[player] = profile
 	self:push(player)

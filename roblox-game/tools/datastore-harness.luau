@@ -169,5 +169,38 @@ for _, n in stagingNames do
 end
 env.game.PlaceId = nil
 
+-- ------------------------------- 6. the Studio returning-player shim
+--
+-- Studio persists nothing (PlaceId 0), so every session looks like a first-ever
+-- visit and the client both replays the tutorial and auto-readies the player
+-- into a shift. The shim fixes that -- but ONLY if it lands before the first
+-- push, because the push is what the client acts on. The first attempt shimmed
+-- the profile after playerAdded returned and pushed again, by which point the
+-- client had already seen sessions = 1 and readied itself into a round.
+local pushed = {}
+local pushRemotes = { Progress = { FireClient = function(_, _p, payload)
+	table.insert(pushed, payload)
+end } }
+
+env.game.PlaceId = nil
+local Pshim = luau.load(luau.compile(fs.readFile("game-src/server/Progression.luau")), { environment = env })()
+local shimmed = Pshim.new(Config, pushRemotes, Catalog, nil)
+shimmed.studioReturning = true
+shimmed:playerAdded({ UserId = 4242, Name = "Studio" })
+check(#pushed >= 1, "the profile is pushed to the client")
+local first = pushed[1]
+check(first ~= nil and first.sessions ~= nil and first.sessions > 1,
+	`the FIRST push already says returning ({tostring(first and first.sessions)} sessions)`)
+check(first ~= nil and (first.rounds or 0) > 0,
+	`and already has a round on the clock ({tostring(first and first.rounds)}), so needsTutorial is false`)
+
+-- and without the flag, nothing is faked
+pushed = {}
+local Pplain = luau.load(luau.compile(fs.readFile("game-src/server/Progression.luau")), { environment = env })()
+local plain = Pplain.new(Config, pushRemotes, Catalog, nil)
+plain:playerAdded({ UserId = 4343, Name = "Real" })
+check(pushed[1] ~= nil and pushed[1].sessions == 1, "a real first-ever player is still a first-ever player")
+check(pushed[1] ~= nil and (pushed[1].rounds or 0) == 0, "with no rounds behind them")
+
 print(if failures > 0 then `{failures} FAILURES` else "PASS: datastore hardening")
 if failures > 0 then error(`{failures} checks failed`) end
