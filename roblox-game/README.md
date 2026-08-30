@@ -16,7 +16,54 @@ npm run build                            # sync -> tstl -> rojo build -> SizzleS
 ```
 
 Open `SizzleSquad.rbxl` in Studio and press Play. Test multiplayer with
-*Clients and Servers → Start Local Server* (2–4 players).
+*Clients and Servers → Start Local Server* (2–4 players) — the roster, the
+ready ticks and the READY-vs-START SHIFT verb only mean anything with a second
+human in the server.
+
+### Use `rojo serve`, not rebuild-and-reopen
+
+```sh
+rojo plugin install     # once: installs the Rojo Studio plugin
+rojo serve              # then: Rojo plugin -> Connect, in Studio
+```
+
+**Studio snapshots the `.rbxl` when it opens it and never re-reads it.** A
+rebuild writes the file on disk and changes nothing in a session that is
+already open, so the place keeps running whatever it was opened with — and the
+only symptom is a change you expected not being there, which looks exactly like
+a change that does not work. This cost two rounds of debugging in one day.
+`check-luau`'s staleness guard cannot help: it compares the `.rbxl` against
+`game-src`, and what Studio holds in memory is not something the filesystem
+knows.
+
+It is worse when the work is in a git worktree, because then the file being
+rebuilt and the file being opened are genuinely different files in different
+directories, and reopening does not help either.
+
+With `rojo serve` connected, a save reaches Studio directly. No rebuild, no
+reopen, no ambiguity about which file is which.
+
+**Whatever you do, the place says which build it is.** Every run prints it,
+next to the familiar startup lines:
+
+```
+[sizzle] build 0fbec49 on jhurliman/soft-launch, built 2026-08-30 01:13
+[sizzle] client up
+```
+
+with `+dirty` when the tree has uncommitted changes. If that sha is not the one
+you just wrote, you are not testing what you think you are testing.
+
+### Studio does not persist anything
+
+`game.PlaceId` is 0 for a rojo-built local file, so DataStore calls fail and no
+profile is saved. The server warns about it on startup rather than leaving you
+to work it out.
+
+The visible consequence: `needsTutorial` is `rounds == 0`, so without
+persistence First Shift would run on *every* playtest. `Config.STUDIO_SKIP_TUTORIAL`
+defaults to skipping it in Studio; set it false when the tutorial is the thing
+you are testing.
 
 ## What's implemented
 
