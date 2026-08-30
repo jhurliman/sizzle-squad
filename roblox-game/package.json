@@ -14,7 +14,8 @@
     "publish": "npm run build && node tools/publish-place.mjs",
     "smoke:live": "node tools/opencloud.mjs luau tools/place-smoke.luau",
     "publish:staging": "npm run build && node tools/publish-place.mjs --staging",
-    "smoke:staging": "node tools/opencloud.mjs luau tools/place-smoke.luau --staging"
+    "smoke:staging": "node tools/opencloud.mjs luau tools/place-smoke.luau --staging",
+    "places": "node tools/opencloud.mjs places"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

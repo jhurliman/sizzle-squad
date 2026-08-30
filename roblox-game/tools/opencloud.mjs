@@ -210,6 +210,45 @@ async function cmdLuau(file) {
 }
 
 const [cmd, arg] = process.argv.slice(2).filter((a) => a !== "--staging");
+// Which places does this universe have, and which one is which?
+//
+// NOT on apis.roblox.com. Open Cloud v2 exposes a place by id but has no
+// listing, and there is no create-place operation there at all -- creating one
+// is AssetService:CreatePlaceAsync, a LUAU call, and the Open Cloud Luau
+// sandbox is refused it (HTTP 403). So a new place is made from Studio's
+// command bar and this is how you find its id afterwards without hunting
+// through the dashboard.
+async function cmdPlaces() {
+  const { apiKey, universeId, placeId } = creds();
+  const res = await fetch(
+    `https://develop.roblox.com/v1/universes/${universeId}/places?limit=50`,
+    { headers: { "x-api-key": apiKey } },
+  );
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`places -> ${res.status} ${text.slice(0, 200)}`);
+  }
+  const staging = (process.env.SIZZLE_STAGING_PLACE_ID || "").trim();
+  const rows = JSON.parse(text).data || [];
+  console.log(`universe ${universeId}: ${rows.length} place(s)`);
+  for (const p of rows) {
+    const id = String(p.id);
+    let tag = "";
+    if (id === placeId) tag = "  <-- LIVE";
+    else if (id === staging) tag = "  <-- staging (SIZZLE_STAGING_PLACE_ID)";
+    else tag = "  <-- not pointed at by anything";
+    console.log(`  ${id.padEnd(18)} ${p.name}${tag}`);
+  }
+  if (rows.length === 1) {
+    console.log(
+      "\nOnly the live place exists. To add a staging one, open Studio and run\n" +
+        "this in the command bar (it creates a copy of live, in the same universe):\n\n" +
+        `  print(game:GetService("AssetService"):CreatePlaceAsync("Sizzle Squad — Staging", ${placeId}, "Staging"))\n\n` +
+        "then export SIZZLE_STAGING_PLACE_ID=<the printed id> in ~/.zshrc.",
+    );
+  }
+}
+
 const run = {
   check: cmdCheck,
   list: cmdList,
@@ -217,10 +256,12 @@ const run = {
   boards: () => wipeBoards(creds().universeId, arg),
   wipe: () => cmdWipe(arg),
   luau: () => cmdLuau(arg),
+  places: cmdPlaces,
 }[cmd];
 if (!run) {
   console.error(`usage:
   node tools/opencloud.mjs check              verify the key and list datastores
+  node tools/opencloud.mjs places             list the universe's places and which is which
   node tools/opencloud.mjs list               list stored profile keys
   node tools/opencloud.mjs profile <userId>   read one profile (--raw for all fields)
   node tools/opencloud.mjs boards <userId>    clear just the leaderboard rows

@@ -195,8 +195,27 @@ npm run smoke:staging       # module load check against staging
 npm run publish             # only after staging is green
 ```
 
-Create it once at **Creator Dashboard → Sizzle Squad → Places → Create Place**
-(Open Cloud cannot create places, only publish to them).
+**Creating the place, once.** The dashboard no longer offers a button for it and
+points at the Create and Save Place API instead — which is a LUAU api, not an
+HTTP one: `AssetService:CreatePlaceAsync`. Open Cloud v2 exposes a place by id
+but has no create operation, and running CreatePlaceAsync through the Open
+Cloud Luau sandbox is refused outright (HTTP 403), because that session is not
+the owner.
+
+So it runs from Studio's command bar, as you:
+
+```lua
+print(game:GetService("AssetService"):CreatePlaceAsync("Sizzle Squad — Staging", 113028832194057, "Staging"))
+```
+
+The template id is live, so staging starts as a copy of what players have
+rather than an empty baseplate; `publish:staging` overwrites it from the next
+build anyway, so this only decides where it begins. Then export the printed id
+as `SIZZLE_STAGING_PLACE_ID`.
+
+`npm run places` lists the universe's places and says which is live, which is
+staging, and which nothing points at — handy for reading the new id back
+without going through the dashboard.
 
 **These commands used to publish to LIVE.** `publish:staging` was
 `ROBLOX_PLACE_ID=$SIZZLE_STAGING_PLACE_ID node tools/publish-place.mjs`, and
