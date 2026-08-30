@@ -13,6 +13,20 @@ local Theme = require(script.Parent.Theme) :: any
 local EmoteBar = {}
 EmoteBar.__index = EmoteBar
 
+-- THE BOTTOM OF THE SCREEN, AS A NUMBER OTHER FILES CAN READ.
+--
+-- The Start Shift column is pinned directly above this row, so its position is
+-- now derived from these rather than from a `- 34` written out by hand in two
+-- other places. They are used to build the row itself a few lines down, so the
+-- constants cannot drift from the geometry they describe.
+EmoteBar.HEIGHT = 26
+EmoteBar.BOTTOM_MARGIN = 8
+
+--- Y of the top edge of the emote row, in pixels from the top of the screen.
+function EmoteBar.topOf(viewportY: number): number
+	return viewportY - EmoteBar.HEIGHT - EmoteBar.BOTTOM_MARGIN
+end
+
 local mk = Theme.mk
 
 function EmoteBar.new(gui: Instance, deps: any)
@@ -24,8 +38,8 @@ function EmoteBar.new(gui: Instance, deps: any)
 	self.root = mk("Frame", {
 		Name = "EmoteBar",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -8),
-		Size = UDim2.fromOffset(560, 26),
+		Position = UDim2.new(0.5, 0, 1, -EmoteBar.BOTTOM_MARGIN),
+		Size = UDim2.fromOffset(560, EmoteBar.HEIGHT),
 		BackgroundTransparency = 1,
 	}, gui)
 	mk("UIListLayout", {
@@ -99,7 +113,7 @@ function EmoteBar:render()
 end
 
 function EmoteBar:relayout(_L: any, viewport: Vector2)
-	self.root.Size = UDim2.fromOffset(math.min(560, viewport.X - 240), 26)
+	self.root.Size = UDim2.fromOffset(math.min(560, viewport.X - 240), EmoteBar.HEIGHT)
 	self:render()
 end
 

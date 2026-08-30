@@ -1,7 +1,11 @@
 --!strict
--- The between-rounds home screen: a big Start Shift button, the four menu
--- buttons, and your career line -- centred, because this IS the screen when a
--- shift is not running.
+-- The between-rounds home screen: a big Start Shift button, the four-chair
+-- roster, and your career line -- stacked at the BOTTOM of the screen, just
+-- above the emote row.
+--
+-- Bottom, not centred, because the thing worth looking at here is the four
+-- characters standing in the kitchen behind it. Centred, Start Shift landed
+-- squarely across two of their faces on anything laptop-sized or bigger.
 --
 -- Replaces both the old ready button and the top-left tab cluster. The cluster
 -- sat under the patience bar and collided with Roblox's own top-bar controls;
@@ -19,6 +23,9 @@ local Players = game:GetService("Players")
 
 local Theme = require(script.Parent.Theme) :: any
 local Loc = require(script.Parent.Parent.Loc) :: any
+-- For its geometry only, not to build one: this column hangs directly above
+-- the emote row, so it needs to know where the top of that row is.
+local EmoteBar = require(script.Parent.EmoteBar) :: any
 
 local ShiftPanel = {}
 ShiftPanel.__index = ShiftPanel
@@ -29,11 +36,13 @@ local mk = Theme.mk
 -- between the four, so this is only what they are built at.
 local SLOT_W = 150
 
--- Vertical padding between the panel's four rows. Named because relayout has
--- to reproduce the column's height to know whether it is sitting on the emote
--- row, and reaching for the wrong gap there under-lifts it by exactly this
--- much -- which is how the first attempt at that clamp failed.
+-- Vertical padding between the panel's rows.
 local COLUMN_GAP = 18
+
+-- Air between the bottom of this column and the top of the emote row. Slightly
+-- more than the 8px the emote row itself keeps off the screen edge, so the two
+-- read as separate strips rather than one crowded block.
+local EMOTE_CLEARANCE = 12
 
 -- ONE DOOR, NOT FOUR.
 --
@@ -56,10 +65,15 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	self.spectating = false
 	self.phase = { phase = "countdown" }
 
+	-- HUNG FROM THE BOTTOM, NOT CENTRED.
+	--
+	-- Anchored at its BOTTOM edge, so AutomaticSize.Y grows the column upward
+	-- from a fixed line just above the emote row. relayout sets the real Y; this
+	-- is only what it looks like for the frame before the first layout pass.
 	self.root = mk("Frame", {
 		Name = "ShiftPanel",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.58),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -(EmoteBar.HEIGHT + EmoteBar.BOTTOM_MARGIN + EMOTE_CLEARANCE)),
 		Size = UDim2.fromOffset(600, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
@@ -555,6 +569,18 @@ function ShiftPanel:step(_dt: number) end
 function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	self.lastViewport = viewport
 	local compact = viewport.X < 720
+	-- SHORT IS NOT THE SAME AS NARROW.
+	--
+	-- `compact` keys on WIDTH, and every size below it was chosen for a screen
+	-- that is short as well. An 812x375 phone in landscape is neither: wide
+	-- enough for the full-size Start button, but only 375 tall, and now that
+	-- the column grows upward from the emote row the tall button pushed its own
+	-- top edge into the WARDROBE chip in the corner -- caught by the harness at
+	-- 3px of overlap, which is exactly the kind of margin nobody notices until
+	-- it is a screenshot. Vertical space is what is scarce there, so the button
+	-- takes the shorter height on height grounds, independently of width.
+	local short = viewport.Y < 400
+	local tight = compact or short
 	-- Hidden buttons take no space in the row: a tutorial server shows four,
 	-- not six with two gaps.
 	local visible = {}
@@ -619,27 +645,22 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	-- Pinned to the corner, so it sizes to its own buttons rather than to the
 	-- panel's width.
 	self.tabRow.Position = UDim2.fromOffset(12, 84)
-	-- KEEP OFF THE EMOTE ROW.
+	-- SIT ON THE EMOTE ROW, DON'T FLOAT OVER THE FACES.
 	--
-	-- The panel sits at 0.58 of the height, which was chosen when it was
-	-- shorter. It has since grown a roster row, and on a phone the info chip at
-	-- its bottom landed on top of the emote buttons -- reported from mobile,
-	-- and measured afterwards at -3px on a 844x390 screen and -16px at
-	-- 740x360. It clears by 7px at 896x414, which is not a margin, it is luck.
+	-- This column used to be centred at 0.58 of the height and lift only as far
+	-- as it had to in order to clear the emote buttons. On a phone that was the
+	-- right rule; on a laptop it left Start Shift squarely across two of the
+	-- four faces the lobby shot exists to show. The column is a control strip,
+	-- not the subject, so it belongs at the bottom of the screen at every size.
 	--
-	-- The emote row is anchored (0.5, 1) at (1, -8) and is 26 tall, so its top
-	-- is viewport.Y - 34. Rather than hide one of them, the panel lifts only as
-	-- far as it must to clear, and stays where it was designed to be whenever
-	-- there is room -- which on anything laptop-sized and up is always.
-	-- The tab row is NOT in this column any more (it is pinned top-left), so it
-	-- is not part of the panel's height and there are two gaps, not three.
-	local panelH = self.startRoot.Size.Y.Offset
-		+ self.friendRow.Size.Y.Offset
-		+ self.progressChip.Size.Y.Offset
-		+ COLUMN_GAP * 2
-	local wantY = 0.58 * viewport.Y
-	local maxCentre = (viewport.Y - 34 - 8) - panelH / 2
-	self.root.Position = UDim2.new(0.5, 0, 0, math.floor(math.min(wantY, maxCentre)))
+	-- Pinning the BOTTOM edge also removes the arithmetic. The old rule needed
+	-- panelH, hand-summed from the rows and their gaps, and that sum had to be
+	-- re-derived every time a row was added or removed -- it was wrong at least
+	-- twice, and the guard that was supposed to catch it only ever caught the
+	-- panel being too LOW. Now the bottom edge is stated outright and
+	-- AutomaticSize.Y grows the column upward from it, so there is no height to
+	-- get wrong in the first place.
+	self.root.Position = UDim2.new(0.5, 0, 0, EmoteBar.topOf(viewport.Y) - EMOTE_CLEARANCE)
 	-- The corner row sizes to ITS OWN buttons; the panel sizes to the chairs.
 	-- They used to share a width because they shared a column, and keeping that
 	-- link would stretch a one-button row across the whole screen.
@@ -651,13 +672,13 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	-- every time a gap or a control changed height, and was already carrying
 	-- 12px of slack nobody could account for.
 	self.root.Size = UDim2.fromOffset(math.max(widest, 320), 0)
-	self.startRoot.Size = UDim2.fromOffset(if compact then 260 else 340, if compact then 62 else 72)
+	self.startRoot.Size = UDim2.fromOffset(if compact then 260 else 340, if tight then 62 else 72)
 	-- No per-state TextSize any more: the CTA scales its own label (see
 	-- Theme.cta). Only the ceiling moves with the breakpoint.
 	-- Sized off the button, not picked by feel: a chunky display face wants
 	-- roughly 60% of the button's height or it reads as a small label floating
 	-- in a large slab, which is how the first version looked.
-	local h = if compact then 62 else 72
+	local h = if tight then 62 else 72
 	local cap = self.startButton:FindFirstChildWhichIsA("UITextSizeConstraint")
 	if cap ~= nil then
 		cap.MaxTextSize = math.floor(h * 0.62)

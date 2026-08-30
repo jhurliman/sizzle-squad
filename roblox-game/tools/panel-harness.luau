@@ -143,14 +143,31 @@ local Loc = {
 	end,
 }
 
--- ShiftPanel resolves its two requires off `script`.
+-- The REAL EmoteBar, not a stub: the panel is positioned from its exported
+-- geometry, and a stub with made-up numbers would let the two drift apart
+-- while this file kept saying they agreed. It only requires Theme, and nothing
+-- here constructs one.
+local emoteEnv = table.clone(env)
+emoteEnv.script = { Parent = { Theme = "THEME" } }
+emoteEnv.require = function(what)
+	if what == "THEME" then
+		return Theme
+	end
+	error(`unexpected require from EmoteBar: {tostring(what)}`)
+end
+local EmoteBar =
+	luau.load(luau.compile(fs.readFile("game-src/client/Menu/EmoteBar.luau")), { environment = emoteEnv })()
+
+-- ShiftPanel resolves its three requires off `script`.
 local panelEnv = table.clone(env)
-panelEnv.script = { Parent = { Theme = "THEME", Parent = { Loc = "LOC" } } }
+panelEnv.script = { Parent = { Theme = "THEME", EmoteBar = "EMOTEBAR", Parent = { Loc = "LOC" } } }
 panelEnv.require = function(what)
 	if what == "THEME" then
 		return Theme
 	elseif what == "LOC" then
 		return Loc
+	elseif what == "EMOTEBAR" then
+		return EmoteBar
 	end
 	error(`unexpected require: {tostring(what)}`)
 end
@@ -190,19 +207,31 @@ for _, w in { 1920, 1280, 1024, 820, 720, 640, 480, 414, 360, 320 } do
 	check(ok, `relayout at {w}px` .. (if ok then "" else ` -- {tostring(err)}`))
 end
 
--- ------------------------------------------- A2. does the panel clear the emotes?
+-- ---------------------------------- A2. does the bottom strip fit the screen?
 --
 -- REAL COLLISION, REPORTED ON MOBILE: the panel grew a roster row and the info
--- chip at its bottom landed on top of the emote row. Removing the global BOTS
--- button afterwards took the tab row from six buttons to five, which can
--- collapse it from two rows to one -- so the collision may already be gone,
--- and that is arithmetic rather than a matter of opinion.
+-- chip at its bottom landed on top of the emote row.
 --
--- Panel: AnchorPoint (0.5, 0.5) at 0.58 of the height, AutomaticSize.Y, so its
--- height is its four children plus three 18px gaps.
+-- THE SHAPE OF THIS CHECK CHANGED. The panel used to be centred at 0.58 of the
+-- height and lift only as far as it had to; the guard measured that lift, and
+-- was only ever one-sided -- deliberately over-estimating the column height by
+-- 200px passed clean, because over-lifting just moved the panel up and nothing
+-- looked at where it ended up. The panel now hangs from its BOTTOM edge, a
+-- fixed 12px above the emote row, so the bottom clearance is true by
+-- construction and measuring it would only be measuring the constant.
+--
+-- What can still go wrong is at the OTHER end: the column grows upward, so a
+-- taller column on a short screen runs into the WARDROBE row pinned in the
+-- top-left corner, and then off the top of the screen. That is what is
+-- measured here, and unlike the old one it is genuinely two-sided -- adding a
+-- row to the column moves this number, in the direction that hurts.
+--
+-- Panel: AnchorPoint (0.5, 1), AutomaticSize.Y, so its height is its three
+-- children plus two 18px gaps and its top is Position.Y - that.
 -- EmoteBar: AnchorPoint (0.5, 1) at (1, -8), 26 tall, so its top is H - 34.
-print("A2. the Start Shift panel clears the emote row")
-local function clearance(w: number, h: number): (number, number, number)
+print("A2. the bottom strip fits above the emote row and below the corner")
+local EMOTE_CLEARANCE = 12
+local function clearance(w: number, h: number): (number, number, number, number, number)
 	panel:relayout(nil, Vector2.new(w, h))
 	-- The tab row is pinned to the top-left corner now, not stacked in this
 	-- column, so it is not part of the panel's height and there are two gaps
@@ -211,14 +240,14 @@ local function clearance(w: number, h: number): (number, number, number)
 		+ panel.friendRow.Size.Y.Offset
 		+ panel.progressChip.Size.Y.Offset
 	local panelH = children + 18 * 2
-	-- relayout may have lifted the panel; read where it actually put it.
-	local centre = panel.root.Position.Y.Offset
-	if centre == 0 then
-		centre = 0.58 * h
-	end
-	local panelBottom = centre + panelH / 2
-	local emoteTop = h - 34
-	return emoteTop - panelBottom, panelH, panel.tabRow.Size.Y.Offset, centre - panelH / 2, panel.tabRow.Size.X.Offset
+	-- Anchored (0.5, 1): Position.Y IS the bottom edge, not the centre.
+	local panelBottom = panel.root.Position.Y.Offset
+	-- From EmoteBar itself rather than a `- 34` copied here, which is what the
+	-- panel does too. Which does mean the gap check below is weak -- both sides
+	-- read the same constant, so it proves the panel WIRED the geometry up, not
+	-- that the geometry is right. The top-edge check is the load-bearing one.
+	local emoteTop = EmoteBar.topOf(h)
+	return emoteTop - panelBottom, panelH, panel.tabRow.Size.Y.Offset, panelBottom - panelH, panel.tabRow.Size.X.Offset
 end
 
 for _, vp in
@@ -237,12 +266,16 @@ do
 	local rows = if rowsH > 60 then 2 else 1
 	-- The corner row must not run off the right edge either.
 	check(12 + tabsW <= vp.w, `{vp.name}: the corner row fits ({tabsW}px from x=12 in {vp.w})`)
+	-- Sitting ON the emote row is the intent, so this is an equality, not a
+	-- floor: it fails if the column drifts up as well as down.
 	check(
-		gap >= 0,
-		`{vp.name} {vp.w}x{vp.h}: panel {panelH}px, tabs {rows} row(s), clears the emote row by {string.format("%.0f", gap)}px`
+		gap == EMOTE_CLEARANCE,
+		`{vp.name} {vp.w}x{vp.h}: panel {panelH}px, tabs {rows} row(s), sits {string.format("%.0f", gap)}px above the emote row`
 	)
-	-- Lifting to clear the bottom must not push the Start button off the top.
-	check(top >= 0, `       and its top edge is on screen ({string.format("%.0f", top)}px)`)
+	-- The column grows upward from that line. It must not reach the WARDROBE
+	-- row in the corner, which is 48 tall at y=84, nor the screen edge above it.
+	local cornerBottom = 84 + rowsH
+	check(top >= cornerBottom, `       and its top edge clears the corner row ({string.format("%.0f", top)} >= {cornerBottom})`)
 end
 
 -- --------------------------------------------------- B. four fixed characters
