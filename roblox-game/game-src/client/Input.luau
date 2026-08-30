@@ -59,6 +59,9 @@ function Input.new(hudGui: Instance)
 	end)
 
 	self.enabled = true
+	-- Starts true so nothing changes until a phase says otherwise; the first
+	-- RoundPhase sets it properly.
+	self.actionOn = true
 	-- Kept on the instance so setEnabled can rebind the very same handler.
 	self.actionHandler = function(_, state)
 		if state == Enum.UserInputState.Begin then
@@ -135,6 +138,44 @@ end
 --- viewport, and stray E/Space presses landing as grabs. Disabling the
 --- ControlModule also HIDES the thumbstick, and unbinding the action removes
 --- the touch action button, so the screen visibly clears too.
+--- Show or hide the context action button WITHOUT touching movement.
+---
+--- setEnabled is the menu switch: it suspends everything, because a chef
+--- walking blind behind a full-screen panel is the problem it solves. Between
+--- rounds we want the opposite half of that -- walking around the lobby is
+--- deliberate and people like it -- while the action button should go, because
+--- there is nothing to press it on. The kitchen is asleep, so it did nothing
+--- anyway, and a button that does nothing is worse than no button.
+function Input:setActionEnabled(on: boolean)
+	if self.actionOn == on then
+		return
+	end
+	self.actionOn = on
+	self:refreshAction()
+end
+
+--- The action is bound only when the menu allows input AND the phase wants it.
+--- Two independent switches, one place that resolves them, so they cannot
+--- disagree about whether the button exists.
+function Input:refreshAction()
+	if self.enabled and self.actionOn then
+		ContextActionService:BindAction(ACTION, self.actionHandler, true, Enum.KeyCode.E, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
+		if UserInputService.TouchEnabled then
+			ContextActionService:SetPosition(ACTION, UDim2.new(1, -104, 1, -124))
+			pcall(function()
+				ContextActionService:GetButton(ACTION).Size = UDim2.fromOffset(88, 88)
+			end)
+		end
+		self:setVerb("none")
+	else
+		ContextActionService:UnbindAction(ACTION)
+		-- Drop any half-finished press so re-binding cannot fire a stale grab.
+		self.grabQueued = false
+		self.useHeld = false
+		self.arrowX = 0
+	end
+end
+
 function Input:setEnabled(on: boolean)
 	if self.enabled == on then
 		return
@@ -154,22 +195,7 @@ function Input:setEnabled(on: boolean)
 			end
 		end)
 	end
-	if on then
-		ContextActionService:BindAction(ACTION, self.actionHandler, true, Enum.KeyCode.E, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
-		if UserInputService.TouchEnabled then
-			ContextActionService:SetPosition(ACTION, UDim2.new(1, -104, 1, -124))
-			pcall(function()
-				ContextActionService:GetButton(ACTION).Size = UDim2.fromOffset(88, 88)
-			end)
-		end
-		self:setVerb("none")
-	else
-		ContextActionService:UnbindAction(ACTION)
-		-- Drop any half-finished press so closing the menu cannot fire a grab.
-		self.grabQueued = false
-		self.useHeld = false
-		self.arrowX = 0
-	end
+	self:refreshAction()
 end
 
 --- Kitchen-space move vector. Camera faces -Z, so screen-up is kitchen -y:

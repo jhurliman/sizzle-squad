@@ -476,6 +476,10 @@ remotes.RoundPhase.OnClientEvent:Connect(function(phase)
 	end
 	-- The one call site for the phase gate.
 	menu:setPhase(phase, state.myChefId == nil)
+	-- The action button is for gameplay. Walking around the lobby stays on --
+	-- people like it and it is what puts you on your mark -- but there is
+	-- nothing to press it on between rounds, so it goes.
+	input:setActionEnabled(phase.phase == "round")
 
 	-- CAMERA: ONE OWNER, THREE SHOTS, REAL MOVES BETWEEN THEM.
 	--

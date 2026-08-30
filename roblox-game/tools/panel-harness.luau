@@ -204,11 +204,13 @@ end
 print("A2. the Start Shift panel clears the emote row")
 local function clearance(w: number, h: number): (number, number, number)
 	panel:relayout(nil, Vector2.new(w, h))
+	-- The tab row is pinned to the top-left corner now, not stacked in this
+	-- column, so it is not part of the panel's height and there are two gaps
+	-- between three children rather than three between four.
 	local children = panel.startRoot.Size.Y.Offset
 		+ panel.friendRow.Size.Y.Offset
-		+ panel.tabRow.Size.Y.Offset
 		+ panel.progressChip.Size.Y.Offset
-	local panelH = children + 18 * 3
+	local panelH = children + 18 * 2
 	-- relayout may have lifted the panel; read where it actually put it.
 	local centre = panel.root.Position.Y.Offset
 	if centre == 0 then
@@ -216,7 +218,7 @@ local function clearance(w: number, h: number): (number, number, number)
 	end
 	local panelBottom = centre + panelH / 2
 	local emoteTop = h - 34
-	return emoteTop - panelBottom, panelH, panel.tabRow.Size.Y.Offset, centre - panelH / 2
+	return emoteTop - panelBottom, panelH, panel.tabRow.Size.Y.Offset, centre - panelH / 2, panel.tabRow.Size.X.Offset
 end
 
 for _, vp in
@@ -231,8 +233,10 @@ for _, vp in
 		{ w = 667, h = 375, name = "iPhone SE landscape" },
 	}
 do
-	local gap, panelH, rowsH, top = clearance(vp.w, vp.h)
+	local gap, panelH, rowsH, top, tabsW = clearance(vp.w, vp.h)
 	local rows = if rowsH > 60 then 2 else 1
+	-- The corner row must not run off the right edge either.
+	check(12 + tabsW <= vp.w, `{vp.name}: the corner row fits ({tabsW}px from x=12 in {vp.w})`)
 	check(
 		gap >= 0,
 		`{vp.name} {vp.w}x{vp.h}: panel {panelH}px, tabs {rows} row(s), clears the emote row by {string.format("%.0f", gap)}px`

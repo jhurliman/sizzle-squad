@@ -35,11 +35,17 @@ local SLOT_W = 150
 -- much -- which is how the first attempt at that clamp failed.
 local COLUMN_GAP = 18
 
+-- ONE DOOR, NOT FOUR.
+--
+-- Wardrobe, Shop, Career and Ranks each had a button here, and the panel they
+-- open already carries a tab strip across all four -- so three of those buttons
+-- were a second way to reach somewhere you land anyway. They cost a whole row
+-- of a screen whose entire job is showing you four characters, and that row was
+-- sitting across their faces.
+--
+-- Wardrobe is the entry point because it is the one people come for.
 local TABS = {
 	{ id = "wardrobe", label = "👕 WARDROBE" },
-	{ id = "shop", label = "🛒 SHOP" },
-	{ id = "career", label = "⭐ CAREER" },
-	{ id = "ranks", label = "🏆 RANKS" },
 }
 
 function ShiftPanel.new(gui: Instance, deps: any)
@@ -242,15 +248,23 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		self.slots[i] =
 			{ root = slot, face = face, name = name, state = state, species = species, dismiss = dismiss }
 	end
+	-- OUT OF THE COLUMN, INTO THE CORNER.
+	--
+	-- These used to be the third row of the centred panel, which pushed Start
+	-- and the four chairs up over the crew's faces -- the one thing the lobby
+	-- shot exists to show. They are navigation, not part of the crew decision,
+	-- so they sit where the in-round coin chip does (which is hidden between
+	-- rounds, so the corner is free) and the panel is a row shorter.
 	self.tabRow = mk("Frame", {
 		Size = UDim2.fromOffset(600, Theme.MIN_TAP),
 		BackgroundTransparency = 1,
-		LayoutOrder = 3,
-	}, self.root)
+		AnchorPoint = Vector2.new(0, 0),
+		Position = UDim2.fromOffset(12, 84),
+	}, gui)
 	mk("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
 		Padding = UDim.new(0, 8),
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, self.tabRow)
 
@@ -264,7 +278,9 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		mk("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			Padding = UDim.new(0, 8),
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			-- Left, because the row is pinned to the left edge now rather than
+			-- centred under the panel.
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}, row)
@@ -600,6 +616,9 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	self.friendRow.Size = UDim2.fromOffset(friendW, Theme.MIN_TAP + Theme.SHADOW_DY)
 
 	local rowsH = rows * (Theme.MIN_TAP + Theme.SHADOW_DY) + (rows - 1) * gap
+	-- Pinned to the corner, so it sizes to its own buttons rather than to the
+	-- panel's width.
+	self.tabRow.Position = UDim2.fromOffset(12, 84)
 	-- KEEP OFF THE EMOTE ROW.
 	--
 	-- The panel sits at 0.58 of the height, which was chosen when it was
@@ -612,16 +631,21 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	-- is viewport.Y - 34. Rather than hide one of them, the panel lifts only as
 	-- far as it must to clear, and stays where it was designed to be whenever
 	-- there is room -- which on anything laptop-sized and up is always.
+	-- The tab row is NOT in this column any more (it is pinned top-left), so it
+	-- is not part of the panel's height and there are two gaps, not three.
 	local panelH = self.startRoot.Size.Y.Offset
 		+ self.friendRow.Size.Y.Offset
-		+ rowsH
 		+ self.progressChip.Size.Y.Offset
-		+ COLUMN_GAP * 3
+		+ COLUMN_GAP * 2
 	local wantY = 0.58 * viewport.Y
 	local maxCentre = (viewport.Y - 34 - 8) - panelH / 2
 	self.root.Position = UDim2.new(0.5, 0, 0, math.floor(math.min(wantY, maxCentre)))
-	local widest = math.max(self.rows[1].Size.X.Offset, self.rows[2].Size.X.Offset, friendW)
-	self.tabRow.Size = UDim2.fromOffset(widest, rowsH)
+	-- The corner row sizes to ITS OWN buttons; the panel sizes to the chairs.
+	-- They used to share a width because they shared a column, and keeping that
+	-- link would stretch a one-button row across the whole screen.
+	local tabsW = math.max(self.rows[1].Size.X.Offset, self.rows[2].Size.X.Offset)
+	self.tabRow.Size = UDim2.fromOffset(tabsW, rowsH)
+	local widest = friendW
 	-- Height comes from the column's own contents (AutomaticSize.Y), not from a
 	-- hand-summed constant: the old `142 + rowsH` had to be re-derived by hand
 	-- every time a gap or a control changed height, and was already carrying
