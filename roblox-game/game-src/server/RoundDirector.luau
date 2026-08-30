@@ -83,14 +83,42 @@ function RoundDirector:setPhase(phase: Phase, timer: number)
 end
 
 function RoundDirector:broadcastPhase()
-	-- readyIds is what lets the client render its own ready caption as a pure
-	-- function of server state instead of remembering that it clicked.
-	local readyIds = {}
-	for player in self.crew.seats do
-		if self.ready[player] then
-			table.insert(readyIds, player.UserId)
+	-- THE SEAT ROSTER: WHO IS HERE, NOT JUST HOW MANY.
+	--
+	-- This used to be `readyIds`, a bare list of UserIds of the players who had
+	-- pressed Start. Two problems with that. Names, skins and hats are all
+	-- keyed by chefId, so drawing a crew row meant bridging UserId to chefId
+	-- through the skin table -- a two-hop join that only worked because skins
+	-- happen to be a unique permutation. And there was no way at all to learn
+	-- who had NOT pressed Start, because an absent UserId and an absent player
+	-- look identical.
+	--
+	-- Carrying chefId here makes the lobby roster a lookup instead of an
+	-- inference, and carrying the not-ready seats is what lets it show four
+	-- chairs rather than a count.
+	--
+	-- AFK seats are excluded, matching readyTally. They used not to be: an
+	-- AFK-but-ready player landed in readyIds while readyTally left them out of
+	-- both halves of the count, so #readyIds could exceed readyCount and a
+	-- roster built from it would render "3/2".
+	local seats = {}
+	for player, seat in self.crew.seats do
+		if not seat.afk then
+			table.insert(seats, {
+				chefId = seat.chefId,
+				userId = player.UserId,
+				ready = self.ready[player] == true,
+				-- The name rides along rather than being joined client-side.
+				-- EquipDeltas already carries one keyed by chefId, but pairing
+				-- the two payloads to draw one row is how the UserId->chefId
+				-- inference this replaced got fragile in the first place.
+				name = player.DisplayName or player.Name,
+			})
 		end
 	end
+	table.sort(seats, function(a, b)
+		return a.chefId < b.chefId
+	end)
 	local readyCount, readyTotal = self:readyTally()
 	self.remotes.RoundPhase:FireAllClients({
 		phase = self.phase,
@@ -100,14 +128,11 @@ function RoundDirector:broadcastPhase()
 		tutorial = self.tutorialFn(),
 		timer = self.timer,
 		round = self.round,
-		waiting = not self.simService.botFill and self.crew:humanCount() == 0,
 		botFill = self.simService.botFill,
 		botFillPending = self.pendingBotFill,
-		readyIds = readyIds,
+		seats = seats,
 		readyCount = readyCount,
 		readyTotal = readyTotal,
-		-- countdown/intermission are lobbies waiting on Start, not countdowns
-		awaitingStart = self.phase == "countdown" or self.phase == "intermission",
 		results = if self.phase == "results" or self.phase == "intermission" then self.lastResults else nil,
 	})
 end

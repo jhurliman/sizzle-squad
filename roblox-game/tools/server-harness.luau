@@ -237,6 +237,79 @@ check(#remotes.Transforms.allFired > 100, `transforms streamed ({#remotes.Transf
 check(#remotes.SimEvents.allFired > 10, `events streamed ({#remotes.SimEvents.allFired} batches)`)
 check(#remotes.RoundPhase.allFired > 5, "round phases broadcast")
 
+-- ------------------------------------------------- the lobby seat roster
+--
+-- The phase payload used to carry `readyIds`, a bare list of UserIds of the
+-- players who had pressed Start. The lobby roster cannot be drawn from that:
+-- names and skins are keyed by chefId, so it needed a two-hop join through the
+-- skin table, and there was no way at all to learn who had NOT pressed, since
+-- an absent UserId and an absent player look identical.
+--
+-- The 3/2 bug is the one worth pinning. readyIds did not check seat.afk while
+-- readyTally excluded AFK seats from BOTH halves of its count, so an
+-- AFK-but-ready player made #readyIds exceed readyCount and any roster built
+-- from it rendered more ready players than there were players.
+local function lastPhasePayload()
+	local fired = remotes.RoundPhase.allFired
+	return fired[#fired][1]
+end
+
+-- The emulated client above spends the whole round sending packets with no
+-- real movement in them, so by now the AFK gate has correctly parked it. Clear
+-- that first: the AFK case gets its own check below, and this one is about the
+-- shape of the payload.
+crew:touch(crew.seats[playerA])
+-- setReady no-ops outside a lobby phase and the round has just ended, so set
+-- the flag and ask for the broadcast directly rather than reading a payload
+-- from thirty seconds ago.
+director.ready[playerA] = true
+director:broadcastPhase()
+local pay = lastPhasePayload()
+check(pay.seats ~= nil, "the phase payload carries a seat roster")
+check(pay.readyIds == nil, "and the old readyIds list is gone")
+check(pay.awaitingStart == nil and pay.waiting == nil, "along with two fields nothing ever read")
+
+local seatA = nil
+for _, st in pay.seats do
+	if st.userId == playerA.UserId then
+		seatA = st
+	end
+end
+check(seatA ~= nil, "the seated player is in the roster")
+if seatA ~= nil then
+	check(seatA.chefId ~= nil, `carrying a chefId ({tostring(seatA.chefId)}), so names need no join`)
+	check(seatA.name ~= nil and seatA.name ~= "", `and a display name ({tostring(seatA.name)})`)
+	check(seatA.ready == true, "and their ready state")
+end
+
+-- AFK-and-ready: the case that used to render 3/2
+crew.seats[playerA].afk = true
+director:broadcastPhase()
+local afkPay = lastPhasePayload()
+local n, total = director:readyTally()
+check(#afkPay.seats == total, `an AFK seat leaves the roster ({#afkPay.seats} rows, readyTotal {total})`)
+local anyAfk = false
+for _, st in afkPay.seats do
+	if st.userId == playerA.UserId then
+		anyAfk = true
+	end
+end
+check(not anyAfk, "an AFK-but-ready player is not counted as a ready chair")
+check(#afkPay.seats >= n, `roster rows never undercount the ready tally ({#afkPay.seats} >= {n})`)
+crew.seats[playerA].afk = false
+director:broadcastPhase()
+
+-- and it stays in chefId order, so the four chairs do not shuffle each tick
+local ordered = true
+local prev = -1
+for _, st in lastPhasePayload().seats do
+	if st.chefId <= prev then
+		ordered = false
+	end
+	prev = st.chefId
+end
+check(ordered, "the roster is ordered by chefId, so chairs hold still between broadcasts")
+
 -- buffer round-trip
 local b = Net.packMove(7, 3.25, 4.5, 1.5, -2.25, 0.7, true)
 local p = Net.unpackMove(b)

@@ -553,6 +553,30 @@ remotes.ClientReady:FireServer()
 local acc = 0
 local sendAcc = 0
 
+--- The nametag over a chef, with a ready tick while the crew is deciding.
+---
+--- The lobby roster and the chef in the world are the same fact shown twice,
+--- so they have to agree: the roster names who has pressed Start, and this is
+--- what lets you look up from the panel and see WHICH of the four it was. Only
+--- while the lobby is up -- a tick over somebody's head mid-service would just
+--- be a tick nobody asked about.
+local function nameTagFor(chefId: number): string?
+	local base = state.names[chefId]
+	if base == nil then
+		return nil
+	end
+	local seats = state.phase.seats
+	if seats == nil or state.phase.phase == "round" then
+		return base
+	end
+	for _, seat in seats do
+		if seat.chefId == chefId and seat.ready then
+			return `✅ {base}`
+		end
+	end
+	return base
+end
+
 --- Are we in a phase where the crew should be standing on its marks?
 --- Everything that is not a live round: the lobby closeup and the end-of-shift
 --- photo both frame Staging.LINEUP.
@@ -649,7 +673,7 @@ RunService.RenderStepped:Connect(function(dt)
 		if id ~= state.myChefId then
 			local pose = state:remotePose(id)
 			if pose ~= nil and state.clock - (state.lastSeen[id] or -10) < 2 then
-				visuals:update(id, skin, pose, state.flags[id] or 0, dt, state.carrying[id], state.hats[id], state.names[id], state.palettes[id])
+				visuals:update(id, skin, pose, state.flags[id] or 0, dt, state.carrying[id], state.hats[id], nameTagFor(id), state.palettes[id])
 			elseif visuals.chefs[id] ~= nil then
 				-- parked / departed chefs stop streaming: clear their body
 				visuals:remove(id)
