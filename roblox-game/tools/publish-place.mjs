@@ -14,22 +14,17 @@
 //   node tools/publish-place.mjs            # publish (live)
 //   node tools/publish-place.mjs --saved    # save a version without publishing
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
-const CONFIG = path.join(os.homedir(), '.config', 'sizzle', 'opencloud.json');
+// Universe/place ids and the key lookup are shared with opencloud.mjs so the
+// two tools cannot disagree about which place is live. creds() exits if there
+// is no API key.
+import { creds } from './opencloud-creds.mjs';
+
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const PLACE_FILE = path.join(ROOT, 'SizzleSquad.rbxl');
 
-let file = {};
-if (fs.existsSync(CONFIG)) file = JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
-const apiKey = process.env.ROBLOX_SIZZLE_SQUAD_API_KEY || process.env.ROBLOX_API_KEY || file.apiKey;
-const universeId = process.env.ROBLOX_UNIVERSE_ID || file.universeId || '10761465304';
-const placeId = process.env.ROBLOX_PLACE_ID || file.placeId || '113028832194057';
-if (!apiKey) {
-  console.error('missing API key — export ROBLOX_SIZZLE_SQUAD_API_KEY');
-  process.exit(1);
-}
+const { apiKey, universeId, placeId } = creds();
 if (!fs.existsSync(PLACE_FILE)) {
   console.error(`no ${PLACE_FILE} — run \`npm run build\` first`);
   process.exit(1);

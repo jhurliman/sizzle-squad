@@ -5,36 +5,10 @@
 // vars override it, which is what CI would use. See tools/OPEN-CLOUD.md for how
 // to mint the key.
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 
-const CONFIG = path.join(os.homedir(), ".config", "sizzle", "opencloud.json");
-
-// Override with ROBLOX_UNIVERSE_ID.
-const DEFAULT_UNIVERSE_ID = "10761465304";
-
-function creds() {
-  let file = {};
-  if (fs.existsSync(CONFIG)) file = JSON.parse(fs.readFileSync(CONFIG, "utf8"));
-  const c = {
-    apiKey:
-      process.env.ROBLOX_SIZZLE_SQUAD_API_KEY ||
-      process.env.ROBLOX_API_KEY ||
-      file.apiKey,
-    universeId:
-      process.env.ROBLOX_UNIVERSE_ID || file.universeId || DEFAULT_UNIVERSE_ID,
-    placeId: process.env.ROBLOX_PLACE_ID || file.placeId,
-  };
-  if (!c.apiKey) {
-    console.error(
-      `missing API key. Export ROBLOX_SIZZLE_SQUAD_API_KEY, or create ${CONFIG}:\n` +
-        `{ "apiKey": "...", "universeId": "...", "placeId": "..." }\n` +
-        `See roblox-game/tools/OPEN-CLOUD.md.`,
-    );
-    process.exit(1);
-  }
-  return c;
-}
+// Universe/place ids and the key lookup are shared with publish-place.mjs so
+// the two tools cannot disagree about which place is live.
+import { creds } from "./opencloud-creds.mjs";
 
 // The key must never reach stdout, a log, or an error message.
 async function api(url, { method = "GET", body, headers = {} } = {}) {
@@ -196,7 +170,6 @@ async function wipeBoards(universeId, userId) {
 // Roblox-only behaviour possible at all.
 async function cmdLuau(file) {
   const { universeId, placeId } = creds();
-  if (!placeId) throw new Error("placeId is required for luau execution");
   const script = fs.readFileSync(file, "utf8");
   const base = `https://apis.roblox.com/cloud/v2/universes/${universeId}/places/${placeId}`;
   const task = await api(`${base}/luau-execution-session-tasks`, {

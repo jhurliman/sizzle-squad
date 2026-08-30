@@ -10,6 +10,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
+// Just the id, not creds(): --verify SKIPS without a key rather than exiting,
+// which creds() would do.
+import { DEFAULT_UNIVERSE_ID } from './opencloud-creds.mjs';
+
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(HERE, '..');
 const src = JSON.parse(fs.readFileSync(path.join(ROOT, 'loc/source.json'), 'utf8'));
@@ -166,7 +170,7 @@ if (orphanCalls.length) {
 let langMismatch = 0;
 if (process.argv.includes('--verify')) {
   const key = process.env.ROBLOX_SIZZLE_SQUAD_API_KEY;
-  const universe = process.env.ROBLOX_UNIVERSE_ID || '10761465304';
+  const universe = process.env.ROBLOX_UNIVERSE_ID || DEFAULT_UNIVERSE_ID;
   if (!key) {
     console.log('\n--verify skipped: no API key in the environment');
   } else {
