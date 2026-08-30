@@ -132,16 +132,22 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			LayoutOrder = i,
 		}, self.friendRow)
 
-		-- The filled face: a plaque with a name and a tick.
-		local face = mk("Frame", {
+		-- THE WHOLE CHAIR IS THE CONTROL.
+		--
+		-- A bot chair and an empty chair are both offers -- "play as this
+		-- character" -- so the face is a button rather than a plaque with a
+		-- button bolted to it. It simply refuses when the chair holds a person.
+		local face = mk("TextButton", {
 			Size = UDim2.fromOffset(SLOT_W, Theme.MIN_TAP),
 			BackgroundColor3 = Theme.BROWN_MID,
 			BorderSizePixel = 0,
+			AutoButtonColor = false,
+			Text = "",
 		}, slot)
 		Theme.corner(face, 10)
 		local name = mk("TextLabel", {
-			Size = UDim2.new(1, -10, 0, 20),
-			Position = UDim2.fromOffset(5, 6),
+			Size = UDim2.new(1, -10, 0, 18),
+			Position = UDim2.fromOffset(5, 13),
 			BackgroundTransparency = 1,
 			Font = Theme.BOLD_FONT,
 			TextSize = 15,
@@ -150,8 +156,8 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			Text = "",
 		}, face)
 		local state = mk("TextLabel", {
-			Size = UDim2.new(1, -10, 0, 16),
-			Position = UDim2.fromOffset(5, 26),
+			Size = UDim2.new(1, -10, 0, 14),
+			Position = UDim2.fromOffset(5, 31),
 			BackgroundTransparency = 1,
 			Font = Theme.BODY_FONT,
 			TextSize = 13,
@@ -164,29 +170,60 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			Text = "",
 		}, face)
 
-		-- The empty face: a button, because an empty chair is an invitation.
-		local cta = Theme.cta({
-			Size = UDim2.fromOffset(SLOT_W, Theme.MIN_TAP),
-			Fill = Theme.BLUE,
-			TextSize = 14,
-			Text = "＋ INVITE",
-		}, slot)
-		cta.root.Visible = false
-		cta.button.Activated:Connect(function()
-			local f = self.friend
-			if f ~= nil then
-				self.deps.onJoinFriend(f.jobId, f.name)
+		-- The character whose chair this is. Small, above the occupant, because
+		-- it is the constant and the occupant is not.
+		local species = mk("TextLabel", {
+			Size = UDim2.new(1, -10, 0, 12),
+			Position = UDim2.fromOffset(5, 2),
+			BackgroundTransparency = 1,
+			Font = Theme.BODY_FONT,
+			TextSize = 11,
+			TextColor3 = Theme.GOLD,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Text = "",
+		}, face)
+
+		-- Dismissing a bot is a separate, smaller act than taking its chair, so
+		-- it gets its own corner rather than a second meaning for the same tap.
+		local dismiss = mk("TextButton", {
+			Size = UDim2.fromOffset(20, 20),
+			Position = UDim2.new(1, -22, 0, 2),
+			BackgroundTransparency = 1,
+			Font = Theme.BOLD_FONT,
+			TextSize = 15,
+			TextColor3 = Theme.DIM,
+			-- Not U+2715 or U+2717: KNOWN-GAPS records both shipping as empty
+			-- boxes, because they depend on the TEXT font and FredokaOne has
+			-- neither. A lower-case x always renders.
+			Text = "x",
+			Visible = false,
+		}, face)
+
+		local idx = i
+		face.Activated:Connect(function()
+			local seat = self.seats and self.seats[idx]
+			if seat == nil then
 				return
 			end
-			-- pcall: PromptGameInvite throws outright where the platform cannot
-			-- show the invite sheet, and a dead button beats a broken panel.
-			pcall(function()
-				local SocialService = game:GetService("SocialService")
-				SocialService:PromptGameInvite(Players.LocalPlayer)
-			end)
+			if seat.kind == "player" then
+				return -- somebody is sitting there
+			end
+			if seat.kind == "empty" and self.friend ~= nil then
+				self.deps.onJoinFriend(self.friend.jobId, self.friend.name)
+				return
+			end
+			self.deps.onSeatAction(seat.chefId, "claim")
+		end)
+		dismiss.Activated:Connect(function()
+			local seat = self.seats and self.seats[idx]
+			if seat == nil then
+				return
+			end
+			self.deps.onSeatAction(seat.chefId, if seat.kind == "bot" then "dismiss" else "fill")
 		end)
 
-		self.slots[i] = { root = slot, face = face, name = name, state = state, cta = cta }
+		self.slots[i] =
+			{ root = slot, face = face, name = name, state = state, species = species, dismiss = dismiss }
 	end
 	-- Kept for relayout, which sizes the row from the widest thing in it.
 	self.inviteRoot = self.slots[1].root
@@ -253,20 +290,6 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		self.tabButtons[t.id] = cta.button
 	end
 
-	-- BOTS ARE OPTIONAL, AND THE LOBBY IS WHERE YOU SAY SO.
-	--
-	-- Sits with the tab row rather than in a settings screen because it is a
-	-- per-server choice made in the ten seconds before a shift, not a
-	-- preference. The caption states what will happen at the NEXT start, since
-	-- that is when it lands — flipping bots mid-shift would freeze them where
-	-- they stand, mid-carry.
-	local botCta = rowButton("BOTS: ON", #TABS + 1)
-	self.botButton = botCta.button
-	self.botRoot = botCta.root
-	self.botButton.Activated:Connect(function()
-		self.deps.onToggleBots(not self.botFill)
-	end)
-
 	-- LEAVING IS AN AFFORDANCE, NOT AN ADMISSION.
 	--
 	-- A player who dislikes a lobby and has no way out closes the app; every
@@ -304,40 +327,58 @@ end
 --- An empty chair offers JOIN when a friend is actually reachable and INVITE
 --- otherwise. Never both, and never a JOIN with nobody behind it -- an
 --- always-on "join a friend" that leads nowhere advertises an empty game.
+--- Paint the four chairs from the last roster the server sent.
+---
+--- A CHAIR IS A CHARACTER; the occupant is what changes. Four states, and the
+--- tap does the obvious thing for each:
+---   you     -- nothing to do
+---   player  -- somebody else's, not tappable
+---   bot     -- tap to play as that character, or x to send the bot away
+---   empty   -- tap to take it, or invite/join if a friend is reachable
+---
+--- This replaces a global BOTS: ON button that could not say "three bots but
+--- not a fourth", and whose scope (everyone in the server) was invisible.
 function ShiftPanel:renderRoster()
 	local seats = self.seats or {}
-	local bots = self.botFill == true
-	local friend = self.friend
+	local me = Players.LocalPlayer.UserId
 	for i, slot in self.slots do
 		local seat = seats[i]
-		if seat ~= nil then
-			slot.face.Visible = true
-			slot.cta.root.Visible = false
-			slot.name.Text = seat.name or "Chef"
-			-- Three states, each said in words. The not-ready one used to be a
-			-- bare "…", which is not a state, it is a shrug.
-			if seat.afk then
-				slot.state.Text = "away"
-				slot.state.TextColor3 = Theme.DIM
-			elseif seat.ready then
-				slot.state.Text = "✅ ready"
-				slot.state.TextColor3 = Theme.GREEN
-			else
-				slot.state.Text = "choosing"
-				slot.state.TextColor3 = Theme.DIM
-			end
-		elseif bots then
-			-- A bot in the chair IS the crew setting, stated as its effect.
-			slot.face.Visible = true
-			slot.cta.root.Visible = false
-			slot.name.Text = "Bot"
-			slot.state.Text = "filling in"
-			slot.state.TextColor3 = Theme.DIM
+		if seat == nil then
+			slot.root.Visible = false
 		else
-			slot.face.Visible = false
-			slot.cta.root.Visible = true
-			slot.cta.button.Text = if friend ~= nil then Loc.f("fmt.join_name", friend.name) else "＋ INVITE"
-			Theme.setCtaFill(slot.cta.button, if friend ~= nil then Theme.GREEN else Theme.BLUE)
+			slot.root.Visible = true
+			slot.species.Text = string.upper(seat.species or "")
+			local mine = seat.userId == me
+			slot.dismiss.Visible = seat.kind == "bot"
+			if seat.kind == "player" then
+				slot.name.Text = seat.name or "Chef"
+				slot.face.BackgroundColor3 = if mine then Theme.BROWN_LIGHT else Theme.BROWN_MID
+				-- Three states, each said in words. The not-ready one used to be a
+				-- bare "…", which is not a state, it is a shrug.
+				if seat.afk then
+					slot.state.Text = "away"
+					slot.state.TextColor3 = Theme.DIM
+				elseif seat.ready then
+					slot.state.Text = "✅ ready"
+					slot.state.TextColor3 = Theme.GREEN
+				else
+					slot.state.Text = "choosing"
+					slot.state.TextColor3 = Theme.DIM
+				end
+			elseif seat.kind == "bot" then
+				slot.name.Text = "Bot"
+				slot.state.Text = "tap to play"
+				slot.state.TextColor3 = Theme.DIM
+				slot.face.BackgroundColor3 = Theme.BROWN_MID
+			else
+				-- Empty. Offer the friend if there is one, because filling a chair
+				-- with a person beats filling it with yourself.
+				local f = self.friend
+				slot.name.Text = if f ~= nil then Loc.f("fmt.join_name", f.name) else "＋ INVITE"
+				slot.state.Text = "or tap to play"
+				slot.state.TextColor3 = Theme.DIM
+				slot.face.BackgroundColor3 = Theme.BLUE
+			end
 		end
 	end
 end
@@ -362,24 +403,6 @@ function ShiftPanel:setProgress(progress: any)
 	self.progressChip.Text = Loc.f("fmt.lv_coins", progress.level or 1, progress.coins or 0) .. suffix
 end
 
-function ShiftPanel:setBots(_on: boolean, pending: boolean, _phase: string?)
-	self.botFill = pending
-	self.botButton.Text = if pending then "BOTS: ON" else "BOTS: OFF"
-	Theme.setCtaFill(self.botButton, if pending then Theme.BROWN_MID else Theme.BROWN_DEEP)
-	-- THE ROSTER ANSWERS "AND WHEN?" NOW, SO THE CAPTION DOES NOT HAVE TO.
-	--
-	-- There used to be a "(next shift)" suffix here, for the case where the
-	-- toggle had been flipped but the running shift still had the old value. It
-	-- could never be seen: it was gated on `phase == "round"`, and this whole
-	-- panel is hidden during a round. Dead the day it was written.
-	--
-	-- What replaces it is not another caption but the chairs above -- with bots
-	-- on you are looking at bots sitting in the spare seats, and with them off
-	-- you are looking at empty chairs. The setting shown as its own effect,
-	-- which is also the only version of it that cannot go stale.
-	self:renderRoster()
-end
-
 function ShiftPanel:setPhase(phase: any, spectating: boolean)
 	self.phase = phase
 	self.spectating = spectating
@@ -387,7 +410,6 @@ function ShiftPanel:setPhase(phase: any, spectating: boolean)
 	-- go; NEW SERVER in particular would teleport a learner out of the lesson.
 	if phase.tutorial ~= nil then
 		self.tutorial = phase.tutorial == true
-		self.botRoot.Visible = not self.tutorial
 		self.newServerRoot.Visible = not self.tutorial
 		self:relayoutLast()
 	end

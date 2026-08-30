@@ -85,20 +85,6 @@ remotes.ReadyUp.OnServerEvent:Connect(function(player, on)
 	director:setReady(player, on == true)
 end)
 
--- BOTS ARE OPTIONAL, AND ANY SEATED PLAYER MAY DECIDE.
---
--- No host role exists in this game and inventing one for a four-player co-op
--- kitchen is not worth it: the worst case is somebody flipping a toggle their
--- crewmates did not want, in a lobby, where it is one tap to flip back.
--- Spectators and unseated clients are ignored so a passer-by cannot change a
--- shift they are not working.
-remotes.BotFill.OnServerEvent:Connect(function(player, on)
-	if crew.seats[player] == nil then
-		return
-	end
-	director.pendingBotFill = on == true
-	director:broadcastPhase()
-end)
 
 -- Emotes travel as IDS. This used to rebroadcast any client-supplied string
 -- (<=24 chars) to every player, which is an unmoderated free-text channel in
@@ -190,6 +176,18 @@ local function queueEquips()
 		broadcastEquips()
 	end)
 end
+
+-- A CHAIR IS A CHARACTER. The logic is CrewManager:seatAction, not here --
+-- server-harness cannot load this file, so anything that lives in it is
+-- untestable by construction, which a set of vacuously-passing checks proved.
+remotes.SeatAction.OnServerEvent:Connect(function(player, msg)
+	local claimed = crew:seatAction(player, msg)
+	if claimed ~= nil then
+		progression:setSpecies(player, claimed)
+	end
+	queueEquips()
+	director:broadcastPhase()
+end)
 
 -- Premium grants land in the profile like any other unlock, so the wardrobe
 -- and shop need no special case for them.

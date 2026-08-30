@@ -108,7 +108,11 @@ const IGNORE = new Set(['0', '0 coins', '3:00', 'X', '★', '☆', '🍳 ', '�
   // Punctuation standing in for a word, not a word. The roster shows this
   // against a chair whose player has not pressed Start yet; there is nothing
   // in an ellipsis for a translator to do.
-  '…']);
+  '…',
+  // The dismiss glyph on a bot chair. A lower-case x rather than U+2715 or
+  // U+2717, both of which KNOWN-GAPS records shipping as empty boxes because
+  // they depend on the TEXT font and FredokaOne has neither.
+  'x']);
 const missing = [];
 for (const kind of ['static', 'content']) {
   for (const e of found[kind]) {

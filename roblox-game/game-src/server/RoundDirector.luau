@@ -103,24 +103,44 @@ function RoundDirector:broadcastPhase()
 	-- AFK-but-ready player landed in readyIds while readyTally left them out of
 	-- both halves of the count, so #readyIds could exceed readyCount and a
 	-- roster built from it would render "3/2".
+	-- ALL FOUR CHAIRS, ALWAYS, IN THE ORDER THEY STAND IN.
+	--
+	-- This used to send only the seated humans, which cannot describe a lobby:
+	-- the empty chairs and the bot-filled ones are most of what a player is
+	-- looking at and deciding about. Now every chef slot reports what is in it.
+	--
+	-- Ordered by chefId rather than by species, so chair order matches the
+	-- lineup left-to-right in the crew shot. Claiming a character SWAPS species
+	-- between two chefs (see CrewManager:claimSkin), so ordering by species
+	-- would keep the labels still and let the chairs slide around behind them --
+	-- the wrong half to hold constant when the whole point of the closeup is
+	-- that the panel and the room show the same four people.
 	local seats = {}
-	for player, seat in self.crew.seats do
+	for _, chef in self.simService.sim.chefs do
+		local seat = self.crew.byChef[chef.id]
+		local kind
+		if seat ~= nil then
+			kind = "player"
+		elseif self.simService:isActive(chef) then
+			kind = "bot"
+		else
+			kind = "empty"
+		end
 		table.insert(seats, {
-			chefId = seat.chefId,
-			userId = player.UserId,
-			ready = self.ready[player] == true,
+			chefId = chef.id,
+			-- The character in this chair. This is what the label says and what
+			-- claiming the chair gets you.
+			species = chef.skin,
+			kind = kind,
+			userId = if seat ~= nil then seat.player.UserId else nil,
+			name = if seat ~= nil then (seat.player.DisplayName or seat.player.Name) else nil,
 			-- AFK seats STAY on the roster, flagged. Dropping them made the
-			-- lobby lie: the panel parks you on a mark, standing still used
-			-- to count as idle, and a present player watched their own chair
-			-- turn into a bot. The roster answers "who is in this room",
-			-- which is not the same question as readyTally's "who can still
-			-- answer", and conflating them is what produced that.
-			afk = seat.afk == true,
-			-- The name rides along rather than being joined client-side.
-			-- EquipDeltas already carries one keyed by chefId, but pairing
-			-- the two payloads to draw one row is how the UserId->chefId
-			-- inference this replaced got fragile in the first place.
-			name = player.DisplayName or player.Name,
+			-- lobby lie: the panel parks you on a mark, standing still used to
+			-- count as idle, and a present player watched their own chair turn
+			-- into a bot. The roster answers "who is in this room", which is not
+			-- the same question as readyTally's "who can still answer".
+			ready = seat ~= nil and self.ready[seat.player] == true,
+			afk = seat ~= nil and seat.afk == true,
 		})
 	end
 	table.sort(seats, function(a, b)

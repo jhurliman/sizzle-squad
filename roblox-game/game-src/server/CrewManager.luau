@@ -147,6 +147,64 @@ function CrewManager:claimSkin(chefId: number, want: string?): string?
 	return mine.skin
 end
 
+--- Act on a chair: take it, empty it, or hand it back to a bot.
+---
+--- LIVES HERE RATHER THAN IN main.server.luau BECAUSE THAT FILE IS UNTESTABLE.
+--- The first version of this was a remote handler in the composition root, and
+--- server-harness does not load that script -- so a set of checks that fired
+--- the remote and asserted on the result passed while doing nothing at all.
+--- Two of them only failed because the real behaviour was missing; the rest
+--- were green on an empty room. Rule of thumb the hard way: if main.server can
+--- hold it, a harness cannot reach it.
+---
+--- Returns the species the caller ended up wearing when a claim succeeded, so
+--- the caller can persist the preference; nil for everything else.
+---
+--- No host role, deliberately. Any seated player may rearrange a lobby that
+--- takes one tap to rearrange back. Spectators and unseated clients are
+--- ignored so a passer-by cannot reorganise a shift they are not working.
+function CrewManager:seatAction(player: any, msg: any): string?
+	local seat = self.seats[player]
+	if seat == nil or typeof(msg) ~= "table" then
+		return nil
+	end
+	local chefId = tonumber(msg.chefId)
+	if chefId == nil then
+		return nil
+	end
+	local target = nil
+	for _, chef in self.simService.sim.chefs do
+		if chef.id == chefId then
+			target = chef
+		end
+	end
+	if target == nil then
+		return nil
+	end
+	local action = msg.action
+
+	if action == "claim" then
+		-- A chair with a person in it is not on offer. The client does not draw
+		-- it that way and the server does not honour it either.
+		if self.byChef[chefId] ~= nil then
+			return nil
+		end
+		local want = target.skin
+		-- Claiming a chair somebody emptied is exactly what emptying it was
+		-- for, so a claim always un-dismisses.
+		self.simService:setDismissed(want, false)
+		return self:claimSkin(seat.chefId, want)
+	elseif action == "dismiss" then
+		if self.byChef[chefId] ~= nil then
+			return nil
+		end
+		self.simService:setDismissed(target.skin, true)
+	elseif action == "fill" then
+		self.simService:setDismissed(target.skin, false)
+	end
+	return nil
+end
+
 --- Species currently worn by a SEATED HUMAN, mapped to that human's UserId.
 ---
 --- The value is the owner rather than `true` because this is broadcast to

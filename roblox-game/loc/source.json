@@ -2153,6 +2153,36 @@
         "de": "überlegt",
         "id": "memilih"
       }
+    },
+    {
+      "key": "ui.chair_take_bot",
+      "source": "tap to play",
+      "context": "Caption under 'Bot' on a lobby chair: tapping the chair makes you play as that character instead, and the bot takes the one you left. Imperative, lower case, fixed-width chip.",
+      "note": "",
+      "tr": {
+        "es": "toca para jugar",
+        "pt": "toque para jogar",
+        "ja": "タップで交代",
+        "ko": "탭하여 플레이",
+        "fr": "toucher pour jouer",
+        "de": "tippen zum Spielen",
+        "id": "ketuk untuk main"
+      }
+    },
+    {
+      "key": "ui.chair_take_empty",
+      "source": "or tap to play",
+      "context": "Caption on an EMPTY lobby chair, under the invite button. The 'or' matters: the first offer is to invite somebody into the chair, and this is the alternative -- take that character yourself.",
+      "note": "",
+      "tr": {
+        "es": "o toca para jugar",
+        "pt": "ou toque para jogar",
+        "ja": "または自分で使う",
+        "ko": "또는 직접 플레이",
+        "fr": "ou jouer ce chef",
+        "de": "oder selbst spielen",
+        "id": "atau main sendiri"
+      }
     }
   ],
   "note": "Bare language codes, not region locales. The experience registers its languages as languageCodeType=Language (en, fr, de, id, ja, ko, pt, es) and the dashboard importer rejects de-de/id-id/ja-jp/ko-kr against that. Bare codes are also the better runtime choice: Roblox falls back from a player's region locale (ja-jp) to the base language (ja), so one column covers every region of that language."

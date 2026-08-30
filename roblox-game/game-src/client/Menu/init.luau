@@ -91,8 +91,9 @@ function Menu.new(deps: any)
 		onOpenTab = function(tab)
 			self:openTab(tab)
 		end,
-		onToggleBots = function(on)
-			self.remotes.BotFill:FireServer(on)
+		-- A chair is a character; see the SeatAction handler on the server.
+		onSeatAction = function(chefId, action)
+			self.remotes.SeatAction:FireServer({ chefId = chefId, action = action })
 		end,
 		onNewServer = function()
 			-- Never mid-shift: walking out on three crewmates is not a button.
@@ -432,10 +433,6 @@ end
 
 --- Species other seated players are wearing (species -> UserId), from the
 --- EquipDeltas broadcast. Held here so a wardrobe built later still gets it.
-function Menu:setBots(on: boolean, pending: boolean, phase: string?)
-	self.shiftPanel:setBots(on, pending, phase)
-end
-
 function Menu:setTaken(taken: any)
 	self.taken = taken
 	local w = self.tabs and self.tabs.wardrobe

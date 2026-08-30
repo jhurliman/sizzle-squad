@@ -309,6 +309,100 @@ check(n == 0, "so an AFK-but-ready player cannot start the round on their own")
 crew.seats[playerA].afk = false
 director:broadcastPhase()
 
+-- ---------------------------------------------- a chair is a character
+--
+-- Replaces a single global BOTS: ON toggle, which could not express "three
+-- bots but not a fourth" and hid a server-wide setting behind a button that
+-- said nothing about its scope. Every chef slot is now a chair with three
+-- possible occupants, and the chair is the control.
+local function chairs()
+	return lastPhasePayload().seats
+end
+-- seatAction mutates; the payload is only rebuilt on a broadcast, which the
+-- remote handler does for us in the real server.
+local function act(who: any, msg: any)
+	local claimed = crew:seatAction(who, msg)
+	director:broadcastPhase()
+	return claimed
+end
+local function chairFor(chefId: number): any
+	for _, c in chairs() do
+		if c.chefId == chefId then
+			return c
+		end
+	end
+	return nil
+end
+
+director:broadcastPhase()
+check(#chairs() == #simService.sim.chefs, `every chef slot is a chair ({#chairs()})`)
+local mine = chairFor(crew.seats[playerA].chefId)
+check(mine ~= nil and mine.kind == "player", "the seated player's chair says player")
+check(mine ~= nil and mine.species ~= nil, `and names the character in it ({tostring(mine and mine.species)})`)
+
+-- find a chair a bot is in
+local botChair = nil
+for _, c in chairs() do
+	if c.kind == "bot" then
+		botChair = c
+	end
+end
+check(botChair ~= nil, "and there is a bot chair to take")
+
+if botChair ~= nil then
+	local wanted = botChair.species
+	local before = chairFor(crew.seats[playerA].chefId).species
+	check(wanted ~= before, `the bot chair is a different character ({before} -> {wanted})`)
+
+	-- CLAIM: play as that character.
+	act(playerA, { chefId = botChair.chefId, action = "claim" })
+	local after = chairFor(crew.seats[playerA].chefId).species
+	check(after == wanted, `claiming a bot chair makes you that character ({after})`)
+	local stillFour = #chairs()
+	check(stillFour == 4, `still four chairs afterwards ({stillFour})`)
+	local players = 0
+	for _, c in chairs() do
+		if c.kind == "player" then
+			players += 1
+		end
+	end
+	check(players == 1, "and still exactly one person at the table, not two")
+end
+
+-- DISMISS: send a bot away and leave the chair for a human.
+local target = nil
+for _, c in chairs() do
+	if c.kind == "bot" then
+		target = c
+	end
+end
+if target ~= nil then
+	act(playerA, { chefId = target.chefId, action = "dismiss" })
+	local now = chairFor(target.chefId)
+	check(now.kind == "empty", `dismissing a bot empties its chair ({now.kind})`)
+
+	-- FILL: and it can be given back.
+	act(playerA, { chefId = target.chefId, action = "fill" })
+	check(chairFor(target.chefId).kind == "bot", "and a bot can be put back into it")
+	act(playerA, { chefId = target.chefId, action = "dismiss" })
+end
+
+-- A CHAIR WITH A PERSON IN IT IS NOT ON OFFER, whatever the client sends.
+local occupied = crew.seats[playerA].chefId
+local speciesBefore = chairFor(occupied).species
+act(playerA, { chefId = occupied, action = "dismiss" })
+check(chairFor(occupied).kind == "player", "a crafted dismiss cannot evict a person")
+check(chairFor(occupied).species == speciesBefore, "and cannot change what they are playing as")
+
+-- AND A PASSER-BY CANNOT REARRANGE A SHIFT THEY ARE NOT WORKING.
+local stranger = { UserId = 999999, Name = "Stranger" }
+local kindBefore = chairFor(occupied).kind
+act(stranger, { chefId = occupied, action = "claim" })
+check(chairFor(occupied).kind == kindBefore, "an unseated client's seat action is ignored")
+act(playerA, { chefId = 0, action = "nonsense" })
+act(playerA, "not a table")
+check(#chairs() == 4, "and junk on the wire changes nothing")
+
 -- and it stays in chefId order, so the four chairs do not shuffle each tick
 local ordered = true
 local prev = -1

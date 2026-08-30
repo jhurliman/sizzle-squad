@@ -45,6 +45,15 @@ function SimService.new(shared: any, opts: { seed: number, chefCount: number?, b
 	self.shared = shared
 	self.chefCount = opts.chefCount or 4
 	self.botFill = opts.botFill == true
+	-- PER-CHAIR BOT DISMISSAL, keyed by species.
+	--
+	-- Bots used to be one boolean for the whole server, flipped by one button,
+	-- which made "I want three bots but not a fourth" unsayable. A chair is a
+	-- character, so a dismissal is about a character: no bot as Nori.
+	-- Keyed by species rather than chef id because claimSkin swaps species
+	-- between chefs, and the thing a player dismissed was the chair they were
+	-- looking at, not whichever slot index happened to hold it.
+	self.dismissed = {} :: { [string]: boolean }
 	-- Injected, never required: this module is deliberately Roblox-free so the
 	-- Lune harnesses can drive it. nil simply means nobody lines up.
 	self.staging = opts.staging
@@ -85,7 +94,7 @@ end
 
 --- Chefs that play: humans always; bot-driven slots only when botFill is on.
 function SimService:isActive(chef: any): boolean
-	return chef.isPlayer or self.botFill
+	return chef.isPlayer or (self.botFill and not self.dismissed[chef.skin])
 end
 
 --- Move every non-human chef to its parking spot (no-op when bots fill in).
@@ -324,6 +333,11 @@ function SimService:tick(dt: number, _now: number?): ({ any }, number)
 end
 
 --- Movement-only advance for results/intermission.
+--- Leave a chair empty, or let a bot have it again.
+function SimService:setDismissed(species: string, on: boolean)
+	self.dismissed[species] = if on then true else nil
+end
+
 --- Walk a bot to its lobby mark and stand it facing the camera.
 ---
 --- BETWEEN ROUNDS, NOTHING ELSE MOVES A BOT AT ALL. tickMovementOnly never
