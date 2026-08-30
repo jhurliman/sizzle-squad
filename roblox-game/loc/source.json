@@ -2003,6 +2003,126 @@
         "pt": "O {1} está pronto — pegue e ponha no prato.",
         "es": "El {1} está listo: cógelo y añádelo al plato."
       }
+    },
+    {
+      "key": "ui.roster_invite",
+      "source": "＋ INVITE",
+      "context": "Button on an EMPTY chair in the four-seat lobby roster. Opens the Roblox invite sheet. Very tight fixed-width chip, so keep it to one short word plus the plus sign.",
+      "note": "",
+      "tr": {
+        "es": "＋ INVITAR",
+        "pt": "＋ CONVIDAR",
+        "ja": "＋ 招待",
+        "ko": "＋ 초대",
+        "fr": "＋ INVITER",
+        "de": "＋ EINLADEN",
+        "id": "＋ UNDANG"
+      }
+    },
+    {
+      "key": "ui.roster_ready",
+      "source": "✅ ready",
+      "context": "Status line under a player's name in the lobby roster, meaning they have pressed Ready. Lower case on purpose: it sits under the name as a caption, not as a heading. Keep it short, the chip is fixed width.",
+      "note": "",
+      "tr": {
+        "es": "✅ listo",
+        "pt": "✅ pronto",
+        "ja": "✅ 準備OK",
+        "ko": "✅ 준비 완료",
+        "fr": "✅ prêt",
+        "de": "✅ bereit",
+        "id": "✅ siap"
+      }
+    },
+    {
+      "key": "ui.roster_bot",
+      "source": "Bot",
+      "context": "Name shown on a lobby chair occupied by a computer-controlled chef rather than a person. A noun, the kind of player it is.",
+      "note": "",
+      "tr": {
+        "es": "Bot",
+        "pt": "Bot",
+        "ja": "ボット",
+        "ko": "봇",
+        "fr": "Bot",
+        "de": "Bot",
+        "id": "Bot"
+      }
+    },
+    {
+      "key": "ui.roster_bot_sub",
+      "source": "filling in",
+      "context": "Caption under 'Bot' on a lobby chair: this bot is standing in for a missing player and will give the seat up when somebody joins. Short, lower case, fixed-width chip.",
+      "note": "",
+      "tr": {
+        "es": "cubriendo",
+        "pt": "reserva",
+        "ja": "代役で参加",
+        "ko": "대신 참여",
+        "fr": "en renfort",
+        "de": "springt ein",
+        "id": "pengganti"
+      }
+    },
+    {
+      "key": "ui.ready_pledge",
+      "source": "READY",
+      "context": "The main lobby button WHEN OTHER PEOPLE ARE PRESENT. It is a pledge -- 'I am ready, start when everyone else is' -- not a command to begin. When the player is alone the button says START SHIFT instead (ui.start_shift), because then it really does start the round. NOTE: ui.ready is a DIFFERENT string, 'READY!' with an exclamation mark, still used on the Kitchen Card. This one has no exclamation mark because it alternates with START SHIFT on the same button and they should be punctuated alike.",
+      "note": "",
+      "tr": {
+        "es": "LISTO",
+        "pt": "PRONTO",
+        "ja": "準備OK",
+        "ko": "준비 완료",
+        "fr": "PRÊT",
+        "de": "BEREIT",
+        "id": "SIAP"
+      }
+    },
+    {
+      "key": "ui.share_photo",
+      "source": "SHARE PHOTO",
+      "context": "Button at the end of a shift that opens the device's share sheet with a screenshot of the crew. 'Photo' as in a picture of the team, not a photograph in general.",
+      "note": "",
+      "tr": {
+        "es": "COMPARTIR FOTO",
+        "pt": "COMPARTILHAR FOTO",
+        "ja": "写真をシェア",
+        "ko": "사진 공유",
+        "fr": "PARTAGER LA PHOTO",
+        "de": "FOTO TEILEN",
+        "id": "BAGIKAN FOTO"
+      }
+    },
+    {
+      "key": "ui.share_unavailable",
+      "source": "Sharing is not available on this account",
+      "context": "Toast shown when the platform refuses the share sheet, usually because the account is too young for it. Explain, do not apologise.",
+      "note": "",
+      "tr": {
+        "es": "Compartir no está disponible en esta cuenta",
+        "pt": "O compartilhamento não está disponível nesta conta",
+        "ja": "このアカウントでは共有できません",
+        "ko": "이 계정에서는 공유할 수 없습니다",
+        "fr": "Le partage n'est pas disponible sur ce compte",
+        "de": "Teilen ist mit diesem Konto nicht möglich",
+        "id": "Berbagi tidak tersedia di akun ini"
+      }
+    },
+    {
+      "key": "ui.share_failed",
+      "source": "Could not take the photo",
+      "context": "Toast shown when the screenshot itself failed, before any sharing was attempted.",
+      "note": "",
+      "tr": {
+        "es": "No se pudo tomar la foto",
+        "pt": "Não foi possível tirar a foto",
+        "ja": "写真を撮れませんでした",
+        "ko": "사진을 찍지 못했습니다",
+        "fr": "Impossible de prendre la photo",
+        "de": "Foto konnte nicht aufgenommen werden",
+        "id": "Tidak dapat mengambil foto"
+      }
     }
   ],
   "note": "Bare language codes, not region locales. The experience registers its languages as languageCodeType=Language (en, fr, de, id, ja, ko, pt, es) and the dashboard importer rejects de-de/id-id/ja-jp/ko-kr against that. Bare codes are also the better runtime choice: Roblox falls back from a player's region locale (ja-jp) to the base language (ja), so one column covers every region of that language."

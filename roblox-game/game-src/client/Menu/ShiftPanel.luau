@@ -156,6 +156,11 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			Font = Theme.BODY_FONT,
 			TextSize = 13,
 			TextColor3 = Theme.DIM,
+			-- A fixed-width chip with a translated word in it. KNOWN-GAPS has
+			-- German and Japanese overrunning controls sized for English, and
+			-- unlike the CTA labels these do not auto-scale, so clip rather
+			-- than spill into the neighbour.
+			TextTruncate = Enum.TextTruncate.AtEnd,
 			Text = "",
 		}, face)
 

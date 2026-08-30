@@ -179,7 +179,7 @@ function Results.new(gui: Instance)
 		Fill = Theme.BLUE,
 		TextSize = 18,
 		ZIndex = 11,
-		Text = "📸 SHARE",
+		Text = "SHARE PHOTO",
 	}, self.card)
 	self.shareRoot = shareCta.root
 	self.shareRoot.Visible = false

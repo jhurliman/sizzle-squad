@@ -104,7 +104,11 @@ const covered = new Set(src.entries.map((e) => e.source));
 // Glyphs, digits and placeholder values that are overwritten before anyone
 // sees them. Listed explicitly so the exemption is a decision, not a gap.
 const IGNORE = new Set(['0', '0 coins', '3:00', 'X', '★', '☆', '🍳 ', '🔥', '🔪',
-  'Level 1', 'Lv 1  ·  0 coins', 'BLT']);
+  'Level 1', 'Lv 1  ·  0 coins', 'BLT',
+  // Punctuation standing in for a word, not a word. The roster shows this
+  // against a chair whose player has not pressed Start yet; there is nothing
+  // in an ellipsis for a translator to do.
+  '…']);
 const missing = [];
 for (const kind of ['static', 'content']) {
   for (const e of found[kind]) {
