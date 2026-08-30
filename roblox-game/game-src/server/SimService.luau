@@ -398,6 +398,16 @@ function SimService:tickMovementOnly(dt: number, _now: number?)
 			-- for every chef rather than decrementing it.
 			chef.working = nil
 			chef.stun = 0
+			-- AND NOBODY IS HOLDING ANYTHING EITHER.
+			--
+			-- Whatever was in your hands when the whistle went stayed there
+			-- through the whole lobby and into the crew photo -- the shot that
+			-- prompted this had somebody posing with a fistful of bacon. There
+			-- is nothing to carry between rounds: the kitchen is asleep, and
+			-- startRound rebuilds the sim from scratch anyway (simService:reset),
+			-- so the plate economy is not losing anything that would otherwise
+			-- have been counted.
+			chef.carrying = nil
 			local slot = self.humans[chef.id]
 			if slot then
 				self:applyHuman(chef, slot, shared.SIM_DT, t)

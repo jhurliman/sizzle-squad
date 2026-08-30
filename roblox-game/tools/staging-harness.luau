@@ -62,7 +62,10 @@ for _ = 1, 60 * 8 do -- eight seconds of lobby
 	svc:tickMovementOnly(1 / 60)
 end
 for _, chef in svc.sim.chefs do
-	local mark = Staging.LINEUP[(chef.id % #Staging.LINEUP) + 1]
+	-- By CHARACTER. Indexing by chef id happens to agree in a fresh sim, where
+	-- chef 0 is bramble and so on, and stops agreeing the moment anybody claims
+	-- a character -- so asserting it that way would quietly stop testing this.
+	local mark = Staging.markFor(chef.skin)
 	local d = math.sqrt((chef.pos.x - mark.x) ^ 2 + (chef.pos.y - mark.y) ^ 2)
 	check(d <= Staging.ARRIVE_EPS + 0.05, `chef {chef.id} reached its mark ({string.format("%.2f", d)} away)`)
 	check(
@@ -72,7 +75,33 @@ for _, chef in svc.sim.chefs do
 	check(math.abs(chef.vel.x) < 1e-6 and math.abs(chef.vel.y) < 1e-6, `chef {chef.id} has come to a stop`)
 end
 
-print("D. and it stays put rather than hunting around the mark")
+print("D. and everybody's hands are empty for the photo")
+-- Whatever was in your hands when the whistle went used to stay there through
+-- the whole lobby and into the crew shot. Nothing carries between rounds --
+-- startRound rebuilds the sim outright -- so there is nothing to preserve.
+for _, chef in svc.sim.chefs do
+	chef.carrying = { kind = "bacon", state = "cooked", id = 99 }
+	chef.working = 3
+	chef.stun = 0.5
+end
+svc:tickMovementOnly(1 / 60)
+local holding, busy, stunned = 0, 0, 0
+for _, chef in svc.sim.chefs do
+	if chef.carrying ~= nil then
+		holding += 1
+	end
+	if chef.working ~= nil then
+		busy += 1
+	end
+	if chef.stun > 0 then
+		stunned += 1
+	end
+end
+check(holding == 0, `nobody is still holding anything ({holding})`)
+check(busy == 0, "nobody is still mid-task")
+check(stunned == 0, "and nobody is still stunned")
+
+print("E. and it stays put rather than hunting around the mark")
 local before = {}
 for _, chef in svc.sim.chefs do
 	before[chef.id] = { x = chef.pos.x, y = chef.pos.y }
@@ -88,7 +117,7 @@ check(drift < 0.01, `three more seconds moved nobody more than {string.format("%
 
 -- ---------------------------------------------------------------- 3. humans are left alone
 
-print("E. the server never walks a human -- their client owns that")
+print("F. the server never walks a human -- their client owns that")
 local svc2 = SimService.new(shared, { seed = 7, botFill = true, staging = Staging })
 local human = svc2.sim.chefs[1]
 svc2.humans[human.id] = {
@@ -103,11 +132,11 @@ human.pos.x, human.pos.y = 2.5, 2.5
 for _ = 1, 60 * 4 do
 	svc2:tickMovementOnly(1 / 60)
 end
-local mark = Staging.LINEUP[(human.id % #Staging.LINEUP) + 1]
+local mark = Staging.markFor(human.skin)
 local moved = math.sqrt((human.pos.x - mark.x) ^ 2 + (human.pos.y - mark.y) ^ 2)
 check(moved > 1.0, `a seated human was NOT dragged to the mark by the server ({string.format("%.1f", moved)} cells away)`)
 
-print("F. with bots off, nobody is staged into an empty kitchen")
+print("G. with bots off, nobody is staged into an empty kitchen")
 local svc3 = SimService.new(shared, { seed = 7, botFill = false, staging = Staging })
 for _, chef in svc3.sim.chefs do
 	chef.pos.x, chef.pos.y = 2.5, 2.5
