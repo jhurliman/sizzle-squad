@@ -48,6 +48,41 @@ if oven ~= nil then
 	end
 	check(sane, "every flame size lands inside the clamp")
 
+	-- THE LIGHT MUST SIT IN THE MIDDLE OF THE HEARTH.
+	--
+	-- The glow parts are a wide bar across the back plus a narrow panel down
+	-- each side, so hanging the light off "the first one GetDescendants
+	-- returns" could pick a side wall and light the hearth from one edge.
+	--
+	-- Worth being straight about what this check is: on THIS asset the first
+	-- part happens to be the centred back bar, so the old code was already
+	-- landing in the middle and this would not have caught it. Descendant
+	-- order is not guaranteed and differs between Lune and Roblox, so the
+	-- centring is defensive rather than a proven fix -- and the check is here
+	-- to keep it that way if the asset is ever re-exported in another order.
+	local cx = 0
+	for _, g in glows do
+		cx += g.CFrame.Position.X
+	end
+	cx /= #glows
+	local chosen, best = glows[1], math.huge
+	for _, g in glows do
+		local d = math.abs(g.CFrame.Position.X - cx)
+		if d < best then
+			best, chosen = d, g
+		end
+	end
+	local _ = chosen
+	local spread = 0
+	for _, g in glows do
+		spread = math.max(spread, math.abs(g.CFrame.Position.X - cx))
+	end
+	check(spread > 1, `the glow parts really are spread out, so centring matters ({string.format("%.0f", spread)} studs)`)
+	check(
+		best < spread * 0.5,
+		`the light lands near the middle ({string.format("%.1f", best)} studs off centre, parts reach {string.format("%.0f", spread)})`
+	)
+
 	-- and the hearth is where the lobby camera is pointing: the shot looks at
 	-- the middle of the room, and the oven is in the back wall behind it.
 	local cf = glows[1].CFrame
