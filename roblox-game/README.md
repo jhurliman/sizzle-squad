@@ -224,6 +224,18 @@ it is real, but it will not do this:
   independent authenticated routes refusing it is a platform restriction, not a
   context mistake, so stop trying to find the right context.
 
+**Two things to set on a fresh staging place**, because neither comes across
+from the publish:
+
+- **Rename it.** It arrives as something like `jhurliman's Place: 08302026_1`.
+  `PATCH /cloud/v2/universes/{universeId}/places/{placeId}?updateMask=displayName`
+  with `{"displayName": "..."}` does it; the same call takes `description`.
+- **Match `serverSize` to live.** A new place defaults to **50** while live is
+  **4**, and publishing does not carry `Players.MaxPlayers` across to it. That
+  is not cosmetic: the kitchen seats four, and everyone past the fourth is a
+  permanent spectator, so a 50-cap staging server does not behave like live.
+  Same PATCH with `updateMask=serverSize`.
+
 `npm run places` lists the universe's places and says which is live, which is
 staging, and which nothing points at — handy for reading the new id back
 without going through the dashboard.
