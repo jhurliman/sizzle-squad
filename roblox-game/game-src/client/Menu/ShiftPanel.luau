@@ -533,7 +533,6 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	for _, slot in self.slots do
 		slot.root.Size = UDim2.fromOffset(slotW, Theme.MIN_TAP + Theme.SHADOW_DY)
 		slot.face.Size = UDim2.fromOffset(slotW, Theme.MIN_TAP)
-		slot.cta.root.Size = UDim2.fromOffset(slotW, Theme.MIN_TAP)
 	end
 	local friendW = slotW * 4 + gap * 3
 	self.friendRow.Size = UDim2.fromOffset(friendW, Theme.MIN_TAP + Theme.SHADOW_DY)
