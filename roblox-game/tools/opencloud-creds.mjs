@@ -30,6 +30,11 @@ export const CONFIG = path.join(
 // ROBLOX_PLACE_ID without editing the tools.
 export const DEFAULT_UNIVERSE_ID = "10761465304";
 export const DEFAULT_PLACE_ID = "113028832194057";
+// The staging place, in the same universe. Defaulted here for the same reason
+// the live one is: it is not a secret, it is in the place URL, and holding it
+// in a shell variable means it is missing on any machine that has not been set
+// up -- which for the staging commands used to mean falling through to live.
+export const DEFAULT_STAGING_PLACE_ID = "120226790931100";
 
 // Resolved once. `api()` calls creds() per request, and re-reading the config
 // file on every poll of a 120-iteration wait loop is pure noise.
@@ -47,18 +52,17 @@ let cached = null;
  * command whose entire job is to keep a build away from players published it
  * to them, silently, and printed a perfectly normal-looking version number.
  *
- * Never infer a staging target. Demand it, and refuse it if it is live.
+ * The env var still wins, for a second staging place or someone else's fork.
+ * What does NOT happen is falling back to the live default: the refusal below
+ * is the whole point of this function existing, and it stands whether the id
+ * came from the environment or from the constant.
  */
 export function stagingPlaceId() {
-  const id = (process.env.SIZZLE_STAGING_PLACE_ID || '').trim();
+  const id = (process.env.SIZZLE_STAGING_PLACE_ID || '').trim() || DEFAULT_STAGING_PLACE_ID;
   if (!id) {
     console.error(
-      'SIZZLE_STAGING_PLACE_ID is not set.\n' +
-        'Create a second place in universe ' +
-        DEFAULT_UNIVERSE_ID +
-        ' (Creator Dashboard -> the experience -> Places -> Create Place),\n' +
-        'then export SIZZLE_STAGING_PLACE_ID=<its id> in ~/.zshrc.\n' +
-        'Refusing to guess: the guess would be the live place.',
+      'No staging place. Set SIZZLE_STAGING_PLACE_ID, or fix ' +
+        'DEFAULT_STAGING_PLACE_ID in tools/opencloud-creds.mjs.',
     );
     process.exit(1);
   }

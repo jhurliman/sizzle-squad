@@ -308,6 +308,21 @@ else
 	print(`the game and the publisher agree that live is place {luauId}`)
 end
 
+-- AND STAGING MUST NOT BE LIVE. Both ids are constants in the same file now, a
+-- copy-paste apart, and the whole point of the staging commands is that they
+-- cannot reach players. The runtime check in stagingPlaceId refuses this too;
+-- this one catches it before anybody runs anything.
+local stagingId = string.match(credsSrc, 'DEFAULT_STAGING_PLACE_ID = "(%d+)"')
+if stagingId == nil then
+	idBad += 1
+	print("FAIL opencloud-creds.mjs has no DEFAULT_STAGING_PLACE_ID")
+elseif stagingId == nodeId then
+	idBad += 1
+	print(`FAIL the staging place id IS the live one ({stagingId}) — publish:staging would ship to players`)
+else
+	print(`and that staging is a different place ({stagingId})`)
+end
+
 if failed > 0 or bundleBad > 0 or stale or audioBad > 0 or pathBad > 0 or wiringBad > 0 or idBad > 0 then
 	process.exit(1)
 end

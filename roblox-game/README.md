@@ -189,11 +189,19 @@ What works is a **second place inside the same universe**, joinable by its own
 id and invisible in search:
 
 ```sh
-export SIZZLE_STAGING_PLACE_ID=<the staging place id>   # in ~/.zshrc
 npm run publish:staging     # build + upload to staging only
 npm run smoke:staging       # module load check against staging
 npm run publish             # only after staging is green
 ```
+
+The staging place id is a default in `tools/opencloud-creds.mjs` alongside the
+live one — neither is a secret, both are in a place URL, and an id that only
+exists in somebody's shell is missing on every machine that is not theirs.
+`SIZZLE_STAGING_PLACE_ID` still overrides it for a second staging place or a
+fork. What does not happen, ever, is falling back to live: `stagingPlaceId()`
+refuses an id equal to the live place whether it came from the environment or
+the constant, and `check-luau` fails the build if the two constants are the
+same.
 
 **Creating the place, once.** Studio's publish dialog, from whatever file you
 already have open:
@@ -263,6 +271,38 @@ Badges are still shared, so a staging playthrough can grant real ones.
 
 Given the failure this was built for was "the client could not even start",
 staging plus `smoke:live` catches that class outright.
+
+### When Open Cloud will not take the upload
+
+```
+409 Conflict — Save failed. Server is busy and unable to process your upload
+request. Please try again in a couple minutes.
+```
+
+Seen persistently, across days, on both the live and staging places, for both
+`versionType=Published` and `Saved`. It is not a local problem and not a key
+problem: `smoke:staging` runs Luau inside the same place with the same key and
+passes, so the credentials reach it fine. Retrying does not clear it — twelve
+attempts with backoff all return the same thing.
+
+**Studio's publish path still works.** That is the inversion worth writing down,
+because this whole tool exists on the opposite premise: Open Cloud was built
+here after Studio's uploader failed on "Server is busy" and left live serving an
+empty blue sky. Right now the failure has swapped ends — Studio's *File →
+Publish to Roblox As…* is what got the current build onto staging, while Open
+Cloud is the one being refused.
+
+So when this happens, publish from Studio and then confirm what actually landed
+rather than trusting either path:
+
+```sh
+npm run smoke:staging     # every module loads inside a real server
+node tools/opencloud.mjs luau <a script that prints BuildInfo.summary> --staging
+```
+
+The build stamp is what makes that check meaningful — it reports the sha the
+place is really running, which is the only way to tell a silent publish failure
+from a successful one.
 
 **Publishing is live and outward-facing, so it happens on explicit approval —
 never as a side effect of a build.**
