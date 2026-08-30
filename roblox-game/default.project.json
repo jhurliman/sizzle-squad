@@ -1,0 +1,69 @@
+{
+  "name": "sizzle-squad",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "SizzleSquad": {
+        "$path": "game-src/server"
+      }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": {
+        "$path": "out/shared-bundle.lua"
+      },
+      "Game": {
+        "$path": "game-src/shared"
+      },
+      "Rigs": {
+        "$path": "assets/chef-rigs.rbxm"
+      },
+      "Items": {
+        "$path": "assets/item-viz.rbxm"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "SizzleSquad": {
+          "$path": "game-src/client"
+        }
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "Kitchen": {
+        "$path": "assets/kitchen.rbxm"
+      }
+    },
+    "TextChatService": {
+      "$className": "TextChatService",
+      "$properties": {
+        "ChatVersion": "TextChatService"
+      }
+    },
+    "Players": {
+      "$className": "Players",
+      "$properties": {
+        "MaxPlayers": 4,
+        "PreferredPlayers": 4
+      }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": "Voxel",
+        "ClockTime": 14.5,
+        "Brightness": 2
+      }
+    },
+    "LocalizationService": {
+      "$className": "LocalizationService",
+      "SizzleSquad": {
+        "$path": "loc/SizzleSquad-localization.csv"
+      }
+    }
+  }
+}

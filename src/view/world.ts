@@ -89,6 +89,19 @@ const WAINSCOT_H = 0.9;
  * in it. 0.38 with a shallow apron shows floor between the legs, so even where
  * a bench does cross a chef you still read the whole silhouette through it.
  */
+/**
+ * How far a chopping board sits forward of its cell centre, in cells.
+ *
+ * Bench dressing parks props in the BACK corner, and a board 0.48 deep about
+ * the centre overlapped them. Nudging the board toward the camera clears the
+ * props and puts the working surface nearer the chef.
+ *
+ * MIRRORED in the port's StationVisuals so food resting on a board lands on
+ * the board rather than behind it. Change both.
+ */
+export const BOARD_FORWARD = 0.14;
+
+
 const TABLE_H = 0.38;
 const COUNTER_H = 0.86;
 /**
@@ -3371,16 +3384,27 @@ export class WorldView {
         // than a margin, and the working face is a MID sage grey: a stop under
         // the crockery, a stop over the walnut rim, and cool, so it can never
         // merge into plank at any lighting.
-        P.box(C.tray, 0.62, 0.04, 0.48, x, h + 0.02, z);
-        P.box(C.trayShade, 0.64, 0.018, 0.5, x, h + 0.004, z);
-        P.box(0x6f4718, 0.58, 0.055, 0.44, x, h + 0.068, z);
-        P.box(C.slate, 0.5, 0.04, 0.36, x, h + 0.108, z);
+        // FORWARD OF CENTRE. Bench dressing parks its props in the back
+        // corner (oz -0.29 in buildDressing) and the board is 0.48 deep about
+        // the cell centre, so the two overlapped by ~0.1 and the board grew a
+        // bowl out of its back edge. Reported from play as boards
+        // intersecting the kitchen tchotchkes. Moving the board toward the
+        // camera clears the props and puts the working surface nearer the
+        // chef, which is also where a real board sits.
+        //
+        // StationVisuals applies the SAME offset to whatever is resting on a
+        // board, or the food would float behind it.
+        const bz = z + BOARD_FORWARD;
+        P.box(C.tray, 0.62, 0.04, 0.48, x, h + 0.02, bz);
+        P.box(C.trayShade, 0.64, 0.018, 0.5, x, h + 0.004, bz);
+        P.box(0x6f4718, 0.58, 0.055, 0.44, x, h + 0.068, bz);
+        P.box(C.slate, 0.5, 0.04, 0.36, x, h + 0.108, bz);
         // A darker channel round the rim — a board is a slab with a lip, and
         // without the line the two slabs above read as one pale card.
-        P.box(0x6f4718, 0.54, 0.018, 0.045, x, h + 0.124, z + 0.185);
+        P.box(0x6f4718, 0.54, 0.018, 0.045, x, h + 0.124, bz + 0.185);
         // Knife laid along the back edge.
-        P.box(C.knife, 0.42, 0.02, 0.06, x + 0.08, h + 0.14, z - 0.19, 0, 0.18);
-        P.box(C.timberDark, 0.16, 0.05, 0.06, x - 0.16, h + 0.14, z - 0.23, 0, 0.18);
+        P.box(C.knife, 0.42, 0.02, 0.06, x + 0.08, h + 0.14, bz - 0.19, 0, 0.18);
+        P.box(C.timberDark, 0.16, 0.05, 0.06, x - 0.16, h + 0.14, bz - 0.23, 0, 0.18);
         break;
       }
       case 'stove': {
@@ -3455,6 +3479,11 @@ export class WorldView {
         // The wide shallow basin the reference parks on a mid bench. Its rim is
         // bright steel and the water inside it is pale blue — ours was a dark
         // grey slab that read as a hole in the bench from three tables away.
+        // The scullery sink sits at (12,1), in the counter run past the right
+        // serve window. That cell is clear of buildBackWall's timber posts
+        // (x1, ovenSpan.x0 - 0.5, ovenSpan.x1 + 0.5, W - 1) — which the first
+        // placement beside the arch was NOT, and stepping the basin forward to
+        // dodge that post only left it hanging off the counter front.
         P.box(C.steel, 0.88, 0.2, 0.66, x, h + 0.08, z);
         P.box(0xa9c6c8, 0.74, 0.16, 0.52, x, h + 0.13, z);
         P.cyl(C.steel, 0.035, 0.035, 0.34, 8, x + 0.3, h + 0.34, z - 0.2);
@@ -4513,17 +4542,35 @@ export class WorldView {
 
     this.dressPass(span);
     this.foreground();
-    this.nooks();
+    // NO FLOOR DRESSING INSIDE THE PLAY AREA. There used to be a `nooks()`
+    // pass here that stood a barrel, a firewood crate or a stockpot in every
+    // floor cell with exactly one walkable neighbour.
+    //
+    // Its premise was that a flow field never routes a chef THROUGH such a
+    // cell, which is true and irrelevant: chefs route TO it. A cell with one
+    // walkable neighbour has three neighbours that are furniture, so standing
+    // in it is precisely how a player reaches up to three station faces —
+    // those pockets are not spare ground, they are the best-served tiles in
+    // the room. Every prop the pass placed was therefore standing where
+    // somebody needed to stand, and one was reported blocking a counter.
+    //
+    // The near-field rank in `foreground()` already dresses the room from
+    // OUTSIDE the map (z = height + 0.05), which is where scenery belongs.
+    // If the floor wants more character, it goes there, not in here.
 
     // The two servers. In the reference a Toad stands behind each team counter
     // and the order balloon hangs off its head; ours were unmanned coloured
     // boxes, which left the upper-left and upper-right thirds of the frame —
     // the two places the reference puts its biggest, brightest shapes — as flat
-    // ochre wall. They stand BEHIND the counter, so the counter crops them at
-    // the chest exactly as it does theirs, and they are static merged geometry:
-    // set dressing, not characters.
-    this.passToad(span.x0 - 1.9, 1.34, C.teamRed, 0xd8574c);
-    this.passToad(span.x1 + 1.9, 1.34, C.teamGreen, 0x4f9d3e);
+    // ochre wall. They stand ON the counter's station-free inboard seam (see
+    // passToad), and they are static merged geometry: set dressing, not
+    // characters.
+    // x: the station-free gap-filler between the counter cells and the post.
+    // z: forward of the post's front face (BACK_Z + 0.344 = 1.344) so his back
+    // does not sink into the timber, and behind the counter's front edge
+    // (1.93) so he does not overhang it.
+    this.passToad(span.x0 - 0.75, 1.62, C.teamRed, 0xd8574c);
+    this.passToad(span.x1 + 0.75, 1.62, C.teamGreen, 0x4f9d3e);
 
     // The big kitchen props go on the benches that are NOT ingredient trays —
     // boards and free counters — so nothing ever competes with the thing the
@@ -4685,112 +4732,6 @@ export class WorldView {
     void W;
   }
 
-  /**
-   * FLOOR DRESSING IN THE MAP'S DEAD ENDS.
-   *
-   * The critic measured our empty-cell fraction at 17-34% of the lower frame
-   * against the reference's 6%, and the level cannot close that on its own:
-   * every dressed cell added to the middle of a row costs the bot brain
-   * throughput, and the numbers are in kitchen.ts. What the level CAN hand over
-   * for free is its list of nooks — floor cells with exactly one walkable
-   * orthogonal neighbour, i.e. the pockets between two islands of furniture. A
-   * flow field never routes a chef through one (there is nothing on the far
-   * side), so a sack of flour or a barrel standing in it is worth an eighth of
-   * the room's bare floor at zero cost to the sim.
-   *
-   * Everything here is knee-height or under, for the same reason the benches
-   * are: nothing in this room may ever hide a character from a frontal camera.
-   * Nothing here is a station, and nothing here blocks a cell — the map is not
-   * touched, so if the level changes these follow it.
-   */
-  private nooks() {
-    const k = this.kitchen;
-    const P = this.props;
-    const walk = (x: number, y: number) =>
-      x >= 0 && y >= 0 && x < k.width && y < k.height && k.cells[y * k.width + x] === 'floor';
-    let i = 0;
-    for (let y = 2; y < k.height - 1; y++) {
-      for (let x = 1; x < k.width - 1; x++) {
-        if (!walk(x, y)) continue;
-        const n = [
-          [1, 0],
-          [-1, 0],
-          [0, 1],
-          [0, -1],
-        ].filter(([dx, dy]) => walk(x + dx, y + dy)).length;
-        if (n !== 1) continue;
-        // Sit it against the closed side of the nook, not dead centre, so the
-        // prop reads as stowed against the furniture rather than dropped in a
-        // walkway — and so a chef nudged into the cell still has the open half.
-        const open = [
-          [1, 0],
-          [-1, 0],
-          [0, 1],
-          [0, -1],
-        ].find(([dx, dy]) => walk(x + dx, y + dy))!;
-        const cx = x + 0.5 - open[0] * 0.2;
-        const cz = y + 0.5 - open[1] * 0.2;
-        const yaw = (this.runOffset(x + 3, y + 11) * 2 - 1) * 0.5;
-        this.contact(cx, cz + 0.12, 0.95, 0.95, 0.85);
-        switch (i++ % 4) {
-          case 0: {
-            // A stack of flour sacks. Pale cream, which is the one thing the
-            // floor of this room has none of.
-            for (let s = 0; s < 3; s++) {
-              const t = s === 2 ? 0.62 : 1;
-              P.ball(
-                s === 1 ? 0xe4d9b6 : 0xf0e7c8,
-                0.24 * t,
-                cx + (s === 1 ? 0.13 : -0.1) * (s === 2 ? 0 : 1),
-                0.13 + s * 0.16,
-                cz + (s % 2 ? 0.08 : -0.06),
-                1.15,
-                0.72,
-                0.95,
-              );
-            }
-            P.box(0xc9bd95, 0.34, 0.03, 0.2, cx, 0.29, cz + 0.06, 0, yaw);
-            break;
-          }
-          case 1: {
-            // A coopered barrel with two steel hoops — the room's own bin
-            // vocabulary, so it never reads as a station you can use.
-            P.cyl(C.benchTopAlt, 0.28, 0.24, 0.44, 14, cx, 0.22, cz);
-            for (const hy of [0.1, 0.35]) P.cyl(C.steelDark, 0.29, 0.29, 0.045, 14, cx, hy, cz);
-            P.cyl(C.benchRail, 0.3, 0.29, 0.06, 14, cx, 0.46, cz);
-            break;
-          }
-          case 2: {
-            // A crate of firewood for the oven.
-            P.box(C.benchLeg, 0.56, 0.3, 0.44, cx, 0.15, cz, 0, yaw);
-            P.box(C.benchTopAlt, 0.58, 0.05, 0.46, cx, 0.31, cz, 0, yaw);
-            for (let s = 0; s < 4; s++)
-              P.cyl(
-                s % 2 ? C.timberDark : C.benchApron,
-                0.062,
-                0.062,
-                0.5,
-                7,
-                cx - 0.16 + s * 0.11,
-                0.38 + (s % 2) * 0.04,
-                cz,
-                0,
-                Math.PI / 2,
-              );
-            break;
-          }
-          default: {
-            // A copper stockpot off the line, lid beside it.
-            P.cyl(C.copperDark, 0.26, 0.22, 0.34, 16, cx, 0.17, cz);
-            P.cyl(C.copperRim, 0.27, 0.27, 0.05, 16, cx, 0.36, cz);
-            P.cyl(C.copper, 0.19, 0.19, 0.04, 14, cx, 0.4, cz);
-            P.ball(C.copperRim, 0.05, cx, 0.44, cz);
-            break;
-          }
-        }
-      }
-    }
-  }
 
   /**
    * THE FOREGROUND RANK — SET DRESSING IN THE ROW THE PLAYER CANNOT ENTER.
@@ -4895,6 +4836,40 @@ export class WorldView {
         }
       }
     }
+
+    // A COOPERED BARREL, IN THE CELL BELOW THE PLAY AREA'S BOTTOM-RIGHT CORNER.
+    //
+    // The survivor of the deleted nooks() pass. It is not the barrel that was
+    // ever wrong, only the ground it stood on.
+    //
+    // KITCHEN_MAP row 8 is the last walkable row and runs x 1..13, so (13, 8)
+    // is the furthest a chef can get down and to the right. (13, 9) is '#' —
+    // the cell directly in front of that corner — which makes it the one spot
+    // that is simultaneously unreachable, adjacent to the play area, and
+    // inside the fixed camera's frame. Earlier attempts put it at the end of a
+    // bench and then in the pocket in front of the near rank; both were out of
+    // frame or out of the way of nothing.
+    //
+    // It will partially occlude a chef's feet when they stand in that corner.
+    // That is accepted: it costs nothing mechanically, and the alternative is
+    // a prop nobody ever sees.
+    //
+    // x is 13.3 rather than the cell centre 13.5 because the cobbles stand
+    // 0.28 proud of the wall face at 14, reaching 13.72; at 13.5 the barrel's
+    // 0.3 radius would bury 0.08 of itself in the stones. 13.3 clears by 0.07.
+    //
+    // Named palette colours, deliberately: benchTopAlt/benchRail match /^bench/
+    // and resolve to WoodPlanks. A hand-mixed brown would be reverse-matched to
+    // the nearest palette NAME and could come out as stone, the way the flour
+    // sacks did.
+    {
+      const bx = 13.3;
+      const bz = 9.5;
+      this.contact(bx, bz + 0.12, 0.95, 0.95, 0.85);
+      P.cyl(C.benchTopAlt, 0.28, 0.24, 0.44, 14, bx, 0.22, bz);
+      for (const hy of [0.1, 0.35]) P.cyl(C.steelDark, 0.29, 0.29, 0.045, 14, bx, hy, bz);
+      P.cyl(C.benchRail, 0.3, 0.29, 0.06, 14, bx, 0.46, bz);
+    }
   }
 
   /**
@@ -4990,6 +4965,24 @@ export class WorldView {
    */
   private passToad(x: number, z: number, spot: number, vest: number) {
     const P = this.props;
+    // HE STANDS ON THE COUNTER, not behind it.
+    //
+    // Cropping him at the chest with the counter was the reference's framing,
+    // but the reference's counter is not also a game surface. Ours is: every
+    // counter cell is somewhere a plate gets put down, and the right-hand
+    // server was additionally sharing his cell with the new scullery sink —
+    // his outboard mitt sat 0.29 cells inside the basin.
+    //
+    // The fix is not an alcove and does not cost a station. Between the last
+    // counter CELL and the timber post flanking the oven there is a half-cell
+    // of gap-filler counter that carries no station and never holds an item
+    // (`dressPass` builds it at x = span.x0 - 0.75 / span.x1 + 0.75). He stands
+    // on that, whole, in front of the post — cream cap on dark timber, at the
+    // inboard end of his own team's counter.
+    //
+    // 0.36 is measured, not chosen: the torso ball's underside sits at 0.496
+    // and the counter rail's top face is COUNTER_H = 0.86.
+    const L = 0.36;
     // The counter rail sits at 0.86. The reference's servers clear it by a
     // whole head, and the cap alone is about the width of the tray in front of
     // them — ours cleared it by half a cap and read as a beige egg.
@@ -5006,35 +4999,43 @@ export class WorldView {
     // Cap smaller (0.40) and higher (1.66), face bigger and higher (1.32),
     // eyes pushed further proud (z+0.25). The sightline now clears the cap's
     // footprint at y≈1.33, a clear 0.06 below the brim.
-    const capY = 1.66;
+    const capY = L + 1.66;
     const capR = 0.4;
     const capH = 0.68;
 
-    // Torso — only the top of it clears the counter, so the vest panel is what
-    // carries the team colour, not the body.
-    P.ball(C.toadSkin, 0.27, x, 0.82, z, 1.0, 1.2, 0.9);
-    P.ball(vest, 0.25, x, 0.8, z + 0.07, 1.02, 1.06, 0.72);
-    P.ball(C.toadCap, 0.13, x, 1.02, z + 0.06, 1.5, 0.45, 0.9);
-    // ARMS, resting on the counter rail and reaching forward over it, because
-    // the reference's Toads are visibly DOING something behind their counters.
-    // Two stubs at the shoulder read as nothing; a stub, an elbow and a mitt
-    // sat on the rail reads as a body leaning on a bench.
+    // FEET, because he is standing ON the counter now and a legless bean
+    // resting on a rail reads as a bust someone left behind.
+    P.ball(0xfbf6e8, 0.1, x - 0.12, L + 0.55, z + 0.06, 1.1, 0.62, 1.5);
+    P.ball(0xfbf6e8, 0.1, x + 0.12, L + 0.55, z + 0.06, 1.1, 0.62, 1.5);
+    // Torso.
+    P.ball(C.toadSkin, 0.27, x, L + 0.82, z, 1.0, 1.2, 0.9);
+    // The vest is a PANEL, not a paunch. Sized to be a strip above a counter
+    // rail, at full height it bulged into a pink egg wider than the body. Now
+    // inset 0.035 inside the torso's silhouette on both sides and flattened to
+    // 0.55 depth, so cream shows around it and it reads as something he is
+    // wearing.
+    P.ball(vest, 0.24, x, L + 0.86, z + 0.14, 0.98, 0.92, 0.55);
+    P.ball(C.toadCap, 0.13, x, L + 1.02, z + 0.06, 1.5, 0.45, 0.9);
+    // ARMS hang at his sides. They used to reach forward onto the counter
+    // rail, which was the correct pose for a body cropped at the chest BY that
+    // rail; standing on top of it, the same pose left two mitts floating a
+    // third of a cell above the surface.
     for (const s of [-1, 1]) {
-      P.ball(C.toadSkin, 0.105, x + s * 0.28, 0.95, z + 0.04, 1, 1.2, 1);
-      P.ball(C.toadSkin, 0.088, x + s * 0.35, 0.86, z + 0.2, 1, 1, 1.5);
-      P.ball(0xfbf6e8, 0.095, x + s * 0.36, 0.85, z + 0.36, 1.05, 0.85, 1.05);
+      P.ball(C.toadSkin, 0.105, x + s * 0.28, L + 0.95, z + 0.02, 1, 1.2, 1);
+      P.ball(C.toadSkin, 0.088, x + s * 0.32, L + 0.87, z + 0.05, 1, 1.3, 1);
+      P.ball(0xfbf6e8, 0.095, x + s * 0.34, L + 0.76, z + 0.08, 1.05, 1, 1.05);
     }
 
     // Face. Bigger skull, and the features carried well forward of it so they
     // survive both the cap above and the counter below.
-    P.ball(C.toadSkin, 0.285, x, 1.32, z + 0.02, 1, 0.94, 1);
+    P.ball(C.toadSkin, 0.285, x, L + 1.32, z + 0.02, 1, 0.94, 1);
     for (const s of [-1, 1]) {
-      P.ball(0x2b2119, 0.06, x + s * 0.11, 1.34, z + 0.25, 1, 1.55, 0.5);
-      P.ball(0xffffff, 0.022, x + s * 0.13, 1.4, z + 0.27, 1, 1, 0.5);
-      P.ball(0xf0a086, 0.062, x + s * 0.21, 1.25, z + 0.18, 1, 0.7, 0.5);
+      P.ball(0x2b2119, 0.06, x + s * 0.11, L + 1.34, z + 0.25, 1, 1.55, 0.5);
+      P.ball(0xffffff, 0.022, x + s * 0.13, L + 1.4, z + 0.27, 1, 1, 0.5);
+      P.ball(0xf0a086, 0.062, x + s * 0.21, L + 1.25, z + 0.18, 1, 0.7, 0.5);
     }
     // A mouth. Without one a Toad is a bean with two dots on it.
-    P.ball(0x2b2119, 0.052, x, 1.19, z + 0.26, 1.5, 0.42, 0.4);
+    P.ball(0x2b2119, 0.052, x, L + 1.19, z + 0.26, 1.5, 0.42, 0.4);
 
     // Cap, with the spots sat properly ON the dome rather than floating near it.
     P.ball(C.toadCap, capR, x, capY, z, 1, capH, 1);

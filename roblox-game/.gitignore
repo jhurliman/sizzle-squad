@@ -1,0 +1,5 @@
+node_modules/
+out/
+src/shared/domain/
+src/shared/bots/
+SizzleSquad.rbxl

@@ -1,0 +1,92 @@
+{
+  "pickup": [
+    "pickup_1.wav",
+    "pickup_2.wav",
+    "pickup_3.wav"
+  ],
+  "place": [
+    "place_1.wav",
+    "place_2.wav",
+    "place_3.wav"
+  ],
+  "grabMiss": [
+    "grabMiss_1.wav",
+    "grabMiss_2.wav",
+    "grabMiss_3.wav"
+  ],
+  "chopTick": [
+    "chopTick_1.wav",
+    "chopTick_2.wav",
+    "chopTick_3.wav"
+  ],
+  "chopDone": [
+    "chopDone_1.wav",
+    "chopDone_2.wav",
+    "chopDone_3.wav"
+  ],
+  "cookDone": [
+    "cookDone_1.wav",
+    "cookDone_2.wav",
+    "cookDone_3.wav"
+  ],
+  "burn": [
+    "burn_1.wav",
+    "burn_2.wav",
+    "burn_3.wav"
+  ],
+  "fireStart": [
+    "fireStart_1.wav",
+    "fireStart_2.wav",
+    "fireStart_3.wav"
+  ],
+  "serveWrong": [
+    "serveWrong_1.wav",
+    "serveWrong_2.wav",
+    "serveWrong_3.wav"
+  ],
+  "orderNew": [
+    "orderNew_1.wav",
+    "orderNew_2.wav",
+    "orderNew_3.wav"
+  ],
+  "orderExpired": [
+    "orderExpired_1.wav",
+    "orderExpired_2.wav",
+    "orderExpired_3.wav"
+  ],
+  "trash": [
+    "trash_1.wav",
+    "trash_2.wav",
+    "trash_3.wav"
+  ],
+  "washDone": [
+    "washDone_1.wav",
+    "washDone_2.wav",
+    "washDone_3.wav"
+  ],
+  "bump": [
+    "bump_1.wav",
+    "bump_2.wav",
+    "bump_3.wav"
+  ],
+  "wallHit": [
+    "wallHit_1.wav",
+    "wallHit_2.wav",
+    "wallHit_3.wav"
+  ],
+  "footstep": [
+    "footstep_1.wav",
+    "footstep_2.wav",
+    "footstep_3.wav"
+  ],
+  "gameOver": [
+    "gameOver_1.wav",
+    "gameOver_2.wav",
+    "gameOver_3.wav"
+  ],
+  "serve": [
+    "serve_combo1.wav",
+    "serve_combo4.wav",
+    "serve_combo8.wav"
+  ]
+}

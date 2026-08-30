@@ -1,0 +1,15 @@
+{
+  "name": "sizzle-squad-roblox-export",
+  "private": true,
+  "type": "module",
+  "description": "Exports the procedurally generated kitchen environment to a Roblox place file",
+  "scripts": {
+    "generate": "node build.mjs && node capture.bundle.mjs && node prepare.mjs && lune run convert.luau",
+    "verify": "lune run verify.luau",
+    "render": "esbuild viewer.mjs --bundle --format=iife --outfile=viewer.bundle.js --log-level=warning && node shoot.mjs",
+    "anim": "lune run pose-dump.luau && node anim-sheet.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

@@ -1,5 +1,6 @@
 import type { Kitchen, Vec2 } from './types';
 import { isWalkable } from './kitchen';
+import { filled, hypot } from './portable';
 
 /**
  * Breadth-first distance field over walkable cells. Bots steer down the
@@ -7,7 +8,7 @@ import { isWalkable } from './kitchen';
  * because they're still driven by the same acceleration model as the player).
  */
 export interface FlowField {
-  dist: Int32Array;
+  dist: number[];
   width: number;
   height: number;
 }
@@ -20,7 +21,7 @@ const NEIGHBORS: Vec2[] = [
 ];
 
 export function buildFlow(k: Kitchen, targets: Vec2[]): FlowField {
-  const dist = new Int32Array(k.width * k.height).fill(-1);
+  const dist: number[] = filled(k.width * k.height, -1);
   const queue: number[] = [];
   for (const t of targets) {
     const cx = Math.floor(t.x);
@@ -45,7 +46,7 @@ export function buildFlow(k: Kitchen, targets: Vec2[]): FlowField {
   for (let head = 0; head < queue.length; head++) {
     const i = queue[head];
     const x = i % k.width;
-    const y = (i / k.width) | 0;
+    const y = Math.floor(i / k.width);
     for (const n of NEIGHBORS) {
       const nx = x + n.x;
       const ny = y + n.y;
@@ -88,7 +89,10 @@ export function flowDir(f: FlowField, k: Kitchen, pos: Vec2): Vec2 {
   const ty = cy + best.y + 0.5;
   const vx = tx - pos.x;
   const vy = ty - pos.y;
-  const m = Math.hypot(vx, vy) || 1;
+  // Explicit zero test: `|| 1` reads a 0 as falsy in JS but truthy in Lua,
+  // and this file compiles for both runtimes.
+  const h = hypot(vx, vy);
+  const m = h > 0 ? h : 1;
   return { x: vx / m, y: vy / m };
 }
 

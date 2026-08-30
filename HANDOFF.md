@@ -1,5 +1,11 @@
 # HANDOFF — Sizzle Squad
 
+> **The active project is the Roblox port.** Its current state, tooling and
+> launch plan are in [`roblox-game/HANDOFF.md`](roblox-game/HANDOFF.md) — start
+> there. This file remains the brief for the ORIGINAL BROWSER GAME: its method
+> notes still apply and are worth reading, but its status section describes a
+> single-player web build that the port has long since overtaken.
+
 *This file is the brief for whoever takes over. Read it top to bottom before
 running anything. Then read `REFERENCE.md`, then `AGENTS.md`, then open
 `refs/dash-and-dine-01.jpeg` and `refs/dash-and-dine-02.jpeg` with the Read tool

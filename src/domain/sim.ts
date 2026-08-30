@@ -16,19 +16,110 @@ import type {
   Vec2,
 } from './types';
 import { NO_INPUT } from './types';
+import { filled, hypot } from './portable';
 
 // --------------------------------------------------------------------- rng
+
+/**
+ * 32-bit multiply, low word — `Math.imul` spelled in plain arithmetic and
+ * bitwise ops. Both factors stay under 2^49 so the f64 products are exact,
+ * and every intermediate is reduced mod 2^32 by the trailing `| 0`, so this
+ * returns bit-identical results to `Math.imul` in V8 and in bit32-compiled
+ * Luau alike (signed/unsigned representation differs only by multiples of
+ * 2^32, which the reductions erase).
+ */
+function imul(a: number, b: number): number {
+  return ((a & 0xffff) * b + ((((a >>> 16) * b) & 0xffff) << 16)) | 0;
+}
 
 /** Deterministic PRNG so a seed reproduces an entire run exactly. */
 export function mulberry32(seed: number) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    let t = imul(a ^ (a >>> 15), 1 | a);
+    t = (t + imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+// ---------------------------------------------------------------- director
+
+/**
+ * LIVE-DIRECTOR KNOBS.
+ *
+ * The multiplayer port scales pacing by human count and skill — more humans
+ * means faster tickets, brand-new players get gentler timers — WITHOUT
+ * retuning the sim itself. Every knob defaults to exactly the shipped
+ * single-player behavior; a sim that never touches `director` plays
+ * identically to one built before this existed (the seeded-replay suite
+ * enforces that). The knobs are re-read live, so an external director may
+ * adjust them between ticks (the port's pressure director rubber-bands
+ * `orderGapMul` a few percent every second).
+ */
+export interface DirectorKnobs {
+  /** Scales the gap between order spawns. <1 = faster kitchen. */
+  orderGapMul: number;
+  /** Added to the concurrent-ticket cap. */
+  maxOrdersBonus: number;
+  /** Scales each NEW ticket's timer (existing tickets are untouched). */
+  ticketTimeMul: number;
+  /** Scales the patience cost of an expired ticket. */
+  patienceMissMul: number;
+  /** Scales how long cooked food sits before burning (assist: >1 is kinder). */
+  burnTimeMul: number;
+  /** Max recipe size (component count) the board may ask for. Infinity = all. */
+  recipeDepthCap: number;
+  /**
+   * Coin multiplier for a dish whose plating was done by a bot chef —
+   * leaderboard integrity in the port ("bots take a cut"). 1 = off.
+   */
+  botServeValueMul: number;
+  /**
+   * Recipe ids to issue, in order, before the board goes back to picking at
+   * random. Onboarding uses it to guarantee a first shift that teaches the
+   * loop in the right order: chop → plate → serve, then cook, then a second
+   * chop with more on the plate.
+   *
+   * A random board cannot teach. A brand-new player's first ticket used to be
+   * whatever the dice said, so roughly half of them opened on Bacon Roll and
+   * met the pan — the least discoverable station in the kitchen — before they
+   * had ever chopped anything or carried a plate.
+   *
+   * Empty (the default) skips the branch entirely, so an unscripted board
+   * draws bit-identically to before this existed.
+   */
+  scriptedRecipes: string[];
+  /** How far through `scriptedRecipes` the board has got. */
+  scriptedIndex: number;
+  /**
+   * NO CLOCK AND NO FAIL STATE. The service runs until something outside the
+   * sim decides it is finished.
+   *
+   * Written for the First Shift tutorial, which has to be a place a brand-new
+   * player cannot lose: the round must not end because 180 seconds elapsed,
+   * and it must not end because a ticket they had not understood yet ran the
+   * patience meter to zero. Both are lessons for the second shift.
+   *
+   * The caller then owns the exit — see RoundDirector's tutorial completion
+   * check, which sets `over` once the dish target is met so the ordinary
+   * results and payout path still runs.
+   */
+  endless: boolean;
+}
+
+export const DEFAULT_DIRECTOR: DirectorKnobs = {
+  orderGapMul: 1,
+  maxOrdersBonus: 0,
+  ticketTimeMul: 1,
+  patienceMissMul: 1,
+  burnTimeMul: 1,
+  recipeDepthCap: Infinity,
+  botServeValueMul: 1,
+  scriptedRecipes: [],
+  scriptedIndex: 0,
+  endless: false,
+};
 
 // ------------------------------------------------------------------- state
 
@@ -43,10 +134,24 @@ export interface SimState {
   over: boolean;
   /** Seconds until the next ticket. */
   nextOrderIn: number;
+  /** Clean plates left on the racks; see TUNING.plateStock. */
+  plateStock: number;
+  /**
+   * Dirty plates stacked at the wash-up.
+   *
+   * A COUNT, never objects parked on benches: every surface in this kitchen is
+   * load-bearing, and dirty crockery left on one breaks whatever that surface
+   * was for. Measured -- on counters it broke plate assembly outright and
+   * throughput FELL as plate stock rose; on the racks it blocked the
+   * dispensers.
+   */
+  dirtyPlates: number;
   /** 0..1 ramp of how hard the run currently is. */
   heat: number;
-  rand: () => number;
+  rand: (this: void) => number;
   nextId: number;
+  /** Pacing knobs, all defaulted to shipped behavior. See DirectorKnobs. */
+  director: DirectorKnobs;
   /** Cosmetic: distance walked since last footstep, per chef. */
   stepAccum: number[];
   /**
@@ -68,6 +173,25 @@ export const SIM_DT = 1 / SIM_HZ;
 export interface SimOptions {
   seed?: number;
   botCount?: number;
+  /**
+   * Director knobs applied BEFORE the opening tickets are seeded.
+   *
+   * This has to be a construction option, not a post-hoc assignment: createSim
+   * seeds two tickets immediately (see seedOrders), so a caller that sets
+   * `sim.director` afterwards has already missed the only two tickets a new
+   * player is guaranteed to see.
+   */
+  director?: Partial<DirectorKnobs>;
+}
+
+function buildDirector(over?: Partial<DirectorKnobs>): DirectorKnobs {
+  const d: DirectorKnobs = { ...DEFAULT_DIRECTOR, ...(over ?? {}) };
+  // Always a FRESH array: DEFAULT_DIRECTOR's is shared by reference through
+  // the spread, so two sims would otherwise consume one another's script.
+  d.scriptedRecipes = (over?.scriptedRecipes ?? []).slice();
+  d.scriptedIndex = over?.scriptedIndex ?? 0;
+  d.endless = over?.endless ?? false;
+  return d;
 }
 
 export function createSim(opts: SimOptions = {}): SimState {
@@ -140,11 +264,16 @@ export function createSim(opts: SimOptions = {}): SimState {
     events: [],
     over: false,
     nextOrderIn: 1.2,
+    /** Clean plates left on the racks. */
+    plateStock: TUNING.plateStock,
+    /** Dirty plates stacked at the wash-up, waiting to be dealt with. */
+    dirtyPlates: 0,
     heat: 0,
     rand,
     nextId: 1,
+    director: buildDirector(opts.director),
     stepAccum: chefs.map(() => 0),
-    contactLock: new Array(chefs.length * chefs.length).fill(0),
+    contactLock: filled(chefs.length * chefs.length, 0),
   };
   seedOrders(state);
   return state;
@@ -160,7 +289,7 @@ export function createSim(opts: SimOptions = {}): SimState {
  *
  * Deterministic: fixed ring order, no rand, same map gives the same answer.
  */
-function safeSpawn(k: Kitchen, want: Vec2): Vec2 {
+export function safeSpawn(k: Kitchen, want: Vec2): Vec2 {
   const r = TUNING.chefRadius;
   if (!collides(k, want.x, want.y, r)) return { ...want };
   for (let ring = 1; ring <= 6; ring++) {
@@ -211,7 +340,7 @@ function emit(s: SimState, e: SimEvent) {
 }
 
 function len(v: Vec2) {
-  return Math.hypot(v.x, v.y);
+  return hypot(v.x, v.y);
 }
 
 function angleDelta(a: number, b: number) {
@@ -381,7 +510,7 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
     if (ws) {
       let ax = ws.cell.x + 0.5 - chef.pos.x;
       let ay = ws.cell.y + 0.5 - chef.pos.y;
-      const a = Math.hypot(ax, ay);
+      const a = hypot(ax, ay);
       if (a > 1e-4) {
         ax /= a;
         ay /= a;
@@ -396,7 +525,7 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
   } else {
     mx = input.move.x;
     my = input.move.y;
-    m = Math.hypot(mx, my);
+    m = hypot(mx, my);
     if (m > 1) {
       mx /= m;
       my /= m;
@@ -435,7 +564,7 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
     // there is no stick to aim at, so we aim at where the body is actually
     // going, which is both what the eye expects and what the station in front
     // of you needs.
-    const vmag = Math.hypot(chef.vel.x, chef.vel.y);
+    const vmag = hypot(chef.vel.x, chef.vel.y);
     const maxTurn = TUNING.turnRate * load.turn * dt;
     if (m > 0.05) {
       const dd = angleDelta(chef.heading, Math.atan2(my, mx));
@@ -500,7 +629,7 @@ function moveChef(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
     const out = safeSpawn(k, chef.pos);
     const ox = out.x - chef.pos.x;
     const oy = out.y - chef.pos.y;
-    const od = Math.hypot(ox, oy);
+    const od = hypot(ox, oy);
     if (od > 0) {
       const stepOut = Math.min(od, TUNING.moveSpeed * dt);
       chef.pos.x += (ox / od) * stepOut;
@@ -617,7 +746,7 @@ function resolveChefCollisions(s: SimState, dt: number) {
       const b = s.chefs[j];
       const dx = b.pos.x - a.pos.x;
       const dy = b.pos.y - a.pos.y;
-      const dist = Math.hypot(dx, dy);
+      const dist = hypot(dx, dy);
       const min = r * 2;
       if (dist === 0) continue;
       if (dist >= min) {
@@ -757,7 +886,7 @@ function resolveChefCollisions(s: SimState, dt: number) {
 function boxDist(st: Station, x: number, y: number): number {
   const dx = Math.max(st.cell.x - x, 0, x - (st.cell.x + 1));
   const dy = Math.max(st.cell.y - y, 0, y - (st.cell.y + 1));
-  return Math.hypot(dx, dy);
+  return hypot(dx, dy);
 }
 
 /**
@@ -810,6 +939,27 @@ export type GrabKind =
   | 'return' // put it back where you found it
   | 'serve'
   | 'discard'
+  /** Empty-handed at a pan with cooked food: take the food itself. Asked for
+   * in playtest twice — the plate-scoop stays the fast path, but a bare hand
+   * must never watch dinner burn. */
+  | 'unload'
+  /**
+   * A PLATE OF THE WRONG THING, SCRAPED CLEAN AT THE SINK, STILL IN YOUR HANDS.
+   *
+   * From the first multiplayer playtest: you drop a bun onto a plate that
+   * already has a prepped tomato, and now you are holding the beginnings of a
+   * BLT nobody ordered. The bin will take it apart one item per press — it is
+   * an undo, deliberately — but when the whole plate is wrong that is three
+   * presses at the far corner of the kitchen while tickets expire.
+   *
+   * The sink already existed and did nothing a new player would ever see (it
+   * only takes DIRTY plates, and plates only go dirty once all eight clean ones
+   * are gone). Letting it take a wrongly-loaded plate gives it a job from the
+   * first minute, and it is strictly better than a bin run: the food goes, the
+   * plate stays clean in your hands, and you are already standing where you can
+   * start again.
+   */
+  | 'rinse'
   /**
    * HOLD THIS ONE — it is what makes a single action button possible.
    *
@@ -879,13 +1029,30 @@ function affordance(chef: Chef, st: Station, plan: GrabKind): 0 | 1 | 2 {
   return 0;
 }
 
+/**
+ * A plate only takes food in a state some recipe could want. Raw tomato or
+ * lettuce (choppable) and raw bacon (cookable) junk the plate — reported
+ * from the Roblox playtest: 'i should not be allowed to plate any unprepped
+ * ingredients'. Raw bun (nothing to prep) stays plateable.
+ */
+function plateable(ing: Ingredient): boolean {
+  const def = INGREDIENT_DEFS[ing.kind];
+  return !(ing.state === 'raw' && (def.chopSeconds > 0 || def.cookSeconds > 0));
+}
+
 export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind {
   if (!st) return 'none';
   const held = chef.carrying;
 
   if (!held) {
     if (st.kind === 'crate' && st.dispenses) return 'dispense';
-    if (st.kind === 'plates') return 'dispense';
+    // The rack hands over a clean plate if it has one, otherwise a DIRTY one.
+    // Handing out nothing is what deadlocks: a chef already holding food has
+    // to guess that the fix is somewhere else entirely, and the bots simply
+    // never recovered -- measured, they held a chopped tomato for the rest of
+    // the round. A dirty plate in the hand is a problem with an obvious answer,
+    // and the route from there to a sink already existed.
+    if (st.kind === 'plates') return s.plateStock > 0 || s.dirtyPlates > 0 ? 'dispense' : 'none';
     /**
      * A PAN NEVER LEAVES THE BURNER. YOU ONLY EVER HANDLE FOOD.
      *
@@ -921,8 +1088,13 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
      * the rule is unchanged: a pan doing its job stays put, and a plate still
      * comes to the pan rather than the other way round (the 'load' rung below).
      */
-    if (st.kind === 'stove' && st.holding?.type === 'pan')
-      return st.holding.pan.contents.some((i) => i.state === 'burnt') ? 'discard' : 'none';
+    if (st.kind === 'stove' && st.holding?.type === 'pan') {
+      if (st.holding.pan.contents.some((i) => i.state === 'burnt')) return 'discard';
+      // Cooked food comes out into a bare hand too ('unload'). The plate
+      // scoop ('load' below) is still the efficient path — this is the rescue.
+      if (st.holding.pan.contents.some((i) => i.state === 'cooked')) return 'unload';
+      return 'none';
+    }
     // See 'prep' above. Same conditions the `useHeld` gate in step() tests, and
     // the SAME chopSeconds test updateStations makes before it advances any
     // work — all three have to agree or the button lies.
@@ -948,8 +1120,13 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
   switch (st.kind) {
     case 'bin':
       if (held.type === 'ingredient') return 'discard';
-      if (held.type === 'plate' && held.plate.contents.length) return 'discard';
-      if (held.type === 'pan' && held.pan.contents.length) return 'discard';
+      // `.length > 0`, NOT `.length`. TSTL compiles a bare `.length` test to
+      // `#t`, and 0 is TRUTHY in Lua -- so on Roblox the bin advertised
+      // 'discard' for an EMPTY plate or pan and the press then did nothing.
+      // Caught by tools/focus-harness.luau; invisible to the parity harness,
+      // because the divergence is in the prompt and no state changes.
+      if (held.type === 'plate' && held.plate.contents.length > 0) return 'discard';
+      if (held.type === 'pan' && held.pan.contents.length > 0) return 'discard';
       return 'none';
     case 'serve':
       // A wrong plate is not a no-op: it is a refusal with a sound, and since
@@ -978,7 +1155,20 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
     case 'plates':
       return held.type === 'plate' && !held.plate.dirty && held.plate.contents.length === 0 ? 'return' : 'none';
     case 'stove':
-      if (st.holding?.type === 'pan' && held.type === 'ingredient' && st.holding.pan.contents.length < 3) return 'combine';
+      /**
+       * A PAN ONLY TAKES FOOD THAT CAN COOK. Found in the Roblox port
+       * playtest and true here too: a raw tomato (cookSeconds 0) dropped in a
+       * pan never advances, and `load` only extracts cooked items, so it was
+       * stuck in the pan forever. Same rule as the sink below: a station must
+       * not advertise an action worth nothing.
+       */
+      if (
+        st.holding?.type === 'pan' &&
+        held.type === 'ingredient' &&
+        INGREDIENT_DEFS[held.ingredient.kind].cookSeconds > 0 &&
+        st.holding.pan.contents.length < 3
+      )
+        return 'combine';
       /**
        * BOTS PIECE, MINIMAL FIX — COOKED FOOD COULD NOT LEAVE THE PAN.
        *
@@ -1017,13 +1207,53 @@ export function planGrab(s: SimState, chef: Chef, st: Station | null): GrabKind 
        * and the ask was explicit: fewer useless actions. Dirty plates only.
        */
       if (held.type === 'plate' && held.plate.dirty && !st.holding) return 'place';
+      // See GrabKind 'rinse'. Checked after the dirty-plate case because a
+      // dirty plate is always empty, so the two can never both apply.
+      if (held.type === 'plate' && held.plate.contents.length > 0) return 'rinse';
       return 'none';
     default: {
+      /**
+       * A BOARD IS FOR CUTTING, SO IT ONLY TAKES THINGS THAT CUT.
+       *
+       * Reported from the tutorial: put raw bacon on a chopping board and the
+       * coach dutifully told you to chop it — bacon is chopSeconds 0, so the
+       * press did nothing and the rasher sat there. `planGrab` already refuses
+       * to CHOP it (see the 'prep' rung); refusing to PUT IT DOWN there in the
+       * first place is the same rule applied one step earlier, and it is the
+       * one a player actually sees.
+       *
+       * Only ingredients, and only ones with nothing to cut: a plate still
+       * parks on a board (that is what `affordance` tiers it down for), and
+       * anything already prepped can still be set down.
+       */
+      if (
+        st.kind === 'board' &&
+        !st.holding &&
+        held.type === 'ingredient' &&
+        INGREDIENT_DEFS[held.ingredient.kind].chopSeconds <= 0
+      )
+        return 'none';
       if (!st.holding) return 'place';
-      if (st.holding.type === 'plate' && held.type === 'ingredient' && st.holding.plate.contents.length < PLATE_CAPACITY)
+      if (
+        st.holding.type === 'plate' &&
+        held.type === 'ingredient' &&
+        plateable(held.ingredient) &&
+        st.holding.plate.contents.length < PLATE_CAPACITY
+      )
         return 'combine';
-      if (st.holding.type === 'pan' && held.type === 'ingredient' && st.holding.pan.contents.length < 3) return 'combine';
-      if (held.type === 'plate' && st.holding.type === 'ingredient' && held.plate.contents.length < PLATE_CAPACITY)
+      if (
+        st.holding.type === 'pan' &&
+        held.type === 'ingredient' &&
+        INGREDIENT_DEFS[held.ingredient.kind].cookSeconds > 0 &&
+        st.holding.pan.contents.length < 3
+      )
+        return 'combine';
+      if (
+        held.type === 'plate' &&
+        st.holding.type === 'ingredient' &&
+        plateable(st.holding.ingredient) &&
+        held.plate.contents.length < PLATE_CAPACITY
+      )
         return 'load';
       // Same rule as the stove above, for a pan parked on a bench: a plate takes
       // cooked food off ANY pan, wherever it is standing. Without this the same
@@ -1101,8 +1331,8 @@ function gateFocus(s: SimState, chef: Chef): Station | null {
    * Only the ANGLE is wound back. `reach` is about where the arms are now.
    */
   const v = chef.vel;
-  const ax = chef.pos.x - (v ? v.x : 0) * TUNING.focusLead;
-  const ay = chef.pos.y - (v ? v.y : 0) * TUNING.focusLead;
+  const ax = chef.pos.x - (v !== undefined ? v.x : 0) * TUNING.focusLead;
+  const ay = chef.pos.y - (v !== undefined ? v.y : 0) * TUNING.focusLead;
   for (const st of s.kitchen.stations) {
     const held = st.id === chef.focus;
     const bd = boxDist(st, chef.pos.x, chef.pos.y);
@@ -1110,7 +1340,7 @@ function gateFocus(s: SimState, chef: Chef): Station | null {
     const c = stationCenter(st);
     const dx = c.x - ax;
     const dy = c.y - ay;
-    const dist = Math.hypot(dx, dy);
+    const dist = hypot(dx, dy);
     const dot = (dx * hx + dy * hy) / (dist || 1);
     const ang = Math.acos(Math.max(-1, Math.min(1, dot)));
     if (ang > TUNING.reachCone + (held ? TUNING.focusKeepCone : 0)) continue;
@@ -1184,13 +1414,22 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
   const held = chef.carrying;
 
   switch (plan) {
-    case 'dispense':
-      chef.carrying =
-        st.kind === 'plates'
-          ? { type: 'plate', plate: mkPlate(s) }
-          : { type: 'ingredient', ingredient: mkIngredient(s, st.dispenses!) };
+    case 'dispense': {
+      if (st.kind === 'plates') {
+        const clean = s.plateStock > 0;
+        if (!clean && s.dirtyPlates <= 0) return false;
+        if (clean) s.plateStock -= 1;
+        else s.dirtyPlates -= 1;
+        const plate = mkPlate(s);
+        plate.dirty = !clean;
+        chef.carrying = { type: 'plate', plate };
+        emit(s, { t: 'pickup', chef: chef.id, at });
+        return true;
+      }
+      chef.carrying = { type: 'ingredient', ingredient: mkIngredient(s, st.dispenses!) };
       emit(s, { t: 'pickup', chef: chef.id, at });
       return true;
+    }
     case 'take': {
       // Nothing is ever lifted off a burner — see planGrab. A burning pan is
       // handled by 'discard' below, and the pan itself is a fixture.
@@ -1213,11 +1452,19 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       st.work = held.type === 'ingredient' ? (held.ingredient.chop ?? 0) : 0;
       chef.carrying = null;
       emit(s, { t: 'place', chef: chef.id, at });
+      // Setting a dirty plate down in a sink STARTS the wash. Otherwise the
+      // loop is place, press, take -- three presses for one chore, and the
+      // middle one looks like nothing happened.
+      if (st.kind === 'sink' && st.holding?.type === 'plate' && st.holding.plate.dirty) {
+        chef.working = st.id;
+        chef.intent = 'working';
+      }
       return true;
     case 'combine':
       if (held?.type !== 'ingredient' || !st.holding) return false;
       if (st.holding.type === 'plate') {
         st.holding.plate.contents.push(held.ingredient);
+        if (!chef.isPlayer) st.holding.plate.botMade = true;
       } else if (st.holding.type === 'pan') {
         st.holding.pan.contents.push(held.ingredient);
       }
@@ -1229,6 +1476,7 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       // Off a bench: the plate takes the whole item.
       if (st.holding?.type === 'ingredient') {
         held.plate.contents.push(st.holding.ingredient);
+        if (!chef.isPlayer) held.plate.botMade = true;
         st.holding = null;
         st.work = 0;
         emit(s, { t: 'place', chef: chef.id, at });
@@ -1239,6 +1487,7 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
         const i = st.holding.pan.contents.findIndex((x) => x.state === 'cooked');
         if (i < 0) return false;
         held.plate.contents.push(st.holding.pan.contents.splice(i, 1)[0]);
+        if (!chef.isPlayer) held.plate.botMade = true;
         emit(s, { t: 'place', chef: chef.id, at });
         return true;
       }
@@ -1258,6 +1507,10 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       // ingredient simply rejoins the pile; the plate stack takes its plate
       // back the same way. This is the reference's own instruction to the
       // player and it was the one thing the kitchen could not do.
+      if (st.kind === 'plates' && held?.type === 'plate') {
+        if (held.plate.dirty) s.dirtyPlates += 1;
+        else s.plateStock += 1;
+      }
       chef.carrying = null;
       emit(s, { t: 'place', chef: chef.id, at });
       return true;
@@ -1269,6 +1522,15 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       chef.working = st.id;
       chef.intent = 'working';
       return true;
+    case 'unload': {
+      // One cooked item out of the pan, into the empty hand.
+      if (held || st.holding?.type !== 'pan') return false;
+      const cookedIdx = st.holding.pan.contents.findIndex((x) => x.state === 'cooked');
+      if (cookedIdx < 0) return false;
+      chef.carrying = { type: 'ingredient', ingredient: st.holding.pan.contents.splice(cookedIdx, 1)[0] };
+      emit(s, { t: 'pickup', chef: chef.id, at });
+      return true;
+    }
     case 'discard':
       /**
        * EMPTY-HANDED AT A BURNING PAN: SCRAPE IT, DO NOT PICK IT UP.
@@ -1299,10 +1561,22 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
       else if (held.type === 'plate') held.plate.contents.pop();
       else if (held.type === 'pan') {
         held.pan.contents.pop();
-        if (!held.pan.contents.length) held.pan.fire = 0;
+        // `=== 0`, not `!...length`: `not #t` is FALSE in Lua for an empty
+        // table, so this inverted on Roblox and the fire was never put out.
+        if (held.pan.contents.length === 0) held.pan.fire = 0;
       }
       emit(s, { t: 'trash', at });
       return true;
+    case 'rinse': {
+      // The WHOLE plate, in one press. The bin's one-item-per-press rhythm is
+      // an undo for a single mis-drop; this is for when the plate is simply
+      // wrong and the fastest correct move is to start over.
+      if (held?.type !== 'plate' || held.plate.contents.length === 0) return false;
+      held.plate.contents = [];
+      held.plate.dirty = false;
+      emit(s, { t: 'trash', at });
+      return true;
+    }
     case 'serve':
       // A refused plate is not a miss: `trySer` emits its own serveWrong, which
       // is a louder and more specific answer than the generic thunk.
@@ -1319,6 +1593,25 @@ function doGrab(s: SimState, chef: Chef, st: Station | null): boolean {
  * an order who walked past the pass, and charging them a combo for it is
  * punishing a player for the ambiguity of a hitbox they cannot see.
  */
+/**
+ * TIP MULTIPLIER FOR A STREAK OF `combo` CONSECUTIVE CLEAN SERVES.
+ *
+ * Exported because the HUD needs the same number the scoring does. It used to
+ * be inline at the serve site while the HUD printed the raw streak COUNT
+ * behind an "x", so the chip read "x0" on a fresh round -- a multiplier of
+ * zero, i.e. "nothing you serve is worth anything", which is the opposite of
+ * what a streak of zero means. Two readouts of one quantity is how that
+ * happens; now there is one.
+ *
+ * combo 1 pays 1.00 (a streak has not earned anything until it is a streak),
+ * and it climbs 0.15 a serve to a 2.50 ceiling at combo 11. The max() only
+ * matters to callers outside the serve path -- there the count is always >= 1
+ * because it is incremented first -- so it cannot move scoring.
+ */
+export function comboMultiplier(combo: number): number {
+  return 1 + Math.min(1.5, Math.max(0, combo - 1) * 0.15);
+}
+
 function plateIsWorkInProgress(s: SimState, plate: Plate): boolean {
   if (plate.contents.length === 0) return true;
   const have = new Map<string, number>();
@@ -1359,11 +1652,12 @@ function trySer(s: SimState, chef: Chef, plate: Plate, at: Vec2) {
   s.score.served += 1;
   // Fresher tickets tip better; combos multiply. Rewards flow, not hoarding.
   const freshness = 0.6 + 0.4 * (order.remaining / order.total);
-  const comboMul = 1 + Math.min(1.5, (s.score.combo - 1) * 0.15);
-  const value = Math.round(order.recipe.baseValue * freshness * comboMul);
+  const comboMul = comboMultiplier(s.score.combo);
+  const value = Math.round(order.recipe.baseValue * freshness * comboMul * (plate.botMade === true ? s.director.botServeValueMul : 1));
   s.score.coins += value;
   s.score.patience = Math.min(1, s.score.patience + TUNING.patiencePerServe);
   chef.carrying = null;
+  s.dirtyPlates += 1;
   emit(s, { t: 'serve', at, value, combo: s.score.combo, orderId: order.id });
 }
 
@@ -1433,7 +1727,7 @@ function updateStations(s: SimState, dt: number) {
           cooking = true;
           minCook = Math.min(minCook, ing.progress);
         } else if (ing.state === 'cooked' && Number.isFinite(def.burnSeconds)) {
-          maxBurn = Math.max(maxBurn, Math.min(1, ing.overcook / def.burnSeconds));
+          maxBurn = Math.max(maxBurn, Math.min(1, ing.overcook / (def.burnSeconds * s.director.burnTimeMul)));
         } else if (ing.state === 'burnt') {
           maxBurn = 1;
         }
@@ -1452,7 +1746,7 @@ function updateStations(s: SimState, dt: number) {
           }
         } else if (ing.state === 'cooked' && Number.isFinite(def.burnSeconds)) {
           ing.overcook += dt;
-          if (ing.overcook >= def.burnSeconds) {
+          if (ing.overcook >= def.burnSeconds * s.director.burnTimeMul) {
             ing.state = 'burnt';
             emit(s, { t: 'burn', at });
           }
@@ -1478,10 +1772,28 @@ function updateStations(s: SimState, dt: number) {
 // --------------------------------------------------------------- orders
 
 function pickRecipe(s: SimState): Recipe {
+  // A scripted opening runs before anything else, and deliberately does NOT
+  // draw from rand(): the sequence is fixed, so spending a draw on it would
+  // desync an otherwise identical seeded replay.
+  const script = s.director.scriptedRecipes;
+  if (s.director.scriptedIndex < script.length) {
+    const wanted = script[s.director.scriptedIndex];
+    s.director.scriptedIndex += 1;
+    for (const r of RECIPES) {
+      if (r.id === wanted) return r;
+    }
+    // Unknown id: fall through and pick normally rather than crash a round.
+  }
   // Unlock deeper recipes as heat rises so minute one is always fair.
     const unlocked = Math.max(2, Math.min(RECIPES.length, 2 + Math.floor(s.heat * (RECIPES.length - 2) + 0.5)));
-  const i = Math.floor(s.rand() * unlocked);
-  const pick = RECIPES[Math.min(i, unlocked - 1)];
+  // Assist gating (DirectorKnobs.recipeDepthCap): while a crew is learning,
+  // the board never asks for a recipe bigger than the cap. At the default
+  // (Infinity) the pool is exactly the unlocked prefix and every draw below
+  // is bit-identical to the pre-knob code — same rand() count, same indices.
+  let pool = RECIPES.slice(0, unlocked).filter((r) => r.components.length <= s.director.recipeDepthCap);
+  if (pool.length === 0) pool = RECIPES.slice(0, 2);
+  const i = Math.floor(s.rand() * pool.length);
+  const pick = pool[Math.min(i, pool.length - 1)];
   // NEVER TWO IDENTICAL TICKETS ON THE BOARD.
   //
   // The reference's two balloons are always visibly different, and that
@@ -1492,8 +1804,8 @@ function pickRecipe(s: SimState): Recipe {
   // recipe nobody is already waiting on; if every unlocked recipe is live,
   // fall through and accept the duplicate rather than starve the board.
   if (s.orders.some((o) => o.recipe.id === pick.id)) {
-    for (let k = 1; k < unlocked; k++) {
-      const alt = RECIPES[(Math.min(i, unlocked - 1) + k) % unlocked];
+    for (let k = 1; k < pool.length; k++) {
+      const alt = pool[(Math.min(i, pool.length - 1) + k) % pool.length];
       if (!s.orders.some((o) => o.recipe.id === alt.id)) return alt;
     }
   }
@@ -1506,8 +1818,8 @@ function addOrder(s: SimState, recipe: Recipe) {
   const order: Order = {
     id: s.nextId++,
     recipe,
-    remaining: recipe.baseSeconds * timeScale,
-    total: recipe.baseSeconds * timeScale,
+    remaining: recipe.baseSeconds * timeScale * s.director.ticketTimeMul,
+    total: recipe.baseSeconds * timeScale * s.director.ticketTimeMul,
     createdTick: s.tick,
   };
   s.orders.push(order);
@@ -1528,9 +1840,20 @@ function addOrder(s: SimState, recipe: Recipe) {
  */
 export function seedOrders(s: SimState) {
   const a = addOrder(s, pickRecipe(s));
-  let b = pickRecipe(s);
-  for (let i = 0; i < 4 && b.id === a.recipe.id; i++) b = pickRecipe(s);
-  addOrder(s, b);
+  // ...UNLESS THE BOARD IS ONLY ALLOWED ONE.
+  //
+  // This used to add the second ticket unconditionally, ignoring the
+  // concurrent cap it is the caller's whole means of control. A tutorial board
+  // set to one ticket therefore opened with two, which is how a First Shift
+  // that exists to teach one thing at a time put a salad and a bacon roll up
+  // together and left the coach pointing at whichever it liked.
+  //
+  // `maxOrders` in updateOrders is the same expression; heat is 0 here.
+  if (3 + s.director.maxOrdersBonus >= 2) {
+    let b = pickRecipe(s);
+    for (let i = 0; i < 4 && b.id === a.recipe.id; i++) b = pickRecipe(s);
+    addOrder(s, b);
+  }
   // Long enough that the opening of a run reads as the reference's balanced
   // pair rather than as a board already three deep before the player moves.
   s.nextOrderIn = 13;
@@ -1541,11 +1864,11 @@ function updateOrders(s: SimState, dt: number) {
   s.heat = Math.min(1, s.time / 240);
 
   s.nextOrderIn -= dt;
-  const maxOrders = 3 + Math.floor(s.heat * 2);
-  if (s.nextOrderIn <= 0 && s.orders.length < maxOrders && s.time < TUNING.roundSeconds) {
+  const maxOrders = 3 + Math.floor(s.heat * 2) + s.director.maxOrdersBonus;
+  if (s.nextOrderIn <= 0 && s.orders.length < maxOrders && (s.director.endless || s.time < TUNING.roundSeconds)) {
     addOrder(s, pickRecipe(s));
     const gap = 9.5 - 5.0 * s.heat;
-    s.nextOrderIn = gap * (0.8 + s.rand() * 0.4);
+    s.nextOrderIn = gap * s.director.orderGapMul * (0.8 + s.rand() * 0.4);
   }
 
   for (let i = s.orders.length - 1; i >= 0; i--) {
@@ -1555,14 +1878,15 @@ function updateOrders(s: SimState, dt: number) {
       s.orders.splice(i, 1);
       s.score.missed += 1;
       s.score.combo = 0;
-      s.score.patience = Math.max(0, s.score.patience - TUNING.patiencePerMiss);
+      s.score.patience = Math.max(0, s.score.patience - TUNING.patiencePerMiss * s.director.patienceMissMul);
       emit(s, { t: 'orderExpired', orderId: o.id });
     }
   }
 
   // The clock in the HUD counts TUNING.roundSeconds down; service has to
   // actually end when it reaches zero or that number is decoration.
-  if ((s.score.patience <= 0 || s.time >= TUNING.roundSeconds) && !s.over) {
+  // Endless boards (DirectorKnobs.endless) end only when the caller says so.
+  if (!s.director.endless && (s.score.patience <= 0 || s.time >= TUNING.roundSeconds) && !s.over) {
     s.over = true;
     emit(s, { t: 'gameOver', score: s.score.coins });
   }
@@ -1574,6 +1898,34 @@ function updateOrders(s: SimState, dt: number) {
  * Advance the sim exactly one fixed tick. `inputs` is indexed by chef id.
  * Callers must drain `state.events` after each step.
  */
+/**
+ * THE FOUR PHASES OF A TICK, EXPORTED SEPARATELY.
+ *
+ * `step()` below is still the only sanctioned way to advance a whole sim, and
+ * its behaviour is unchanged. The phases exist as named exports because the
+ * Roblox port splits authority down exactly these seams: a client integrates
+ * `movePhase` for its own chef (zero-latency feel), while the server owns
+ * collisions, interaction, stations and orders. Keeping the seams here — in
+ * the file that defines the ordering — is what stops the two halves from
+ * drifting apart.
+ */
+
+/** Integrate one chef's movement. Phase 1 of a tick. */
+export function movePhase(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
+  moveChef(s, chef, input, dt);
+}
+
+/** Chef-vs-chef separation, bumps, knockback. Phase 2 of a tick. */
+export function collidePhase(s: SimState, dt: number) {
+  resolveChefCollisions(s, dt);
+}
+
+/** Stations advance work/cook/burn; orders spawn, expire, and end the round. Phase 4. */
+export function stationPhase(s: SimState, dt: number) {
+  updateStations(s, dt);
+  updateOrders(s, dt);
+}
+
 export function step(s: SimState, inputs: InputSnapshot[]) {
   if (s.over) return;
   const dt = SIM_DT;
@@ -1582,12 +1934,25 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
 
   for (const chef of s.chefs) {
     const input = inputs[chef.id] ?? NO_INPUT;
-    moveChef(s, chef, input, dt);
+    movePhase(s, chef, input, dt);
   }
-  resolveChefCollisions(s, dt);
+  collidePhase(s, dt);
 
   for (const chef of s.chefs) {
     const input = inputs[chef.id] ?? NO_INPUT;
+    interactPhase(s, chef, input, dt);
+  }
+
+  stationPhase(s, dt);
+}
+
+/**
+ * Focus, the grab buffer, and the committed job — one chef's interaction
+ * slice of a tick. Phase 3. Order inside this function is load-bearing;
+ * every block below carries the comment explaining why.
+ */
+export function interactPhase(s: SimState, chef: Chef, input: InputSnapshot, dt: number) {
+  {
     /**
      * Gate first, coyote second, and the coyote timer is spent HERE so that
      * `findFocus` stays a pure question anyone can ask. A tick the gate wins
@@ -1614,7 +1979,7 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
       chef.working = null;
       chef.grabBuffer = 0;
       if (chef.intent === 'working') chef.intent = 'idle';
-      continue;
+      return;
     }
 
     /**
@@ -1639,7 +2004,7 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
       // is merely early.
       if (chef.grabBuffer === 0) emit(s, { t: 'grabMiss', chef: chef.id, at: { x: chef.pos.x, y: chef.pos.y } });
     }
-    if (chef.stun > 0) continue;
+    if (chef.stun > 0) return;
     if (chef.grabBuffer > 0) {
       if (doGrab(s, chef, st)) chef.grabBuffer = 0;
       else if (input.grabPressed && len(chef.vel) < TUNING.grabBufferMinSpeed) {
@@ -1713,9 +2078,6 @@ export function step(s: SimState, inputs: InputSnapshot[]) {
       }
     }
   }
-
-  updateStations(s, dt);
-  updateOrders(s, dt);
 }
 
 /** Seed the kitchen with the pans the run starts with. */

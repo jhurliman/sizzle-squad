@@ -57,10 +57,29 @@ export const PLATE_CAPACITY = 4;
 export const TUNING = {
   /**
    * Cells per second at full stick. Overcooked sits around 4.5 body-lengths/s;
-   * a chef is ~1.09 units tall, so 6.2 is 5.7 body-lengths/s.
-   * MEASURED: 1.97s to cross the room, 2.98s corner to corner. Unchanged.
+   * a chef is ~1.09 units tall, so 5.7 is 5.2 body-lengths/s.
+   *
+   * WAS 6.2 (1.97s to cross the room, 2.98s corner to corner). Dropped ~8% off
+   * the back of the Roblox port, where chefs read as slightly too twitchy
+   * through a fixed 22.5-degree camera -- and the same note applies in the
+   * browser, so the change lives here rather than as a port-side override.
+   * Crossing is now ~2.14s and the diagonal ~3.24s, both still inside the 2-3s
+   * band the reference sits in, and 5.7 stays clear of the ~5.2 floor below
+   * which the room stops reading as fast.
    */
-  moveSpeed: 6.2,
+  moveSpeed: 5.7,
+  /**
+   * How many clean plates the kitchen owns.
+   *
+   * WASHING UP WAS DEAD CONTENT. The sink, its verb, its 2.2s timer, the
+   * washDone event, a dirty-plate mesh and the bot brain's "wash the plate"
+   * rule all existed, but nothing ever set `dirty` and the racks were
+   * bottomless, so no player ever had a reason to walk to a sink.
+   *
+   * A finite stock is what gives the sink a job. Infinity restores the old
+   * bottomless behaviour.
+   */
+  plateStock: 8,
   /**
    * Multiplier while carrying a plate or a pan — heavier, more committed.
    *
