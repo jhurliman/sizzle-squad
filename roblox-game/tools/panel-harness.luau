@@ -32,7 +32,11 @@ local function newInstance(class: string): any
 	local inst
 	local children = {}
 	local handlers = {}
-	local props: { [string]: any } = { ClassName = class, Name = class }
+	-- Visible defaults TRUE on a real GuiObject. Returning nil here made
+	-- relayout count zero visible tab buttons, so every measurement below was
+	-- taken against a one-row panel no matter how many buttons there were --
+	-- a harness quietly answering an easier question than the one asked.
+	local props: { [string]: any } = { ClassName = class, Name = class, Visible = true }
 	local dead = { Connect = function() return { Disconnect = function() end } end }
 	local activated = {
 		Connect = function(_, fn)
@@ -212,7 +216,7 @@ local function clearance(w: number, h: number): (number, number, number)
 	end
 	local panelBottom = centre + panelH / 2
 	local emoteTop = h - 34
-	return emoteTop - panelBottom, panelH, panel.tabRow.Size.Y.Offset
+	return emoteTop - panelBottom, panelH, panel.tabRow.Size.Y.Offset, centre - panelH / 2
 end
 
 for _, vp in
@@ -220,17 +224,21 @@ for _, vp in
 		{ w = 1920, h = 1080, name = "desktop" },
 		{ w = 1366, h = 768, name = "laptop" },
 		{ w = 1024, h = 768, name = "iPad 4:3" },
-		{ w = 896, h = 414, name = "phone landscape" },
-		{ w = 844, h = 390, name = "small phone landscape" },
-		{ w = 740, h = 360, name = "very small phone" },
+		{ w = 896, h = 414, name = "iPhone 11 landscape" },
+		{ w = 844, h = 390, name = "iPhone 12 landscape" },
+		{ w = 812, h = 375, name = "iPhone X landscape" },
+		{ w = 736, h = 414, name = "iPhone 8+ landscape" },
+		{ w = 667, h = 375, name = "iPhone SE landscape" },
 	}
 do
-	local gap, panelH, rowsH = clearance(vp.w, vp.h)
+	local gap, panelH, rowsH, top = clearance(vp.w, vp.h)
 	local rows = if rowsH > 60 then 2 else 1
 	check(
 		gap >= 0,
 		`{vp.name} {vp.w}x{vp.h}: panel {panelH}px, tabs {rows} row(s), clears the emote row by {string.format("%.0f", gap)}px`
 	)
+	-- Lifting to clear the bottom must not push the Start button off the top.
+	check(top >= 0, `       and its top edge is on screen ({string.format("%.0f", top)}px)`)
 end
 
 -- --------------------------------------------------- B. four fixed characters
@@ -307,11 +315,30 @@ check(#acted == 1 and acted[1].kind == "dismiss" and acted[1].chefId == 2, "its 
 acted = {}
 panel.slots[4].face.__press()
 check(#acted == 1 and acted[1].kind == "claim" and acted[1].chefId == 3, "tapping an empty chair takes the character")
+acted = {}
+panel.slots[4].dismiss.__press()
+check(#acted == 1 and acted[1].kind == "fill" and acted[1].chefId == 3, "and its + puts a bot in it")
+
+-- THE CORNER IS ONE QUESTION: is there a bot in this chair? It briefly meant
+-- "invite" on an empty chair, which everybody read as "add a bot" -- opposite
+-- an x that removes one -- and which then did nothing at all, because
+-- PromptGameInvite throws with no platform sheet and the pcall swallowed it.
 panel:setFriends({ { name = "Kim", jobId = "abc" } })
 acted = {}
 panel.slots[4].dismiss.__press()
-check(#acted == 1 and acted[1].kind == "join", "and its + offers the chair to a reachable friend")
+check(#acted == 1 and acted[1].kind == "fill", "and it still means bot even when a friend is reachable")
+check(
+	string.find(panel.inviteButton.Text, "Kim", 1, true) ~= nil,
+	`inviting is a row button, and it offers the friend ({panel.inviteButton.Text})`
+)
+acted = {}
+panel.inviteButton.__press()
+check(#acted == 1 and acted[1].kind == "join", "which joins them")
 panel:setFriends({})
+check(
+	string.find(panel.inviteButton.Text, "INVITE", 1, true) ~= nil,
+	`and asks for one when nobody is cooking ({panel.inviteButton.Text})`
+)
 acted = {}
 panel.slots[2].face.__press()
 check(#acted == 0, "tapping somebody else's chair does nothing")

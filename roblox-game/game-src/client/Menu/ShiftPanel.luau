@@ -219,35 +219,29 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			end
 			self.deps.onSeatAction(seat.chefId, "claim")
 		end)
+		-- THE CORNER IS ONE QUESTION: is there a bot in this chair?
+		--
+		-- x sends it away, + brings it back, and that is the whole meaning. It
+		-- briefly meant "invite a friend" on an empty chair, which read as
+		-- "add a bot" to everybody who saw it -- reasonably, since it sits
+		-- opposite an x that removes one -- and then did nothing at all,
+		-- because PromptGameInvite throws where there is no platform invite
+		-- sheet and the pcall swallowed it. A silent button that means
+		-- something other than it looks like is two bugs.
+		--
+		-- Inviting is not a per-chair act anyway: a friend fills whichever seat
+		-- is free, not the one you happened to tap. It lives on the row below.
 		dismiss.Activated:Connect(function()
 			local seat = self.seats and self.seats[idx]
 			if seat == nil then
 				return
 			end
-			if seat.kind == "bot" then
-				self.deps.onSeatAction(seat.chefId, "dismiss")
-				return
-			end
-			-- Empty chair: the corner is how you offer it to a person.
-			local f = self.friend
-			if f ~= nil then
-				self.deps.onJoinFriend(f.jobId, f.name)
-				return
-			end
-			-- pcall: PromptGameInvite throws outright where the platform cannot
-			-- show the invite sheet, and a dead button beats a broken panel.
-			pcall(function()
-				local SocialService = game:GetService("SocialService")
-				SocialService:PromptGameInvite(Players.LocalPlayer)
-			end)
+			self.deps.onSeatAction(seat.chefId, if seat.kind == "bot" then "dismiss" else "fill")
 		end)
 
 		self.slots[i] =
 			{ root = slot, face = face, name = name, state = state, species = species, dismiss = dismiss }
 	end
-	-- Kept for relayout, which sizes the row from the widest thing in it.
-	self.inviteRoot = self.slots[1].root
-
 	self.tabRow = mk("Frame", {
 		Size = UDim2.fromOffset(600, Theme.MIN_TAP),
 		BackgroundTransparency = 1,
@@ -310,6 +304,36 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		self.tabButtons[t.id] = cta.button
 	end
 
+	-- INVITING IS A SERVER-WIDE ACT, SO IT IS NOT ON A CHAIR.
+	--
+	-- It lived on the empty chairs for a while, which put it in four places at
+	-- once and implied you were inviting somebody into that particular seat.
+	-- You are not: a friend takes whichever seat is free. The chairs answer
+	-- "who is in this one"; this answers "is there anybody else coming".
+	--
+	-- It reads JOIN <name> when somebody is already cooking, because joining a
+	-- friend beats summoning one.
+	local inviteCta = rowButton("＋ INVITE A FRIEND", #TABS + 2, Theme.BLUE)
+	self.inviteButton = inviteCta.button
+	self.inviteRoot = inviteCta.root
+	self.inviteButton.Activated:Connect(function()
+		local f = self.friend
+		if f ~= nil then
+			self.deps.onJoinFriend(f.jobId, f.name)
+			return
+		end
+		-- PromptGameInvite throws outright where the platform cannot show the
+		-- sheet -- Studio, most obviously. Say so rather than being a button
+		-- that does nothing, which is exactly how the last one went wrong.
+		local ok = pcall(function()
+			local SocialService = game:GetService("SocialService")
+			SocialService:PromptGameInvite(Players.LocalPlayer)
+		end)
+		if not ok then
+			self.deps.onToast("Invites are not available here")
+		end
+	end)
+
 	-- LEAVING IS AN AFFORDANCE, NOT AN ADMISSION.
 	--
 	-- A player who dislikes a lobby and has no way out closes the app; every
@@ -338,6 +362,11 @@ end
 --- wins: this is a button, not a browser.
 function ShiftPanel:setFriends(friends: { any })
 	self.friend = friends ~= nil and friends[1] or nil
+	if self.inviteButton ~= nil then
+		self.inviteButton.Text = if self.friend ~= nil
+			then Loc.f("fmt.join_name", self.friend.name)
+			else "＋ INVITE A FRIEND"
+	end
 	self:renderRoster()
 	self:relayoutLast()
 end
@@ -442,6 +471,8 @@ function ShiftPanel:setPhase(phase: any, spectating: boolean)
 	if phase.tutorial ~= nil then
 		self.tutorial = phase.tutorial == true
 		self.newServerRoot.Visible = not self.tutorial
+		-- A reserved tutorial server is not somewhere to invite anybody into.
+		self.inviteRoot.Visible = not self.tutorial
 		self:relayoutLast()
 	end
 	if phase.seats ~= nil then
