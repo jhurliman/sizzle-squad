@@ -8,7 +8,7 @@ import fs from "node:fs";
 
 // Universe/place ids and the key lookup are shared with publish-place.mjs so
 // the two tools cannot disagree about which place is live.
-import { creds, stagingPlaceId } from "./opencloud-creds.mjs";
+import { creds, stagingPlaceId, DEFAULT_STAGING_PLACE_ID } from "./opencloud-creds.mjs";
 
 // Same refusal as the publisher: a staging command that quietly resolves to
 // live is worse than no staging command.
@@ -228,16 +228,26 @@ async function cmdPlaces() {
   if (!res.ok) {
     throw new Error(`places -> ${res.status} ${text.slice(0, 200)}`);
   }
-  const staging = (process.env.SIZZLE_STAGING_PLACE_ID || "").trim();
+  // The default counts: the id lives in opencloud-creds.mjs now, not only in
+  // somebody's shell, so a place can be "the staging one" without the variable
+  // being set anywhere.
+  const staging = (process.env.SIZZLE_STAGING_PLACE_ID || "").trim() || DEFAULT_STAGING_PLACE_ID;
   const rows = JSON.parse(text).data || [];
   console.log(`universe ${universeId}: ${rows.length} place(s)`);
   for (const p of rows) {
     const id = String(p.id);
     let tag = "";
     if (id === placeId) tag = "  <-- LIVE";
-    else if (id === staging) tag = "  <-- staging (SIZZLE_STAGING_PLACE_ID)";
+    else if (id === staging) tag = "  <-- staging";
     else tag = "  <-- not pointed at by anything";
     console.log(`  ${id.padEnd(18)} ${p.name}${tag}`);
+    // A NON-ROOT PLACE HAS NO GAME PAGE OF ITS OWN. roblox.com/games/<id>
+    // redirects to the experience's ROOT place, so that link silently drops
+    // you into live looking perfectly normal -- which is exactly how somebody
+    // reviews the wrong build. games/start?placeId= is the one that joins it.
+    if (id !== placeId) {
+      console.log(`${" ".repeat(21)}join: https://www.roblox.com/games/start?placeId=${id}`);
+    }
   }
   if (rows.length === 1) {
     console.log(

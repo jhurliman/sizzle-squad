@@ -244,6 +244,20 @@ from the publish:
   permanent spectator, so a 50-cap staging server does not behave like live.
   Same PATCH with `updateMask=serverSize`.
 
+**Joining staging is not the obvious URL.** A non-root place has no game page
+of its own: `roblox.com/games/<placeId>` REDIRECTS to the experience's root
+place, so that link drops you into live, looking perfectly normal, and you
+review the wrong build without ever being told. Use:
+
+```
+https://www.roblox.com/games/start?placeId=<staging place id>
+```
+
+Same link for anyone you want to test with. Note what that implies: the place
+is unlisted, not private. Access is governed by the UNIVERSE's playability
+rather than per place, so on a public experience anybody holding this link can
+join staging, and there is no separate switch to lock it down.
+
 `npm run places` lists the universe's places and says which is live, which is
 staging, and which nothing points at — handy for reading the new id back
 without going through the dashboard.
