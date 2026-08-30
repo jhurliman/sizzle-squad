@@ -107,4 +107,26 @@ check(math.abs(state.simTime - 2) < 0.01, "clock holds between rounds")
 state:applyScore({ coins = 10, patience = 1, time = 42 })
 check(state.simTime == 42, "authoritative score resyncs the clock")
 
+-- ---------------------------------------------- an emptied chair goes at once
+--
+-- The render loop culls a chef after two seconds of silence, which is right
+-- when a chef stops streaming for reasons nobody knows. It is wrong when the
+-- server has just said the chair is empty: dismissing a bot stops its
+-- transform stream, so the body stood there for the full timeout and the delay
+-- read as lag on a button press. It was never lag -- the roster arrives in the
+-- same breath as the dismissal and says outright that nobody is there.
+state.clock = 100
+state.lastSeen[2] = 100 -- streaming healthily a moment ago
+state.phase = { phase = "intermission", seats = { { chefId = 2, species = "nori", kind = "bot" } } }
+check(state:shouldShowChef(2), "a bot the server still lists is drawn")
+state.phase.seats[1].kind = "empty"
+check(not state:shouldShowChef(2), "and vanishes the instant the server says the chair is empty")
+
+-- silence still gets the benefit of the doubt, for a while
+state.phase = { phase = "round" }
+state.lastSeen[3] = 99.5
+check(state:shouldShowChef(3), "a chef quiet for half a second is still drawn")
+state.lastSeen[3] = 97
+check(not state:shouldShowChef(3), "one quiet for three seconds is not")
+
 print("PASS: round clock")

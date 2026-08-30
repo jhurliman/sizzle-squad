@@ -732,7 +732,7 @@ RunService.RenderStepped:Connect(function(dt)
 	for id, skin in state.skins do
 		if id ~= state.myChefId then
 			local pose = state:remotePose(id)
-			if pose ~= nil and state.clock - (state.lastSeen[id] or -10) < 2 then
+			if pose ~= nil and state:shouldShowChef(id) then
 				visuals:update(id, skin, pose, state.flags[id] or 0, dt, state.carrying[id], state.hats[id], nameTagFor(id), state.palettes[id])
 			elseif visuals.chefs[id] ~= nil then
 				-- parked / departed chefs stop streaming: clear their body

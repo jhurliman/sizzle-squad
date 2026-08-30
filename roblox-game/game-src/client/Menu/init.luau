@@ -432,14 +432,25 @@ end
 
 -- ------------------------------------------------------------------ state
 
---- The emote row is for gameplay: visible in a round, and not behind a panel.
+--- Hidden behind an open panel, and on the Start Shift screen.
 ---
---- Two things want to hide it and they used to disagree -- setOpen hid it for
---- an open panel and nothing hid it between rounds, so whichever fired last
---- won. One rule, both callers.
+--- NOT during results: reacting to the scoreboard and the crew photo is one of
+--- the better moments the emotes have, and the first version of this hid them
+--- there too.
+---
+--- The Start Shift screen is a LAYOUT collision rather than a matter of taste.
+--- The panel grew a roster row, which pushed the info chip (Lv 6 · 2978 coins)
+--- down onto the emote row on a short screen -- reported on mobile, where
+--- there is least room to spare. Hiding the row is the cheap fix and costs
+--- lobby emotes; the alternative is lifting the panel or the chip so both fit,
+--- which is worth doing if people want to muck about between rounds.
+---
+--- Two things want to hide it and they would otherwise disagree, with
+--- whichever fired last winning. One rule, both callers.
 function Menu:refreshEmoteBar()
-	local inRound = self.phase ~= nil and self.phase.phase == "round"
-	self.emoteBar:setHidden(self.open or not inRound)
+	local p = self.phase ~= nil and self.phase.phase or nil
+	local lobby = p == "countdown" or p == "intermission"
+	self.emoteBar:setHidden(self.open or lobby)
 end
 
 function Menu:setPhase(phase: any, spectating: boolean)
