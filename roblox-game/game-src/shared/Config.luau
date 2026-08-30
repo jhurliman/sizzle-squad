@@ -24,6 +24,19 @@ Config.LATE_JOIN_CUTOFF = 15 -- <15s left: hold joiner in kitchen-cam until resu
 -- freezes every bot where it stands.
 Config.BOT_FILL = true
 
+-- SKIP FIRST SHIFT IN STUDIO.
+--
+-- Studio cannot persist a profile from a rojo-built local file: game.PlaceId is
+-- 0, so DataStore calls fail and `rounds` is 0 again every session. Since
+-- needsTutorial is `rounds == 0`, First Shift does not run once for a new
+-- player in Studio -- it runs EVERY TIME, forever, in front of the person least
+-- in need of it.
+--
+-- Set this false when the tutorial itself is what you are testing. With
+-- `rojo serve` running, the flip reaches Studio as soon as the file is saved.
+-- Studio only: a real client is unaffected either way.
+Config.STUDIO_SKIP_TUTORIAL = true
+
 -- Difficulty by (non-AFK) human count.
 --
 -- MEASURED, not guessed (tools/economy-probe.luau): dishes served plateaus at

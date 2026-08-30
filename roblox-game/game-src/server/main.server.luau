@@ -307,9 +307,16 @@ Players.PlayerAdded:Connect(function(player)
 		and Tutorial.needsTutorial(progression.profiles[player])
 	then
 		if Tutorial.isStudio() then
-			-- No teleport available; run First Shift right here (Tutorial.luau).
-			Tutorial.forced = true
-			print("[sizzle] First Shift: Studio, running the tutorial in this server")
+			if Config.STUDIO_SKIP_TUTORIAL then
+				-- Every Studio session looks like a brand-new player (PlaceId 0
+				-- means no DataStore, so `rounds` never persists), which turned
+				-- First Shift into a toll on every single playtest.
+				print("[sizzle] First Shift SKIPPED (Config.STUDIO_SKIP_TUTORIAL); set it false to test the tutorial")
+			else
+				-- No teleport available; run First Shift right here (Tutorial.luau).
+				Tutorial.forced = true
+				print("[sizzle] First Shift: Studio, running the tutorial in this server")
+			end
 		elseif Tutorial.send(player) then
 			return
 		end

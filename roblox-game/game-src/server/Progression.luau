@@ -160,6 +160,15 @@ function Progression.new(config: any, remotes: { [string]: any }, catalog: any, 
 			dishes = DataStoreService:GetOrderedDataStore(scoped(BOARD_DISHES)),
 		}
 	end)
+	if self.stores == nil then
+		-- SILENCE HERE COSTS AN HOUR. With no DataStore every session starts
+		-- from nothing, which in Studio means `rounds` is 0 forever, which
+		-- means needsTutorial is true forever, which means First Shift runs on
+		-- every single playtest -- and none of that announces itself. The pcall
+		-- is right (a DataStore outage must not stop the game) but it should
+		-- not be quiet.
+		warn("[progression] no DataStore — nothing will persist this session (Studio: PlaceId 0, or API services off)")
+	end
 	return self
 end
 
