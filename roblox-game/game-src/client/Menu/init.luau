@@ -153,7 +153,10 @@ function Menu.new(deps: any)
 	end)
 
 	-- Gameplay, so it lives in the HUD gui and survives the menu's phase gate
-	-- (you can still ping mid-round); it only hides behind an open panel.
+	-- (you can still ping mid-round). It is hidden the rest of the time:
+	-- pinging "Order up!" at a lobby is pinging nobody about nothing, and the
+	-- row sat across the bottom of the crew shot and the results card, which
+	-- is where a player's eye actually is between rounds.
 	self.emoteBar = EmoteBar.new(deps.hudGui, {
 		catalog = self.catalog,
 		onEmote = function(id)
@@ -170,6 +173,9 @@ function Menu.new(deps: any)
 		end)
 	end
 	self:relayout()
+	-- Hidden until a round starts, rather than flashing across the first lobby
+	-- before the first RoundPhase arrives.
+	self:refreshEmoteBar()
 	return self
 end
 
@@ -400,7 +406,7 @@ function Menu:setOpen(on: boolean)
 	self.scrim.Visible = on
 	self.panel.Visible = on
 	self.shiftPanel:setHidden(on)
-	self.emoteBar:setHidden(on)
+	self:refreshEmoteBar()
 
 	-- One switch solves movement-while-blind, drag-vs-thumbstick, and stray
 	-- E/Space grabs: ControlModule:Disable() also hides the touch thumbstick,
@@ -426,6 +432,16 @@ end
 
 -- ------------------------------------------------------------------ state
 
+--- The emote row is for gameplay: visible in a round, and not behind a panel.
+---
+--- Two things want to hide it and they used to disagree -- setOpen hid it for
+--- an open panel and nothing hid it between rounds, so whichever fired last
+--- won. One rule, both callers.
+function Menu:refreshEmoteBar()
+	local inRound = self.phase ~= nil and self.phase.phase == "round"
+	self.emoteBar:setHidden(self.open or not inRound)
+end
+
 function Menu:setPhase(phase: any, spectating: boolean)
 	self.phase = phase
 	self.spectating = spectating
@@ -437,6 +453,7 @@ function Menu:setPhase(phase: any, spectating: boolean)
 	self.gui.Enabled = allowed
 	self.shiftPanel:setPhase(phase, spectating)
 	self.kitchenCard:setPhase(phase)
+	self:refreshEmoteBar()
 	self:maybeAutoStart()
 end
 
