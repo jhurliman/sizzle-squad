@@ -51,6 +51,12 @@
         "PreferredPlayers": 4
       }
     },
+    "StarterGui": {
+      "$className": "StarterGui",
+      "$properties": {
+        "ScreenOrientation": "LandscapeSensor"
+      }
+    },
     "Lighting": {
       "$className": "Lighting",
       "$properties": {

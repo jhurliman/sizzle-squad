@@ -22,7 +22,9 @@ local Analytics = require(script.Parent.Analytics) :: any
 
 local remotes = Net.server(ReplicatedStorage)
 
-local simService = SimService.new(shared, { seed = os.time() % 2 ^ 31, botFill = Config.BOT_FILL })
+local Staging = require(gameShared:WaitForChild("Staging")) :: any
+local simService =
+	SimService.new(shared, { seed = os.time() % 2 ^ 31, botFill = Config.BOT_FILL, staging = Staging })
 local replicator = Replicator.new(shared, Net, remotes, function(chef)
 	return simService:chefFlags(chef)
 end, function(chef)

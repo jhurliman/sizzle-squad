@@ -28,6 +28,7 @@ local BinDress = require(script.Parent.BinDress) :: any
 
 local SCALE = 5
 local Config = require(gameShared:WaitForChild("Config")) :: any
+local Staging = require(gameShared:WaitForChild("Staging")) :: any
 local remotes = Net.client(ReplicatedStorage)
 local state = ClientState.new(shared, Net)
 local visualsFolder = Instance.new("Folder")
@@ -420,21 +421,29 @@ remotes.RoundPhase.OnClientEvent:Connect(function(phase)
 	end
 	-- The one call site for the phase gate.
 	menu:setPhase(phase, state.myChefId == nil)
-	-- Photo moment: a 3-star finish gets a celebratory push-in on the pass.
-	if phase.phase == "results" and lastPhase ~= "results" and phase.results ~= nil and phase.results.stars >= 3 then
-		local camera = Workspace.CurrentCamera :: Camera
-		local focus = Vector3.new(7.5 * SCALE, 1.2 * SCALE, 1.5 * SCALE)
-		local from = camera.CFrame
-		local to = CFrame.lookAt(focus + Vector3.new(0, 4 * SCALE, 7 * SCALE), focus)
-		local t0 = os.clock()
-		local conn
-		conn = RunService.RenderStepped:Connect(function()
-			local f = math.clamp((os.clock() - t0) / 1.2, 0, 1)
-			camera.CFrame = from:Lerp(to, 1 - (1 - f) ^ 3)
-			if os.clock() - t0 > 4 then
-				conn:Disconnect()
-			end
-		end)
+
+	-- CAMERA: ONE OWNER, THREE SHOTS, REAL MOVES BETWEEN THEM.
+	--
+	-- This used to be a push-in written inline here, on its own RenderStepped,
+	-- which beat CameraRig only because it connected later and therefore ran
+	-- after it every frame. It held for four seconds and then Disconnect()ed,
+	-- snapping the camera back in a single frame with eight seconds of the
+	-- ceremony still to go. CameraRig owns the camera now and a move has
+	-- somewhere to land.
+	if phase.phase ~= lastPhase then
+		if phase.phase == "round" then
+			-- Go time. Ease-OUT rather than the slower smootherstep used
+			-- elsewhere: the round is already live and tickets are already
+			-- ticking, so the pull-back has to hand over a playable frame
+			-- immediately and spend its remaining time settling, not the other
+			-- way round.
+			cameraRig:cutTo("gameplay", 0.9, "out")
+		elseif phase.phase == "results" then
+			cameraRig:cutTo("photo", 1.1, "smooth")
+		else
+			-- countdown / intermission: the lobby closeup on the crew.
+			cameraRig:cutTo("lobby", if lastPhase == "" then 0 else 1.2, "smooth")
+		end
 	end
 	lastPhase = phase.phase
 end)
@@ -543,6 +552,13 @@ remotes.ClientReady:FireServer()
 
 local acc = 0
 local sendAcc = 0
+
+--- Are we in a phase where the crew should be standing on its marks?
+--- Everything that is not a live round: the lobby closeup and the end-of-shift
+--- photo both frame Staging.LINEUP.
+local function stagingActive(): boolean
+	return state.phase.phase ~= "round"
+end
 local seq = 0
 
 RunService.RenderStepped:Connect(function(dt)
@@ -562,7 +578,32 @@ RunService.RenderStepped:Connect(function(dt)
 
 	-- fixed-step the own-chef mirror
 	acc = math.min(acc + dt, 0.25)
-	local snapshot = { move = input:move(), grabPressed = false, useHeld = input.useHeld }
+	local mv = input:move()
+	local mx, my = mv.x, mv.y
+	-- BETWEEN ROUNDS, WALK YOURSELF ONTO YOUR MARK.
+	--
+	-- The lobby camera frames Staging.LINEUP, so somebody has to be standing on
+	-- it. This drives the LOCAL player there as ordinary synthetic input rather
+	-- than the server repositioning them: the client stays the only thing that
+	-- moves the client, so there is no authority handover between rounds to get
+	-- wrong -- which is exactly the trap KNOWN-GAPS records under "sim.time is
+	-- frozen while tickMovementOnly runs".
+	--
+	-- Touching the stick wins instantly and completely. The lobby is still a
+	-- place you can walk around; it just tidies itself up when you stop.
+	if stagingActive() and mx == 0 and my == 0 and state.mirror ~= nil and state.myChefId ~= nil then
+		local mark = Staging.LINEUP[(state.myChefId % #Staging.LINEUP) + 1]
+		local sx, sy, arrived = Staging.moveToward(state.mirror.pos, mark)
+		if arrived then
+			-- Turn to face the lens. movePhase only advances heading while
+			-- there is motion, so writing it here sticks.
+			local d = ((Staging.FACE_CAMERA - state.mirror.heading + math.pi) % (2 * math.pi)) - math.pi
+			state.mirror.heading += d * math.min(1, dt * 6)
+		else
+			mx, my = sx, sy
+		end
+	end
+	local snapshot = { move = { x = mx, y = my }, grabPressed = false, useHeld = input.useHeld }
 	while acc >= shared.SIM_DT do
 		acc -= shared.SIM_DT
 		state:stepOwn(snapshot, shared.SIM_DT)
