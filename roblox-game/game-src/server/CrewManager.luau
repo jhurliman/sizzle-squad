@@ -205,6 +205,38 @@ function CrewManager:seatAction(player: any, msg: any): string?
 	return nil
 end
 
+--- Appearance for EVERY chef, for EquipDeltas.
+---
+--- LIVES HERE BECAUSE main.server.luau IS UNREACHABLE FROM A HARNESS. This was
+--- a local function in the composition root, and it iterated crew.seats -- so
+--- only humans were ever described. Claiming a character SWAPS species between
+--- two chefs, and the bot on the other end of the swap was never mentioned to
+--- anybody: the client went on rendering it as the character it used to be.
+--- Take Mochi from a bot and you get two Mochis and no Bramble, which is
+--- exactly what the lobby looked like. Nothing could have caught it there.
+---
+--- Hats, palettes and names belong to the PERSON, so a bot chair has none of
+--- them. The skin belongs to the chair and always ships.
+function CrewManager:appearanceList(profileFor: (any) -> any, nameFor: (any) -> string): { any }
+	local seatByChef = {}
+	for player, seat in self.seats do
+		seatByChef[seat.chefId] = player
+	end
+	local list = {}
+	for _, chef in self.simService.sim.chefs do
+		local player = seatByChef[chef.id]
+		local profile = if player ~= nil then profileFor(player) else nil
+		table.insert(list, {
+			chefId = chef.id,
+			skin = chef.skin,
+			hat = profile and profile.equipped and profile.equipped.hat or nil,
+			palette = profile and profile.equipped and profile.equipped.palette or nil,
+			name = if player ~= nil then nameFor(player) else nil,
+		})
+	end
+	return list
+end
+
 --- Species currently worn by a SEATED HUMAN, mapped to that human's UserId.
 ---
 --- The value is the owner rather than `true` because this is broadcast to

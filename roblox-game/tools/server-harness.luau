@@ -68,7 +68,10 @@ local playerA = { UserId = 1001, Name = "Alice" }
 
 -- ---------------------------------------------------------------- stack
 
-local simService = SimService.new(shared, { seed = 4242, botFill = true })
+local Staging = require("../game-src/shared/Staging")
+-- Injected here as it is in the real server, or walkToMark no-ops and the
+-- lobby checks below would pass by doing nothing.
+local simService = SimService.new(shared, { seed = 4242, botFill = true, staging = Staging })
 local replicator = Replicator.new(shared, Net, remotes, function(chef)
 	return simService:chefFlags(chef)
 end)
@@ -403,16 +406,101 @@ act(playerA, { chefId = 0, action = "nonsense" })
 act(playerA, "not a table")
 check(#chairs() == 4, "and junk on the wire changes nothing")
 
--- and it stays in chefId order, so the four chairs do not shuffle each tick
+-- ------------------------------- everybody's appearance reaches the client
+--
+-- THE DUPLICATE-CHARACTER BUG. EquipDeltas used to be built from crew.seats,
+-- so it described only humans. Claiming a character swaps species between two
+-- chefs, and the bot on the other end of that swap was never mentioned to
+-- anyone -- the client kept drawing it as the character it used to be. Take
+-- Mochi from a bot and the room has two Mochis and no Bramble.
+local function appearance()
+	return crew:appearanceList(function(player)
+		return progression.profiles[player]
+	end, function(player)
+		return player.DisplayName or player.Name
+	end)
+end
+
+local look = appearance()
+check(#look == #simService.sim.chefs, `every chef is described, not just the seated ones ({#look})`)
+local seenSkin, dupes = {}, 0
+for _, e in look do
+	check(e.skin ~= nil, `chef {e.chefId} ships a skin`)
+	if seenSkin[e.skin] then
+		dupes += 1
+	end
+	seenSkin[e.skin] = true
+end
+check(dupes == 0, `and no two chefs claim the same character ({dupes} duplicates)`)
+
+-- the invariant has to survive a claim, which is when it used to break
+local botToTake = nil
+for _, c in chairs() do
+	if c.kind == "bot" then
+		botToTake = c
+	end
+end
+if botToTake ~= nil then
+	act(playerA, { chefId = botToTake.chefId, action = "claim" })
+	local after = appearance()
+	local seen2, dupes2 = {}, 0
+	for _, e in after do
+		if seen2[e.skin] then
+			dupes2 += 1
+		end
+		seen2[e.skin] = true
+	end
+	check(dupes2 == 0, `still four distinct characters after claiming one ({dupes2} duplicates)`)
+	check(#after == 4, "and still four of them")
+	local named = 0
+	for _, e in after do
+		if e.name ~= nil then
+			named += 1
+		end
+	end
+	check(named == 1, `exactly one chef carries a player name ({named})`)
+end
+
+-- ------------------------------- the first lobby anybody sees is a lobby
+--
+-- tickMovementOnly ran for results and intermission only. It is also what
+-- walks bots onto their marks now, so on a fresh server -- countdown, the one
+-- phase a player actually starts in -- nobody walked anywhere and the crew
+-- shot framed an empty floor with one person in it.
+local moved = 0
+for _, chef in simService.sim.chefs do
+	if simService.humans[chef.id] == nil then
+		chef.pos.x, chef.pos.y = 2.5, 2.5
+	end
+end
+director.phase = "countdown"
+for _ = 1, 240 do
+	director:heartbeat(1 / 60)
+end
+for _, chef in simService.sim.chefs do
+	if simService.humans[chef.id] == nil and (math.abs(chef.pos.x - 2.5) > 0.5 or math.abs(chef.pos.y - 2.5) > 0.5) then
+		moved += 1
+	end
+end
+check(moved > 0, `bots walk to their marks during countdown too ({moved} moved)`)
+
+-- ORDERED BY CHARACTER, so the four chairs never move.
+--
+-- This asserted chefId order until the chairs became characters. Ordering by
+-- chefId kept the chairs in step with the bodies, but claiming a character
+-- swaps species between chefs, so the LABELS slid along the row every time
+-- anybody picked anybody -- the chair you were about to tap had moved by the
+-- time you tapped it.
 local ordered = true
 local prev = -1
 for _, st in lastPhasePayload().seats do
-	if st.chefId <= prev then
+	local at = Staging.indexOf(st.species)
+	if at <= prev then
 		ordered = false
 	end
-	prev = st.chefId
+	prev = at
 end
-check(ordered, "the roster is ordered by chefId, so chairs hold still between broadcasts")
+check(ordered, "the roster is ordered by character, so the chairs never move")
 
 -- buffer round-trip
 local b = Net.packMove(7, 3.25, 4.5, 1.5, -2.25, 0.7, true)

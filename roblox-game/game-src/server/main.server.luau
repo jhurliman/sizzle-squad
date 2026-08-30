@@ -154,27 +154,16 @@ local function electKitchen(): { [string]: string }
 	return out
 end
 
+-- The list is CrewManager:appearanceList; this only supplies the lookups it
+-- cannot have. Keeping it out of here is the point -- server-harness cannot
+-- load this file, and the last version of this logic shipped a bug precisely
+-- because nothing could reach it.
 local function broadcastEquips()
-	local list = {}
-	for player, seat in crew.seats do
-		local profile = progression.profiles[player]
-		local skin = nil
-		for _, chef in simService.sim.chefs do
-			if chef.id == seat.chefId then
-				skin = chef.skin
-			end
-		end
-		table.insert(list, {
-			chefId = seat.chefId,
-			hat = profile and profile.equipped and profile.equipped.hat or nil,
-			palette = profile and profile.equipped and profile.equipped.palette or nil,
-			skin = skin,
-			name = monetization:flairFor(player) .. (player.DisplayName or player.Name),
-		})
-	end
-	-- `taken` is the species other SEATED HUMANS are wearing right now. The
-	-- wardrobe still previews every character (trying hats on is the whole
-	-- point of it) but cannot select one that is spoken for in this server.
+	local list = crew:appearanceList(function(player)
+		return progression.profiles[player]
+	end, function(player)
+		return monetization:flairFor(player) .. (player.DisplayName or player.Name)
+	end)
 	remotes.EquipDeltas:FireAllClients({ chefs = list, kitchen = electKitchen(), taken = crew:takenSkins() })
 end
 

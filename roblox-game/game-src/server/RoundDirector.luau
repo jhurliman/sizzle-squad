@@ -470,7 +470,15 @@ function RoundDirector:heartbeat(dt: number)
 
 	-- Between rounds chefs still walk and bump (plan §2.2: the intermission
 	-- IS the lobby); only the kitchen itself sleeps.
-	if self.phase == "results" or self.phase == "intermission" then
+	-- COUNTDOWN IS A LOBBY TOO, and it is the FIRST one anybody sees.
+	--
+	-- This ran for results and intermission only, which was fine when the
+	-- between-rounds tick just let chefs wander. Now it is also what walks bots
+	-- onto their marks -- so on a fresh server, in the one phase a player
+	-- actually starts in, nobody walked anywhere and the crew shot framed an
+	-- empty floor with one person standing in it. Reported as "only my
+	-- character was standing".
+	if self.phase ~= "round" then
 		self.simService:tickMovementOnly(dt)
 		self.replicator:flush(self.simService.sim, {}, dt)
 	end
