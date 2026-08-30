@@ -36,6 +36,42 @@ export const DEFAULT_PLACE_ID = "113028832194057";
 let cached = null;
 
 /**
+ * The staging place id, or a hard stop.
+ *
+ * THIS EXISTS BECAUSE THE STAGING COMMANDS USED TO TARGET LIVE.
+ *
+ * `publish:staging` was `ROBLOX_PLACE_ID=$SIZZLE_STAGING_PLACE_ID node
+ * tools/publish-place.mjs`. With the variable unset -- which it was on this
+ * machine -- the shell substitutes an empty string, empty string is falsy in
+ * JS, and the lookup fell straight through to the live default. So the one
+ * command whose entire job is to keep a build away from players published it
+ * to them, silently, and printed a perfectly normal-looking version number.
+ *
+ * Never infer a staging target. Demand it, and refuse it if it is live.
+ */
+export function stagingPlaceId() {
+  const id = (process.env.SIZZLE_STAGING_PLACE_ID || '').trim();
+  if (!id) {
+    console.error(
+      'SIZZLE_STAGING_PLACE_ID is not set.\n' +
+        'Create a second place in universe ' +
+        DEFAULT_UNIVERSE_ID +
+        ' (Creator Dashboard -> the experience -> Places -> Create Place),\n' +
+        'then export SIZZLE_STAGING_PLACE_ID=<its id> in ~/.zshrc.\n' +
+        'Refusing to guess: the guess would be the live place.',
+    );
+    process.exit(1);
+  }
+  if (id === DEFAULT_PLACE_ID) {
+    console.error(
+      `SIZZLE_STAGING_PLACE_ID is ${id}, which is the LIVE place. Refusing.`,
+    );
+    process.exit(1);
+  }
+  return id;
+}
+
+/**
  * Resolve the Open Cloud credentials: env vars first, then the config file,
  * then the non-secret defaults. Exits if there is no API key, because every
  * caller needs one and none of them can do anything useful without it.

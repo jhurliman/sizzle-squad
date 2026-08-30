@@ -277,6 +277,37 @@ if wiringBad == 0 then
 	print("client->server handshake remotes are wired at both ends")
 end
 
-if failed > 0 or bundleBad > 0 or stale or audioBad > 0 or pathBad > 0 or wiringBad > 0 then
+-- ------------------------------------------------------------------------
+-- THE GAME AND THE TOOLING MUST AGREE ON WHICH PLACE IS LIVE.
+--
+-- Progression scopes its DataStores by place id so a staging place cannot read
+-- and write live's profiles. That check names LIVE explicitly, on purpose: if
+-- the id it compares against were ever wrong, live would stop matching, take
+-- the staging branch, and open a set of empty stores -- every profile in the
+-- game apparently gone at once.
+--
+-- The publish tooling already carries the same number. There is no shared
+-- runtime between a .mjs and a .luau to put it in, so the next best thing is
+-- refusing to let the two copies drift.
+local idBad = 0
+local progSrc = fs.readFile("game-src/server/Progression.luau")
+local credsSrc = fs.readFile("tools/opencloud-creds.mjs")
+local luauId = string.match(progSrc, "LIVE_PLACE_ID = (%d+)")
+local nodeId = string.match(credsSrc, 'DEFAULT_PLACE_ID = "(%d+)"')
+if luauId == nil then
+	idBad += 1
+	print("FAIL Progression.luau has no LIVE_PLACE_ID to check")
+elseif nodeId == nil then
+	idBad += 1
+	print("FAIL opencloud-creds.mjs has no DEFAULT_PLACE_ID to check")
+elseif luauId ~= nodeId then
+	idBad += 1
+	print(`FAIL live place id disagrees: Progression says {luauId}, the publisher says {nodeId}`)
+	print("     If the publisher is right, live would take the STAGING DataStore branch.")
+else
+	print(`the game and the publisher agree that live is place {luauId}`)
+end
+
+if failed > 0 or bundleBad > 0 or stale or audioBad > 0 or pathBad > 0 or wiringBad > 0 or idBad > 0 then
 	process.exit(1)
 end

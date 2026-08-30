@@ -10,6 +10,33 @@ Progression.__index = Progression
 local PROFILE_STORE = "SizzleProfiles_v1"
 local BOARD_ALLTIME = "SizzleBestRound_v1"
 local BOARD_DISHES = "SizzleCareerDishes_v1"
+
+-- DATASTORES ARE PER-UNIVERSE, NOT PER-PLACE.
+--
+-- The only way to get a staging place on Roblox is a second place in the SAME
+-- universe -- there is no other kind -- and that means it shares every
+-- DataStore with live by default. Not a subtle overlap: the same profiles, the
+-- same leaderboards. One playthrough on staging spends a real player's coins
+-- and writes the result back over their save.
+--
+-- So anything that is not live gets its own namespace. Live is matched by id
+-- and left exactly as it was, and so is Studio (PlaceId 0, or nil under a
+-- Lune harness), which means the names change for precisely one thing: a
+-- staging place, which has no data to lose. Getting this wrong in the other
+-- direction would rename live's stores and lose everybody's progression, which
+-- is why the condition names live rather than trying to detect staging.
+--
+-- check-luau asserts this id matches the one the publish tooling defaults to,
+-- so the two cannot drift apart the way the place id already did once.
+local LIVE_PLACE_ID = 113028832194057
+
+local function scoped(name: string): string
+	local placeId = tonumber((game :: any).PlaceId) or 0
+	if placeId == 0 or placeId == LIVE_PLACE_ID then
+		return name
+	end
+	return `{name}__p{placeId}`
+end
 local AUTOSAVE_SECONDS = 60
 
 -- DataStore hardening --------------------------------------------------------
@@ -127,10 +154,10 @@ function Progression.new(config: any, remotes: { [string]: any }, catalog: any, 
 	pcall(function()
 		local DataStoreService = dataStores or game:GetService("DataStoreService")
 		self.stores = {
-			profiles = DataStoreService:GetDataStore(PROFILE_STORE),
-			allTime = DataStoreService:GetOrderedDataStore(BOARD_ALLTIME),
-			weekly = DataStoreService:GetOrderedDataStore("SizzleWeekly_" .. weekKey()),
-			dishes = DataStoreService:GetOrderedDataStore(BOARD_DISHES),
+			profiles = DataStoreService:GetDataStore(scoped(PROFILE_STORE)),
+			allTime = DataStoreService:GetOrderedDataStore(scoped(BOARD_ALLTIME)),
+			weekly = DataStoreService:GetOrderedDataStore(scoped("SizzleWeekly_" .. weekKey())),
+			dishes = DataStoreService:GetOrderedDataStore(scoped(BOARD_DISHES)),
 		}
 	end)
 	return self

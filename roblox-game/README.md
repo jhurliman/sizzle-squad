@@ -142,25 +142,38 @@ What works is a **second place inside the same universe**, joinable by its own
 id and invisible in search:
 
 ```sh
-export SIZZLE_STAGING_PLACE_ID=<the staging place id>
+export SIZZLE_STAGING_PLACE_ID=<the staging place id>   # in ~/.zshrc
 npm run publish:staging     # build + upload to staging only
-npm run smoke:live -- ...   # or: npm run smoke:staging
+npm run smoke:staging       # module load check against staging
 npm run publish             # only after staging is green
 ```
 
 Create it once at **Creator Dashboard → Sizzle Squad → Places → Create Place**
 (Open Cloud cannot create places, only publish to them).
 
-**The one caveat, and it is sharp:** places in the same universe share
-DataStores and badges. Loading checks are safe — `place-smoke.luau` only
-requires modules, it never writes — but a full playthrough on staging writes to
-real player profiles and can grant real badges. For that, either point
-`Config`'s store names at a `-staging` suffix or use a separate universe and
-accept a second API key.
+**These commands used to publish to LIVE.** `publish:staging` was
+`ROBLOX_PLACE_ID=$SIZZLE_STAGING_PLACE_ID node tools/publish-place.mjs`, and
+with the variable unset the shell substitutes an empty string, which is falsy
+in JS, which falls straight through to the live default. The one command whose
+job is to keep a build away from players shipped it to them and printed a
+normal-looking version number. Both staging commands now take `--staging` and
+refuse outright if the id is missing or is the live place. They never infer a
+target, because the inference was live.
+
+**Profiles are isolated automatically.** Places in the same universe share
+DataStores, so a playthrough on staging would otherwise spend real coins and
+write the result over a real save. `Progression` scopes its four store names by
+`game.PlaceId`: live and Studio keep the names they have always had, and any
+other place gets a `__p<placeId>` suffix and its own empty world. The condition
+names LIVE explicitly rather than trying to detect staging — getting it the
+other way round would rename live's stores and lose every profile in the game —
+and `check-luau` asserts the id in `Progression.luau` still matches the one the
+publisher defaults to, so the two copies cannot drift.
+
+Badges are still shared, so a staging playthrough can grant real ones.
 
 Given the failure this was built for was "the client could not even start",
-staging plus `smoke:live` catches that class outright and does not need the
-data isolation.
+staging plus `smoke:live` catches that class outright.
 
 **Publishing is live and outward-facing, so it happens on explicit approval —
 never as a side effect of a build.**

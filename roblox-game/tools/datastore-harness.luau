@@ -31,12 +31,16 @@ function store:SetAsync(key, v) self.data[key] = v end
 function store:UpdateAsyncOrdered() end
 local ordered = { UpdateAsync = function() end, IncrementAsync = function() end }
 
-local fakeDSS = {
-	GetDataStore = function() return store end,
-	GetOrderedDataStore = function() return ordered end,
-}
-fakeDSS.GetDataStore = function(_self) return store end
-fakeDSS.GetOrderedDataStore = function(_self) return ordered end
+local asked = {}
+local fakeDSS = {}
+fakeDSS.GetDataStore = function(_self, name)
+	table.insert(asked, name)
+	return store
+end
+fakeDSS.GetOrderedDataStore = function(_self, name)
+	table.insert(asked, name)
+	return ordered
+end
 
 local env = {
 	game = { JobId = "server-A", GetService = function() return fakeDSS end, BindToClose = function() end },
@@ -113,6 +117,57 @@ check(p3.profiles[playerA].__readOnly ~= true and p3.profiles[playerA].coins == 
 p3.profiles[playerA].coins = 4321
 p3:flushAll()
 check(store.data["p7"].coins == 4321, "flushAll persisted on shutdown")
+
+-- ------------------------------------------- 5. staging must not share live's data
+--
+-- DataStores are per-UNIVERSE, and the only staging place Roblox will give you
+-- is a second place in the same universe. So without a namespace, a playthrough
+-- on staging spends a real player's coins and writes the result over their
+-- save.
+--
+-- The direction that matters most here is the boring one: LIVE MUST BE
+-- UNCHANGED. Renaming live's stores would lose every profile in the game, so
+-- that is what these check first.
+local LIVE = 113028832194057
+
+local function namesFor(placeId: any): { string }
+	asked = {}
+	env.game.PlaceId = placeId
+	local P = luau.load(luau.compile(fs.readFile("game-src/server/Progression.luau")), { environment = env })()
+	P.new(Config, remotes, Catalog, fakeDSS)
+	return asked
+end
+
+local liveNames = namesFor(LIVE)
+check(table.find(liveNames, "SizzleProfiles_v1") ~= nil, "on the live place the profile store keeps its name")
+check(table.find(liveNames, "SizzleBestRound_v1") ~= nil, "and so does the all-time board")
+check(table.find(liveNames, "SizzleCareerDishes_v1") ~= nil, "and the dishes board")
+
+-- Studio reports PlaceId 0 for a local file, and a Lune harness has no PlaceId
+-- at all. Neither should move either, or every existing test profile vanishes.
+local studioNames = namesFor(0)
+check(table.find(studioNames, "SizzleProfiles_v1") ~= nil, "Studio (PlaceId 0) is left alone too")
+local harnessNames = namesFor(nil)
+check(table.find(harnessNames, "SizzleProfiles_v1") ~= nil, "and so is a harness with no PlaceId at all")
+
+-- A staging place is the one thing that moves.
+local stagingNames = namesFor(987654321)
+check(
+	table.find(stagingNames, "SizzleProfiles_v1") == nil,
+	"a staging place does NOT open live's profile store"
+)
+local sawScoped = false
+for _, n in stagingNames do
+	if string.find(n, "__p987654321", 1, true) ~= nil then
+		sawScoped = true
+	end
+end
+check(sawScoped, `staging gets its own namespace instead ({stagingNames[1]})`)
+check(#stagingNames == #liveNames, `and the same number of stores ({#stagingNames})`)
+for _, n in stagingNames do
+	check(#n <= 50, `"{n}" is within the 50-character DataStore name limit ({#n})`)
+end
+env.game.PlaceId = nil
 
 print(if failures > 0 then `{failures} FAILURES` else "PASS: datastore hardening")
 if failures > 0 then error(`{failures} checks failed`) end

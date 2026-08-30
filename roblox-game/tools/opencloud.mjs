@@ -8,7 +8,12 @@ import fs from "node:fs";
 
 // Universe/place ids and the key lookup are shared with publish-place.mjs so
 // the two tools cannot disagree about which place is live.
-import { creds } from "./opencloud-creds.mjs";
+import { creds, stagingPlaceId } from "./opencloud-creds.mjs";
+
+// Same refusal as the publisher: a staging command that quietly resolves to
+// live is worse than no staging command.
+const STAGING = process.argv.includes("--staging");
+const targetPlace = () => (STAGING ? stagingPlaceId() : creds().placeId);
 
 // The key must never reach stdout, a log, or an error message.
 async function api(url, { method = "GET", body, headers = {} } = {}) {
@@ -169,7 +174,8 @@ async function wipeBoards(universeId, userId) {
 // prints whatever it logs. This is the piece that makes headless validation of
 // Roblox-only behaviour possible at all.
 async function cmdLuau(file) {
-  const { universeId, placeId } = creds();
+  const { universeId } = creds();
+  const placeId = targetPlace();
   const script = fs.readFileSync(file, "utf8");
   const base = `https://apis.roblox.com/cloud/v2/universes/${universeId}/places/${placeId}`;
   const task = await api(`${base}/luau-execution-session-tasks`, {
@@ -203,7 +209,7 @@ async function cmdLuau(file) {
   }
 }
 
-const [cmd, arg] = process.argv.slice(2);
+const [cmd, arg] = process.argv.slice(2).filter((a) => a !== "--staging");
 const run = {
   check: cmdCheck,
   list: cmdList,

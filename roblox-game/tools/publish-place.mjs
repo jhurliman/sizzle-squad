@@ -19,12 +19,15 @@ import path from 'node:path';
 // Universe/place ids and the key lookup are shared with opencloud.mjs so the
 // two tools cannot disagree about which place is live. creds() exits if there
 // is no API key.
-import { creds } from './opencloud-creds.mjs';
+import { creds, stagingPlaceId } from './opencloud-creds.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const PLACE_FILE = path.join(ROOT, 'SizzleSquad.rbxl');
 
-const { apiKey, universeId, placeId } = creds();
+const { apiKey, universeId } = creds();
+// --staging never falls back. See stagingPlaceId: the old shell-substitution
+// version of this resolved to the LIVE place whenever the variable was unset.
+const placeId = process.argv.includes('--staging') ? stagingPlaceId() : creds().placeId;
 if (!fs.existsSync(PLACE_FILE)) {
   console.error(`no ${PLACE_FILE} — run \`npm run build\` first`);
   process.exit(1);
