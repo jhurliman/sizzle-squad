@@ -28,6 +28,15 @@
 -- FOV is deliberately equal across the shots. The lobby closeup is pure dolly:
 -- moving the camera and changing the lens at the same time is the one thing
 -- that reliably makes a game camera feel cheap.
+--
+-- DEPTH OF FIELD IS THE ONE LENS PROPERTY THAT DOES MOVE, and it is not a
+-- contradiction of that: focal length changes what is IN the frame, aperture
+-- only changes what is sharp. Softening the kitchen behind the crew reads as
+-- depth rather than as a lens swap.
+--
+-- Roblox has no programmable shaders, so this is DepthOfFieldEffect on
+-- Lighting -- the one engine effect that is genuinely depth-aware. A
+-- BlurEffect would soften the four chefs along with the room behind them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Staging = require(ReplicatedStorage:WaitForChild("Game"):WaitForChild("Staging")) :: any
@@ -56,6 +65,31 @@ local PLAY_PITCH = math.rad(22.5)
 -- clear sightline and somewhere to stand.
 local BODY = 0.36 -- cells, TUNING.chefRadius
 local CHEF_H = 1.6 -- cells, head clearance to keep in frame
+
+-- HOW MUCH THE BACKGROUND SOFTENS, PER SHOT.
+--
+-- Far only. The ask was blur BEHIND the crew, and the camera sits low and
+-- pitched over open floor, so any near blur would land on the foreground
+-- boards a player is about to walk over.
+--
+-- Well under the engine's 0.75 default, which reads as a smear rather than as
+-- a lens. Anything not listed -- gameplay -- is 0, and at 0 the effect is
+-- switched off outright rather than left running at zero strength, because
+-- post-processing is exactly what a low-end phone can least afford during a
+-- round.
+local SHOT_DOF = { lobby = 0.45, photo = 0.35 }
+
+-- Studs either side of the focal plane that stay sharp. Staging.LINEUP steps
+-- two of the four chefs a whole cell forward of the other two -- 5 studs at
+-- this SCALE -- so the band has to hold all four plus their bodies, or the
+-- back pair go soft and it reads as a mistake rather than as a lens.
+local DOF_RADIUS = 10
+
+local DOF_NAME = "SizzleLobbyDof"
+
+local function dofFor(name: string): number
+	return SHOT_DOF[name] or 0
+end
 
 local SHOTS = {
 	lobby = { marks = Staging.LINEUP, pitch = math.rad(14), lookH = 1.0, air = 0.62, minDist = 4.0 * SCALE },
@@ -138,7 +172,48 @@ function CameraRig.new(camera: Camera)
 	self.easing = "smooth"
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.FieldOfView = FOV
+
+	-- Reused if it is already there, so a Rojo hot-sync in Studio does not
+	-- stack a second effect on Lighting every time this file is saved.
+	-- pcall'd because the rig is also built by the layout harness, where there
+	-- is no Lighting to parent anything to; applyDof no-ops when this is nil.
+	pcall(function()
+		local lighting = game:GetService("Lighting")
+		local dof = lighting:FindFirstChild(DOF_NAME)
+		if dof == nil then
+			dof = Instance.new("DepthOfFieldEffect")
+			dof.Name = DOF_NAME
+			dof.Parent = lighting
+		end
+		dof.NearIntensity = 0
+		dof.InFocusRadius = DOF_RADIUS
+		dof.Enabled = false
+		self.dof = dof
+	end)
 	return self
+end
+
+--- Point the lens at whatever the shot is looking at, and set how hard the
+--- background falls off.
+---
+--- FocusDistance is measured to the LOOK-AT, not to a constant: every shot is
+--- re-solved every frame, so on a narrow phone the camera stands further back
+--- than on a desktop and a hardcoded distance would put the focal plane in
+--- front of the crew on exactly the devices least able to spare the effect.
+function CameraRig:applyDof(pos: Vector3, look: Vector3, intensity: number)
+	local dof = self.dof
+	if dof == nil then
+		return
+	end
+	local on = intensity > 0.001
+	if dof.Enabled ~= on then
+		dof.Enabled = on
+	end
+	if not on then
+		return
+	end
+	dof.FocusDistance = (look - pos).Magnitude
+	dof.FarIntensity = intensity
 end
 
 --- Add a shake impulse (0..~0.5). Decays each update; Vfx drives this off
@@ -164,9 +239,9 @@ function CameraRig:cutTo(shot: string, duration: number?, easing: string?)
 		-- starts from the visible pose rather than jumping to a shot we never
 		-- reached.
 		local aspect = self:aspect()
-		local pos, look, fov = self:resolve(aspect)
+		local pos, look, fov, dof = self:resolve(aspect)
 		self.fromShot = nil
-		self.fromPose = { pos = pos, look = look, fov = fov }
+		self.fromPose = { pos = pos, look = look, fov = fov, dof = dof }
 	else
 		self.fromShot = self.shot
 		self.fromPose = nil
@@ -186,21 +261,26 @@ function CameraRig:aspect(): number
 	return math.max(0.4, vp.X / math.max(1, vp.Y))
 end
 
---- The pose for this frame, blend included, before shake.
-function CameraRig:resolve(aspect: number): (Vector3, Vector3, number)
+--- The pose for this frame, blend included, before shake. Fourth return is the
+--- depth-of-field strength, blended on the SAME curve as the pose -- the whole
+--- point of a move is that nothing in it steps.
+function CameraRig:resolve(aspect: number): (Vector3, Vector3, number, number)
 	local pos, look, fov = solve(self.shot, aspect)
+	local dof = dofFor(self.shot)
 	if self.moveDur <= 0 then
-		return pos, look, fov
+		return pos, look, fov, dof
 	end
-	local fPos, fLook, fFov
+	local fPos, fLook, fFov, fDof
 	if self.fromPose ~= nil then
 		fPos, fLook, fFov = self.fromPose.pos, self.fromPose.look, self.fromPose.fov
+		fDof = self.fromPose.dof or 0
 	else
 		fPos, fLook, fFov = solve(self.fromShot or "gameplay", aspect)
+		fDof = dofFor(self.fromShot or "gameplay")
 	end
 	local raw = math.clamp(self.moveT / self.moveDur, 0, 1)
 	local k = if self.easing == "out" then easeOutCubic(raw) else smootherstep(raw)
-	return fPos:Lerp(pos, k), fLook:Lerp(look, k), fFov + (fov - fFov) * k
+	return fPos:Lerp(pos, k), fLook:Lerp(look, k), fFov + (fov - fFov) * k, fDof + (dof - fDof) * k
 end
 
 function CameraRig:update(dt: number)
@@ -219,10 +299,12 @@ function CameraRig:update(dt: number)
 		end
 	end
 
-	local pos, look, fov = self:resolve(self:aspect())
+	local pos, look, fov, dof = self:resolve(self:aspect())
 	if math.abs(camera.FieldOfView - fov) > 0.01 then
 		camera.FieldOfView = fov
 	end
+	-- Before shake: the focal plane follows the subject, not the jitter.
+	self:applyDof(pos, look, dof)
 
 	-- screenshake: a decaying random look-at jitter
 	self.shake = math.max(0, self.shake - dt * 2.6)

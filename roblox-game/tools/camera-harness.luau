@@ -25,7 +25,15 @@ end
 -- ---------------------------------------------------------------- fakes
 
 local V3 = {}
-V3.__index = V3
+-- Magnitude as a computed property, not a stored one: CameraRig measures the
+-- focal distance with `(look - pos).Magnitude`, and shipping code should not
+-- be contorted into `math.sqrt(...)` to suit a test double.
+V3.__index = function(t, k)
+	if k == "Magnitude" then
+		return math.sqrt(t.X * t.X + t.Y * t.Y + t.Z * t.Z)
+	end
+	return rawget(V3, k)
+end
 local function v3(x: number, y: number, z: number)
 	return setmetatable({ X = x, Y = y, Z = z }, V3)
 end
@@ -66,17 +74,47 @@ local staging = luau.load(luau.compile(fs.readFile("game-src/shared/Staging.luau
 	environment = { math = math, table = table, ipairs = ipairs, pairs = pairs },
 })()
 
+-- A Lighting with just enough behaviour for the rig to hang an effect on it,
+-- so the depth-of-field path below runs for real rather than being skipped by
+-- the pcall that guards it.
+local lighting = { children = {} :: { any } }
+function lighting:FindFirstChild(name: string)
+	for _, c in self.children do
+		if c.Name == name then
+			return c
+		end
+	end
+	return nil
+end
+
 local env = {
 	game = {
-		GetService = function()
+		GetService = function(_s, name)
+			if name == "Lighting" then
+				return lighting
+			end
 			return {
-				WaitForChild = function(_s, name)
-					if name == "Game" then
+				WaitForChild = function(_s2, child)
+					if child == "Game" then
 						return { WaitForChild = function() return "STAGING" end }
 					end
 					return "STAGING"
 				end,
 			}
+		end,
+	},
+	Instance = {
+		new = function(class: string)
+			local inst = { ClassName = class, Name = class }
+			setmetatable(inst, {
+				__newindex = function(t, k, v)
+					if k == "Parent" and v ~= nil then
+						table.insert(v.children, t)
+					end
+					rawset(t, k, v)
+				end,
+			})
+			return inst
 		end,
 	},
 	require = function(what)
@@ -98,6 +136,9 @@ local env = {
 	ipairs = ipairs,
 	pairs = pairs,
 	setmetatable = setmetatable,
+	rawset = rawset,
+	rawget = rawget,
+	pcall = pcall,
 	type = type,
 	tostring = tostring,
 	print = print,
@@ -238,6 +279,88 @@ check(
 rig:update(1.0)
 local back = rig:resolve(1.777)
 check(math.abs(back.Z - gPos.Z) < 0.01, "and it still arrives exactly on gameplay")
+
+-- ------------------------------------------------ F. DEPTH OF FIELD
+--
+-- Roblox gives no programmable shaders, so this is DepthOfFieldEffect on
+-- Lighting -- a GLOBAL effect, which is the whole risk. It is not scoped to a
+-- view, so if it is ever left on when a round starts the player cooks through
+-- a soft-focus lens, and the one thing a harness cannot do here is look at it.
+--
+-- What can be checked is everything except how it looks: that it is off during
+-- play, that it focuses on the crew and not on a constant, and that it moves
+-- on the same curve as the camera rather than snapping at either end.
+print("F. depth of field")
+do
+	local rig = CameraRig.new(camera)
+	local dof = lighting:FindFirstChild("SizzleLobbyDof")
+	check(dof ~= nil, "the rig hangs a DepthOfFieldEffect on Lighting")
+	check(dof.ClassName == "DepthOfFieldEffect", "and it is the depth-aware one, not a BlurEffect")
+
+	-- A second rig must not stack a second effect (Rojo re-syncs this file).
+	CameraRig.new(camera)
+	check(#lighting.children == 1, `re-creating the rig reuses it ({#lighting.children} on Lighting)`)
+
+	rig:update(1 / 60)
+	check(not dof.Enabled, "during gameplay it is switched off, not merely at zero")
+	check(dof.NearIntensity == 0, "nothing in FRONT of the crew is ever blurred")
+
+	rig:cutTo("lobby", 0)
+	rig:update(1 / 60)
+	check(dof.Enabled, "on the lobby shot it is on")
+	check(dof.FarIntensity > 0 and dof.FarIntensity < 0.6, `subtle, not a smear ({dof.FarIntensity})`)
+
+	-- The focal plane must sit ON the crew. Solve the shot and compare.
+	local pos, look = rig:resolve(rig:aspect())
+	local want = math.sqrt((look.X - pos.X) ^ 2 + (look.Y - pos.Y) ^ 2 + (look.Z - pos.Z) ^ 2)
+	check(
+		math.abs(dof.FocusDistance - want) < 0.01,
+		`focused on the crew, {string.format("%.1f", dof.FocusDistance)} studs out, not a constant`
+	)
+	-- ...and the whole lineup has to be inside the sharp band, or the two chefs
+	-- standing further back go soft and it reads as a bug, not as a lens.
+	local depths = {}
+	for _, m in staging.LINEUP do
+		-- Chest height, matching how section B frames them, not the floor.
+		local p = v3(m.x * SCALE, CHEF_H * 0.5, m.y * SCALE)
+		local fwd = v3(look.X - pos.X, look.Y - pos.Y, look.Z - pos.Z)
+		local flen = fwd.Magnitude
+		fwd = v3(fwd.X / flen, fwd.Y / flen, fwd.Z / flen)
+		local rel = v3(p.X - pos.X, p.Y - pos.Y, p.Z - pos.Z)
+		table.insert(depths, rel.X * fwd.X + rel.Y * fwd.Y + rel.Z * fwd.Z)
+	end
+	local lo, hi = depths[1], depths[1]
+	for _, d in depths do
+		if d < lo then
+			lo = d
+		end
+		if d > hi then
+			hi = d
+		end
+	end
+	local worst = math.max(math.abs(hi - dof.FocusDistance), math.abs(dof.FocusDistance - lo))
+	check(
+		worst <= dof.InFocusRadius,
+		`all four chefs are inside the sharp band (worst {string.format("%.1f", worst)} <= {dof.InFocusRadius})`
+	)
+
+	-- And it has to RIDE the move, not step at one end of it.
+	rig:cutTo("gameplay", 1.2, "smooth")
+	local seen = {}
+	local stepped = false
+	local prev = dof.Enabled and dof.FarIntensity or 0
+	for _ = 1, 72 do
+		rig:update(1 / 60)
+		local now = if dof.Enabled then dof.FarIntensity else 0
+		if math.abs(now - prev) > 0.08 then
+			stepped = true
+		end
+		prev = now
+		table.insert(seen, now)
+	end
+	check(not stepped, "it eases out with the camera instead of popping")
+	check(seen[#seen] == 0 and not dof.Enabled, "and is off again by the time the round starts")
+end
 
 print(if failures > 0 then `{failures} FAILURES` else "PASS: camera")
 if failures > 0 then
