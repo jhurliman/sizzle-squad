@@ -25,15 +25,7 @@ end
 -- ---------------------------------------------------------------- fakes
 
 local V3 = {}
--- Magnitude as a computed property, not a stored one: CameraRig measures the
--- focal distance with `(look - pos).Magnitude`, and shipping code should not
--- be contorted into `math.sqrt(...)` to suit a test double.
-V3.__index = function(t, k)
-	if k == "Magnitude" then
-		return math.sqrt(t.X * t.X + t.Y * t.Y + t.Z * t.Z)
-	end
-	return rawget(V3, k)
-end
+V3.__index = V3
 local function v3(x: number, y: number, z: number)
 	return setmetatable({ X = x, Y = y, Z = z }, V3)
 end
@@ -74,75 +66,17 @@ local staging = luau.load(luau.compile(fs.readFile("game-src/shared/Staging.luau
 	environment = { math = math, table = table, ipairs = ipairs, pairs = pairs },
 })()
 
--- A Lighting with just enough behaviour for the rig to hang an effect on it,
--- so the depth-of-field path below runs for real rather than being skipped by
--- the pcall that guards it.
-local lighting = { children = {} :: { any } }
-function lighting:FindFirstChild(name: string)
-	for _, c in self.children do
-		if c.Name == name then
-			return c
-		end
-	end
-	return nil
-end
-function lighting:FindFirstChildOfClass(class: string)
-	for _, c in self.children do
-		if c.ClassName == class then
-			return c
-		end
-	end
-	return nil
-end
-
 local env = {
 	game = {
-		GetService = function(_s, name)
-			if name == "Lighting" then
-				return lighting
-			end
+		GetService = function()
 			return {
-				WaitForChild = function(_s2, child)
-					if child == "Game" then
+				WaitForChild = function(_s, name)
+					if name == "Game" then
 						return { WaitForChild = function() return "STAGING" end }
 					end
 					return "STAGING"
 				end,
 			}
-		end,
-	},
-	Instance = {
-		-- A PROXY WITH A SEPARATE BACKING STORE, and that detail is the whole
-		-- point. The first version stored properties on the table itself with
-		-- rawset, and __newindex only fires for keys that are ABSENT -- so the
-		-- very first `Parent = x` worked and every assignment after it bypassed
-		-- the hook entirely. Detaching silently did nothing, and the check for
-		-- "off during a round" passed while the atmosphere stayed attached.
-		new = function(class: string)
-			local props: { [string]: any } = { ClassName = class, Name = class }
-			local inst
-			inst = setmetatable({}, {
-				__index = function(_, k)
-					return props[k]
-				end,
-				__newindex = function(_, k, v)
-					if k == "Parent" then
-						local was = props.Parent
-						if was ~= nil then
-							for i = #was.children, 1, -1 do
-								if was.children[i] == inst then
-									table.remove(was.children, i)
-								end
-							end
-						end
-						if v ~= nil then
-							table.insert(v.children, inst)
-						end
-					end
-					props[k] = v
-				end,
-			})
-			return inst
 		end,
 	},
 	require = function(what)
@@ -152,7 +86,6 @@ local env = {
 		error("unexpected require in CameraRig: " .. tostring(what))
 	end,
 	Vector3 = { new = v3, zero = v3(0, 0, 0) },
-	Color3 = { fromRGB = function(r, g, b) return { R = r, G = g, B = b } end },
 	CFrame = {
 		Angles = cframeAngles,
 		lookAt = function(pos, look)
@@ -165,9 +98,6 @@ local env = {
 	ipairs = ipairs,
 	pairs = pairs,
 	setmetatable = setmetatable,
-	rawset = rawset,
-	rawget = rawget,
-	pcall = pcall,
 	type = type,
 	tostring = tostring,
 	print = print,
@@ -308,66 +238,6 @@ check(
 rig:update(1.0)
 local back = rig:resolve(1.777)
 check(math.abs(back.Z - gPos.Z) < 0.01, "and it still arrives exactly on gameplay")
-
--- ----------------------------------------------------- F. THE LOBBY HAZE
---
--- This started as DepthOfFieldEffect and had to be thrown away: it does not
--- render. A DOF at physically absurd settings changed nothing on screen while
--- a greyscale ColorCorrectionEffect planted beside it as a control worked, so
--- the engine is dropping DOF at this render quality and no amount of tuning
--- was ever going to show up. Atmosphere is on the base render path instead.
---
--- WHAT THIS CANNOT CHECK IS WHETHER IT LOOKS RIGHT. screen_capture through the
--- Studio MCP returns a flat magenta frame in this setup, so nothing visual is
--- verifiable from here -- which is exactly how the DOF version shipped twice
--- while doing nothing at all. What follows is the machinery only: that it
--- exists in the lobby, that it is GONE during a round, and that it fades on
--- the same curve as the camera rather than being switched off at the end.
-print("F. the lobby haze")
-do
-	local rig = CameraRig.new(camera)
-	check(rig.atmo ~= nil, "the rig has an Atmosphere")
-	check(rig.atmo.ClassName == "Atmosphere", "and it is base-render Atmosphere, not a post effect")
-
-	-- Order-independent: earlier sections leave the rig on whatever shot they
-	-- finished with, so state the shot rather than assuming a clean slate.
-	rig:cutTo("gameplay", 0)
-	rig:update(1 / 60)
-	check(rig.atmo.Parent == nil, "during gameplay it is not on Lighting at all")
-	check(#lighting.children == 0, "and nothing of ours is left attached")
-
-	rig:cutTo("lobby", 0)
-	rig:update(1 / 60)
-	check(rig.atmo.Parent == lighting, "on the lobby shot it is attached")
-	check(rig.atmo.Density > 0 and rig.atmo.Haze > 0, `and hazy ({rig.atmo.Density}, {rig.atmo.Haze})`)
-	check(#lighting.children == 1, "exactly one, not one per frame")
-
-	-- A second rig must not stack another, and must not clobber an atmosphere
-	-- somebody else authored.
-	CameraRig.new(camera)
-	check(#lighting.children <= 1, `re-creating the rig does not stack ({#lighting.children})`)
-
-	-- IT HAS TO ATTENUATE ACROSS THE MOVE, which is the whole ask: the kitchen
-	-- comes back into clear air as the camera pulls out, rather than the haze
-	-- vanishing in one frame when the move ends.
-	rig:cutTo("gameplay", 1.2, "smooth")
-	local prev = rig.atmo.Haze
-	local stepped, sawMiddle = false, false
-	for _ = 1, 72 do
-		rig:update(1 / 60)
-		local now = if rig.atmo.Parent ~= nil then rig.atmo.Haze else 0
-		if math.abs(now - prev) > 0.35 then
-			stepped = true
-		end
-		if now > 0.05 and now < 2.5 then
-			sawMiddle = true
-		end
-		prev = now
-	end
-	check(sawMiddle, "it passes through part-strength on the way out")
-	check(not stepped, "easing out with the camera rather than snapping")
-	check(rig.atmo.Parent == nil, "and is off Lighting again by the time the round starts")
-end
 
 print(if failures > 0 then `{failures} FAILURES` else "PASS: camera")
 if failures > 0 then

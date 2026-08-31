@@ -28,24 +28,6 @@
 -- FOV is deliberately equal across the shots. The lobby closeup is pure dolly:
 -- moving the camera and changing the lens at the same time is the one thing
 -- that reliably makes a game camera feel cheap.
---
--- THE LOBBY PUSHES THE KITCHEN BACK WITH HAZE, and that is a deliberate
--- second choice.
---
--- The first attempt was DepthOfFieldEffect, which is the only depth-aware
--- effect Roblox has -- and it does not render. Proven, not assumed: a DOF at
--- physically absurd settings (FocusDistance 1, InFocusRadius 0, both
--- intensities at 1, which should reduce the whole viewport to mush) changed
--- nothing, while a ColorCorrectionEffect greyscale planted beside it as a
--- control worked. DOF is among the first things the engine drops below high
--- render quality, developers cannot raise a client's quality setting, and this
--- game is played on phones.
---
--- Atmosphere is not post-processing. It is part of the base render path, so it
--- survives where the post effects do not, and it attenuates with DISTANCE --
--- which is the property that matters here. Not blur: the background washes out
--- rather than softening. But visible to the people actually playing, which the
--- blur was not.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Staging = require(ReplicatedStorage:WaitForChild("Game"):WaitForChild("Staging")) :: any
@@ -74,71 +56,6 @@ local PLAY_PITCH = math.rad(22.5)
 -- clear sightline and somewhere to stand.
 local BODY = 0.36 -- cells, TUNING.chefRadius
 local CHEF_H = 1.6 -- cells, head clearance to keep in frame
-
--- HOW MUCH THE BACKGROUND SOFTENS, PER SHOT.
---
--- Far only. The ask was blur BEHIND the crew, and the camera sits low and
--- pitched over open floor, so any near blur would land on the foreground
--- boards a player is about to walk over.
---
--- How strongly the room behind the crew washes out, 0..1, per shot. Anything
--- not listed -- gameplay -- is 0, and at 0 the atmosphere is unparented rather
--- than left at zero density: it is a global environmental object, and a kitchen
--- that is meant to be crisp should not have one hanging off Lighting at all.
-local SHOT_HAZE = { lobby = 1, photo = 0.75 }
-
--- What a strength of 1 means. Density is how much there is; Haze is how much it
--- veils what is behind it, and is the one doing the visible work.
---
--- Deliberately WARM. The room is lit by a hearth and hanging timber lights, and
--- a neutral grey fog in a warm kitchen reads as a rendering fault rather than
--- as air.
-local HAZE_DENSITY = 0.45
-local HAZE_AMOUNT = 3
-local HAZE_COLOR = Color3.fromRGB(255, 236, 206)
-
-local ATMO_NAME = "SizzleLobbyHaze"
-
-local function hazeFor(name: string): number
-	return SHOT_HAZE[name] or 0
-end
-
--- ONE ATMOSPHERE FOR THE WHOLE CLIENT, HELD AT MODULE LEVEL.
---
--- It was per-rig, and that was wrong twice over. Lighting takes ONE
--- atmosphere, so it is not per-instance state to begin with -- and because the
--- off state is "unparented", a second rig could not find the first one's to
--- reuse it and simply made another. Caught by the harness building more than
--- one rig, which is what a Rojo hot-sync does in Studio: two atmospheres, one
--- of them stale and still attached.
-local sharedAtmo: any = nil
-local atmoResolved = false
-
-local function ensureAtmo(): any
-	if atmoResolved then
-		return sharedAtmo
-	end
-	atmoResolved = true
-	pcall(function()
-		local lighting = game:GetService("Lighting")
-		local existing = lighting:FindFirstChildOfClass("Atmosphere")
-		-- IF THE PLACE ALREADY HAS ONE, LEAVE IT ALONE. Parenting ours beside an
-		-- artist-authored atmosphere would either be ignored or quietly rewrite
-		-- the look of the whole game.
-		if existing ~= nil and existing.Name ~= ATMO_NAME then
-			return
-		end
-		local atmo = existing
-		if atmo == nil then
-			atmo = Instance.new("Atmosphere")
-			atmo.Name = ATMO_NAME
-		end
-		atmo.Color = HAZE_COLOR
-		atmo.Parent = nil
-		sharedAtmo = atmo
-	end)
-	return sharedAtmo
-end
 
 local SHOTS = {
 	lobby = { marks = Staging.LINEUP, pitch = math.rad(14), lookH = 1.0, air = 0.62, minDist = 4.0 * SCALE },
@@ -221,40 +138,7 @@ function CameraRig.new(camera: Camera)
 	self.easing = "smooth"
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.FieldOfView = FOV
-
-	-- Shared, not owned: see ensureAtmo. nil in a harness with no Lighting to
-	-- hang it on, and applyHaze no-ops in that case.
-	pcall(function()
-		self.lighting = game:GetService("Lighting")
-	end)
-	self.atmo = ensureAtmo()
 	return self
-end
-
---- How far back the kitchen sits, 0..1.
----
---- Unparented rather than zeroed at 0: Atmosphere has no Enabled property, and
---- an atmosphere at zero density is still an environmental object attached to
---- Lighting. The parent only changes when the on/off state flips, not every
---- frame.
-function CameraRig:applyHaze(strength: number)
-	local atmo = self.atmo
-	if atmo == nil then
-		return
-	end
-	if strength <= 0.001 then
-		if atmo.Parent ~= nil then
-			atmo.Parent = nil
-		end
-		return
-	end
-	-- Both scale from zero, so the room clears as the camera pulls out rather
-	-- than the haze simply being switched off at the end of the move.
-	atmo.Density = HAZE_DENSITY * strength
-	atmo.Haze = HAZE_AMOUNT * strength
-	if atmo.Parent ~= self.lighting then
-		atmo.Parent = self.lighting
-	end
 end
 
 --- Add a shake impulse (0..~0.5). Decays each update; Vfx drives this off
@@ -280,9 +164,9 @@ function CameraRig:cutTo(shot: string, duration: number?, easing: string?)
 		-- starts from the visible pose rather than jumping to a shot we never
 		-- reached.
 		local aspect = self:aspect()
-		local pos, look, fov, haze = self:resolve(aspect)
+		local pos, look, fov = self:resolve(aspect)
 		self.fromShot = nil
-		self.fromPose = { pos = pos, look = look, fov = fov, haze = haze }
+		self.fromPose = { pos = pos, look = look, fov = fov }
 	else
 		self.fromShot = self.shot
 		self.fromPose = nil
@@ -302,27 +186,21 @@ function CameraRig:aspect(): number
 	return math.max(0.4, vp.X / math.max(1, vp.Y))
 end
 
---- The pose for this frame, blend included, before shake. Fourth return is the
---- haze strength, blended on the SAME curve as the pose -- the whole point of a
---- move is that nothing in it steps, and the kitchen coming back into clear air
---- is half of what sells the pull-out at go time.
-function CameraRig:resolve(aspect: number): (Vector3, Vector3, number, number)
+--- The pose for this frame, blend included, before shake.
+function CameraRig:resolve(aspect: number): (Vector3, Vector3, number)
 	local pos, look, fov = solve(self.shot, aspect)
-	local haze = hazeFor(self.shot)
 	if self.moveDur <= 0 then
-		return pos, look, fov, haze
+		return pos, look, fov
 	end
-	local fPos, fLook, fFov, fHaze
+	local fPos, fLook, fFov
 	if self.fromPose ~= nil then
 		fPos, fLook, fFov = self.fromPose.pos, self.fromPose.look, self.fromPose.fov
-		fHaze = self.fromPose.haze or 0
 	else
 		fPos, fLook, fFov = solve(self.fromShot or "gameplay", aspect)
-		fHaze = hazeFor(self.fromShot or "gameplay")
 	end
 	local raw = math.clamp(self.moveT / self.moveDur, 0, 1)
 	local k = if self.easing == "out" then easeOutCubic(raw) else smootherstep(raw)
-	return fPos:Lerp(pos, k), fLook:Lerp(look, k), fFov + (fov - fFov) * k, fHaze + (haze - fHaze) * k
+	return fPos:Lerp(pos, k), fLook:Lerp(look, k), fFov + (fov - fFov) * k
 end
 
 function CameraRig:update(dt: number)
@@ -341,11 +219,10 @@ function CameraRig:update(dt: number)
 		end
 	end
 
-	local pos, look, fov, haze = self:resolve(self:aspect())
+	local pos, look, fov = self:resolve(self:aspect())
 	if math.abs(camera.FieldOfView - fov) > 0.01 then
 		camera.FieldOfView = fov
 	end
-	self:applyHaze(haze)
 
 	-- screenshake: a decaying random look-at jitter
 	self.shake = math.max(0, self.shake - dt * 2.6)
