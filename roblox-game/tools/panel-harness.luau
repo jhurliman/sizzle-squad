@@ -86,8 +86,25 @@ local function newInstance(class: string): any
 			return props[k]
 		end,
 		__newindex = function(_, k, v)
-			if k == "Parent" and v ~= nil then
-				table.insert(v.__children, inst)
+			if k == "Parent" then
+				-- DETACH FIRST. A real Instance has exactly one parent, and
+				-- reparenting removes it from the old one. This used to only
+				-- ever append, so relayout -- which reparents every control on
+				-- every pass -- left the same button in the row eighty times
+				-- over, and anything counting or summing a row's children was
+				-- measuring the harness rather than the panel.
+				local was = props.Parent
+				if was ~= nil then
+					local kids = was.__children
+					for i = #kids, 1, -1 do
+						if kids[i] == inst then
+							table.remove(kids, i)
+						end
+					end
+				end
+				if v ~= nil then
+					table.insert(v.__children, inst)
+				end
 			end
 			props[k] = v
 		end,
@@ -102,6 +119,7 @@ local env = {
 	math = math,
 	table = table,
 	string = string,
+	utf8 = utf8,
 	pairs = pairs,
 	ipairs = ipairs,
 	setmetatable = setmetatable,
@@ -318,6 +336,113 @@ do
 	check(not inColumn, "the career chip is in the top bar, not the column")
 	check(panel.progressChip.Parent == panel.rows[1], "and specifically in the bar's first row")
 end
+
+-- ------------------------------------ A4. the bar holds text it did not expect
+--
+-- REPORTED FROM A PHONE: "🔥3 day streak" spilling out of the career plate and
+-- over the WARDROBE button. The plate was one box with a hardcoded width
+-- weight of 16, and the string it was handed -- level, coins AND the streak
+-- glued on the end -- ran to 34 characters. A Roblox TextLabel does not keep
+-- its text inside its own rect, so the overflow drew straight over its
+-- neighbour.
+--
+-- Widths are measured from the text now, so the test is to hand the panel text
+-- it was not designed around and check the bar still fits: a long streak, a
+-- rich save file, and a German translation (the longest of the seven) at once.
+print("A4. a long readout does not push the bar out of shape")
+-- Deliberately a SECOND implementation, not the panel's. If the check imported
+-- the same function it would agree with the layout by construction and prove
+-- nothing about whether the width is really enough for the text.
+local function textWeight(text: string): number
+	local w = 0
+	for _, c in utf8.codes(text) do
+		w += if c < 128 then 1 else 1.8
+	end
+	return w
+end
+for _, case in
+	{
+		{ name = "no streak", progress = { level = 1, coins = 0, streak = 0 } },
+		{ name = "3 day streak", progress = { level = 6, coins = 2978, streak = 3 } },
+		{ name = "maxed save", progress = { level = 99, coins = 9999999, streak = 365 } },
+	}
+do
+	panel:setProgress(case.progress)
+	for _, vp in { { w = 874, h = 402, name = "iPhone 16 Pro" }, { w = 667, h = 375, name = "iPhone SE" }, { w = 1920, h = 1080, name = "desktop" } } do
+		local m = measure(vp.w, vp.h)
+		check(
+			m.barLeft >= m.pillsEnd,
+			`{case.name} @ {vp.name}: bar {m.barRight - m.barLeft}px wide, still clear of Roblox's controls ({m.barLeft} >= {m.pillsEnd})`
+		)
+		check(m.barBottom <= m.bandTop, `       and still above the face band ({m.barBottom} <= {m.bandTop})`)
+		-- A readout that is on screen must be wide enough to READ. 5.5px per
+		-- weight unit plus padding is what the text costs at the smallest size
+		-- it is allowed to shrink to; under that the plate clips its own text,
+		-- which is the bug this section exists for.
+		for _, chip in { panel.progressChip, panel.streakChip } do
+			if chip.Visible and chip.Parent ~= nil then
+				local need = math.floor(textWeight(chip.Text) * 5.5 + 12)
+				check(
+					chip.Size.X.Offset >= need,
+					`       "{chip.Text}" has room to be read ({chip.Size.X.Offset} >= {need})`
+				)
+			end
+		end
+		-- Every plate and button inside the bar has to fit the row it is in,
+		-- which is the specific thing that failed: the row was the right width
+		-- and one child inside it was not.
+		for _, row in { panel.rows[1], panel.rows[2] } do
+			if row.Visible then
+				local sum = 0
+				local kids = 0
+				for _, c in row:GetChildren() do
+					if c.Size ~= nil and c.ClassName ~= "UIListLayout" and c.Visible then
+						sum += c.Size.X.Offset
+						kids += 1
+					end
+				end
+				local width = sum + 8 * math.max(0, kids - 1)
+				check(width <= row.Size.X.Offset, `       row holds its {kids} children ({width} <= {row.Size.X.Offset})`)
+			end
+		end
+	end
+end
+-- THE HARNESS'S OWN Loc STUB IS SHORTER THAN THE REAL THING. It returns
+-- "fmt.lv_coins:99", fifteen characters, where the shipping English is "Lv 99
+-- · 9999999 coins" and the German is longer still -- so the cases above pass on
+-- strings easier than any real player will ever see. Drive the actual worst
+-- case: the longest of the seven translations, at the largest numbers, with the
+-- streak showing.
+print("A4b. and holds the longest translation, not just the stub's")
+for _, case in
+	{
+		{ name = "de", lv = "Lv 99  ·  9999999 Münzen", streak = "🔥365 Tage in Folge" },
+		{ name = "ja", lv = "Lv99  ·  9999999コイン", streak = "🔥365日連続" },
+		{ name = "en", lv = "Lv 99  ·  9999999 coins", streak = "🔥365 day streak" },
+	}
+do
+	for _, vp in { { w = 874, h = 402, name = "iPhone 16 Pro" }, { w = 667, h = 375, name = "iPhone SE" }, { w = 1920, h = 1080, name = "desktop" } } do
+		-- Set the text, then lay out: relayout measures whatever is there.
+		panel:setProgress({ level = 99, coins = 9999999, streak = 365 })
+		panel.progressChip.Text = case.lv
+		panel.streakChip.Text = case.streak
+		local m = measure(vp.w, vp.h)
+		check(m.barLeft >= m.pillsEnd, `{case.name} @ {vp.name}: bar clears Roblox's controls ({m.barLeft} >= {m.pillsEnd})`)
+		check(m.barBottom <= m.bandTop, `       and stays above the face band ({m.barBottom} <= {m.bandTop})`)
+		for _, chip in { panel.progressChip, panel.streakChip } do
+			if chip.Visible and chip.Parent ~= nil then
+				local need = math.floor(textWeight(chip.Text) * 5.5 + 12)
+				check(
+					chip.Size.X.Offset >= need,
+					`       "{chip.Text}" is readable ({chip.Size.X.Offset} >= {need})`
+				)
+			end
+		end
+	end
+end
+
+-- Leave the panel as the later tests expect to find it.
+panel:setProgress({ level = 1, coins = 0, streak = 0 })
 
 -- --------------------------------------------------- B. four fixed characters
 print("B. the chairs are four fixed characters, and people move between them")

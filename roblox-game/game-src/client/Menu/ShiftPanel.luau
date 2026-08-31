@@ -52,8 +52,23 @@ local COLUMN_GAP = 18
 -- Floor and ceiling for one control in the top bar. The floor is a tap target
 -- that a thumb can actually hit; the ceiling stops a long label from taking
 -- the whole bar and pushing the rest into a second row.
+--
+-- Readouts get a longer ceiling than buttons. A button's label is fixed and
+-- short; a readout's is a sentence that grows with the save file -- "Lv 6 ·
+-- 2978 coins" is already wider than any button here.
 local MIN_BAR_ITEM = 64
 local MAX_BAR_ITEM = 176
+local MAX_BAR_CHIP = 260
+
+-- Roughly what one weight unit costs at the smallest text size a readout is
+-- allowed to shrink to (UITextSizeConstraint MinTextSize = 11), plus the
+-- plate's own padding. Below this a readout is not small, it is cut in half.
+local CHIP_PX_PER_UNIT = 5.5
+local CHIP_PAD = 12
+
+-- What a button may be squeezed to when the bar is short of room. Still a
+-- larger target than the Roblox topbar buttons sitting next to it.
+local MIN_BAR_SQUEEZED = 52
 
 -- The Start button will shrink to fit a short screen, but not below this --
 -- past it the hero button stops reading as the hero and the screen would be
@@ -341,14 +356,11 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	-- smaller and in the panel's brown — the shape is what says "button".
 	self.rowButtons = {}
 	self.rowRoots = {}
-	-- Each control declares roughly how many glyphs it has to fit, and relayout
-	-- shares the bar's width out in that proportion instead of giving a
-	-- two-word button and a five-word one the same box. An approximation on
-	-- purpose: the labels are translated into seven languages and INVITE
-	-- rewrites itself to JOIN <name>, so the exact width is not knowable here.
-	-- The clamp and the label's own UITextSizeConstraint absorb the error.
-	self.rowWeights = {}
-	local function rowButton(label: string, order: number, fill: Color3?, weight: number?): any
+	-- relayout shares the bar's width out in proportion to how much text each
+	-- control is showing, measured at layout time rather than declared here --
+	-- a declared number is a second copy of the label's length, and the one
+	-- that was here went stale the moment the text it described grew.
+	local function rowButton(label: string, order: number, fill: Color3?): any
 		local cta = Theme.cta({
 			Size = UDim2.fromOffset(140, Theme.MIN_TAP),
 			Fill = fill or Theme.BROWN_MID,
@@ -358,11 +370,10 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		}, self.rows[1])
 		table.insert(self.rowButtons, cta.button)
 		table.insert(self.rowRoots, cta.root)
-		table.insert(self.rowWeights, weight or 12)
 		return cta
 	end
 	for i, t in TABS do
-		local cta = rowButton(t.label, i, nil, 11)
+		local cta = rowButton(t.label, i)
 		cta.button.Activated:Connect(function()
 			self.deps.onOpenTab(t.id)
 		end)
@@ -378,7 +389,7 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	--
 	-- It reads JOIN <name> when somebody is already cooking, because joining a
 	-- friend beats summoning one.
-	local inviteCta = rowButton("＋ INVITE A FRIEND", #TABS + 2, Theme.BLUE, 17)
+	local inviteCta = rowButton("＋ INVITE A FRIEND", #TABS + 2, Theme.BLUE)
 	self.inviteButton = inviteCta.button
 	self.inviteRoot = inviteCta.root
 	self.inviteButton.Activated:Connect(function()
@@ -405,7 +416,7 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	-- established Roblox co-op game offers a rematch. Roblox has no
 	-- "anywhere but here" API — Teleport re-runs matchmaking, which prefers
 	-- servers with room, so it usually moves you but is not guaranteed to.
-	local newCta = rowButton("🔄 NEW SERVER", #TABS + 3, nil, 13)
+	local newCta = rowButton("🔄 NEW SERVER", #TABS + 3)
 	self.newServerButton = newCta.button
 	self.newServerRoot = newCta.root
 	self.newServerButton.Activated:Connect(function()
@@ -422,6 +433,13 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	--
 	-- LayoutOrder 0 so it leads the bar, furthest from the right edge: the
 	-- controls stay in the corner where a thumb reaches them.
+	--
+	-- TWO PLATES, NOT ONE THAT GROWS. The streak used to be glued onto the end
+	-- of this one as a suffix, which made a fixed-width box hold a string whose
+	-- length depended on the save file -- "Lv 6 · 2978 coins · 🔥3 day streak"
+	-- is twice what it was sized for, and a Roblox TextLabel does not keep its
+	-- text inside its own rect, so it spilled straight over the WARDROBE
+	-- button. A separate plate is measured and placed on its own terms.
 	self.progressChip = Theme.chip({
 		Size = UDim2.fromOffset(160, Theme.TOPBAR_MIN),
 		TextSize = 15,
@@ -430,7 +448,31 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		LayoutOrder = 0,
 		Text = "Lv 1  ·  0 coins",
 	}, self.rows[1])
-	self.chipWeight = 16
+	self.streakChip = Theme.chip({
+		Size = UDim2.fromOffset(120, Theme.TOPBAR_MIN),
+		TextSize = 15,
+		BackgroundTransparency = 0.3,
+		Font = Theme.BOLD_FONT,
+		LayoutOrder = 1,
+		-- EMPTY, not a sample streak. setProgress writes the real localized
+		-- string before this is ever shown, and a placeholder here is a static
+		-- English string as far as the loc extractor is concerned -- it would
+		-- demand a row in source.json and seven translations for text no player
+		-- can see.
+		Text = "",
+		Visible = false,
+	}, self.rows[1])
+	-- BELT AND BRACES AGAINST SPILLING AGAIN. Scaled text shrinks to fit the
+	-- box the allocator gave it, the constraint stops it shrinking past
+	-- legible, and clipping is the hard guarantee for whatever is left --
+	-- because "it fits at the sizes I tried" is exactly what was believed last
+	-- time. Applied to both plates: either can be handed a long translation.
+	for _, chip in { self.progressChip, self.streakChip } do
+		chip.TextScaled = true
+		chip.TextWrapped = false
+		chip.ClipsDescendants = true
+		mk("UITextSizeConstraint", { MinTextSize = 11, MaxTextSize = 15 }, chip)
+	end
 
 	return self
 end
@@ -534,10 +576,18 @@ function ShiftPanel:setProgress(progress: any)
 	-- between shifts, and out here -- next to a level and a coin count, both of
 	-- which are self-describing -- a bare flame and a digit reads as a third
 	-- currency rather than a streak. Say the noun.
-	local suffix = if streak > 1 then "  ·  " .. Loc.f("fmt.streak", streak) else ""
 	-- NOT the coin emoji: FredokaOne has no glyph for it and it renders as a
-	-- hollow box (the 🔥 in the same string is fine).
-	self.progressChip.Text = Loc.f("fmt.lv_coins", progress.level or 1, progress.coins or 0) .. suffix
+	-- hollow box (the 🔥 on the streak plate is fine).
+	self.progressChip.Text = Loc.f("fmt.lv_coins", progress.level or 1, progress.coins or 0)
+	local show = streak > 1
+	if show then
+		self.streakChip.Text = Loc.f("fmt.streak", streak)
+	end
+	self.streakChip.Visible = show
+	-- The bar's widths are measured from the text, so text that changes width
+	-- has to re-measure. Safe to call from here: relayout ends in paint(), and
+	-- paint does not touch either plate, so there is no way back into this.
+	self:relayoutLast()
 end
 
 function ShiftPanel:setPhase(phase: any, spectating: boolean)
@@ -613,29 +663,82 @@ end
 
 function ShiftPanel:step(_dt: number) end
 
+--- Roughly how wide a string wants to be, in units of one Latin character.
+---
+--- Not #text, which is BYTES: every accented character in the French and
+--- German labels, and every kanji, counts two or three times over and the
+--- widths come out nonsense. Not utf8.len either, which counts a kanji the
+--- same as an "i" when it draws about twice as wide. Codepoints, weighted --
+--- crude, but wrong by a fraction rather than by a multiple.
+local function textWeight(text: string): number
+	local w = 0
+	local ok = pcall(function()
+		for _, c in utf8.codes(text) do
+			w += if c < 128 then 1 else 1.8
+		end
+	end)
+	if not ok or w <= 0 then
+		return #text
+	end
+	return w
+end
+
+--- The narrowest this item may be drawn.
+---
+--- A BUTTON AND A READOUT WANT DIFFERENT THINGS HERE, which one shared floor
+--- could not express. A button needs to be big enough to hit; its label scales
+--- and it still reads as a button at any width. A readout needs to be big
+--- enough to READ -- past its minimum text size the plate clips, and half of
+--- "Lv 6 · 2978 coins" is worse than none of it. So a readout's floor is
+--- whatever its own text costs at that minimum size, and it claims that before
+--- anything is shared out.
+local function floorFor(it: any, buttonFloor: number): number
+	if it.chip then
+		return math.min(math.floor(it.weight * CHIP_PX_PER_UNIT + CHIP_PAD), MAX_BAR_CHIP)
+	end
+	return buttonFloor
+end
+
 --- Share `budget` out between items in proportion to how much label each has
---- to carry, with a floor so a short label still gets a tappable box and a
---- ceiling so a long one cannot eat the bar. Returns the widths and their sum
---- including the gaps between them.
-local function allocate(weights: { number }, budget: number, gap: number): ({ number }, number)
-	local n = #weights
+--- to carry. Returns the widths and their sum including the gaps.
+---
+--- FLOOR FIRST, THEN SHARE THE REST. The obvious version -- proportional, then
+--- clamp each result into range -- can return a total LARGER than the budget
+--- it was given, because clamping only ever pushes small items up. Handing
+--- every item its floor first and distributing what is left over means the
+--- total cannot exceed the budget unless the floors alone already do -- and
+--- that case is reported honestly, by returning a total over budget, so the
+--- caller can drop something instead of quietly overflowing.
+local function allocate(items: { any }, budget: number, gap: number, buttonFloor: number): ({ number }, number)
+	local n = #items
 	if n == 0 then
 		return {}, 0
 	end
-	-- Padding is per item, not per glyph: a button is its text plus two ends.
-	local units = 0
-	for _, w in weights do
-		units += w + 4
-	end
-	local content = math.max(1, budget - gap * (n - 1))
+	local gaps = gap * (n - 1)
 	local widths = {}
-	local total = 0
-	for i, w in weights do
-		local px = math.clamp(math.floor(content * (w + 4) / units), MIN_BAR_ITEM, MAX_BAR_ITEM)
-		widths[i] = px
-		total += px
+	local floors = 0
+	for i, it in items do
+		widths[i] = floorFor(it, buttonFloor)
+		floors += widths[i]
 	end
-	return widths, total + gap * (n - 1)
+	local spare = budget - gaps - floors
+	if spare <= 0 then
+		return widths, floors + gaps
+	end
+	-- Padding is per item, not per glyph: a plate is its text plus two ends.
+	local units = 0
+	for _, it in items do
+		units += it.weight + 4
+	end
+	local total = floors
+	for i, it in items do
+		local want = math.floor(spare * (it.weight + 4) / units)
+		local cap = (if it.chip then MAX_BAR_CHIP else MAX_BAR_ITEM) - widths[i]
+		local add = math.clamp(want, 0, math.max(0, cap))
+		widths[i] += add
+		total += add
+	end
+	return widths, total + gaps
 end
 
 function ShiftPanel:relayout(_L: any, viewport: Vector2)
@@ -656,41 +759,73 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	local barAvail = math.max(MIN_BAR_ITEM * 2, (barRight - Theme.TOPBAR_MARGIN) - barLeft)
 
 	-- Hidden controls take no space: a tutorial server hides INVITE.
+	--
+	-- Every weight is MEASURED off the text the control is actually showing.
+	-- They used to be constants declared where the button was built, and the
+	-- career plate's constant said 16 while it was rendering 34 characters --
+	-- which is how it came to be drawn over the top of WARDROBE.
 	local visible = {}
 	for i, root in self.rowRoots do
 		if root.Visible then
-			table.insert(visible, { root = root, button = self.rowButtons[i], weight = self.rowWeights[i] })
+			table.insert(visible, {
+				root = root,
+				button = self.rowButtons[i],
+				weight = textWeight(self.rowButtons[i].Text),
+			})
 		end
 	end
-	-- The chip leads, so the buttons keep the right corner.
-	table.insert(visible, 1, { root = self.progressChip, weight = self.chipWeight, chip = true })
+	-- The readouts lead, so the buttons keep the right corner where a thumb is.
+	if self.streakChip.Visible then
+		table.insert(visible, 1, { root = self.streakChip, weight = textWeight(self.streakChip.Text), chip = true })
+	end
+	table.insert(visible, 1, { root = self.progressChip, weight = textWeight(self.progressChip.Text), chip = true })
 	local n = #visible
 
 	-- One row if the whole strip fits beside Roblox's controls; two if it does
 	-- not, which only happens on a very narrow screen. Two still clears the
 	-- face band -- 0.216 of even a 375-tall phone is 81px, and two 36px rows
 	-- with a 4px gap is 76 -- so wrapping is a real fallback, not a cliff.
-	local allW = {}
-	for i, v in visible do
-		allW[i] = v.weight
+	-- THREE THINGS TO GIVE UP, IN ORDER OF WHAT IS LEAST MISSED.
+	--
+	-- 1. the streak plate -- lowest-priority readout, and the Career tab spells
+	--    it out in full, so losing it on a small screen costs nothing that is
+	--    not available one tap away;
+	-- 2. button width, down to a floor that is still comfortably a tap target
+	--    and still larger than Roblox's own topbar buttons;
+	-- 3. a second row, which is correct but taller, and height above the face
+	--    band is the scarcest thing on a phone in landscape.
+	--
+	-- What is never given up is a readout drawn too small to read. On a
+	-- 667x375 phone the bar has room for four items and not five, and this is
+	-- what that decision looks like from the inside.
+	local buttonFloor = MIN_BAR_ITEM
+	local _, oneRowW = allocate(visible, barAvail, gap, buttonFloor)
+	if oneRowW > barAvail and self.streakChip.Visible then
+		table.remove(visible, 2)
+		self.streakChip.Parent = nil
+		n = #visible
+		_, oneRowW = allocate(visible, barAvail, gap, buttonFloor)
 	end
-	local _, oneRowW = allocate(allW, barAvail, gap)
+	if oneRowW > barAvail then
+		buttonFloor = MIN_BAR_SQUEEZED
+		_, oneRowW = allocate(visible, barAvail, gap, buttonFloor)
+	end
 	local rows = if oneRowW <= barAvail then 1 else 2
 	local perRow = if rows == 1 then n else math.ceil(n / 2)
 
 	local counts = { 0, 0 }
-	local rowWeights = { {}, {} }
+	local rowItems = { {}, {} }
 	local index = { {}, {} }
 	for i, v in visible do
 		local r = if rows == 1 then 1 else math.min(2, math.ceil(i / perRow))
 		counts[r] += 1
-		table.insert(rowWeights[r], v.weight)
+		table.insert(rowItems[r], v)
 		table.insert(index[r], i)
 	end
 
 	local rowW = { 0, 0 }
 	for r = 1, 2 do
-		local widths, total = allocate(rowWeights[r], barAvail, gap)
+		local widths, total = allocate(rowItems[r], barAvail, gap, buttonFloor)
 		rowW[r] = total
 		for j, i in index[r] do
 			local v = visible[i]
