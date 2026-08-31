@@ -207,47 +207,59 @@ for _, w in { 1920, 1280, 1024, 820, 720, 640, 480, 414, 360, 320 } do
 	check(ok, `relayout at {w}px` .. (if ok then "" else ` -- {tostring(err)}`))
 end
 
--- ---------------------------------- A2. does the bottom strip fit the screen?
+-- ------------------------------------------ A2. does anything cover the faces?
 --
--- REAL COLLISION, REPORTED ON MOBILE: the panel grew a roster row and the info
--- chip at its bottom landed on top of the emote row.
+-- REAL COLLISIONS, BOTH REPORTED FROM A PHONE: first the career chip landed on
+-- top of the emote row, then the whole column sat across the crew's faces, and
+-- then the controls -- moved to the top-left corner to get them out of the
+-- column -- landed across the top of the faces instead.
 --
--- THE SHAPE OF THIS CHECK CHANGED. The panel used to be centred at 0.58 of the
--- height and lift only as far as it had to; the guard measured that lift, and
--- was only ever one-sided -- deliberately over-estimating the column height by
--- 200px passed clean, because over-lifting just moved the panel up and nothing
--- looked at where it ended up. The panel now hangs from its BOTTOM edge, a
--- fixed 12px above the emote row, so the bottom clearance is true by
--- construction and measuring it would only be measuring the constant.
+-- So the thing to assert is not a clearance between two widgets, it is that
+-- the FACE BAND is empty. Theme.FACE_BAND_TOP/BOTTOM is the band the lobby
+-- camera fills with four heads; everything this screen draws goes above it or
+-- below it, and this checks both edges at once.
 --
--- What can still go wrong is at the OTHER end: the column grows upward, so a
--- taller column on a short screen runs into the WARDROBE row pinned in the
--- top-left corner, and then off the top of the screen. That is what is
--- measured here, and unlike the old one it is genuinely two-sided -- adding a
--- row to the column moves this number, in the direction that hurts.
+-- THIS CHECK IS TWO-SIDED, WHICH THE ONE IT REPLACED WAS NOT. The old guard
+-- measured how far the column had been LIFTED to clear the emote row, so
+-- over-lifting -- including a deliberate 200px over-estimate of the column
+-- height -- passed silently. Both bounds here are real: the bar cannot grow
+-- down into the band and the column cannot grow up into it.
 --
--- Panel: AnchorPoint (0.5, 1), AutomaticSize.Y, so its height is its three
--- children plus two 18px gaps and its top is Position.Y - that.
+-- Top bar: AnchorPoint (1, 0) at (barRight - margin, barY), so its left edge
+-- is Position.X - width and its bottom is Position.Y + height.
+-- Column: AnchorPoint (0.5, 1), AutomaticSize.Y, so its height is its two
+-- remaining children plus one gap and its top is Position.Y - that.
 -- EmoteBar: AnchorPoint (0.5, 1) at (1, -8), 26 tall, so its top is H - 34.
-print("A2. the bottom strip fits above the emote row and below the corner")
+print("A2. nothing is drawn in the face band")
 local EMOTE_CLEARANCE = 12
-local function clearance(w: number, h: number): (number, number, number, number, number)
-	panel:relayout(nil, Vector2.new(w, h))
-	-- The tab row is pinned to the top-left corner now, not stacked in this
-	-- column, so it is not part of the panel's height and there are two gaps
-	-- between three children rather than three between four.
-	local children = panel.startRoot.Size.Y.Offset
+local function measure(w: number, h: number): any
+	local vp = Vector2.new(w, h)
+	panel:relayout(nil, vp)
+	local barY, _barH, barLeft, barRight = Theme.topbarBand(vp)
+	-- The column is Start Shift and the chairs. The career chip is NOT summed
+	-- here on purpose -- it moved to the bar, and if it ever comes back this
+	-- number goes stale rather than silently absorbing it, which is what the
+	-- chip-parent check below is for.
+	local colH = panel.startRoot.Size.Y.Offset
 		+ panel.friendRow.Size.Y.Offset
-		+ panel.progressChip.Size.Y.Offset
-	local panelH = children + 18 * 2
-	-- Anchored (0.5, 1): Position.Y IS the bottom edge, not the centre.
-	local panelBottom = panel.root.Position.Y.Offset
-	-- From EmoteBar itself rather than a `- 34` copied here, which is what the
-	-- panel does too. Which does mean the gap check below is weak -- both sides
-	-- read the same constant, so it proves the panel WIRED the geometry up, not
-	-- that the geometry is right. The top-edge check is the load-bearing one.
-	local emoteTop = EmoteBar.topOf(h)
-	return emoteTop - panelBottom, panelH, panel.tabRow.Size.Y.Offset, panelBottom - panelH, panel.tabRow.Size.X.Offset
+		+ panel.columnLayout.Padding.Offset
+	local colBottom = panel.root.Position.Y.Offset
+	return {
+		barTop = panel.topBar.Position.Y.Offset,
+		barBottom = panel.topBar.Position.Y.Offset + panel.topBar.Size.Y.Offset,
+		barLeft = panel.topBar.Position.X.Offset - panel.topBar.Size.X.Offset,
+		barRight = panel.topBar.Position.X.Offset,
+		pillsEnd = barLeft,
+		bandTop = math.floor(Theme.FACE_BAND_TOP * h),
+		bandBottom = math.floor(Theme.FACE_BAND_BOTTOM * h),
+		colTop = colBottom - colH,
+		colBottom = colBottom,
+		colH = colH,
+		emoteTop = EmoteBar.topOf(h),
+		wantBarY = barY,
+		wantBarRight = barRight - Theme.TOPBAR_MARGIN,
+		rows = if panel.rows[2].Visible then 2 else 1,
+	}
 end
 
 for _, vp in
@@ -255,6 +267,7 @@ for _, vp in
 		{ w = 1920, h = 1080, name = "desktop" },
 		{ w = 1366, h = 768, name = "laptop" },
 		{ w = 1024, h = 768, name = "iPad 4:3" },
+		{ w = 874, h = 402, name = "iPhone 16 Pro landscape" },
 		{ w = 896, h = 414, name = "iPhone 11 landscape" },
 		{ w = 844, h = 390, name = "iPhone 12 landscape" },
 		{ w = 812, h = 375, name = "iPhone X landscape" },
@@ -262,20 +275,48 @@ for _, vp in
 		{ w = 667, h = 375, name = "iPhone SE landscape" },
 	}
 do
-	local gap, panelH, rowsH, top, tabsW = clearance(vp.w, vp.h)
-	local rows = if rowsH > 60 then 2 else 1
-	-- The corner row must not run off the right edge either.
-	check(12 + tabsW <= vp.w, `{vp.name}: the corner row fits ({tabsW}px from x=12 in {vp.w})`)
-	-- Sitting ON the emote row is the intent, so this is an equality, not a
-	-- floor: it fails if the column drifts up as well as down.
+	local m = measure(vp.w, vp.h)
+	-- 1. the bar stops above the faces
 	check(
-		gap == EMOTE_CLEARANCE,
-		`{vp.name} {vp.w}x{vp.h}: panel {panelH}px, tabs {rows} row(s), sits {string.format("%.0f", gap)}px above the emote row`
+		m.barBottom <= m.bandTop,
+		`{vp.name} {vp.w}x{vp.h}: top bar ends at {m.barBottom}, face band starts at {m.bandTop} ({m.rows} row(s))`
 	)
-	-- The column grows upward from that line. It must not reach the WARDROBE
-	-- row in the corner, which is 48 tall at y=84, nor the screen edge above it.
-	local cornerBottom = 84 + rowsH
-	check(top >= cornerBottom, `       and its top edge clears the corner row ({string.format("%.0f", top)} >= {cornerBottom})`)
+	-- 2. the column starts below them
+	check(
+		m.colTop >= m.bandBottom,
+		`       column {m.colH}px starts at {m.colTop}, face band ends at {m.bandBottom}`
+	)
+	-- 3. and still sits on the emote row rather than drifting off the bottom
+	check(
+		m.emoteTop - m.colBottom == EMOTE_CLEARANCE,
+		`       and sits {m.emoteTop - m.colBottom}px above the emote row`
+	)
+	-- 4. the bar is where Theme said to put it, clear of Roblox's own controls
+	--    on the left and inside the screen on the right
+	check(
+		m.barTop == m.wantBarY and m.barRight == m.wantBarRight,
+		`       bar pinned top-right at ({m.barRight}, {m.barTop})`
+	)
+	check(
+		m.barLeft >= m.pillsEnd,
+		`       and clears Roblox's own controls ({m.barLeft} >= {m.pillsEnd})`
+	)
+end
+
+-- The affordance rule, as an assertion: the only flat plate on the screen is in
+-- the bar. A playtester could not tell the career chip from the buttons above
+-- it when it was in the column, so "everything in the column is tappable" is a
+-- property worth failing a build over rather than a note in a comment.
+print("A3. nothing inert is left in the bottom column")
+do
+	local inColumn = false
+	for _, c in panel.root:GetChildren() do
+		if c == panel.progressChip then
+			inColumn = true
+		end
+	end
+	check(not inColumn, "the career chip is in the top bar, not the column")
+	check(panel.progressChip.Parent == panel.rows[1], "and specifically in the bar's first row")
 end
 
 -- --------------------------------------------------- B. four fixed characters

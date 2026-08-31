@@ -1,11 +1,21 @@
 --!strict
--- The between-rounds home screen: a big Start Shift button, the four-chair
--- roster, and your career line -- stacked at the BOTTOM of the screen, just
--- above the emote row.
+-- The between-rounds home screen, split into two strips with a rule between
+-- them that a player can learn without being told:
 --
--- Bottom, not centred, because the thing worth looking at here is the four
--- characters standing in the kitchen behind it. Centred, Start Shift landed
--- squarely across two of their faces on anything laptop-sized or bigger.
+--   TOP BAR   -- readouts and small controls, level with Roblox's own topbar
+--               and to the right of it. The career line is a flat plate; the
+--               three controls are raised buttons.
+--   BOTTOM    -- Start Shift and the four chairs. EVERYTHING HERE IS TAPPABLE.
+--
+-- The middle is deliberately empty: Theme.FACE_BAND is where the lobby camera
+-- puts four chefs' heads, and that is the one thing this screen exists to
+-- show. Both strips are positioned to stay out of it.
+--
+-- The affordance rule is why the career chip moved up rather than shrinking in
+-- place. It sat directly under four things that WERE buttons, in the same
+-- brown, and a playtester had already failed to work out which of that column
+-- could be pressed. Now nothing in the bottom half is inert, and the only flat
+-- plate on screen is up in the bar with the other readouts.
 --
 -- Replaces both the old ready button and the top-left tab cluster. The cluster
 -- sat under the patience bar and collided with Roblox's own top-bar controls;
@@ -38,6 +48,17 @@ local SLOT_W = 150
 
 -- Vertical padding between the panel's rows.
 local COLUMN_GAP = 18
+
+-- Floor and ceiling for one control in the top bar. The floor is a tap target
+-- that a thumb can actually hit; the ceiling stops a long label from taking
+-- the whole bar and pushing the rest into a second row.
+local MIN_BAR_ITEM = 64
+local MAX_BAR_ITEM = 176
+
+-- The Start button will shrink to fit a short screen, but not below this --
+-- past it the hero button stops reading as the hero and the screen would be
+-- better off scrolling.
+local CTA_MIN_H = 48
 
 -- Air between the bottom of this column and the top of the emote row. Slightly
 -- more than the 8px the emote row itself keeps off the screen edge, so the two
@@ -79,7 +100,9 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		BackgroundTransparency = 1,
 		Visible = false,
 	}, gui)
-	mk("UIListLayout", {
+	-- Kept as a field: relayout tightens this gap on screens too short to fit
+	-- the column between the face band and the emote row.
+	self.columnLayout = mk("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
 		Padding = UDim.new(0, COLUMN_GAP),
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -262,25 +285,28 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		self.slots[i] =
 			{ root = slot, face = face, name = name, state = state, species = species, dismiss = dismiss }
 	end
-	-- OUT OF THE COLUMN, INTO THE CORNER.
+	-- THE TOP BAR.
 	--
-	-- These used to be the third row of the centred panel, which pushed Start
-	-- and the four chairs up over the crew's faces -- the one thing the lobby
-	-- shot exists to show. They are navigation, not part of the crew decision,
-	-- so they sit where the in-round coin chip does (which is hidden between
-	-- rounds, so the corner is free) and the panel is a row shorter.
-	self.tabRow = mk("Frame", {
-		Size = UDim2.fromOffset(600, Theme.MIN_TAP),
+	-- Anchored to its RIGHT edge and placed level with Roblox's own topbar
+	-- controls, which live on the left -- so the two rows read as one strip
+	-- across the top rather than as our UI floating underneath theirs.
+	--
+	-- It was briefly in the TOP LEFT, at a hand-picked y=84, which put it
+	-- straight through the top of the face band. relayout sets the real
+	-- position from Theme.topbarBand; this is only the pre-layout frame.
+	self.topBar = mk("Frame", {
+		Name = "TopBar",
+		Size = UDim2.fromOffset(600, Theme.TOPBAR_MIN),
 		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0, 0),
-		Position = UDim2.fromOffset(12, 84),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromOffset(0, 0),
 	}, gui)
 	mk("UIListLayout", {
 		FillDirection = Enum.FillDirection.Vertical,
-		Padding = UDim.new(0, 8),
-		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		Padding = UDim.new(0, 4),
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, self.tabRow)
+	}, self.topBar)
 
 	self.rows = {}
 	for i = 1, 2 do
@@ -288,13 +314,14 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			Size = UDim2.fromOffset(600, Theme.MIN_TAP),
 			BackgroundTransparency = 1,
 			LayoutOrder = i,
-		}, self.tabRow)
+		}, self.topBar)
 		mk("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			Padding = UDim.new(0, 8),
-			-- Left, because the row is pinned to the left edge now rather than
-			-- centred under the panel.
-			HorizontalAlignment = Enum.HorizontalAlignment.Left,
+			-- Right: the bar is pinned by its right edge, so its contents hug
+			-- that edge and any spare width opens up on the left, away from
+			-- Roblox's controls.
+			HorizontalAlignment = Enum.HorizontalAlignment.Right,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}, row)
@@ -314,7 +341,14 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	-- smaller and in the panel's brown — the shape is what says "button".
 	self.rowButtons = {}
 	self.rowRoots = {}
-	local function rowButton(label: string, order: number, fill: Color3?): any
+	-- Each control declares roughly how many glyphs it has to fit, and relayout
+	-- shares the bar's width out in that proportion instead of giving a
+	-- two-word button and a five-word one the same box. An approximation on
+	-- purpose: the labels are translated into seven languages and INVITE
+	-- rewrites itself to JOIN <name>, so the exact width is not knowable here.
+	-- The clamp and the label's own UITextSizeConstraint absorb the error.
+	self.rowWeights = {}
+	local function rowButton(label: string, order: number, fill: Color3?, weight: number?): any
 		local cta = Theme.cta({
 			Size = UDim2.fromOffset(140, Theme.MIN_TAP),
 			Fill = fill or Theme.BROWN_MID,
@@ -324,10 +358,11 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		}, self.rows[1])
 		table.insert(self.rowButtons, cta.button)
 		table.insert(self.rowRoots, cta.root)
+		table.insert(self.rowWeights, weight or 12)
 		return cta
 	end
 	for i, t in TABS do
-		local cta = rowButton(t.label, i)
+		local cta = rowButton(t.label, i, nil, 11)
 		cta.button.Activated:Connect(function()
 			self.deps.onOpenTab(t.id)
 		end)
@@ -343,7 +378,7 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	--
 	-- It reads JOIN <name> when somebody is already cooking, because joining a
 	-- friend beats summoning one.
-	local inviteCta = rowButton("＋ INVITE A FRIEND", #TABS + 2, Theme.BLUE)
+	local inviteCta = rowButton("＋ INVITE A FRIEND", #TABS + 2, Theme.BLUE, 17)
 	self.inviteButton = inviteCta.button
 	self.inviteRoot = inviteCta.root
 	self.inviteButton.Activated:Connect(function()
@@ -370,20 +405,32 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	-- established Roblox co-op game offers a rematch. Roblox has no
 	-- "anywhere but here" API — Teleport re-runs matchmaking, which prefers
 	-- servers with room, so it usually moves you but is not guaranteed to.
-	local newCta = rowButton("NEW SERVER", #TABS + 2)
+	local newCta = rowButton("🔄 NEW SERVER", #TABS + 3, nil, 13)
 	self.newServerButton = newCta.button
 	self.newServerRoot = newCta.root
 	self.newServerButton.Activated:Connect(function()
 		self.deps.onNewServer()
 	end)
 
+	-- A READOUT, AND IT LOOKS LIKE ONE.
+	--
+	-- Theme.chip is flat: no gradient, no drop shadow, no stroke, where
+	-- Theme.cta has all three. That difference is now doing real work, because
+	-- this is the only non-button left on the screen and it sits in the bar
+	-- with the other things you cannot press, not in the column where
+	-- everything else can be.
+	--
+	-- LayoutOrder 0 so it leads the bar, furthest from the right edge: the
+	-- controls stay in the corner where a thumb reaches them.
 	self.progressChip = Theme.chip({
-		Size = UDim2.fromOffset(320, 34),
+		Size = UDim2.fromOffset(160, Theme.TOPBAR_MIN),
 		TextSize = 15,
+		BackgroundTransparency = 0.3,
 		Font = Theme.BOLD_FONT,
-		LayoutOrder = 4,
+		LayoutOrder = 0,
 		Text = "Lv 1  ·  0 coins",
-	}, self.root)
+	}, self.rows[1])
+	self.chipWeight = 16
 
 	return self
 end
@@ -566,74 +613,120 @@ end
 
 function ShiftPanel:step(_dt: number) end
 
+--- Share `budget` out between items in proportion to how much label each has
+--- to carry, with a floor so a short label still gets a tappable box and a
+--- ceiling so a long one cannot eat the bar. Returns the widths and their sum
+--- including the gaps between them.
+local function allocate(weights: { number }, budget: number, gap: number): ({ number }, number)
+	local n = #weights
+	if n == 0 then
+		return {}, 0
+	end
+	-- Padding is per item, not per glyph: a button is its text plus two ends.
+	local units = 0
+	for _, w in weights do
+		units += w + 4
+	end
+	local content = math.max(1, budget - gap * (n - 1))
+	local widths = {}
+	local total = 0
+	for i, w in weights do
+		local px = math.clamp(math.floor(content * (w + 4) / units), MIN_BAR_ITEM, MAX_BAR_ITEM)
+		widths[i] = px
+		total += px
+	end
+	return widths, total + gap * (n - 1)
+end
+
 function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	self.lastViewport = viewport
 	local compact = viewport.X < 720
-	-- SHORT IS NOT THE SAME AS NARROW.
+	local narrow = viewport.X < 480
+	local gap = 8
+
+	-- ---------------------------------------------------------- the top bar
 	--
-	-- `compact` keys on WIDTH, and every size below it was chosen for a screen
-	-- that is short as well. An 812x375 phone in landscape is neither: wide
-	-- enough for the full-size Start button, but only 375 tall, and now that
-	-- the column grows upward from the emote row the tall button pushed its own
-	-- top edge into the WARDROBE chip in the corner -- caught by the harness at
-	-- 3px of overlap, which is exactly the kind of margin nobody notices until
-	-- it is a screenshot. Vertical space is what is scarce there, so the button
-	-- takes the shorter height on height grounds, independently of width.
-	local short = viewport.Y < 400
-	local tight = compact or short
-	-- Hidden buttons take no space in the row: a tutorial server shows four,
-	-- not six with two gaps.
+	-- Level with Roblox's own controls and to the right of them, which is what
+	-- TopbarInset describes. Height comes from the platform too, so our buttons
+	-- are the same height as the system ones rather than a number picked to
+	-- look about right -- clamped only so a bogus inset cannot produce a row
+	-- too small to hit.
+	local barY, barH, barLeft, barRight = Theme.topbarBand(viewport)
+	local btnH = math.clamp(barH, 30, 44)
+	local barAvail = math.max(MIN_BAR_ITEM * 2, (barRight - Theme.TOPBAR_MARGIN) - barLeft)
+
+	-- Hidden controls take no space: a tutorial server hides INVITE.
 	local visible = {}
 	for i, root in self.rowRoots do
 		if root.Visible then
-			table.insert(visible, { root = root, button = self.rowButtons[i] })
+			table.insert(visible, { root = root, button = self.rowButtons[i], weight = self.rowWeights[i] })
 		end
 	end
+	-- The chip leads, so the buttons keep the right corner.
+	table.insert(visible, 1, { root = self.progressChip, weight = self.chipWeight, chip = true })
 	local n = #visible
-	-- Three tiers, not two: at 108 a 3-wide row needs 340 of the 343 usable
-	-- pixels on the narrowest phone, which is a fit only on paper.
-	local narrow = viewport.X < 480
-	local tabW = if narrow then 96 elseif compact then 108 else 140
-	local gap = 8
 
-	-- How many of these fit on one line inside the screen, not inside an
-	-- imagined 600px panel. The 32px is the same margin the menu panel keeps,
-	-- so the row can never reach further left or right than the panel does.
-	local avail = math.max(320, viewport.X - 32)
-	local perRow = math.max(1, math.floor((avail + gap) / (tabW + gap)))
-	local rows = if perRow >= n then 1 else 2
-	if rows == 2 then
-		-- Balance them: 3+3 reads as deliberate where 5+1 reads as a bug.
-		perRow = math.ceil(n / 2)
-	end
-
+	-- One row if the whole strip fits beside Roblox's controls; two if it does
+	-- not, which only happens on a very narrow screen. Two still clears the
+	-- face band -- 0.216 of even a 375-tall phone is 81px, and two 36px rows
+	-- with a 4px gap is 76 -- so wrapping is a real fallback, not a cliff.
+	local allW = {}
 	for i, v in visible do
-		local r = if rows == 1 then 1 else math.min(2, math.ceil(i / perRow))
-		v.root.Parent = self.rows[r]
-		v.root.LayoutOrder = i
-		v.root.Size = UDim2.fromOffset(tabW, Theme.MIN_TAP + Theme.SHADOW_DY)
-		local cap = v.button:FindFirstChildWhichIsA("UITextSizeConstraint")
-		if cap ~= nil then
-			cap.MaxTextSize = if narrow then 12 elseif compact then 13 else 15
-		end
+		allW[i] = v.weight
 	end
+	local _, oneRowW = allocate(allW, barAvail, gap)
+	local rows = if oneRowW <= barAvail then 1 else 2
+	local perRow = if rows == 1 then n else math.ceil(n / 2)
 
 	local counts = { 0, 0 }
-	for i = 1, n do
+	local rowWeights = { {}, {} }
+	local index = { {}, {} }
+	for i, v in visible do
 		local r = if rows == 1 then 1 else math.min(2, math.ceil(i / perRow))
 		counts[r] += 1
-	end
-	for r = 1, 2 do
-		local c = counts[r]
-		self.rows[r].Visible = c > 0
-		self.rows[r].Size = UDim2.fromOffset(math.max(1, tabW * c + gap * math.max(0, c - 1)), Theme.MIN_TAP + Theme.SHADOW_DY)
+		table.insert(rowWeights[r], v.weight)
+		table.insert(index[r], i)
 	end
 
+	local rowW = { 0, 0 }
+	for r = 1, 2 do
+		local widths, total = allocate(rowWeights[r], barAvail, gap)
+		rowW[r] = total
+		for j, i in index[r] do
+			local v = visible[i]
+			v.root.Parent = self.rows[r]
+			if not v.chip then
+				v.root.LayoutOrder = i
+				-- The CTA reserves SHADOW_DY below its face, so the root is
+				-- taller than the button by exactly that overhang.
+				v.root.Size = UDim2.fromOffset(widths[j], btnH + Theme.SHADOW_DY)
+				local cap = v.button:FindFirstChildWhichIsA("UITextSizeConstraint")
+				if cap ~= nil then
+					cap.MaxTextSize = if narrow then 12 elseif compact then 13 else 15
+				end
+			else
+				-- Flat, so no overhang to reserve -- but it is nudged down by
+				-- the same amount so its top aligns with the buttons' faces.
+				v.root.Size = UDim2.fromOffset(widths[j], btnH)
+			end
+		end
+	end
+	for r = 1, 2 do
+		self.rows[r].Visible = counts[r] > 0
+		self.rows[r].Size = UDim2.fromOffset(math.max(1, rowW[r]), btnH + Theme.SHADOW_DY)
+	end
+	local barW = math.max(rowW[1], rowW[2])
+	local barTotalH = rows * (btnH + Theme.SHADOW_DY) + (rows - 1) * 4
+	self.topBar.Size = UDim2.fromOffset(barW, barTotalH)
+	self.topBar.Position = UDim2.fromOffset(barRight - Theme.TOPBAR_MARGIN, barY)
+
+	-- ------------------------------------------------------- the bottom column
+	--
 	-- Four chairs always, sized from the space there actually is rather than a
-	-- breakpoint table. Four fixed 230s overflow a 414-wide phone the same way
-	-- the six-button tab row used to drop its ends off both screen edges, so
-	-- the slots share what is available and stop at a legible floor.
-	local slotW = math.max(96, math.min(190, math.floor((avail - gap * 3) / 4)))
+	-- breakpoint table. Four fixed 230s overflow a 414-wide phone, so the slots
+	-- share what is available and stop at a legible floor.
+	local colAvail = math.max(320, viewport.X - 32)
+	local slotW = math.max(96, math.min(190, math.floor((colAvail - gap * 3) / 4)))
 	for _, slot in self.slots do
 		slot.root.Size = UDim2.fromOffset(slotW, Theme.MIN_TAP + Theme.SHADOW_DY)
 		slot.face.Size = UDim2.fromOffset(slotW, Theme.MIN_TAP)
@@ -641,47 +734,38 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	local friendW = slotW * 4 + gap * 3
 	self.friendRow.Size = UDim2.fromOffset(friendW, Theme.MIN_TAP + Theme.SHADOW_DY)
 
-	local rowsH = rows * (Theme.MIN_TAP + Theme.SHADOW_DY) + (rows - 1) * gap
-	-- Pinned to the corner, so it sizes to its own buttons rather than to the
-	-- panel's width.
-	self.tabRow.Position = UDim2.fromOffset(12, 84)
-	-- SIT ON THE EMOTE ROW, DON'T FLOAT OVER THE FACES.
+	-- FIT BETWEEN THE FACES AND THE EMOTES.
 	--
-	-- This column used to be centred at 0.58 of the height and lift only as far
-	-- as it had to in order to clear the emote buttons. On a phone that was the
-	-- right rule; on a laptop it left Start Shift squarely across two of the
-	-- four faces the lobby shot exists to show. The column is a control strip,
-	-- not the subject, so it belongs at the bottom of the screen at every size.
+	-- The column hangs from its bottom edge just above the emote row and grows
+	-- upward, so what constrains it is the bottom of the face band. Rather than
+	-- position it and hope, work out the height there is room for and shrink to
+	-- it: the gap closes first because 18px of air is the cheapest thing here,
+	-- and only then does the Start button give up height.
 	--
-	-- Pinning the BOTTOM edge also removes the arithmetic. The old rule needed
-	-- panelH, hand-summed from the rows and their gaps, and that sum had to be
-	-- re-derived every time a row was added or removed -- it was wrong at least
-	-- twice, and the guard that was supposed to catch it only ever caught the
-	-- panel being too LOW. Now the bottom edge is stated outright and
-	-- AutomaticSize.Y grows the column upward from it, so there is no height to
-	-- get wrong in the first place.
-	self.root.Position = UDim2.new(0.5, 0, 0, EmoteBar.topOf(viewport.Y) - EMOTE_CLEARANCE)
-	-- The corner row sizes to ITS OWN buttons; the panel sizes to the chairs.
-	-- They used to share a width because they shared a column, and keeping that
-	-- link would stretch a one-button row across the whole screen.
-	local tabsW = math.max(self.rows[1].Size.X.Offset, self.rows[2].Size.X.Offset)
-	self.tabRow.Size = UDim2.fromOffset(tabsW, rowsH)
-	local widest = friendW
-	-- Height comes from the column's own contents (AutomaticSize.Y), not from a
-	-- hand-summed constant: the old `142 + rowsH` had to be re-derived by hand
-	-- every time a gap or a control changed height, and was already carrying
-	-- 12px of slack nobody could account for.
-	self.root.Size = UDim2.fromOffset(math.max(widest, 320), 0)
-	self.startRoot.Size = UDim2.fromOffset(if compact then 260 else 340, if tight then 62 else 72)
-	-- No per-state TextSize any more: the CTA scales its own label (see
-	-- Theme.cta). Only the ceiling moves with the breakpoint.
+	-- Losing the career chip out of this column bought most of the room back --
+	-- it and its gap were 52 of the old 195px -- so on every real device the
+	-- roomy version fits and none of this shrinking happens.
+	local colBottom = EmoteBar.topOf(viewport.Y) - EMOTE_CLEARANCE
+	local budget = colBottom - math.floor(Theme.FACE_BAND_BOTTOM * viewport.Y)
+	local friendH = Theme.MIN_TAP + Theme.SHADOW_DY
+	local colGap = COLUMN_GAP
+	local ctaH = if compact then 62 else 72
+	if ctaH + friendH + colGap > budget then
+		colGap = 8
+	end
+	if ctaH + friendH + colGap > budget then
+		ctaH = math.max(CTA_MIN_H, budget - friendH - colGap)
+	end
+	self.columnLayout.Padding = UDim.new(0, colGap)
+	self.root.Position = UDim2.new(0.5, 0, 0, colBottom)
+	self.root.Size = UDim2.fromOffset(math.max(friendW, 320), 0)
+	self.startRoot.Size = UDim2.fromOffset(if compact then 260 else 340, ctaH)
 	-- Sized off the button, not picked by feel: a chunky display face wants
 	-- roughly 60% of the button's height or it reads as a small label floating
-	-- in a large slab, which is how the first version looked.
-	local h = if tight then 62 else 72
+	-- in a large slab.
 	local cap = self.startButton:FindFirstChildWhichIsA("UITextSizeConstraint")
 	if cap ~= nil then
-		cap.MaxTextSize = math.floor(h * 0.62)
+		cap.MaxTextSize = math.floor(ctaH * 0.62)
 	end
 	self:paint()
 end

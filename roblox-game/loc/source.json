@@ -221,17 +221,17 @@
     },
     {
       "key": "ui.new_server",
-      "source": "NEW SERVER",
+      "source": "🔄 NEW SERVER",
       "context": "Leave this kitchen and find another",
       "note": "",
       "tr": {
-        "fr": "NOUVELLE PARTIE",
-        "de": "NEUER SERVER",
-        "id": "SERVER BARU",
-        "ja": "新しいサーバー",
-        "ko": "새 서버",
-        "pt": "NOVO SERVIDOR",
-        "es": "NUEVO SERVIDOR"
+        "fr": "🔄 NOUVELLE PARTIE",
+        "de": "🔄 NEUER SERVER",
+        "id": "🔄 SERVER BARU",
+        "ja": "🔄 新しいサーバー",
+        "ko": "🔄 새 서버",
+        "pt": "🔄 NOVO SERVIDOR",
+        "es": "🔄 NUEVO SERVIDOR"
       }
     },
     {
