@@ -86,6 +86,14 @@ function lighting:FindFirstChild(name: string)
 	end
 	return nil
 end
+function lighting:FindFirstChildOfClass(class: string)
+	for _, c in self.children do
+		if c.ClassName == class then
+			return c
+		end
+	end
+	return nil
+end
 
 local env = {
 	game = {
@@ -104,14 +112,34 @@ local env = {
 		end,
 	},
 	Instance = {
+		-- A PROXY WITH A SEPARATE BACKING STORE, and that detail is the whole
+		-- point. The first version stored properties on the table itself with
+		-- rawset, and __newindex only fires for keys that are ABSENT -- so the
+		-- very first `Parent = x` worked and every assignment after it bypassed
+		-- the hook entirely. Detaching silently did nothing, and the check for
+		-- "off during a round" passed while the atmosphere stayed attached.
 		new = function(class: string)
-			local inst = { ClassName = class, Name = class }
-			setmetatable(inst, {
-				__newindex = function(t, k, v)
-					if k == "Parent" and v ~= nil then
-						table.insert(v.children, t)
+			local props: { [string]: any } = { ClassName = class, Name = class }
+			local inst
+			inst = setmetatable({}, {
+				__index = function(_, k)
+					return props[k]
+				end,
+				__newindex = function(_, k, v)
+					if k == "Parent" then
+						local was = props.Parent
+						if was ~= nil then
+							for i = #was.children, 1, -1 do
+								if was.children[i] == inst then
+									table.remove(was.children, i)
+								end
+							end
+						end
+						if v ~= nil then
+							table.insert(v.children, inst)
+						end
 					end
-					rawset(t, k, v)
+					props[k] = v
 				end,
 			})
 			return inst
@@ -124,6 +152,7 @@ local env = {
 		error("unexpected require in CameraRig: " .. tostring(what))
 	end,
 	Vector3 = { new = v3, zero = v3(0, 0, 0) },
+	Color3 = { fromRGB = function(r, g, b) return { R = r, G = g, B = b } end },
 	CFrame = {
 		Angles = cframeAngles,
 		lookAt = function(pos, look)
@@ -280,116 +309,64 @@ rig:update(1.0)
 local back = rig:resolve(1.777)
 check(math.abs(back.Z - gPos.Z) < 0.01, "and it still arrives exactly on gameplay")
 
--- ------------------------------------------------ F. DEPTH OF FIELD
+-- ----------------------------------------------------- F. THE LOBBY HAZE
 --
--- Roblox gives no programmable shaders, so this is DepthOfFieldEffect on
--- Lighting -- a GLOBAL effect, which is the whole risk. It is not scoped to a
--- view, so if it is ever left on when a round starts the player cooks through
--- a soft-focus lens, and the one thing a harness cannot do here is look at it.
+-- This started as DepthOfFieldEffect and had to be thrown away: it does not
+-- render. A DOF at physically absurd settings changed nothing on screen while
+-- a greyscale ColorCorrectionEffect planted beside it as a control worked, so
+-- the engine is dropping DOF at this render quality and no amount of tuning
+-- was ever going to show up. Atmosphere is on the base render path instead.
 --
--- What can be checked is everything except how it looks: that it is off during
--- play, that it focuses on the crew and not on a constant, and that it moves
--- on the same curve as the camera rather than snapping at either end.
-print("F. depth of field")
+-- WHAT THIS CANNOT CHECK IS WHETHER IT LOOKS RIGHT. screen_capture through the
+-- Studio MCP returns a flat magenta frame in this setup, so nothing visual is
+-- verifiable from here -- which is exactly how the DOF version shipped twice
+-- while doing nothing at all. What follows is the machinery only: that it
+-- exists in the lobby, that it is GONE during a round, and that it fades on
+-- the same curve as the camera rather than being switched off at the end.
+print("F. the lobby haze")
 do
 	local rig = CameraRig.new(camera)
-	local dof = lighting:FindFirstChild("SizzleLobbyDof")
-	check(dof ~= nil, "the rig hangs a DepthOfFieldEffect on Lighting")
-	check(dof.ClassName == "DepthOfFieldEffect", "and it is the depth-aware one, not a BlurEffect")
+	check(rig.atmo ~= nil, "the rig has an Atmosphere")
+	check(rig.atmo.ClassName == "Atmosphere", "and it is base-render Atmosphere, not a post effect")
 
-	-- A second rig must not stack a second effect (Rojo re-syncs this file).
-	CameraRig.new(camera)
-	check(#lighting.children == 1, `re-creating the rig reuses it ({#lighting.children} on Lighting)`)
-
+	-- Order-independent: earlier sections leave the rig on whatever shot they
+	-- finished with, so state the shot rather than assuming a clean slate.
+	rig:cutTo("gameplay", 0)
 	rig:update(1 / 60)
-	check(not dof.Enabled, "during gameplay it is switched off, not merely at zero")
-	check(dof.NearIntensity == 0, "nothing in FRONT of the crew is ever blurred")
+	check(rig.atmo.Parent == nil, "during gameplay it is not on Lighting at all")
+	check(#lighting.children == 0, "and nothing of ours is left attached")
 
 	rig:cutTo("lobby", 0)
 	rig:update(1 / 60)
-	check(dof.Enabled, "on the lobby shot it is on")
-	-- The FLOOR is the evidence-backed half: 0.45 shipped and was reported as no
-	-- visible difference at all, in a scene of flat-shaded blocks that gives
-	-- blur little to bite on. The ceiling is judgement -- it is there to catch
-	-- someone slamming it to the engine's 1.0, which is a smear.
-	check(
-		dof.FarIntensity >= 0.5 and dof.FarIntensity <= 0.85,
-		`strong enough to see, short of a smear ({dof.FarIntensity})`
-	)
+	check(rig.atmo.Parent == lighting, "on the lobby shot it is attached")
+	check(rig.atmo.Density > 0 and rig.atmo.Haze > 0, `and hazy ({rig.atmo.Density}, {rig.atmo.Haze})`)
+	check(#lighting.children == 1, "exactly one, not one per frame")
 
-	-- The focal plane must sit ON the crew. Solve the shot and compare.
-	local pos, look = rig:resolve(rig:aspect())
-	local want = math.sqrt((look.X - pos.X) ^ 2 + (look.Y - pos.Y) ^ 2 + (look.Z - pos.Z) ^ 2)
-	check(
-		math.abs(dof.FocusDistance - want) < 0.01,
-		`focused on the crew, {string.format("%.1f", dof.FocusDistance)} studs out, not a constant`
-	)
-	-- ...and the whole lineup has to be inside the sharp band, or the two chefs
-	-- standing further back go soft and it reads as a bug, not as a lens.
-	local depths = {}
-	for _, m in staging.LINEUP do
-		-- Chest height, matching how section B frames them, not the floor.
-		local p = v3(m.x * SCALE, CHEF_H * 0.5, m.y * SCALE)
-		local fwd = v3(look.X - pos.X, look.Y - pos.Y, look.Z - pos.Z)
-		local flen = fwd.Magnitude
-		fwd = v3(fwd.X / flen, fwd.Y / flen, fwd.Z / flen)
-		local rel = v3(p.X - pos.X, p.Y - pos.Y, p.Z - pos.Z)
-		table.insert(depths, rel.X * fwd.X + rel.Y * fwd.Y + rel.Z * fwd.Z)
-	end
-	local lo, hi = depths[1], depths[1]
-	for _, d in depths do
-		if d < lo then
-			lo = d
-		end
-		if d > hi then
-			hi = d
-		end
-	end
-	local worst = math.max(math.abs(hi - dof.FocusDistance), math.abs(dof.FocusDistance - lo))
-	check(
-		worst <= dof.InFocusRadius,
-		`all four chefs are inside the sharp band (worst {string.format("%.1f", worst)} <= {dof.InFocusRadius})`
-	)
-	-- THE HALF THAT WAS MISSING, AND THE REASON THIS SHIPPED INVISIBLE.
-	--
-	-- The check above only asks whether the SUBJECT is sharp, which a huge
-	-- in-focus radius satisfies trivially -- and a huge radius is precisely
-	-- what made the first version do nothing at all. Depth of field needs the
-	-- BACKGROUND outside the band as well, and that is a separate question with
-	-- a separate answer.
-	--
-	-- 10 studs is measured, not assumed: in a running client the focal plane sat
-	-- at 25 and the nearest cluster of scenery behind the crew -- bench legs,
-	-- timber lights, the arch stonework -- at 35, with 896 parts between 35 and
-	-- 60.
-	--
-	-- Compared as a GAP so it holds at every aspect ratio. The rig backs off on
-	-- a narrow phone, which moves the focal plane and the measured backdrop
-	-- distance together; the gap between the crew and the wall behind them is a
-	-- property of the room and does not move.
-	local BACKDROP_GAP = 10
-	check(
-		dof.InFocusRadius < BACKDROP_GAP,
-		`and the backdrop is OUTSIDE it, so there is something to blur `
-			.. `(sharp to +{dof.InFocusRadius}, backdrop at +{BACKDROP_GAP})`
-	)
+	-- A second rig must not stack another, and must not clobber an atmosphere
+	-- somebody else authored.
+	CameraRig.new(camera)
+	check(#lighting.children <= 1, `re-creating the rig does not stack ({#lighting.children})`)
 
-	-- And it has to RIDE the move, not step at one end of it.
+	-- IT HAS TO ATTENUATE ACROSS THE MOVE, which is the whole ask: the kitchen
+	-- comes back into clear air as the camera pulls out, rather than the haze
+	-- vanishing in one frame when the move ends.
 	rig:cutTo("gameplay", 1.2, "smooth")
-	local seen = {}
-	local stepped = false
-	local prev = dof.Enabled and dof.FarIntensity or 0
+	local prev = rig.atmo.Haze
+	local stepped, sawMiddle = false, false
 	for _ = 1, 72 do
 		rig:update(1 / 60)
-		local now = if dof.Enabled then dof.FarIntensity else 0
-		if math.abs(now - prev) > 0.08 then
+		local now = if rig.atmo.Parent ~= nil then rig.atmo.Haze else 0
+		if math.abs(now - prev) > 0.35 then
 			stepped = true
 		end
+		if now > 0.05 and now < 2.5 then
+			sawMiddle = true
+		end
 		prev = now
-		table.insert(seen, now)
 	end
-	check(not stepped, "it eases out with the camera instead of popping")
-	check(seen[#seen] == 0 and not dof.Enabled, "and is off again by the time the round starts")
+	check(sawMiddle, "it passes through part-strength on the way out")
+	check(not stepped, "easing out with the camera rather than snapping")
+	check(rig.atmo.Parent == nil, "and is off Lighting again by the time the round starts")
 end
 
 print(if failures > 0 then `{failures} FAILURES` else "PASS: camera")
