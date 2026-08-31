@@ -308,7 +308,14 @@ do
 	rig:cutTo("lobby", 0)
 	rig:update(1 / 60)
 	check(dof.Enabled, "on the lobby shot it is on")
-	check(dof.FarIntensity > 0 and dof.FarIntensity < 0.6, `subtle, not a smear ({dof.FarIntensity})`)
+	-- The FLOOR is the evidence-backed half: 0.45 shipped and was reported as no
+	-- visible difference at all, in a scene of flat-shaded blocks that gives
+	-- blur little to bite on. The ceiling is judgement -- it is there to catch
+	-- someone slamming it to the engine's 1.0, which is a smear.
+	check(
+		dof.FarIntensity >= 0.5 and dof.FarIntensity <= 0.85,
+		`strong enough to see, short of a smear ({dof.FarIntensity})`
+	)
 
 	-- The focal plane must sit ON the crew. Solve the shot and compare.
 	local pos, look = rig:resolve(rig:aspect())
@@ -342,6 +349,29 @@ do
 	check(
 		worst <= dof.InFocusRadius,
 		`all four chefs are inside the sharp band (worst {string.format("%.1f", worst)} <= {dof.InFocusRadius})`
+	)
+	-- THE HALF THAT WAS MISSING, AND THE REASON THIS SHIPPED INVISIBLE.
+	--
+	-- The check above only asks whether the SUBJECT is sharp, which a huge
+	-- in-focus radius satisfies trivially -- and a huge radius is precisely
+	-- what made the first version do nothing at all. Depth of field needs the
+	-- BACKGROUND outside the band as well, and that is a separate question with
+	-- a separate answer.
+	--
+	-- 10 studs is measured, not assumed: in a running client the focal plane sat
+	-- at 25 and the nearest cluster of scenery behind the crew -- bench legs,
+	-- timber lights, the arch stonework -- at 35, with 896 parts between 35 and
+	-- 60.
+	--
+	-- Compared as a GAP so it holds at every aspect ratio. The rig backs off on
+	-- a narrow phone, which moves the focal plane and the measured backdrop
+	-- distance together; the gap between the crew and the wall behind them is a
+	-- property of the room and does not move.
+	local BACKDROP_GAP = 10
+	check(
+		dof.InFocusRadius < BACKDROP_GAP,
+		`and the backdrop is OUTSIDE it, so there is something to blur `
+			.. `(sharp to +{dof.InFocusRadius}, backdrop at +{BACKDROP_GAP})`
 	)
 
 	-- And it has to RIDE the move, not step at one end of it.

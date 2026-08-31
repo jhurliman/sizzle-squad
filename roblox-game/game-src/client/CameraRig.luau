@@ -72,18 +72,42 @@ local CHEF_H = 1.6 -- cells, head clearance to keep in frame
 -- pitched over open floor, so any near blur would land on the foreground
 -- boards a player is about to walk over.
 --
--- Well under the engine's 0.75 default, which reads as a smear rather than as
--- a lens. Anything not listed -- gameplay -- is 0, and at 0 the effect is
--- switched off outright rather than left running at zero strength, because
--- post-processing is exactly what a low-end phone can least afford during a
--- round.
-local SHOT_DOF = { lobby = 0.45, photo = 0.35 }
+-- Anything not listed -- gameplay -- is 0, and at 0 the effect is switched off
+-- outright rather than left running at zero strength, because post-processing
+-- is exactly what a low-end phone can least afford during a round.
+--
+-- These were 0.45 and 0.35 and the result was reported as no visible
+-- difference whatsoever. See DOF_RADIUS: the reason was the radius, not the
+-- intensity, but a scene of flat-shaded blocks needs a firmer hand than a
+-- photographic one would, so they went up too.
+local SHOT_DOF = { lobby = 0.7, photo = 0.55 }
 
--- Studs either side of the focal plane that stay sharp. Staging.LINEUP steps
--- two of the four chefs a whole cell forward of the other two -- 5 studs at
--- this SCALE -- so the band has to hold all four plus their bodies, or the
--- back pair go soft and it reads as a mistake rather than as a lens.
-local DOF_RADIUS = 10
+-- Studs either side of the focal plane that stay sharp.
+--
+-- THIS NUMBER WAS 10 AND THAT IS WHY THE EFFECT WAS INVISIBLE.
+--
+-- It was picked to be safely generous about keeping the crew sharp -- they
+-- only span 2.7 studs of depth, so 10 looked like comfortable headroom. It was
+-- not free. Measured in a running client: the focal plane sits ~25 studs out,
+-- so a radius of 10 held everything sharp to 35 -- and 896 of the room's parts
+-- sit between 35 and 60 studs, right where the blur ramp has barely started.
+-- The entire visible background was inside, or a whisker past, the sharp band.
+--
+-- 4 keeps all four chefs crisp with margin over their 2.7 and ends the sharp
+-- band around 29, so the arch, the benches and the lights actually soften.
+local DOF_RADIUS = 4
+
+-- How far BEHIND the crew the scenery starts, in studs. Measured in a running
+-- client: the focal plane sat at 25 and the nearest cluster of background --
+-- bench legs, timber lights, the arch stonework -- at 35.
+--
+-- Expressed as a gap rather than an absolute distance on purpose. The rig
+-- stands further back on a narrow phone than on a desktop, so the absolute
+-- numbers both move; the gap between the crew and the wall behind them does
+-- not. DOF_RADIUS must stay under this at every aspect ratio or the sharp band
+-- swallows the backdrop and the effect does nothing, which is the bug this
+-- number exists to prevent.
+local DOF_BACKDROP_GAP = 10
 
 local DOF_NAME = "SizzleLobbyDof"
 
