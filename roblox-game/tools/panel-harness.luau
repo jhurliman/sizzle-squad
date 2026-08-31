@@ -444,6 +444,87 @@ end
 -- Leave the panel as the later tests expect to find it.
 panel:setProgress({ level = 1, coins = 0, streak = 0 })
 
+-- --------------------------- A5. a brand-new player never sees this screen
+--
+-- REPORTED FROM STAGING: "it seemed like it started me at the START SHIFT
+-- screen where you select four people, and then it dropped me into the single
+-- player tutorial".
+--
+-- That is what the code did. The panel rendered from the first frame, because
+-- its default phase is "countdown" and nothing gated it on knowing who the
+-- player was. The profile then arrived, the client auto-readied a first-timer
+-- into First Shift, and the crew-select screen they had been looking at for a
+-- profile-load's worth of time vanished. The first thing a new player saw was
+-- a screen that was not for them, taken away before they could use it.
+print("A5. the panel waits until it knows whether the player is new")
+do
+	local fresh = ShiftPanel.new(newInstance("ScreenGui"), {
+		onStart = function() end,
+		onOpenTab = function() end,
+		onNewServer = function() end,
+		onJoinFriend = function() end,
+		onSeatAction = function() end,
+		onToast = function() end,
+	})
+	fresh:relayout(nil, Vector2.new(874, 402))
+	fresh:setPhase({ phase = "countdown", seats = {}, readyCount = 0, readyTotal = 1 }, false)
+	check(not fresh.root.Visible, "on the very first frame, before any profile, it is hidden")
+	check(not fresh.topBar.Visible, "and so is the top bar, which is not parented to the column")
+
+	-- The profile lands and says this is somebody's first ever session.
+	fresh:setProgress({ level = 1, coins = 0, streak = 0, sessions = 1, rounds = 0 })
+	fresh:setPhase({ phase = "countdown", seats = {}, readyCount = 0, readyTotal = 1 }, false)
+	check(not fresh.root.Visible, "a first-ever session stays hidden -- First Shift owns this moment")
+
+	-- ...and once they have played it, it is their home screen like anyone's.
+	fresh:setProgress({ level = 1, coins = 40, streak = 0, sessions = 1, rounds = 1, tutorialDone = true })
+	fresh:setPhase({ phase = "intermission", seats = {}, readyCount = 0, readyTotal = 1 }, false)
+	check(fresh.root.Visible, "after the tutorial round it appears")
+end
+
+do
+	local returning = ShiftPanel.new(newInstance("ScreenGui"), {
+		onStart = function() end,
+		onOpenTab = function() end,
+		onNewServer = function() end,
+		onJoinFriend = function() end,
+		onSeatAction = function() end,
+		onToast = function() end,
+	})
+	returning:relayout(nil, Vector2.new(874, 402))
+	returning:setProgress({ level = 6, coins = 2978, streak = 3, sessions = 12, rounds = 40 })
+	returning:setPhase({ phase = "countdown", seats = {}, readyCount = 0, readyTotal = 1 }, false)
+	check(returning.root.Visible, "a returning player gets it as soon as the profile lands")
+end
+
+-- THE HOLD MUST ALWAYS END. If the profile never arrives -- a DataStore
+-- outage, a dropped remote -- a held panel means no Start button and no way
+-- into the game at all, which is a far worse bug than the flash being fixed
+-- here. Six seconds of stepping and it gives up waiting.
+do
+	local stuck = ShiftPanel.new(newInstance("ScreenGui"), {
+		onStart = function() end,
+		onOpenTab = function() end,
+		onNewServer = function() end,
+		onJoinFriend = function() end,
+		onSeatAction = function() end,
+		onToast = function() end,
+	})
+	stuck:relayout(nil, Vector2.new(874, 402))
+	stuck:setPhase({ phase = "countdown", seats = {}, readyCount = 0, readyTotal = 1 }, false)
+	check(not stuck.root.Visible, "with no profile at all it starts hidden")
+	-- Half the window: still waiting. Without this the test would also pass if
+	-- the hold released immediately, which is the behaviour being replaced.
+	for _ = 1, 30 do
+		stuck:step(0.1)
+	end
+	check(not stuck.root.Visible, "three seconds in it is still waiting for the profile")
+	for _ = 1, 40 do
+		stuck:step(0.1)
+	end
+	check(stuck.root.Visible, "and past six seconds it shows anyway, rather than stranding them")
+end
+
 -- --------------------------------------------------- B. four fixed characters
 print("B. the chairs are four fixed characters, and people move between them")
 local function setSeats(seats: { any })

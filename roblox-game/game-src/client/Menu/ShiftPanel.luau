@@ -75,6 +75,20 @@ local MIN_BAR_SQUEEZED = 52
 -- better off scrolling.
 local CTA_MIN_H = 48
 
+-- HOW LONG THIS SCREEN WILL WAIT TO FIND OUT WHO YOU ARE.
+--
+-- A brand-new player is supposed to be dropped straight into First Shift and
+-- never see this panel, but the client cannot know they are new until their
+-- profile arrives from the server. Rather than show a crew-select screen and
+-- snatch it away a second later, the panel holds until it knows.
+--
+-- The timeout is the important half. If the profile never arrives, or the
+-- auto-start does not take, a player held forever has no Start button and no
+-- way into the game at all -- which is far worse than the flash this fixes. So
+-- the hold always ends, and a slow profile costs a late panel rather than a
+-- dead one.
+local INTRO_HOLD_SECONDS = 6
+
 -- Air between the bottom of this column and the top of the emote row. Slightly
 -- more than the 8px the emote row itself keeps off the screen edge, so the two
 -- read as separate strips rather than one crowded block.
@@ -97,6 +111,10 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	local self = setmetatable({}, ShiftPanel)
 	self.deps = deps
 	self.hidden = false
+	-- Held until the profile says this is a returning player, or until the
+	-- timeout gives up waiting. See INTRO_HOLD_SECONDS.
+	self.introHold = true
+	self.introWaited = 0
 	self.ready = false
 	self.spectating = false
 	self.phase = { phase = "countdown" }
@@ -576,6 +594,16 @@ function ShiftPanel:setProgress(progress: any)
 	-- between shifts, and out here -- next to a level and a coin count, both of
 	-- which are self-describing -- a bare flame and a digit reads as a third
 	-- currency rather than a streak. Say the noun.
+	-- WHO IS THIS? First answer we get, and the one the hold is waiting on.
+	--
+	-- Three fields rather than one, matching FirstShift:setEligible, because
+	-- they disagree in exactly the case that matters: a player teleported out
+	-- of First Shift arrives with `rounds` still reading 0 for a few frames
+	-- while the profile loads. Any one of them saying "not new" is enough.
+	local fresh = (progress.sessions or 1) <= 1 and (progress.rounds or 0) < 1 and progress.tutorialDone ~= true
+	if not fresh then
+		self.introHold = false
+	end
 	-- NOT the coin emoji: FredokaOne has no glyph for it and it renders as a
 	-- hollow box (the 🔥 on the streak plate is fine).
 	self.progressChip.Text = Loc.f("fmt.lv_coins", progress.level or 1, progress.coins or 0)
@@ -633,7 +661,13 @@ function ShiftPanel:paint()
 	-- so what appears is the tabs and nothing that could take a press it
 	-- cannot honour.
 	local lobby = p == "countdown" or p == "intermission" or (self.spectating and p == "round")
-	self.root.Visible = not self.hidden and lobby
+	local show = not self.hidden and lobby and not self.introHold
+	self.root.Visible = show
+	-- The bar goes with it. It is parented to the ScreenGui rather than to the
+	-- column -- that is what keeps it in the corner -- so it does not inherit
+	-- this and would otherwise sit there on its own over the first shot of the
+	-- game, offering a wardrobe to somebody who has not played yet.
+	self.topBar.Visible = show
 
 	self.startRoot.Visible = not self.spectating
 	local n, total = self.phase.readyCount, self.phase.readyTotal
@@ -661,7 +695,16 @@ function ShiftPanel:paint()
 	end
 end
 
-function ShiftPanel:step(_dt: number) end
+function ShiftPanel:step(dt: number)
+	if not self.introHold then
+		return
+	end
+	self.introWaited += dt
+	if self.introWaited >= INTRO_HOLD_SECONDS then
+		self.introHold = false
+		self:paint()
+	end
+end
 
 --- Roughly how wide a string wants to be, in units of one Latin character.
 ---
