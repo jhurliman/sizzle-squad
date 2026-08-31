@@ -295,10 +295,6 @@ function FirstShift:update(state: any, flags: number): number?
 
 	if working then
 		tip = "Working! Stay put — or press again to stop."
-	elseif state.plateStock <= 0 and state.dirtyPlates > 0 then
-		-- Nothing else can make progress: no clean plates left anywhere.
-		tip = "Out of clean plates! Wash up at the sink to get more."
-		target = nearest(state, stationOfKind("sink"))
 	elseif tier == 2 and held ~= nil and held.dirty then
 		-- Washing is the one step nobody discovers on their own, because a
 		-- dirty plate looks like a plate.

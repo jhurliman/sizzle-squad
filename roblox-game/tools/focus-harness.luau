@@ -176,23 +176,30 @@ for _, kind in KINDS do
 	end
 end
 
--- ------------------------------------------------ D. THE RACKS RUN DRY
+-- --------------------------------------- D. THE RACK NEVER STOPS DISPENSING
 --
--- Everything above runs with a full plate rack, which is the one state where
--- the client cannot be wrong about plates: the mirror sim is CONSTRUCTED with
--- TUNING.plateStock, so it agrees with the server by accident.
+-- This block used to drain the racks and check the client agreed they were
+-- empty: applyScore wrote the counts to display fields only, while focusPrompt
+-- plans against mirrorSim, whose stock stayed at its opening value forever --
+-- so an empty rack went on glowing and advertising 'dispense' while the server
+-- answered 'none'.
 --
--- Drain the racks and the accident stops. applyScore used to write the counts
--- to display fields only, while focusPrompt plans against mirrorSim -- whose
--- plateStock stayed at its opening value forever. The empty rack went on
--- glowing and advertising 'dispense' while the server answered 'none': a
--- highlighted prompt that did nothing when pressed.
-for _, drained in { { stock = 0, dirty = 0 }, { stock = 0, dirty = 3 }, { stock = 2, dirty = 0 } } do
+-- There is no stock to disagree about now. What is left is still worth
+-- pinning, because it is the property the whole prompt system rests on: server
+-- and client must plan the SAME verb for the rack, whatever else has happened
+-- in the round.
+for _, held in { "nothing", "plate", "ingredient" } do
 	local sim = newServerSim()
-	sim.plateStock = drained.stock
-	sim.dirtyPlates = drained.dirty
 	local st = stationByKind(sim)["plates"]
 	local chef = sim.chefs[1]
+	if held == "plate" then
+		chef.carrying = { type = "plate", plate = { id = 901, contents = {}, dirty = false } }
+	elseif held == "ingredient" then
+		chef.carrying = {
+			type = "ingredient",
+			ingredient = { id = 902, kind = "tomato", state = "raw", progress = 0, overcook = 0 },
+		}
+	end
 
 	local rep = Replicator.new(shared, Net, remotes, function()
 		return 0
@@ -210,19 +217,11 @@ for _, drained in { { stock = 0, dirty = 0 }, { stock = 0, dirty = 3 }, { stock 
 		end
 	end
 
-	check(
-		client.mirrorSim.plateStock == drained.stock,
-		`mirror sim carries plateStock {drained.stock} (got {tostring(client.mirrorSim.plateStock)})`
-	)
-	check(
-		client.mirrorSim.dirtyPlates == drained.dirty,
-		`mirror sim carries dirtyPlates {drained.dirty} (got {tostring(client.mirrorSim.dirtyPlates)})`
-	)
 	local want = shared.planGrab(sim, chef, st)
 	local got = shared.planGrab(client.mirrorSim, client.mirror, mst)
 	check(
 		want == got,
-		`plates stock={drained.stock} dirty={drained.dirty}: server says '{want}', client says '{got}'`
+		`plates, holding {held}: server says '{want}', client says '{got}'`
 	)
 end
 
@@ -263,7 +262,7 @@ local function fingerprint(sim: any, st: any, chef: any): string
 		end
 		return "?"
 	end
-	return `{c(st.holding)}|{c(chef.carrying)}|{sim.plateStock}|{sim.dirtyPlates}|{sim.score.served}|{sim.score.coins}|{st.active}`
+	return `{c(st.holding)}|{c(chef.carrying)}|{sim.score.served}|{sim.score.coins}|{st.active}`
 end
 
 local bChecks, bFail = 0, 0

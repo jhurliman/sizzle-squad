@@ -670,21 +670,6 @@
       }
     },
     {
-      "key": "coach.out_of_plates",
-      "source": "Out of clean plates! Wash up at the sink to get more.",
-      "context": "Tutorial: plate economy",
-      "note": "",
-      "tr": {
-        "fr": "Plus d'assiettes propres ! Lavez à l'évier pour en avoir.",
-        "de": "Keine sauberen Teller! Spül welche in der Spüle.",
-        "id": "Piring bersih habis! Cuci di wastafel untuk menambah.",
-        "ja": "きれいなお皿がない！シンクで洗って補充しよう。",
-        "ko": "깨끗한 접시가 없어요! 싱크대에서 설거지하세요.",
-        "pt": "Acabaram os pratos limpos! Lave na pia para ter mais.",
-        "es": "¡No quedan platos limpios! Lava en el fregadero para tener más."
-      }
-    },
-    {
       "key": "recipe.salad",
       "source": "Garden Salad",
       "context": "Recipe name on an order ticket",

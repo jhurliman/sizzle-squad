@@ -711,24 +711,83 @@ check(plainFirst ~= nil, `an unscripted board still issues tickets ({plainFirst}
 check(#plain.director.scriptedRecipes == 0, "the default board carries no script")
 
 -- ==========================================================================
--- The plate economy. Washing up used to be unreachable: nothing ever set
--- plate.dirty and the racks were bottomless, so the sink, its verb, its timer
--- and its art were all dead. These pin the loop that makes it real.
+-- THE RACK ALWAYS HANDS OVER A CLEAN PLATE.
+--
+-- It used to own eight, and every serve dirtied one, so the NINTH plate of a
+-- round came out dirty -- and a dirty plate is refused by every plating action
+-- there is. Nothing outside First Shift explains washing-up and the only cue
+-- is that the plate looks slightly grey, so the ninth plate silently stopped
+-- accepting food. Deterministic, and it fires for every crew that serves eight
+-- dishes, which is to say the ones playing well.
+--
+-- Washing-up returns in a content update with legible crockery and a tutorial
+-- beat. Until then the contract is: press the rack, get a clean plate, always.
 -- ==========================================================================
 
 local pe = shared.createSim({ seed = 5, botCount = 0 })
-check(pe.plateStock == shared.TUNING.plateStock, `racks start stocked ({pe.plateStock})`)
-check(pe.dirtyPlates == 0, "nothing is dirty at the start")
+local peRack
+for _, st in pe.kitchen.stations do
+	if st.kind == "plates" then
+		peRack = st
+		break
+	end
+end
+check(peRack ~= nil, "the kitchen has a plate rack")
 
--- Drive a full round with bots and watch the whole loop, rather than poking
--- the private verbs: serve -> dishes pile up -> someone washes -> plates come
--- back. Every earlier attempt at this mechanic failed somewhere in that cycle
--- rather than in any single step.
+-- Through the real input path, not by poking the private verb: stand at the
+-- rack and press, a hundred times, discarding each plate rather than putting
+-- it back. The old rack owned eight, so anything past the ninth press is the
+-- regime where this used to break.
+local peChef = pe.chefs[1]
+peChef.isPlayer = true
+peChef.pos.x = peRack.cell.x + 0.5 + peRack.facing.x * 1.4
+peChef.pos.y = peRack.cell.y + 0.5 + peRack.facing.y * 1.4
+peChef.vel.x, peChef.vel.y = 0, 0
+peChef.heading = math.atan2(-(peRack.facing.y), -(peRack.facing.x))
+
+local peInputs = {}
+for _, c in pe.chefs do
+	peInputs[c.id + 1] = shared.NO_INPUT
+end
+for _ = 1, 10 do
+	shared.step(pe, peInputs)
+	pe.events = {}
+end
+
+local handed, everDirty = 0, false
+for _ = 1, 100 do
+	peChef.carrying = nil
+	-- Rising edge, then release: grabPressed is an edge, not a held state.
+	peInputs[peChef.id + 1] = { move = { x = 0, y = 0 }, grabPressed = true, useHeld = false }
+	shared.step(pe, peInputs)
+	peInputs[peChef.id + 1] = shared.NO_INPUT
+	shared.step(pe, peInputs)
+	pe.events = {}
+	local held = peChef.carrying
+	if held ~= nil and held.type == "plate" then
+		handed += 1
+		if held.plate.dirty then
+			everDirty = true
+		end
+	end
+end
+check(handed == 100, `the rack is bottomless (handed over {handed} of 100)`)
+check(not everDirty, "and never hands over a dirty one")
+
+-- And across a whole round with bots actually serving, which is where the
+-- dirty plates used to come from.
 local live = shared.createSim({ seed = 11, botCount = 0 })
 shared.seedPans(live)
 local botDir = shared.makeBotDirector()
 botDir:setDrivePlayer(true)
-local washes, peakDirty, everStarved, deadlocked = 0, 0, false, false
+local sawDirty, refused = false, false
+local liveRack
+for _, st in live.kitchen.stations do
+	if st.kind == "plates" then
+		liveRack = st
+		break
+	end
+end
 for _ = 1, 60 * 190 do
 	local bi = botDir:update(live, shared.SIM_DT)
 	local inputs = {}
@@ -736,45 +795,28 @@ for _ = 1, 60 * 190 do
 		inputs[chef.id + 1] = bi:get(chef.id) or shared.NO_INPUT
 	end
 	shared.step(live, inputs)
-	for _, ev in live.events do
-		if ev.t == "washDone" then
-			washes += 1
-		end
-	end
 	live.events = {}
-	peakDirty = math.max(peakDirty, live.dirtyPlates)
-	if live.plateStock <= 0 then
-		everStarved = true
-		-- No clean plates AND nothing dirty to wash would be unrecoverable.
-		if live.dirtyPlates <= 0 then
-			local anyPlate = false
-			for _, chef in live.chefs do
-				if chef.carrying ~= nil and chef.carrying.type == "plate" then
-					anyPlate = true
-				end
-			end
-			for _, st in live.kitchen.stations do
-				if st.holding ~= nil and st.holding.type == "plate" then
-					anyPlate = true
-				end
-			end
-			if not anyPlate then
-				deadlocked = true
-			end
+	for _, chef in live.chefs do
+		local c = chef.carrying
+		if c ~= nil and c.type == "plate" and c.plate.dirty then
+			sawDirty = true
 		end
-	end
-	if live.plateStock < 0 or live.dirtyPlates < 0 then
-		deadlocked = true
+		-- An empty-handed chef must always be offered a plate. This is the
+		-- exact check that would have caught the original bug: it went false
+		-- the moment the eighth plate was served.
+		if c == nil and shared.planGrab(live, chef, liveRack) ~= "dispense" then
+			refused = true
+		end
 	end
 	if live.over then
 		break
 	end
 end
-check(live.score.served > 0, `the round served dishes ({live.score.served})`)
-check(peakDirty > 0, `serving sends plates to the wash-up ({peakDirty} at peak)`)
-check(everStarved, "the racks actually run dry during a round -- the mechanic is reachable")
-check(washes > 0, `and somebody washes up ({washes} times)`)
-check(not deadlocked, "the kitchen never reaches a state with no plates and nothing to wash")
+-- Past the old cliff, or the round proves nothing: the eighth serve is where
+-- the rack used to start handing out dirty plates.
+check(live.score.served > 8, `the round serves past the old eight-plate cliff ({live.score.served})`)
+check(not sawDirty, "no dirty plate reaches anybody's hands over a full round")
+check(not refused, "and an empty-handed chef is never refused a plate")
 
 print(if failures > 0 then `{failures} FAILURES` else "PASS: equip slots")
 if failures > 0 then

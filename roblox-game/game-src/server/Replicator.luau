@@ -156,8 +156,6 @@ function Replicator:scoreSummary(sim: any): any
 		-- JOIN SNAPSHOT carries them too -- snapshotFor calls this, and a
 		-- joiner used to get no plate counts at all until the next score
 		-- change happened to fire, which in a quiet intermission is a while.
-		plateStock = sim.plateStock,
-		dirtyPlates = sim.dirtyPlates,
 	}
 end
 
@@ -258,7 +256,7 @@ function Replicator:flush(sim: any, events: { any }, dt: number, carryingChanged
 		end
 		-- score
 		local score = self:scoreSummary(sim)
-		local sk = `{score.coins}|{score.served}|{score.missed}|{score.combo}|{math.floor(score.patience * 50)}|{sim.plateStock}|{sim.dirtyPlates}`
+		local sk = `{score.coins}|{score.served}|{score.missed}|{score.combo}|{math.floor(score.patience * 50)}`
 		if sk ~= self.scoreCache then
 			self.scoreCache = sk
 			remotes.ScoreDelta:FireAllClients(score)

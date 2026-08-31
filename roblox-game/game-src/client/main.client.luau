@@ -748,7 +748,6 @@ RunService.RenderStepped:Connect(function(dt)
 	-- station contents + progress bars
 	ensureStations(state.clock)
 	stationViz:update(state.stations, stationModels)
-	stationViz:updateDishPile(state.stations, state.dirtyPlates)
 
 	-- focus highlight + verb chip (local planGrab over mirrored state)
 	local focusId, action = state:focusPrompt()
