@@ -71,12 +71,16 @@ end
 --- teleport leg is visible at all. Together, `server_kind` and `arrival` say
 --- which leg of the round trip this is -- the one thing the old funnel could
 --- not tell you, because it started after the teleport had already happened.
-function Analytics:joinStart(player: any, isTutorialServer: boolean, hopped: boolean)
+--- `source` is Tutorial.joinSource: teleport_in / friend_invite /
+--- friend_follow / direct. It is the only acquisition breakdown available to a
+--- running server -- the analytics query API has no dimension for it -- so
+--- this event is where "how many of our players arrive through a friend"
+--- gets answered.
+function Analytics:joinStart(player: any, isTutorialServer: boolean, source: string)
 	local s = self.sessions[player]
 	local kind = if isTutorialServer then "tutorial_server" else "public_server"
-	local arrival = if hopped then "teleport_in" else "fresh_join"
 	local who = if s ~= nil and s.isNew then "new" else "returning"
-	self:custom(player, "join_start", 1, { kind, arrival, who })
+	self:custom(player, "join_start", 1, { kind, source, who })
 end
 
 function Analytics:onboarding(player: any, step: string)

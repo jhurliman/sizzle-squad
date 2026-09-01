@@ -87,6 +87,21 @@ a release.
   survivable; `join_start` / `tutorial_teleport` / `session_end` now measure it.
   The alternative is running First Shift in place, which the Studio path
   (`Tutorial.forced`) already does.
+- 🟡 **A friend arrival now skips First Shift entirely.** Someone who followed
+  or was invited by a friend, into a server that still has somebody in it, is
+  seated with them rather than teleported to a private tutorial. They learn by
+  playing next to the person who brought them, which is the whole reason they
+  came — but they never see the two scripted tickets, so their first round is
+  a live one with a stranger's pacing. `rounds` stays 0, so a later solo join
+  still gets First Shift properly. Watch `first_shift_skipped` against
+  first-round completion; if those players do worse, the answer is probably a
+  coach chip during a live round, not sending them away again.
+- 🟢 **"Search vs discovery vs ad" is not measurable in-game.** A server can
+  see a teleport, an invite (`GetJoinData().ReferredByPlayerId`) and a follow
+  (`Player.FollowUserId`), and nothing else — every remaining arrival is
+  `direct`. The analytics query API has no acquisition dimension either (every
+  candidate name returns "dimension not supported"); that breakdown exists only
+  in the Creator Dashboard's own acquisition report.
 - 🟢 **ReadyUp is not rate limited** (it re-broadcasts phase on every call).
   Emote is allowlisted by id; GrabEdge is capped at 3 queued.
 - 🟢 **No packet-loss extrapolation** beyond hold-last-sample for remote chefs.

@@ -297,13 +297,13 @@ Players.PlayerAdded:Connect(function(player)
 	end
 	-- A teleport inside this experience continues the SAME session, so the hop
 	-- must not be counted as a new one (see Progression:playerAdded).
-	local hopped = Tutorial.arrivedByTeleport(player)
-	progression:playerAdded(player, hopped)
+	local source = Tutorial.joinSource(player)
+	progression:playerAdded(player, source == "teleport_in")
 	-- Analytics BEFORE the First Shift gate. This used to sit below the
 	-- `return` on the teleport path, so a brand-new player's first server --
 	-- the one the ad actually paid for -- recorded nothing at all.
 	analytics:playerAdded(player, progression.profiles[player])
-	analytics:joinStart(player, Tutorial.isTutorialServer(), hopped)
+	analytics:joinStart(player, Tutorial.isTutorialServer(), source)
 	-- FIRST SHIFT HAPPENS SOMEWHERE ELSE (see Tutorial.luau).
 	--
 	-- Before seating, before anything that would make this player part of the
@@ -315,7 +315,20 @@ Players.PlayerAdded:Connect(function(player)
 		and not Tutorial.arrivedFromTutorial(player)
 		and Tutorial.needsTutorial(progression.profiles[player])
 	then
-		if Tutorial.isStudio() then
+		if Tutorial.isFriendJoin(source) and #Players:GetPlayers() > 1 then
+			-- THEY CAME HERE FOR A PERSON. Sending them to a private tutorial
+			-- server would put a load screen between them and the only thing
+			-- that reliably retains a new player, while the friend who invited
+			-- them waits alone in another kitchen. They learn standing next to
+			-- them instead.
+			--
+			-- `rounds` stays 0, so if this never becomes a finished round a
+			-- later solo join still gets First Shift properly.
+			--
+			-- The population check matters: a follow whose friend has already
+			-- left is just an ordinary new player, and still needs teaching.
+			analytics:custom(player, "first_shift_skipped", 1, { source })
+		elseif Tutorial.isStudio() then
 			-- No teleport available; run First Shift right here (Tutorial.luau).
 			Tutorial.forced = true
 			print("[sizzle] First Shift: Studio, running the tutorial in this server")

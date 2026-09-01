@@ -126,6 +126,61 @@ later:playerAdded(newbie, false)
 check(later.profiles[newbie].sessions == 2, `coming back tomorrow IS a new session (got {later.profiles[newbie].sessions})`)
 
 --------------------------------------------------------------------------
+-- Where a player came from. Roblox tells a running server almost nothing --
+-- there is no search/discovery/ad signal in here, and no analytics dimension
+-- for one either -- but it does tell us the two arrivals that change what we
+-- should do next: a hop inside the experience, and somebody who came to play
+-- with a specific person.
+--------------------------------------------------------------------------
+local tenv = {
+	game = {
+		GetService = function()
+			return nil
+		end,
+		PlaceId = 1,
+		JobId = "j",
+	},
+	os = os,
+	math = math,
+	table = table,
+	string = string,
+	type = type,
+	typeof = typeof,
+	pairs = pairs,
+	ipairs = ipairs,
+	pcall = pcall,
+	warn = function() end,
+	print = print,
+	setmetatable = setmetatable,
+}
+local Tutorial = luau.load(luau.compile(fs.readFile("game-src/server/Tutorial.luau")), { environment = tenv })()
+
+local function fakePlayer(joinData, followId: number?)
+	return {
+		UserId = 99,
+		Name = "Arriver",
+		FollowUserId = followId or 0,
+		GetJoinData = function()
+			return joinData or {}
+		end,
+	}
+end
+
+check(Tutorial.joinSource(fakePlayer({ TeleportData = { tutorial = true } })) == "teleport_in", "teleport data reads as a hop")
+check(Tutorial.joinSource(fakePlayer({ ReferredByPlayerId = 5 })) == "friend_invite", "ReferredByPlayerId reads as an invite")
+check(Tutorial.joinSource(fakePlayer(nil, 7)) == "friend_follow", "FollowUserId reads as a follow")
+check(Tutorial.joinSource(fakePlayer({})) == "direct", "everything else is direct")
+check(Tutorial.joinSource(fakePlayer({ ReferredByPlayerId = 0 }, 0)) == "direct", "a zeroed id is not a friend join")
+
+check(Tutorial.isFriendJoin("friend_invite"), "an invite is a friend join")
+check(Tutorial.isFriendJoin("friend_follow"), "so is a follow")
+check(not Tutorial.isFriendJoin("direct"), "a direct join is not")
+-- A hop is NOT a friend join: the First Shift return teleport carries teleport
+-- data, and treating that as "they came to play with someone" would skip the
+-- tutorial for a player who is simply on their way back.
+check(not Tutorial.isFriendJoin("teleport_in"), "and neither is a hop")
+
+--------------------------------------------------------------------------
 -- Analytics: "new" must mean "has never finished a shift", never "sessions <= 1"
 --------------------------------------------------------------------------
 local logged = {}
@@ -186,7 +241,7 @@ clock.t = 0
 a:playerAdded(newbie, { sessions = 2, rounds = 0 })
 check(findEvent("onboarding:joined") ~= nil, "a teleported first-timer still enters the onboarding funnel")
 
-a:joinStart(newbie, true, true)
+a:joinStart(newbie, true, "teleport_in")
 local js = findEvent("join_start")
 check(js ~= nil, "join_start is recorded before the First Shift gate")
 check(js ~= nil and js.fields.f1 == "tutorial_server", `and names the server kind ({js and js.fields.f1})`)
@@ -205,10 +260,20 @@ local vet = { UserId = 43, Name = "Vet" }
 clock.t = 0
 a:playerAdded(vet, { sessions = 1, rounds = 4 })
 check(findEvent("onboarding:joined") == nil, "a player with rounds behind them is not in the onboarding funnel")
-a:joinStart(vet, false, false)
+a:joinStart(vet, false, "direct")
 local js2 = findEvent("join_start")
-check(js2 ~= nil and js2.fields.f2 == "fresh_join", `a direct join is not a hop ({js2 and js2.fields.f2})`)
+check(js2 ~= nil and js2.fields.f2 == "direct", `a direct join is not a hop ({js2 and js2.fields.f2})`)
 check(js2 ~= nil and js2.fields.f3 == "returning", `and reads as returning ({js2 and js2.fields.f3})`)
+
+-- A friend arrival carries its own source through to the dashboard, which is
+-- what makes "how many players arrive through a friend" answerable at all.
+logged = {}
+local invited = { UserId = 46, Name = "Invited" }
+a:playerAdded(invited, { sessions = 1, rounds = 0 })
+a:joinStart(invited, false, "friend_invite")
+local js3 = findEvent("join_start")
+check(js3 ~= nil and js3.fields.f2 == "friend_invite", `an invite is recorded as one ({js3 and js3.fields.f2})`)
+check(js3 ~= nil and js3.fields.f3 == "new", "and they are still a first-timer")
 
 -- A finished tutorial is enough on its own, even at rounds == 0 -- the same
 -- pair of fields Tutorial.needsTutorial trusts.

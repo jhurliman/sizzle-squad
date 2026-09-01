@@ -131,15 +131,50 @@ function Tutorial.sendHome(player: Player)
 	end
 end
 
---- Did this player arrive here by any teleport inside this experience? Both
---- legs of the First Shift round trip carry teleport data, so this is how a
---- same-session hop is told apart from a genuinely new session. Counting the
---- hop as a session is what made a brand-new player read as a returning one.
-function Tutorial.arrivedByTeleport(player: Player): boolean
+--- WHERE THIS PLAYER CAME FROM.
+---
+--- Roblox exposes no "search vs discovery vs ad" signal to a running server --
+--- that breakdown lives only in the Creator Dashboard's acquisition report,
+--- and the analytics query API has no dimension for it either. What a server
+--- CAN see is the two arrivals that should change what happens next:
+---
+---   "teleport_in"   -- another server in this experience sent them. Both legs
+---                      of the First Shift round trip look like this, which is
+---                      how a same-session hop is told apart from a new
+---                      session. Counting the hop as a session is what made a
+---                      brand-new player read as a returning one.
+---   "friend_invite" -- accepted an invite (GetJoinData().ReferredByPlayerId)
+---   "friend_follow" -- followed a friend in (Player.FollowUserId)
+---   "direct"        -- everything else: search, discovery, an ad, a link.
+---                      Indistinguishable from each other from in here.
+function Tutorial.joinSource(player: Player): string
 	local ok, data = pcall(function()
-		return player:GetJoinData().TeleportData
+		return player:GetJoinData()
 	end)
-	return ok and type(data) == "table"
+	local d: any = if ok and type(data) == "table" then data else {}
+	if type(d.TeleportData) == "table" then
+		return "teleport_in"
+	end
+	if (d.ReferredByPlayerId or 0) ~= 0 then
+		return "friend_invite"
+	end
+	-- FollowUserId is a property, not join data, and is 0 when unused.
+	local okFollow, follow = pcall(function()
+		return player.FollowUserId
+	end)
+	if okFollow and (follow or 0) ~= 0 then
+		return "friend_follow"
+	end
+	return "direct"
+end
+
+--- Did they come here to play with somebody specific? These are the arrivals
+--- worth interrupting First Shift for: sending someone to a private tutorial
+--- server while the friend who invited them sits waiting in another kitchen
+--- trades the one thing that actually retains players -- another person -- for
+--- two scripted tickets they could just as easily learn standing next to them.
+function Tutorial.isFriendJoin(source: string): boolean
+	return source == "friend_invite" or source == "friend_follow"
 end
 
 --- Did this player arrive here straight out of a tutorial? Used only to make
