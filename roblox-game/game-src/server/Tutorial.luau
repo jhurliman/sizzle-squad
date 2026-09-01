@@ -147,25 +147,44 @@ end
 ---   "friend_follow" -- followed a friend in (Player.FollowUserId)
 ---   "direct"        -- everything else: search, discovery, an ad, a link.
 ---                      Indistinguishable from each other from in here.
-function Tutorial.joinSource(player: Player): string
+--- Returns the source and, when there is one, the user they came here FOR --
+--- which is the only way to tell "my friend is in this kitchen" from "somebody
+--- is in this kitchen".
+function Tutorial.joinSource(player: Player): (string, number?)
 	local ok, data = pcall(function()
 		return player:GetJoinData()
 	end)
 	local d: any = if ok and type(data) == "table" then data else {}
-	if type(d.TeleportData) == "table" then
-		return "teleport_in"
+	local td: any = d.TeleportData
+	if type(td) == "table" then
+		-- Social:joinFriend sets this. Without it, tapping JOIN A FRIEND looked
+		-- like an ordinary arrival, so a player who had never finished a round
+		-- was teleported straight back out to a solo tutorial -- away from the
+		-- friend they had just asked to join.
+		if td.joinedFriend == true then
+			return "friend_hop", tonumber(td.friendUserId)
+		end
+		return "teleport_in", nil
 	end
-	if (d.ReferredByPlayerId or 0) ~= 0 then
-		return "friend_invite"
+	local referred = tonumber(d.ReferredByPlayerId) or 0
+	if referred ~= 0 then
+		return "friend_invite", referred
 	end
 	-- FollowUserId is a property, not join data, and is 0 when unused.
 	local okFollow, follow = pcall(function()
 		return player.FollowUserId
 	end)
-	if okFollow and (follow or 0) ~= 0 then
-		return "friend_follow"
+	local followId = if okFollow then tonumber(follow) or 0 else 0
+	if followId ~= 0 then
+		return "friend_follow", followId
 	end
-	return "direct"
+	return "direct", nil
+end
+
+--- A hop inside this experience: the same player session continuing. Both legs
+--- of the First Shift round trip and every Social teleport are hops.
+function Tutorial.isHop(source: string): boolean
+	return source == "teleport_in" or source == "friend_hop"
 end
 
 --- Did they come here to play with somebody specific? These are the arrivals
@@ -174,7 +193,7 @@ end
 --- trades the one thing that actually retains players -- another person -- for
 --- two scripted tickets they could just as easily learn standing next to them.
 function Tutorial.isFriendJoin(source: string): boolean
-	return source == "friend_invite" or source == "friend_follow"
+	return source == "friend_invite" or source == "friend_follow" or source == "friend_hop"
 end
 
 --- Did this player arrive here straight out of a tutorial? Used only to make

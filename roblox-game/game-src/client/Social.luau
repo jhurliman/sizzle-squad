@@ -71,7 +71,13 @@ function Social:newServer()
 	self.lastAt = os.clock()
 	self.onToast("Finding another kitchen…")
 	local ok, err = pcall(function()
-		TeleportService:Teleport(game.PlaceId, Players.LocalPlayer)
+		-- `hop` marks this as the same player session continuing. Without it
+		-- the arriving server counts a new session, which re-shows the Kitchen
+		-- Card and skews every session metric (see Tutorial.joinSource).
+		--
+		-- TeleportAsync is server-only, so this is the client-side overload:
+		-- Teleport(placeId, player, teleportData).
+		TeleportService:Teleport(game.PlaceId, Players.LocalPlayer, { hop = true })
 	end)
 	if not ok then
 		self.pending = false
@@ -81,7 +87,11 @@ function Social:newServer()
 end
 
 --- Drop into a specific running server — the one a friend is already in.
-function Social:joinFriend(jobId: string, who: string?)
+--- `userId` is who they are going to see. The arriving server needs it: a
+--- player who has never finished a round would otherwise be read as an
+--- ordinary arrival and teleported straight back out to a solo First Shift,
+--- away from the friend they just asked to join.
+function Social:joinFriend(jobId: string, who: string?, userId: number?)
 	if not self:ready() then
 		return
 	end
@@ -89,7 +99,13 @@ function Social:joinFriend(jobId: string, who: string?)
 	self.lastAt = os.clock()
 	self.onToast(if who ~= nil then `Joining {who}…` else "Joining…")
 	local ok, err = pcall(function()
-		TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, Players.LocalPlayer)
+		-- Client-side overload:
+		-- TeleportToPlaceInstance(placeId, instanceId, player, spawnName, teleportData)
+		TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, Players.LocalPlayer, "", {
+			hop = true,
+			joinedFriend = true,
+			friendUserId = userId,
+		})
 	end)
 	if not ok then
 		self.pending = false

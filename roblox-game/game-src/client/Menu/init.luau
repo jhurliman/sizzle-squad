@@ -104,9 +104,9 @@ function Menu.new(deps: any)
 			end
 			self.social:newServer()
 		end,
-		onJoinFriend = function(jobId: string, who: string?)
+		onJoinFriend = function(jobId: string, who: string?, userId: number?)
 			if self.social ~= nil then
-				self.social:joinFriend(jobId, who)
+				self.social:joinFriend(jobId, who, userId)
 			end
 		end,
 	})
@@ -117,9 +117,9 @@ function Menu.new(deps: any)
 		onReady = function()
 			self.remotes.ReadyUp:FireServer(true)
 		end,
-		onJoinFriend = function(jobId: string, who: string?)
+		onJoinFriend = function(jobId: string, who: string?, userId: number?)
 			if self.social ~= nil then
-				self.social:joinFriend(jobId, who)
+				self.social:joinFriend(jobId, who, userId)
 			end
 		end,
 	})

@@ -278,6 +278,23 @@ local pendingJoins: { [any]: boolean } = {}
 -- analytics on PlayerRemoving so a hop is not counted as a quit.
 local exitReason: { [any]: string } = {}
 
+--- Is the person they came here FOR actually in this server?
+---
+--- "Somebody is online" is a different, much weaker question. An invite to a
+--- FULL kitchen routes the guest to a different server, where they arrive with
+--- `ReferredByPlayerId` still set — and skipping First Shift on that basis
+--- would drop a brand-new player into a live round among strangers, which is
+--- the exact opposite of the point. Resolve the actual user or teach them.
+local function friendIsHere(userId: number?): boolean
+	if userId == nil or userId == 0 then
+		return false
+	end
+	local ok, found = pcall(function()
+		return Players:GetPlayerByUserId(userId)
+	end)
+	return ok and found ~= nil
+end
+
 local function roundRemaining(): number
 	return shared.TUNING.roundSeconds - simService.sim.time
 end
@@ -290,58 +307,11 @@ local function seatPending()
 	broadcastEquips()
 end
 
-Players.PlayerAdded:Connect(function(player)
-	player.CharacterAdded:Connect(vaultCharacter)
-	if player.Character ~= nil then
-		vaultCharacter(player.Character)
-	end
-	-- A teleport inside this experience continues the SAME session, so the hop
-	-- must not be counted as a new one (see Progression:playerAdded).
-	local source = Tutorial.joinSource(player)
-	progression:playerAdded(player, source == "teleport_in")
-	-- Analytics BEFORE the First Shift gate. This used to sit below the
-	-- `return` on the teleport path, so a brand-new player's first server --
-	-- the one the ad actually paid for -- recorded nothing at all.
-	analytics:playerAdded(player, progression.profiles[player])
-	analytics:joinStart(player, Tutorial.isTutorialServer(), source)
-	-- FIRST SHIFT HAPPENS SOMEWHERE ELSE (see Tutorial.luau).
-	--
-	-- Before seating, before anything that would make this player part of the
-	-- room: a learner never takes one of four slots in a
-	-- live kitchen. `arrivedFromTutorial` is the loop guard -- a tutorial that
-	-- failed to pay out must not bounce the player straight back into another.
-	if
-		not Tutorial.isTutorialServer()
-		and not Tutorial.arrivedFromTutorial(player)
-		and Tutorial.needsTutorial(progression.profiles[player])
-	then
-		if Tutorial.isFriendJoin(source) and #Players:GetPlayers() > 1 then
-			-- THEY CAME HERE FOR A PERSON. Sending them to a private tutorial
-			-- server would put a load screen between them and the only thing
-			-- that reliably retains a new player, while the friend who invited
-			-- them waits alone in another kitchen. They learn standing next to
-			-- them instead.
-			--
-			-- `rounds` stays 0, so if this never becomes a finished round a
-			-- later solo join still gets First Shift properly.
-			--
-			-- The population check matters: a follow whose friend has already
-			-- left is just an ordinary new player, and still needs teaching.
-			analytics:custom(player, "first_shift_skipped", 1, { source })
-		elseif Tutorial.isStudio() then
-			-- No teleport available; run First Shift right here (Tutorial.luau).
-			Tutorial.forced = true
-			print("[sizzle] First Shift: Studio, running the tutorial in this server")
-		else
-			local sent, outcome = Tutorial.send(player)
-			analytics:custom(player, "tutorial_teleport", 1, { outcome })
-			if sent then
-				exitReason[player] = "teleport_tutorial"
-				return
-			end
-			-- Both failure paths leave the player right here, so they fall
-			-- through and are seated as an ordinary joiner.
-		end
+--- Everything that makes an arrival part of the room. Factored out so the
+--- teleport-failure rescue below can run it late.
+local function seatArrival(player: Player)
+	if player.Parent == nil then
+		return -- they left while we were getting here
 	end
 	monetization:playerAdded(player)
 	badges:backfill(player)
@@ -355,6 +325,79 @@ Players.PlayerAdded:Connect(function(player)
 	director:broadcastPhase()
 	leaderboards:pushTo(player)
 	broadcastEquips()
+end
+
+-- How long to wait before deciding a queued teleport is never going to happen.
+-- Long enough not to race a slow one; short enough that a stranded player is
+-- rescued while they are still in the room.
+local TELEPORT_RESCUE = 15
+
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(vaultCharacter)
+	if player.Character ~= nil then
+		vaultCharacter(player.Character)
+	end
+	-- A teleport inside this experience continues the SAME session, so the hop
+	-- must not be counted as a new one (see Progression:playerAdded).
+	local source, friendUserId = Tutorial.joinSource(player)
+	local hopped = Tutorial.isHop(source)
+	progression:playerAdded(player, hopped)
+	-- Analytics BEFORE the First Shift gate. This used to sit below the
+	-- `return` on the teleport path, so a brand-new player's first server --
+	-- the one the ad actually paid for -- recorded nothing at all.
+	analytics:playerAdded(player, progression.profiles[player], hopped)
+	analytics:joinStart(player, Tutorial.isTutorialServer(), source)
+	-- FIRST SHIFT HAPPENS SOMEWHERE ELSE (see Tutorial.luau).
+	--
+	-- Before seating, before anything that would make this player part of the
+	-- room: a learner never takes one of four slots in a
+	-- live kitchen. `arrivedFromTutorial` is the loop guard -- a tutorial that
+	-- failed to pay out must not bounce the player straight back into another.
+	if
+		not Tutorial.isTutorialServer()
+		and not Tutorial.arrivedFromTutorial(player)
+		and Tutorial.needsTutorial(progression.profiles[player])
+	then
+		if Tutorial.isFriendJoin(source) and friendIsHere(friendUserId) then
+			-- THEY CAME HERE FOR A PERSON. Sending them to a private tutorial
+			-- server would put a load screen between them and the only thing
+			-- that reliably retains a new player, while the friend who invited
+			-- them waits alone in another kitchen. They learn standing next to
+			-- them instead.
+			--
+			-- `rounds` stays 0, so if this never becomes a finished round a
+			-- later solo join still gets First Shift properly.
+			analytics:custom(player, "first_shift_skipped", 1, { source })
+		elseif Tutorial.isStudio() then
+			-- No teleport available; run First Shift right here (Tutorial.luau).
+			Tutorial.forced = true
+			print("[sizzle] First Shift: Studio, running the tutorial in this server")
+		else
+			local sent, outcome = Tutorial.send(player)
+			analytics:custom(player, "tutorial_teleport", 1, { outcome })
+			if sent then
+				exitReason[player] = "teleport_tutorial"
+				-- TeleportAsync returning only means the request was ACCEPTED.
+				-- A later TeleportInitFailed (GameFull, Flooded, Unauthorized)
+				-- leaves them right here having skipped everything below: no
+				-- chef, no Start button, and their eventual quit mislabelled as
+				-- a hop. If they are still in this server long after the
+				-- teleport should have happened, take them back.
+				task.delay(TELEPORT_RESCUE, function()
+					if player.Parent == nil or crew.seats[player] ~= nil or pendingJoins[player] then
+						return
+					end
+					exitReason[player] = nil
+					analytics:custom(player, "tutorial_teleport", 1, { "stranded" })
+					seatArrival(player)
+				end)
+				return
+			end
+			-- Both failure paths leave the player right here, so they fall
+			-- through and are seated as an ordinary joiner.
+		end
+	end
+	seatArrival(player)
 end)
 
 -- Roblox gives us ~30s at shutdown; without this, everything since the last

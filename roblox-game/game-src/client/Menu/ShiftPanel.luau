@@ -135,7 +135,7 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	self.joinButton.Activated:Connect(function()
 		local f = self.friend
 		if f ~= nil then
-			self.deps.onJoinFriend(f.jobId, f.name)
+			self.deps.onJoinFriend(f.jobId, f.name, f.userId)
 		end
 	end)
 

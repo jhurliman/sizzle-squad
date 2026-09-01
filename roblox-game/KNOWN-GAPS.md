@@ -87,9 +87,13 @@ a release.
   survivable; `join_start` / `tutorial_teleport` / `session_end` now measure it.
   The alternative is running First Shift in place, which the Studio path
   (`Tutorial.forced`) already does.
-- 🟡 **A friend arrival now skips First Shift entirely.** Someone who followed
-  or was invited by a friend, into a server that still has somebody in it, is
-  seated with them rather than teleported to a private tutorial. They learn by
+- 🟡 **A friend arrival now skips First Shift entirely.** Someone who followed,
+  was invited by, or tapped JOIN A FRIEND to reach a specific person — and that
+  person is resolvably in this server — is seated with them rather than
+  teleported to a private tutorial. (The check resolves the actual user, not
+  "is anyone here": an invite to a FULL kitchen routes the guest to a different
+  server with `ReferredByPlayerId` still set, and skipping the tutorial on that
+  basis would strand a first-timer among strangers.) They learn by
   playing next to the person who brought them, which is the whole reason they
   came — but they never see the two scripted tickets, so their first round is
   a live one with a stranger's pacing. `rounds` stays 0, so a later solo join

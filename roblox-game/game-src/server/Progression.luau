@@ -241,9 +241,6 @@ function Progression:push(player: any)
 		xpToNext = self.config.LEVEL_CURVE(profile.level),
 		coins = profile.coins,
 		rounds = profile.rounds,
-		-- The client gates First Shift UI on career progress, not on session
-		-- count, so it needs the same two fields Tutorial.needsTutorial reads.
-		tutorialDone = profile.tutorialDone == true,
 		totalDishes = profile.totalDishes,
 		bestRound = profile.bestRound,
 		owned = profile.owned,

@@ -166,19 +166,43 @@ local function fakePlayer(joinData, followId: number?)
 	}
 end
 
-check(Tutorial.joinSource(fakePlayer({ TeleportData = { tutorial = true } })) == "teleport_in", "teleport data reads as a hop")
-check(Tutorial.joinSource(fakePlayer({ ReferredByPlayerId = 5 })) == "friend_invite", "ReferredByPlayerId reads as an invite")
-check(Tutorial.joinSource(fakePlayer(nil, 7)) == "friend_follow", "FollowUserId reads as a follow")
+local src, who = Tutorial.joinSource(fakePlayer({ TeleportData = { tutorial = true } }))
+check(src == "teleport_in", "teleport data reads as a hop")
+check(who == nil, "and carries nobody to find")
+
+src, who = Tutorial.joinSource(fakePlayer({ ReferredByPlayerId = 5 }))
+check(src == "friend_invite", "ReferredByPlayerId reads as an invite")
+check(who == 5, `and returns the referrer ({who})`)
+
+src, who = Tutorial.joinSource(fakePlayer(nil, 7))
+check(src == "friend_follow", "FollowUserId reads as a follow")
+check(who == 7, `and returns who they followed ({who})`)
+
+-- Social:joinFriend stamps this, so tapping JOIN A FRIEND is both a same-
+-- session hop AND a friend arrival. Without it the in-game join button sent a
+-- first-timer straight back out to a solo tutorial, away from the friend they
+-- had just asked to join.
+src, who = Tutorial.joinSource(fakePlayer({ TeleportData = { hop = true, joinedFriend = true, friendUserId = 11 } }))
+check(src == "friend_hop", "JOIN A FRIEND is a friend arrival, not a plain hop")
+check(who == 11, `and knows who they went to see ({who})`)
+
 check(Tutorial.joinSource(fakePlayer({})) == "direct", "everything else is direct")
 check(Tutorial.joinSource(fakePlayer({ ReferredByPlayerId = 0 }, 0)) == "direct", "a zeroed id is not a friend join")
 
 check(Tutorial.isFriendJoin("friend_invite"), "an invite is a friend join")
 check(Tutorial.isFriendJoin("friend_follow"), "so is a follow")
+check(Tutorial.isFriendJoin("friend_hop"), "so is JOIN A FRIEND")
 check(not Tutorial.isFriendJoin("direct"), "a direct join is not")
--- A hop is NOT a friend join: the First Shift return teleport carries teleport
--- data, and treating that as "they came to play with someone" would skip the
--- tutorial for a player who is simply on their way back.
-check(not Tutorial.isFriendJoin("teleport_in"), "and neither is a hop")
+-- The First Shift return teleport carries teleport data, and treating that as
+-- "they came to play with someone" would skip the tutorial for a player who is
+-- simply on their way back.
+check(not Tutorial.isFriendJoin("teleport_in"), "and neither is an ordinary hop")
+
+-- Every in-experience teleport is the same session, however it was triggered.
+check(Tutorial.isHop("teleport_in"), "a tutorial leg is a hop")
+check(Tutorial.isHop("friend_hop"), "so is a Social teleport")
+check(not Tutorial.isHop("friend_invite"), "an invite from outside is not")
+check(not Tutorial.isHop("direct"), "and neither is a direct join")
 
 --------------------------------------------------------------------------
 -- Analytics: "new" must mean "has never finished a shift", never "sessions <= 1"
@@ -253,6 +277,24 @@ a:playerRemoving(newbie, "countdown", "teleport_tutorial")
 local se = findEvent("session_end")
 check(se ~= nil and se.fields.f1 == "teleport_tutorial", `a hop out is not a quit ({se and se.fields.f1})`)
 check(se ~= nil and se.value == 9, `and carries the duration ({se and se.value}s), which is the 8.5s number`)
+
+-- A HOP IS NOT A DROP-OFF. Hoisting playerAdded above the First Shift gate
+-- means the outward leg now has a session record, so the drop-off metrics have
+-- to exclude it explicitly -- otherwise `left_before_first_shift` fills up with
+-- 8-second teleports and average session length reads as a few seconds again,
+-- which is the very artifact this whole change exists to remove.
+check(findEvent("left_before_first_shift") == nil, "a teleport is not recorded as a bounce")
+check(findEvent("session_minutes") == nil, "and does not count as a session's length")
+check(findEvent("session_rounds") == nil, "and does not count as a session at all")
+
+-- The onboarding funnel is per player, not per server: the far side of the hop
+-- must not re-enter it, or every new player is counted twice at step 1.
+logged = {}
+local arrived = { UserId = 47, Name = "Arrived" }
+a:playerAdded(arrived, { sessions = 1, rounds = 0 }, true)
+check(findEvent("onboarding:joined") == nil, "the far side of a hop does not re-enter the funnel")
+a:playerRemoving(arrived, "countdown", "quit")
+check(findEvent("left_before_first_shift") ~= nil, "but a real quit on that leg still counts as a bounce")
 
 -- Someone who has finished a shift is not new, however few sessions they have.
 logged = {}

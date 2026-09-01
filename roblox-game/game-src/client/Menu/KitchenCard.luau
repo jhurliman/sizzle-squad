@@ -233,7 +233,7 @@ function KitchenCard.new(gui: Instance, deps: any)
 			return
 		end
 		self:hide()
-		self.deps.onJoinFriend(f.jobId, f.name)
+		self.deps.onJoinFriend(f.jobId, f.name, f.userId)
 	end)
 
 	local close = Theme.button({

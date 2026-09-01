@@ -264,7 +264,7 @@ function CareerTab:renderFriends()
 				Text = `JOIN {f.name}`,
 			}, self.friends)
 			row.Activated:Connect(function()
-				social:joinFriend(f.jobId, f.name)
+				social:joinFriend(f.jobId, f.name, f.userId)
 			end)
 		end
 	end)
