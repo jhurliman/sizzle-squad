@@ -50,17 +50,43 @@ local function try(fn: () -> ())
 	end
 end
 
-function Analytics:playerAdded(player: any, profile: any)
-	local isNew = (profile.sessions or 1) <= 1
+--- `hopped` means they arrived by a teleport inside this experience, i.e. this
+--- is the far side of a hop rather than a fresh arrival.
+function Analytics:playerAdded(player: any, profile: any, hopped: boolean?)
+	-- "New" means they have never finished a shift -- the same test First
+	-- Shift itself uses (Tutorial.needsTutorial). Deriving it from `sessions`
+	-- made every teleported player look like a returning one, which silently
+	-- emptied the onboarding funnel for 100% of real players.
+	local isNew = (profile.rounds or 0) == 0 and profile.tutorialDone ~= true
 	self.sessions[player] = {
 		joinedAt = os.clock(),
 		rounds = 0,
 		firstRoundDone = false,
 		isNew = isNew,
 	}
-	if isNew then
+	-- The onboarding funnel is a per-PLAYER funnel and a hop is the same player
+	-- continuing, so step 1 belongs to the leg they actually arrived on. Firing
+	-- it again on the far side of the First Shift teleport would count every
+	-- new player twice and make the funnel's own first step meaningless.
+	if isNew and not hopped then
 		self:onboarding(player, "joined")
 	end
+end
+
+--- The first event of a session, emitted BEFORE the First Shift gate so the
+--- teleport leg is visible at all. Together, `server_kind` and `arrival` say
+--- which leg of the round trip this is -- the one thing the old funnel could
+--- not tell you, because it started after the teleport had already happened.
+--- `source` is Tutorial.joinSource: teleport_in / friend_invite /
+--- friend_follow / direct. It is the only acquisition breakdown available to a
+--- running server -- the analytics query API has no dimension for it -- so
+--- this event is where "how many of our players arrive through a friend"
+--- gets answered.
+function Analytics:joinStart(player: any, isTutorialServer: boolean, source: string)
+	local s = self.sessions[player]
+	local kind = if isTutorialServer then "tutorial_server" else "public_server"
+	local who = if s ~= nil and s.isNew then "new" else "returning"
+	self:custom(player, "join_start", 1, { kind, source, who })
 end
 
 function Analytics:onboarding(player: any, step: string)
@@ -199,7 +225,18 @@ end
 --- `phase` is the round phase they left during, which separates "sat in the
 --- lobby and never pressed Start" from "bailed mid-shift" -- two very
 --- different problems with the same session length.
-function Analytics:playerRemoving(player: any, phase: string?)
+--- Exits that are this experience moving a player, not a player leaving it.
+--- They still emit `session_end` -- the hop has a real cost and it should be
+--- measurable -- but never the drop-off metrics.
+local HOP_EXITS: { [string]: boolean } = {
+	teleport_tutorial = true,
+	teleport_home = true,
+}
+
+--- `reason` separates a teleport out of this server from an actual quit. They
+--- were indistinguishable before, and the teleport is by far the more common
+--- exit -- which is why average session length read as a few seconds.
+function Analytics:playerRemoving(player: any, phase: string?, reason: string?)
 	local s = self.sessions[player]
 	self.sessions[player] = nil
 	if s == nil then
@@ -211,6 +248,24 @@ function Analytics:playerRemoving(player: any, phase: string?)
 
 	-- Tagged, so session length can be broken down BY cohort rather than
 	-- averaged across everyone.
+	local why = reason or "quit"
+
+	-- Custom fields cap at three, so the exit reason gets its own event rather
+	-- than being silently truncated off the end of session_minutes. This is
+	-- the one event a hop still emits, and it is how the cost of the First
+	-- Shift round trip gets measured: sum it across the legs of a session.
+	self:custom(player, "session_end", math.floor(seconds), { why, who, durationBucket(seconds) })
+
+	-- A HOP IS NOT A DROP-OFF. Everything below is a drop-off metric, and a
+	-- player teleported to their own tutorial has not dropped off -- they are
+	-- on their way to the thing being measured. Emitting these for the outward
+	-- leg would fill `left_before_first_shift`, the most expensive drop-off
+	-- there is, with 8-second teleports and reproduce exactly the artifact
+	-- this was built to explain.
+	if HOP_EXITS[why] then
+		return
+	end
+
 	self:custom(player, "session_minutes", math.floor(seconds / 6) / 10, { cohort, who, durationBucket(seconds) })
 	self:custom(player, "session_rounds", s.rounds, { cohort, who })
 

@@ -81,13 +81,16 @@ end
 --- Send a player to their own tutorial instance. Returns false if Roblox would
 --- not give us one, in which case the caller must carry on as normal -- a new
 --- player who cannot be taught is still a player who can play.
-function Tutorial.send(player: Player): boolean
+--- The second return value is the outcome, for analytics: "sent",
+--- "reserve_failed" or "teleport_failed". Both failures leave the player in
+--- this server, which the caller must then seat as normal.
+function Tutorial.send(player: Player): (boolean, string)
 	local ok, code = pcall(function()
 		return svc("TeleportService"):ReserveServer(game.PlaceId)
 	end)
 	if not ok or type(code) ~= "string" then
 		warn(`[sizzle] tutorial ReserveServer failed: {code}`)
-		return false
+		return false, "reserve_failed"
 	end
 	local options = Instance.new("TeleportOptions")
 	options.ReservedServerAccessCode = code
@@ -97,9 +100,9 @@ function Tutorial.send(player: Player): boolean
 	end)
 	if not ok2 then
 		warn(`[sizzle] tutorial teleport failed: {err}`)
-		return false
+		return false, "teleport_failed"
 	end
-	return true
+	return true, "sent"
 end
 
 --- Back to public matchmaking. `TeleportAsync` with no reserved code re-runs
@@ -126,6 +129,71 @@ function Tutorial.sendHome(player: Player)
 	if not ok then
 		warn(`[sizzle] tutorial return teleport failed: {err}`)
 	end
+end
+
+--- WHERE THIS PLAYER CAME FROM.
+---
+--- Roblox exposes no "search vs discovery vs ad" signal to a running server --
+--- that breakdown lives only in the Creator Dashboard's acquisition report,
+--- and the analytics query API has no dimension for it either. What a server
+--- CAN see is the two arrivals that should change what happens next:
+---
+---   "teleport_in"   -- another server in this experience sent them. Both legs
+---                      of the First Shift round trip look like this, which is
+---                      how a same-session hop is told apart from a new
+---                      session. Counting the hop as a session is what made a
+---                      brand-new player read as a returning one.
+---   "friend_invite" -- accepted an invite (GetJoinData().ReferredByPlayerId)
+---   "friend_follow" -- followed a friend in (Player.FollowUserId)
+---   "direct"        -- everything else: search, discovery, an ad, a link.
+---                      Indistinguishable from each other from in here.
+--- Returns the source and, when there is one, the user they came here FOR --
+--- which is the only way to tell "my friend is in this kitchen" from "somebody
+--- is in this kitchen".
+function Tutorial.joinSource(player: Player): (string, number?)
+	local ok, data = pcall(function()
+		return player:GetJoinData()
+	end)
+	local d: any = if ok and type(data) == "table" then data else {}
+	local td: any = d.TeleportData
+	if type(td) == "table" then
+		-- Social:joinFriend sets this. Without it, tapping JOIN A FRIEND looked
+		-- like an ordinary arrival, so a player who had never finished a round
+		-- was teleported straight back out to a solo tutorial -- away from the
+		-- friend they had just asked to join.
+		if td.joinedFriend == true then
+			return "friend_hop", tonumber(td.friendUserId)
+		end
+		return "teleport_in", nil
+	end
+	local referred = tonumber(d.ReferredByPlayerId) or 0
+	if referred ~= 0 then
+		return "friend_invite", referred
+	end
+	-- FollowUserId is a property, not join data, and is 0 when unused.
+	local okFollow, follow = pcall(function()
+		return player.FollowUserId
+	end)
+	local followId = if okFollow then tonumber(follow) or 0 else 0
+	if followId ~= 0 then
+		return "friend_follow", followId
+	end
+	return "direct", nil
+end
+
+--- A hop inside this experience: the same player session continuing. Both legs
+--- of the First Shift round trip and every Social teleport are hops.
+function Tutorial.isHop(source: string): boolean
+	return source == "teleport_in" or source == "friend_hop"
+end
+
+--- Did they come here to play with somebody specific? These are the arrivals
+--- worth interrupting First Shift for: sending someone to a private tutorial
+--- server while the friend who invited them sits waiting in another kitchen
+--- trades the one thing that actually retains players -- another person -- for
+--- two scripted tickets they could just as easily learn standing next to them.
+function Tutorial.isFriendJoin(source: string): boolean
+	return source == "friend_invite" or source == "friend_follow" or source == "friend_hop"
 end
 
 --- Did this player arrive here straight out of a tutorial? Used only to make

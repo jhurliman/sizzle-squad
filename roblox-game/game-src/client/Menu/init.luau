@@ -104,9 +104,9 @@ function Menu.new(deps: any)
 			end
 			self.social:newServer()
 		end,
-		onJoinFriend = function(jobId: string, who: string?)
+		onJoinFriend = function(jobId: string, who: string?, userId: number?)
 			if self.social ~= nil then
-				self.social:joinFriend(jobId, who)
+				self.social:joinFriend(jobId, who, userId)
 			end
 		end,
 	})
@@ -117,9 +117,9 @@ function Menu.new(deps: any)
 		onReady = function()
 			self.remotes.ReadyUp:FireServer(true)
 		end,
-		onJoinFriend = function(jobId: string, who: string?)
+		onJoinFriend = function(jobId: string, who: string?, userId: number?)
 			if self.social ~= nil then
-				self.social:joinFriend(jobId, who)
+				self.social:joinFriend(jobId, who, userId)
 			end
 		end,
 	})
@@ -485,7 +485,10 @@ function Menu:maybeAutoStart()
 	if self.autoStarted or self.progress == nil then
 		return
 	end
-	if (self.progress.sessions or 1) > 1 then
+	-- Gate on career progress, not session count. A First Shift player reaches
+	-- this server through a teleport, and counting that hop as a session is
+	-- what stopped this auto-start from ever firing in production.
+	if (self.progress.rounds or 0) > 0 or self.progress.tutorialDone == true then
 		self.autoStarted = true -- returning player: they press the button
 		return
 	end
