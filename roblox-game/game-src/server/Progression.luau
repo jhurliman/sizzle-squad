@@ -123,7 +123,7 @@ end
 
 -- ------------------------------------------------------------- profile I/O
 
-function Progression:playerAdded(player: any)
+function Progression:playerAdded(player: any, sameSession: boolean?)
 	local profile = defaultProfile()
 	if self.stores ~= nil then
 		-- Load AND claim in one UpdateAsync, so the read and the lock write
@@ -165,7 +165,15 @@ function Progression:playerAdded(player: any)
 	end
 	-- Session count drives the Kitchen Card, which must never appear on a
 	-- player's first-ever session (FirstShift owns that moment).
-	profile.sessions = (profile.sessions or 0) + 1
+	--
+	-- A teleport inside this experience is the SAME session continuing. This
+	-- used to increment on every server join, so a brand-new player arrived at
+	-- their own First Shift server already reading `sessions == 2`: the
+	-- auto-start was skipped, the Kitchen Card threw "Welcome back, chef" over
+	-- the Start button, and the onboarding funnel recorded nothing for anyone.
+	if not sameSession then
+		profile.sessions = (profile.sessions or 0) + 1
+	end
 	-- A brand-new chef arrives bare-headed even though they already own the
 	-- Paper Hat, so their first shift looks like the game forgot to dress
 	-- them. Put it on; they can take it off in the wardrobe.
@@ -233,6 +241,9 @@ function Progression:push(player: any)
 		xpToNext = self.config.LEVEL_CURVE(profile.level),
 		coins = profile.coins,
 		rounds = profile.rounds,
+		-- The client gates First Shift UI on career progress, not on session
+		-- count, so it needs the same two fields Tutorial.needsTutorial reads.
+		tutorialDone = profile.tutorialDone == true,
 		totalDishes = profile.totalDishes,
 		bestRound = profile.bestRound,
 		owned = profile.owned,

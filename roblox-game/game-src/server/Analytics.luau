@@ -51,7 +51,11 @@ local function try(fn: () -> ())
 end
 
 function Analytics:playerAdded(player: any, profile: any)
-	local isNew = (profile.sessions or 1) <= 1
+	-- "New" means they have never finished a shift -- the same test First
+	-- Shift itself uses (Tutorial.needsTutorial). Deriving it from `sessions`
+	-- made every teleported player look like a returning one, which silently
+	-- emptied the onboarding funnel for 100% of real players.
+	local isNew = (profile.rounds or 0) == 0 and profile.tutorialDone ~= true
 	self.sessions[player] = {
 		joinedAt = os.clock(),
 		rounds = 0,
@@ -61,6 +65,18 @@ function Analytics:playerAdded(player: any, profile: any)
 	if isNew then
 		self:onboarding(player, "joined")
 	end
+end
+
+--- The first event of a session, emitted BEFORE the First Shift gate so the
+--- teleport leg is visible at all. Together, `server_kind` and `arrival` say
+--- which leg of the round trip this is -- the one thing the old funnel could
+--- not tell you, because it started after the teleport had already happened.
+function Analytics:joinStart(player: any, isTutorialServer: boolean, hopped: boolean)
+	local s = self.sessions[player]
+	local kind = if isTutorialServer then "tutorial_server" else "public_server"
+	local arrival = if hopped then "teleport_in" else "fresh_join"
+	local who = if s ~= nil and s.isNew then "new" else "returning"
+	self:custom(player, "join_start", 1, { kind, arrival, who })
 end
 
 function Analytics:onboarding(player: any, step: string)
@@ -199,7 +215,10 @@ end
 --- `phase` is the round phase they left during, which separates "sat in the
 --- lobby and never pressed Start" from "bailed mid-shift" -- two very
 --- different problems with the same session length.
-function Analytics:playerRemoving(player: any, phase: string?)
+--- `reason` separates a teleport out of this server from an actual quit. They
+--- were indistinguishable before, and the teleport is by far the more common
+--- exit -- which is why average session length read as a few seconds.
+function Analytics:playerRemoving(player: any, phase: string?, reason: string?)
 	local s = self.sessions[player]
 	self.sessions[player] = nil
 	if s == nil then
@@ -211,8 +230,13 @@ function Analytics:playerRemoving(player: any, phase: string?)
 
 	-- Tagged, so session length can be broken down BY cohort rather than
 	-- averaged across everyone.
+	local why = reason or "quit"
+
 	self:custom(player, "session_minutes", math.floor(seconds / 6) / 10, { cohort, who, durationBucket(seconds) })
 	self:custom(player, "session_rounds", s.rounds, { cohort, who })
+	-- Custom fields cap at three, so the exit reason gets its own event rather
+	-- than being silently truncated off the end of session_minutes.
+	self:custom(player, "session_end", math.floor(seconds), { why, who, durationBucket(seconds) })
 
 	if s.rounds == 0 then
 		-- Joined and left without ever starting a shift: the most expensive

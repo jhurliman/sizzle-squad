@@ -274,6 +274,9 @@ end
 -- round, hold the joiner as a spectator (they get the snapshot and watch the
 -- kitchen) and seat them at the next phase change instead.
 local pendingJoins: { [any]: boolean } = {}
+-- Why a player left, when we know. Set before we teleport them out; read by
+-- analytics on PlayerRemoving so a hop is not counted as a quit.
+local exitReason: { [any]: string } = {}
 
 local function roundRemaining(): number
 	return shared.TUNING.roundSeconds - simService.sim.time
@@ -292,11 +295,19 @@ Players.PlayerAdded:Connect(function(player)
 	if player.Character ~= nil then
 		vaultCharacter(player.Character)
 	end
-	progression:playerAdded(player)
+	-- A teleport inside this experience continues the SAME session, so the hop
+	-- must not be counted as a new one (see Progression:playerAdded).
+	local hopped = Tutorial.arrivedByTeleport(player)
+	progression:playerAdded(player, hopped)
+	-- Analytics BEFORE the First Shift gate. This used to sit below the
+	-- `return` on the teleport path, so a brand-new player's first server --
+	-- the one the ad actually paid for -- recorded nothing at all.
+	analytics:playerAdded(player, progression.profiles[player])
+	analytics:joinStart(player, Tutorial.isTutorialServer(), hopped)
 	-- FIRST SHIFT HAPPENS SOMEWHERE ELSE (see Tutorial.luau).
 	--
-	-- Before seating, before analytics, before anything that would make this
-	-- player part of the room: a learner never takes one of four slots in a
+	-- Before seating, before anything that would make this player part of the
+	-- room: a learner never takes one of four slots in a
 	-- live kitchen. `arrivedFromTutorial` is the loop guard -- a tutorial that
 	-- failed to pay out must not bounce the player straight back into another.
 	if
@@ -308,12 +319,18 @@ Players.PlayerAdded:Connect(function(player)
 			-- No teleport available; run First Shift right here (Tutorial.luau).
 			Tutorial.forced = true
 			print("[sizzle] First Shift: Studio, running the tutorial in this server")
-		elseif Tutorial.send(player) then
-			return
+		else
+			local sent, outcome = Tutorial.send(player)
+			analytics:custom(player, "tutorial_teleport", 1, { outcome })
+			if sent then
+				exitReason[player] = "teleport_tutorial"
+				return
+			end
+			-- Both failure paths leave the player right here, so they fall
+			-- through and are seated as an ordinary joiner.
 		end
 	end
 	monetization:playerAdded(player)
-	analytics:playerAdded(player, progression.profiles[player])
 	badges:backfill(player)
 	if director.phase == "round" and roundRemaining() < Config.LATE_JOIN_CUTOFF then
 		pendingJoins[player] = true
@@ -338,7 +355,8 @@ Players.PlayerRemoving:Connect(function(player)
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
 	monetization:playerRemoving(player)
-	analytics:playerRemoving(player, director.phase)
+	analytics:playerRemoving(player, director.phase, exitReason[player])
+	exitReason[player] = nil
 	badges:playerRemoving(player)
 	-- director.ready is keyed by Player and had no cleanup: it leaked a key
 	-- per departure and could strand a stale ready that nothing could clear.

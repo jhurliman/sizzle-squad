@@ -138,7 +138,10 @@ function KitchenCard.new(gui: Instance, deps: any)
 		Text = "PLAY",
 	}, row)
 	self.primary.Activated:Connect(function()
-		if self.phase.phase == "intermission" then
+		-- "countdown" is the phase a freshly started server sits in, and it is
+		-- the ONLY phase a reserved First Shift server is ever in. PLAY did
+		-- nothing there -- on the one screen where it mattered most.
+		if self.phase.phase == "intermission" or self.phase.phase == "countdown" then
 			self.deps.onReady()
 		end
 		self:hide()
@@ -288,7 +291,10 @@ function KitchenCard:maybeShow()
 	if self.consumed or self.shown or self.progress == nil then
 		return
 	end
-	if (self.progress.sessions or 1) <= 1 then
+	-- Keyed on career progress rather than session count, which the First
+	-- Shift teleport inflated -- that is how "Welcome back, chef" ended up
+	-- covering the Start button on a brand-new player's very first screen.
+	if (self.progress.rounds or 0) == 0 and self.progress.tutorialDone ~= true then
 		self.consumed = true -- first-ever session: FirstShift owns this moment
 		return
 	end

@@ -61,7 +61,9 @@ check(sess ~= nil and sess.fields ~= nil and sess.fields.f1 == "no_shift",
 logged = {}
 local player = { UserId = 2, Name = "Chef" }
 clock.t = 0
-a:playerAdded(player, { sessions = 4 })
+-- A returning player is one with SHIFTS behind them; `sessions` no longer
+-- decides that (see first-session-harness).
+a:playerAdded(player, { sessions = 4, rounds = 4 })
 a:roundStarted(player, 1, 2)
 clock.t = 300
 a:playerRemoving(player, "intermission")

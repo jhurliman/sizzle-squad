@@ -22,11 +22,14 @@ the game or into getting people into it.
 Not gaps — questions only players can answer. Nothing here is a reason to hold
 a release.
 
-- 🟢 **Analytics has produced no dashboard data yet**, which is expected with
-  almost no users: the events are pcall'd and degrade to a no-op, so silence is
-  indistinguishable from working until there is volume. Covered by
-  `tools/analytics-harness.luau` against a fake service. Check once the soft
-  launch has run a week; the onboarding funnel is the one to read first.
+- ✅ **The onboarding funnel's silence was a bug, not low volume.** This entry
+  used to read "expected with almost no users". It was not. `Analytics.isNew`
+  derived from `profile.sessions`, which counted server joins, so the First
+  Shift teleport made every real player arrive tagged `returning` and every
+  onboarding step early-returned. `analytics:playerAdded` also sat *below* the
+  `return` on the teleport path, so a new player's first server recorded
+  nothing at all. Both fixed; pinned by `tools/first-session-harness.luau`.
+  Read the onboarding funnel first — it has real data in it now.
 - 🟢 **Localized text fit is unchecked.** All 133 strings are translated into
   seven languages and wired, but German and Japanese routinely overrun controls
   sized for English. The CTA labels auto-scale; the fixed-width chips do not.
@@ -72,10 +75,18 @@ a release.
   backstop.
 - 🟢 **No per-player ready pips** on the shift panel.
 - 🟢 **First Shift does not own its own trigger** — `Menu:maybeAutoStart` still
-  starts a first-ever player's round.
-- 🟡 **The extra load screen on a first-ever join needs more measurement.**
-  First Shift teleports into a reserved server; that lands at the worst moment
-  in the funnel and should be timed on multiple real devices.
+  starts a first-ever player's round. (It gates on `rounds`/`tutorialDone` now;
+  it used to gate on `sessions` and so never fired in production at all.)
+- 🟠 **The extra load screen on a first-ever join is now measured, and it is
+  expensive.** First Shift teleports into a reserved server. From the Aug 2026
+  ad campaign: 677 attributed plays, 1.6h total playtime — 8.5s average — and
+  of 250 sampled profiles, 91.6% never played a round. 182 reached the tutorial
+  server and 2 of them started a shift. The `sessions` off-by-one that made
+  that server hostile is fixed, but the second load screen is still there and
+  still lands at the worst moment. Next campaign will say whether it alone is
+  survivable; `join_start` / `tutorial_teleport` / `session_end` now measure it.
+  The alternative is running First Shift in place, which the Studio path
+  (`Tutorial.forced`) already does.
 - 🟢 **ReadyUp is not rate limited** (it re-broadcasts phase on every call).
   Emote is allowlisted by id; GrabEdge is capped at 3 queued.
 - 🟢 **No packet-loss extrapolation** beyond hold-last-sample for remote chefs.

@@ -81,13 +81,16 @@ end
 --- Send a player to their own tutorial instance. Returns false if Roblox would
 --- not give us one, in which case the caller must carry on as normal -- a new
 --- player who cannot be taught is still a player who can play.
-function Tutorial.send(player: Player): boolean
+--- The second return value is the outcome, for analytics: "sent",
+--- "reserve_failed" or "teleport_failed". Both failures leave the player in
+--- this server, which the caller must then seat as normal.
+function Tutorial.send(player: Player): (boolean, string)
 	local ok, code = pcall(function()
 		return svc("TeleportService"):ReserveServer(game.PlaceId)
 	end)
 	if not ok or type(code) ~= "string" then
 		warn(`[sizzle] tutorial ReserveServer failed: {code}`)
-		return false
+		return false, "reserve_failed"
 	end
 	local options = Instance.new("TeleportOptions")
 	options.ReservedServerAccessCode = code
@@ -97,9 +100,9 @@ function Tutorial.send(player: Player): boolean
 	end)
 	if not ok2 then
 		warn(`[sizzle] tutorial teleport failed: {err}`)
-		return false
+		return false, "teleport_failed"
 	end
-	return true
+	return true, "sent"
 end
 
 --- Back to public matchmaking. `TeleportAsync` with no reserved code re-runs
@@ -126,6 +129,17 @@ function Tutorial.sendHome(player: Player)
 	if not ok then
 		warn(`[sizzle] tutorial return teleport failed: {err}`)
 	end
+end
+
+--- Did this player arrive here by any teleport inside this experience? Both
+--- legs of the First Shift round trip carry teleport data, so this is how a
+--- same-session hop is told apart from a genuinely new session. Counting the
+--- hop as a session is what made a brand-new player read as a returning one.
+function Tutorial.arrivedByTeleport(player: Player): boolean
+	local ok, data = pcall(function()
+		return player:GetJoinData().TeleportData
+	end)
+	return ok and type(data) == "table"
 end
 
 --- Did this player arrive here straight out of a tutorial? Used only to make
