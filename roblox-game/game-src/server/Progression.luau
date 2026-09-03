@@ -66,6 +66,27 @@ local DAILIES = {
 	{ id = "combo8", name = "Reach an 8x combo", stat = "combo8", goal = 1, coins = 70, xp = 50 },
 }
 
+--- HOW FAR A PLAYER GOT, AS AN ORDERED FUNNEL.
+---
+--- `rounds > 0` answers "did they ever finish a shift" and nothing else, so a
+--- player who quit is indistinguishable from one who never got a chef. These
+--- are the stages between, every one of them derived from state the SERVER
+--- already owns -- no client telemetry, no new remotes, nothing to trust.
+---
+--- It lives in the profile rather than in AnalyticsService because a profile
+--- can be read back through Open Cloud and an analytics event cannot: those
+--- are Creator-Dashboard-only, aggregate, never per-player. Writing the funnel
+--- into the profile is the only way to ask "where did THIS player stop".
+local REACH_ORDER: { [string]: number } = {
+	joined = 1, -- PlayerAdded ran; they exist to the server
+	seated = 2, -- got a chef; the round can see them
+	moved = 3, -- first movement input that actually moved
+	pressed = 4, -- first action press
+	carried = 5, -- held an item: they understood pick-up
+	worked = 6, -- committed to a station: chopping, frying, washing
+	finished = 7, -- completed a shift
+}
+
 local function defaultProfile(): any
 	return {
 		xp = 0,
@@ -74,6 +95,11 @@ local function defaultProfile(): any
 		rounds = 0,
 		totalDishes = 0,
 		bestRound = 0,
+		-- Seconds of real play, accumulated across sessions. Nothing recorded
+		-- time before this, so "how long did they last" was unanswerable.
+		playSeconds = 0,
+		-- Furthest funnel stage ever reached (see REACH_ORDER).
+		reach = "",
 		owned = { hat_paper = true },
 		-- no cosmetic hat by default: the species' built-in hats show until the
 		-- player equips one (playtest: paper hat on top of built-in hats = jank)
@@ -106,6 +132,8 @@ function Progression.new(config: any, remotes: { [string]: any }, catalog: any, 
 	-- the results ceremony and by analytics; both need the delta, not the
 	-- running total.
 	self.lastAward = {} :: { [any]: any }
+	-- player -> os.clock() at the last accrual, for playSeconds.
+	self.joinedAt = {} :: { [any]: number }
 	self.lastSave = os.clock()
 
 	self.stores = nil
@@ -180,12 +208,54 @@ function Progression:playerAdded(player: any, sameSession: boolean?)
 	if profile.sessions == 1 and profile.equipped.hat == nil and profile.owned.hat_paper then
 		profile.equipped.hat = "hat_paper"
 	end
+	-- WHEN, not just how often. `os.time` is wall-clock epoch seconds and is
+	-- the only thing here that survives a server restart; `os.clock` is server
+	-- uptime and is useless across sessions.
+	local nowEpoch = os.time()
+	profile.firstJoinAt = profile.firstJoinAt or nowEpoch
+	profile.lastSeenAt = nowEpoch
+	self.joinedAt[player] = os.clock()
 	self.dirty[player] = true
 	self.profiles[player] = profile
 	self:push(player)
 end
 
+--- Fold the time since the last accrual into `playSeconds`. Called on leave and
+--- on every autosave, so a server that dies without a clean PlayerRemoving
+--- still loses at most one autosave interval rather than the whole session.
+function Progression:accrue(player: any)
+	local started = self.joinedAt[player]
+	local profile = self.profiles[player]
+	if started == nil or profile == nil then
+		return
+	end
+	local now = os.clock()
+	profile.playSeconds = (profile.playSeconds or 0) + (now - started)
+	profile.lastSeenAt = os.time()
+	self.joinedAt[player] = now
+	self.dirty[player] = true
+end
+
+--- Record the furthest point this player has reached. Monotonic: a later
+--- session can push it forward, never back, so the value always answers "the
+--- best they ever managed" -- which for anyone who never returns is also
+--- exactly where they gave up.
+function Progression:noteReach(player: any, stage: string)
+	local profile = self.profiles[player]
+	local rank = REACH_ORDER[stage]
+	if profile == nil or rank == nil then
+		return
+	end
+	if (REACH_ORDER[profile.reach] or 0) >= rank then
+		return
+	end
+	profile.reach = stage
+	self.dirty[player] = true
+end
+
 function Progression:playerRemoving(player: any)
+	self:accrue(player)
+	self.joinedAt[player] = nil
 	self.lastAward[player] = nil
 	self:save(player, true)
 	self.profiles[player] = nil
@@ -459,6 +529,13 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 	-- has to be comfortably longer than the autosave interval.
 	if os.clock() - self.lastSave > AUTOSAVE_SECONDS then
 		self.lastSave = os.clock()
+		-- Fold elapsed play time in BEFORE snapshotting the dirty set, so a
+		-- server that dies between autosaves loses at most one interval of
+		-- playSeconds rather than the whole session. accrue() marks dirty, so
+		-- anyone currently in the kitchen is included below.
+		for player in self.profiles do
+			self:accrue(player)
+		end
 		local pending = {}
 		for player in self.dirty do
 			table.insert(pending, player)

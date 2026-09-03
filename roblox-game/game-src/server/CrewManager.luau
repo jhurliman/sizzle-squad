@@ -33,6 +33,10 @@ function CrewManager.new(
 	self.skinFor = skinFor
 	self.seats = {} :: { [any]: Seat } -- keyed by Player
 	self.byChef = {} :: { [number]: Seat }
+	-- Reports how far a player has got (see Progression.noteReach). Assigned
+	-- by the composition root once progression exists; a no-op until then so
+	-- the harnesses can drive input without wiring persistence.
+	self.onReach = function(_player: any, _stage: string) end
 
 	remotes.MoveStream.OnServerEvent:Connect(function(player: any, b: any)
 		local seat = self.seats[player]
@@ -44,6 +48,12 @@ function CrewManager.new(
 			return
 		end
 		self:touch(seat)
+		-- A move packet arrives every frame whether or not the stick is being
+		-- held, so only a non-zero velocity counts as "this player moved".
+		-- Without that test every joiner would look like they had moved.
+		if p.vx * p.vx + p.vy * p.vy > 0.01 then
+			self.onReach(player, "moved")
+		end
 		simService:humanMove(seat.chefId, p)
 	end)
 
@@ -53,6 +63,7 @@ function CrewManager.new(
 			return
 		end
 		self:touch(seat)
+		self.onReach(player, "pressed")
 		simService:pressGrab(seat.chefId)
 	end)
 

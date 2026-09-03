@@ -34,6 +34,8 @@ end
 -- Progression, against an in-memory store, so the profile really round-trips
 -- through save-and-release the way it does across a teleport.
 --------------------------------------------------------------------------
+local CLOCK = { t = 1000 }
+
 local store = { data = {} }
 function store:UpdateAsync(key, fn)
 	local new = fn(self.data[key])
@@ -65,7 +67,17 @@ local penv = {
 		end,
 		BindToClose = function() end,
 	},
-	os = os,
+	-- A CONTROLLABLE CLOCK. playSeconds is a difference of os.clock() readings,
+	-- so it can only be tested if the harness owns the clock.
+	os = {
+		clock = function()
+			return CLOCK.t
+		end,
+		time = function()
+			return 1788000000 + math.floor(CLOCK.t)
+		end,
+		date = os.date,
+	},
 	math = math,
 	table = table,
 	string = string,
@@ -124,6 +136,84 @@ tutorial:playerRemoving(newbie)
 local later = Progression.new(Config, remotes, Catalog, fakeDSS)
 later:playerAdded(newbie, false)
 check(later.profiles[newbie].sessions == 2, `coming back tomorrow IS a new session (got {later.profiles[newbie].sessions})`)
+
+--------------------------------------------------------------------------
+-- HOW FAR THEY GOT, AND HOW LONG THEY LASTED.
+--
+-- `rounds > 0` says only "did they ever finish a shift". For the ~76% who
+-- never do, it says nothing at all -- a player who quit on the loading screen
+-- and one who chopped for two minutes are the same row. These two fields are
+-- what turn that undifferentiated block into a funnel, and they live in the
+-- profile because a profile is readable through Open Cloud and an analytics
+-- event is not.
+--------------------------------------------------------------------------
+local funnelStore = { data = {} }
+function funnelStore:UpdateAsync(key, fn)
+	local nv = fn(self.data[key])
+	if nv ~= nil then
+		self.data[key] = nv
+	end
+	return self.data[key]
+end
+function funnelStore:GetAsync(key)
+	return self.data[key]
+end
+function funnelStore:SetAsync(key, v)
+	self.data[key] = v
+end
+local funnelDSS = {}
+funnelDSS.GetDataStore = function(_self)
+	return funnelStore
+end
+funnelDSS.GetOrderedDataStore = function(_self)
+	return ordered
+end
+
+CLOCK.t = 5000
+local fp = Progression.new(Config, remotes, Catalog, funnelDSS)
+local walker = { UserId = 77, Name = "Walker" }
+fp:playerAdded(walker, false)
+local wp = fp.profiles[walker]
+
+check(wp.reach == "", "a fresh profile has reached nothing yet")
+check(wp.playSeconds == 0, "and has no time on the clock")
+check(wp.firstJoinAt ~= nil, "firstJoinAt is stamped on the first join")
+local firstJoin = wp.firstJoinAt
+
+fp:noteReach(walker, "joined")
+check(wp.reach == "joined", "joined is recorded")
+fp:noteReach(walker, "moved")
+check(wp.reach == "moved", "and the funnel advances")
+-- MONOTONIC. `seated` fires after `moved` in a late-join, and a funnel that
+-- could go backwards would report the wrong drop-off stage for that player.
+fp:noteReach(walker, "seated")
+check(wp.reach == "moved", "an earlier stage never overwrites a later one")
+fp:noteReach(walker, "worked")
+check(wp.reach == "worked", "but a later stage does advance it")
+fp:noteReach(walker, "nonsense")
+check(wp.reach == "worked", "an unknown stage is ignored rather than stored")
+
+-- Time accrues in real seconds and survives the round trip.
+CLOCK.t = 5090
+fp:accrue(walker)
+check(math.abs(wp.playSeconds - 90) < 0.01, `90s of play is recorded (got {wp.playSeconds})`)
+CLOCK.t = 5100
+fp:accrue(walker)
+check(math.abs(wp.playSeconds - 100) < 0.01, `accrual is incremental, not restated (got {wp.playSeconds})`)
+check(wp.lastSeenAt ~= nil and wp.lastSeenAt >= firstJoin, "lastSeenAt moves forward")
+
+-- A second session continues the same totals rather than resetting them.
+fp:playerRemoving(walker)
+CLOCK.t = 9000
+local fp2 = Progression.new(Config, remotes, Catalog, funnelDSS)
+fp2:playerAdded(walker, false)
+local wp2 = fp2.profiles[walker]
+check(math.abs(wp2.playSeconds - 100) < 0.01, `play time persists across sessions (got {wp2.playSeconds})`)
+check(wp2.reach == "worked", "and so does the furthest stage reached")
+check(wp2.firstJoinAt == firstJoin, "firstJoinAt is never overwritten")
+CLOCK.t = 9060
+fp2:accrue(walker)
+check(math.abs(wp2.playSeconds - 160) < 0.01, `a later session adds to it (got {wp2.playSeconds})`)
 
 --------------------------------------------------------------------------
 -- Where a player came from. Roblox tells a running server almost nothing --

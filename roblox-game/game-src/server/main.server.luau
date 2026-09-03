@@ -35,6 +35,12 @@ local crew = CrewManager.new(simService, Net, remotes, replicator, os.clock, fun
 end)
 progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("Catalog")))
 
+-- CrewManager sees the input, Progression owns the profile; connect them once
+-- both exist (CrewManager is built before progression, hence the late assign).
+crew.onReach = function(player: any, stage: string)
+	progression:noteReach(player, stage)
+end
+
 local Catalog = require(gameShared:WaitForChild("Catalog")) :: any
 local leaderboards = Leaderboards.new(progression, remotes)
 local badges = Badges.new(Config)
@@ -69,6 +75,7 @@ local director = RoundDirector.new(shared, Config, simService, crew, replicator,
 		badges:onRoundEnd(crew, progression, results)
 		for player in crew.seats do
 			analytics:roundFinished(player, director.round, results, progression.lastAward[player])
+			progression:noteReach(player, "finished")
 		end
 	end,
 	onRoundStart = function(roundIndex)
@@ -321,6 +328,7 @@ local function seatArrival(player: Player)
 	else
 		crew:playerAdded(player)
 		analytics:onboarding(player, "seated")
+		progression:noteReach(player, "seated")
 	end
 	director:broadcastPhase()
 	leaderboards:pushTo(player)
@@ -347,6 +355,7 @@ Players.PlayerAdded:Connect(function(player)
 	-- the one the ad actually paid for -- recorded nothing at all.
 	analytics:playerAdded(player, progression.profiles[player], hopped)
 	analytics:joinStart(player, Tutorial.isTutorialServer(), source)
+	progression:noteReach(player, "joined")
 	-- FIRST SHIFT HAPPENS SOMEWHERE ELSE (see Tutorial.luau).
 	--
 	-- Before seating, before anything that would make this player part of the
@@ -408,6 +417,14 @@ end)
 
 Players.PlayerRemoving:Connect(function(player)
 	pendingJoins[player] = nil
+	-- Read the funnel stage BEFORE progression drops the profile. The same
+	-- value is persisted for Open Cloud; this copy is for the dashboard, which
+	-- is the only place a distribution across all players can be eyeballed.
+	local profile = progression.profiles[player]
+	local reached = profile and profile.reach or ""
+	if reached ~= "" then
+		analytics:custom(player, "first_shift_reach", 1, { reached, exitReason[player] or "quit" })
+	end
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
 	monetization:playerRemoving(player)
@@ -440,9 +457,34 @@ task.spawn(function()
 	end
 end)
 
+-- WHAT THE PLAYER ACTUALLY MANAGED, read off the sim rather than reported by
+-- the client. `carrying` means they worked out pick-up; `working` means they
+-- committed to a station. Both are the cheapest possible check -- two field
+-- reads per seated human -- and neither needs a remote or any client trust.
+local function noteSimReach()
+	-- Walk the chefs, not the seats: `byChef` already indexes seat-by-chef, so
+	-- this needs no per-frame lookup table and allocates nothing.
+	for _, chef in simService.sim.chefs do
+		if chef.carrying == nil and chef.working == nil then
+			continue
+		end
+		local seat = crew.byChef[chef.id]
+		if seat == nil then
+			continue -- a bot, or a chef nobody is sitting in
+		end
+		if chef.carrying ~= nil then
+			progression:noteReach(seat.player, "carried")
+		end
+		if chef.working ~= nil then
+			progression:noteReach(seat.player, "worked")
+		end
+	end
+end
+
 RunService.Heartbeat:Connect(function(dt)
 	crew:heartbeat()
 	director:heartbeat(dt)
+	noteSimReach()
 	leaderboards:heartbeat(os.clock())
 end)
 
