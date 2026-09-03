@@ -13,12 +13,16 @@
 //   node tools/upload-audio.mjs --check      # verify creds + scope, upload one
 //   node tools/upload-audio.mjs              # upload everything missing
 //   node tools/upload-audio.mjs --force      # re-upload even if already done
+//   node tools/upload-audio.mjs --force music_  # ...only names with this prefix
 //
 // Credentials come from the same place as tools/opencloud.mjs and MUST NEVER
 // reach stdout, a log, or an error message.
 //
-// Roblox does not accept .wav through this API, so each file is transcoded to
-// mp3 with ffmpeg first. Uploads are moderated: an asset can come back
+// Roblox does not accept .wav through this API, so each file is transcoded
+// with ffmpeg first: SFX to mp3, and the MUSIC STEMS TO OGG. The stems are
+// seamless loops that Music.luau wraps every LOOP_SECONDS, and mp3 cannot do
+// that: the encoder pads the head of every file with ~1100 samples of
+// silence, which becomes an audible gap at the seam. Vorbis is gapless. Uploads are moderated: an asset can come back
 // approved immediately or sit pending for a while. Ids are usable either way.
 import fs from "node:fs";
 import os from "node:os";
@@ -55,7 +59,7 @@ function scrub(text, key) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function uploadOne(apiKey, mp3Path, name) {
+async function uploadOne(apiKey, filePath, name, mime = "audio/mpeg") {
   const form = new FormData();
   form.append(
     "request",
@@ -71,8 +75,8 @@ async function uploadOne(apiKey, mp3Path, name) {
   );
   form.append(
     "fileContent",
-    new Blob([fs.readFileSync(mp3Path)], { type: "audio/mpeg" }),
-    path.basename(mp3Path),
+    new Blob([fs.readFileSync(filePath)], { type: mime }),
+    path.basename(filePath),
   );
 
   const res = await fetch("https://apis.roblox.com/assets/v1/assets", {
@@ -119,7 +123,7 @@ async function main() {
   const musicDir = path.join(AUDIO_DIR, "music");
   if (fs.existsSync(musicDir)) {
     for (const f of fs.readdirSync(musicDir)) {
-      if (f.endsWith(".wav")) files.push({ name: f.replace(/\.wav$/, ""), src: path.join(musicDir, f) });
+      if (f.endsWith(".wav")) files.push({ name: f.replace(/\.wav$/, ""), src: path.join(musicDir, f), loop: true });
     }
   }
   files.sort((a, b) => a.name.localeCompare(b.name));
@@ -131,11 +135,19 @@ async function main() {
   // RESUMABLE. A single failure partway through 59 uploads should cost that
   // one file, not the whole run: names already recorded in asset-ids.csv are
   // skipped and carried straight into the rewritten file.
+  // --force alone re-uploads everything; `--force <prefix>` re-uploads only
+  // the names starting with <prefix> and keeps every other id as-is, so four
+  // new stems do not drag 55 SFX back through moderation.
+  const forceAt = args.indexOf("--force");
+  const forceAll = forceAt >= 0 && (args[forceAt + 1] === undefined || args[forceAt + 1].startsWith("--"));
+  const forcePrefix = forceAt >= 0 && !forceAll ? args[forceAt + 1] : null;
   const existing = new Map();
-  if (fs.existsSync(OUT_CSV) && !args.includes("--force")) {
+  if (fs.existsSync(OUT_CSV) && !forceAll) {
     for (const line of fs.readFileSync(OUT_CSV, "utf8").split("\n").slice(1)) {
       const [name, id, , creator] = line.split(",");
-      if (name && id && creator === String(OWNER_USER_ID)) existing.set(name, id);
+      if (!name || !id || creator !== String(OWNER_USER_ID)) continue;
+      if (forcePrefix && name.startsWith(forcePrefix)) continue; // re-upload these
+      existing.set(name, id);
     }
   }
 
@@ -154,12 +166,18 @@ async function main() {
   }
 
   for (const [i, f] of todo.entries()) {
-    const mp3 = path.join(TMP, `${f.name}.mp3`);
-    if (!fs.existsSync(mp3)) {
-      execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", f.src, "-codec:a", "libmp3lame", "-b:a", "128k", mp3]);
-    }
+    const enc = f.loop
+      ? // ffmpeg's built-in vorbis encoder (this machine has no libvorbis). It is
+        // flagged experimental, hence -strict -2; 192k is generous enough that
+        // the lesser encoder does not matter for a game bed.
+        { ext: "ogg", mime: "audio/ogg", args: ["-codec:a", "vorbis", "-strict", "-2", "-b:a", "192k"] }
+      : { ext: "mp3", mime: "audio/mpeg", args: ["-codec:a", "libmp3lame", "-b:a", "128k"] };
+    const out = path.join(TMP, `${f.name}.${enc.ext}`);
+    // Always re-encode: a stale cached transcode of an OLD stem is exactly the
+    // kind of silent mistake this run is here to avoid.
+    execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", f.src, ...enc.args, out]);
     try {
-      const id = await uploadOne(apiKey, mp3, f.name);
+      const id = await uploadOne(apiKey, out, f.name, enc.mime);
       done.push({ name: f.name, id });
       console.log(`  [${i + 1}/${todo.length}] ${f.name} -> ${id}`);
     } catch (e) {

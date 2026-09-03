@@ -1,6 +1,9 @@
 {
-  "tempo": 128,
-  "loopSeconds": 7.5,
+  "tempo": 124,
+  "loopSeconds": 15.483871,
+  "sampleRate": 48000,
+  "channels": 2,
+  "source": "roblox/music — Ableton set, stem block at bars 113-120, Render as Loop",
   "stems": {
     "base": "music_base.wav",
     "groove": "music_groove.wav",
