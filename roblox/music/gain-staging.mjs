@@ -29,9 +29,11 @@ const lin = (db) => 10 ** (db / 20);
 // the mix decision; MASTER is derived from them.
 const G = { base: 0.85, groove: 1.2, melody: 1.15, tension: 1.0 };
 
-// The mixes Music.luau actually produces at those gains.
+// The mixes Music.luau actually produces at those gains. The lobby is the one
+// place the base plays at 1.0, not G.base: the 0.85 only applies once the
+// groove is up and the bed has to make room for it.
 const cases = {
-  'lobby (base only)':                 [['base'], [G.base]],
+  'lobby (base only)':                 [['base'], [1.0]],
   'round start (base+groove)':         [['base', 'groove'], [G.base, G.groove]],
   'hook (base+groove+melody)':         [['base', 'groove', 'melody'], [G.base, G.groove, G.melody]],
   'desperate (base+groove+tension)':   [['base', 'groove', 'tension'], [G.base, G.groove, G.tension]],
@@ -48,16 +50,26 @@ for (const [name, [names, gains]] of Object.entries(cases)) {
   console.log(`  ${name.padEnd(34)} peak ${r.peak.toFixed(1).padStart(6)} dBFS   rms ${r.rms.toFixed(1).padStart(6)} dB`);
 }
 
-// The old bed, for reference: sine stems peaking 0.26 with MASTER 1.6 and
-// lobby gain 0.35. Sines have ~3 dB crest, so RMS ~ peak - 3.
-const oldLobbyRms = 20 * Math.log10(0.26 * 1.6 * 0.35) - 3;
-console.log(`\nold sine bed in the lobby: ~${oldLobbyRms.toFixed(1)} dB RMS  (what players were used to)`);
+// The lobby target, stated rather than inferred. The old sine bed is NOT the
+// reference: measured (roblox/sizzle-music-stems.zip, music_base.wav) it sits
+// at -38.3 dB RMS, which through MASTER 1.6 and lobby gain 0.35 put it near
+// -43 dB -- a bed players mostly did not notice. -22 dB RMS is the level that
+// was confirmed audible in the live place with sfx over it, and is where the
+// current stems land under MASTER 0.69.
+const LOBBY_TARGET_RMS = -22;
+const OLD_BASE_RMS = -38.3; // measured; see above
+const oldLobbyRms = OLD_BASE_RMS + 20 * Math.log10(1.6 * 0.35);
+console.log(`\nold sine bed in the lobby: ~${oldLobbyRms.toFixed(1)} dB RMS  (a floor, not a target)`);
+console.log(`lobby target: ${LOBBY_TARGET_RMS} dB RMS`);
 
 // MASTER: the loudest realistic combination must stay under -1 dBFS.
 const master = Math.min(1.0, lin(-1) / lin(worstPeak));
 console.log(`\nMASTER = ${master.toFixed(2)}   (worst-case sum peaks ${worstPeak.toFixed(1)} dBFS -> ${(worstPeak + 20 * Math.log10(master)).toFixed(1)} dBFS after MASTER)`);
 
-// Lobby gain: bring the lobby bed to the old loudness under that MASTER.
+// Lobby: where the bed lands under that MASTER, against the target. If these
+// disagree by more than a dB or two the fix is the STEM (re-render louder or
+// quieter), not a lobby gain above 1.0 that would eat the peak headroom.
 const baseRms = results['lobby (base only)'].rms;
-console.log(`lobby bed  = ${(baseRms + 20 * Math.log10(master)).toFixed(1)} dB RMS after MASTER  (old sine bed ~${oldLobbyRms.toFixed(1)})`);
+const lobbyRms = baseRms + 20 * Math.log10(master);
+console.log(`lobby bed  = ${lobbyRms.toFixed(1)} dB RMS after MASTER  (target ${LOBBY_TARGET_RMS}, off by ${(lobbyRms - LOBBY_TARGET_RMS).toFixed(1)} dB)`);
 for (const [name, r] of Object.entries(results)) console.log(`  ${name.padEnd(34)} -> ${(r.rms + 20 * Math.log10(master)).toFixed(1)} dB RMS, peak ${(r.peak + 20 * Math.log10(master)).toFixed(1)} dBFS`);
