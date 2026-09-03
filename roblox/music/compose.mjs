@@ -175,23 +175,18 @@ const stab = [n(C4, 0, 0.5, 120), n(C4, 16, 0.5, 116)];
 
 // --------------------------------------------------------------- TENSION
 //
-// v2. The first tension layer was a sub drone and a heartbeat tom -- and both
-// sat exactly where the bass and the kick already live, so stacking all three
-// just thickened the low end. It muddied the track and added nothing.
+// v3. Two elements, both rhythmic: a clock and a riser. Everything sustained
+// that was tried here failed -- a sub drone (inaudible, then muddy), a
+// heartbeat tom (doubled the kick), and a high held b7 on a dark pad, which
+// read as a movie-trailer atmosphere. The lesson, which held across the whole
+// track: in this game tension is HURRY, and hurry is rhythm, not ambience.
+// A held note of any pitch on any pad is the wrong tool.
 //
-// The mistake was treating tension as DREAD. In this game, patience draining
-// is a CLOCK: the feeling wanted is hurry, not fear. So the layer moves UP and
-// gets faster, out of the register the bed owns:
-//
-//   colour  one high sustained b7 -- bluesy, unsettled, fits the Mixolydian
-//           lean, never ugly. Over each chord it becomes something different
-//           (4th over F, b6 over Dm, b3 over G) so it keeps shifting underfoot.
-//   clock   a 16th-note ride tick. Time pressure you can hear.
+//   clock   a 16th-note ride tick, accented on the bar. Time you can hear.
 //   riser   three stacked notes climbing into the loop point.
 //
-// Music.luau already ducks the melody as tension rises, which is the other
-// half of the effect and needs no change.
-const colour = [n(82, 0, LOOP, 84)]; // Live's Bb4
+// Music.luau ducks the melody as tension rises; that is the other half of the
+// effect and needs no change.
 const clock = tile(
   Array.from({ length: 16 }, (_, i) => n(51, i * 0.25, 0.1, i === 0 ? 80 : i % 2 === 0 ? 62 : 44)),
   4,
@@ -255,7 +250,6 @@ export const STEMS = {
     { name: 'melody — "sizzle!" stab',channel: 3, voice: 'stab',   notes: stab },
   ],
   tension: [
-    { name: 'tension — colour (b7)',  channel: 4, voice: 'drone',  notes: colour },
     { name: 'tension — clock (ride)', channel: 9, voice: 'drums',  notes: clock },
     { name: 'tension — riser',        channel: 5, voice: 'riser',  notes: riser },
   ],
