@@ -56,11 +56,65 @@ function Vfx.new(parent: Instance, addShake: (number) -> ())
 		table.insert(self.pool, { part = p, emitter = e, busyUntil = 0 })
 	end
 	self.clock = 0
+	self.queued = {} :: { { at: number, x: number, y: number, color: Color3, count: number } }
 	return self
 end
 
 function Vfx:tick(dt: number)
 	self.clock += dt
+	-- Drain any celebration volley that has come due.
+	local q = self.queued
+	if #q > 0 then
+		local keep = {}
+		for _, b in q do
+			if self.clock >= b.at then
+				self:burst(b.x, b.y, 1.95, b.count, "confetti", b.color, {
+					speed = 3.0,
+					life = 1.6,
+					size = 0.13,
+					gravity = -5.0,
+					up = 4.2,
+				})
+			else
+				table.insert(keep, b)
+			end
+		end
+		self.queued = keep
+	end
+end
+
+-- The serve volley's three colours, which is the celebration this game already
+-- has; the end of a shift is the same feeling, held for longer.
+local CELEBRATION = {
+	Color3.fromRGB(255, 209, 102),
+	Color3.fromRGB(255, 90, 74),
+	Color3.fromRGB(123, 217, 58),
+}
+
+--- Confetti over the crew at the end of a shift.
+---
+--- SPREAD OVER TIME, NOT FIRED AT ONCE. The pool is 30 slots and `burst`
+--- returns silently when they are all busy, so a single big volley would drop
+--- most of itself and look thinner than a normal serve. Dealing it out over a
+--- couple of seconds also just reads better -- one bang is a firework, a rally
+--- is a celebration.
+---
+--- Scaled by stars rather than gated on them: the old push-in only fired at
+--- three stars, so two thirds of finishes ended on nothing at all.
+function Vfx:celebrate(marks: { { x: number, y: number } }, stars: number)
+	local volleys = 5 + math.clamp(stars, 0, 3) * 3
+	local span = 2.2
+	for i = 1, volleys do
+		local m = marks[((i - 1) % #marks) + 1]
+		table.insert(self.queued, {
+			at = self.clock + ((i - 1) / volleys) * span,
+			x = m.x,
+			y = m.y,
+			color = CELEBRATION[((i - 1) % #CELEBRATION) + 1],
+			count = 14,
+		})
+	end
+	self.addShake(0.1 + 0.05 * math.clamp(stars, 0, 3))
 end
 
 --- Configure a free emitter and fire a one-shot burst.

@@ -18,6 +18,7 @@ Net.REMOTES = {
 	-- client -> server
 	MoveStream = "UnreliableRemoteEvent", -- buffer: seq,pos,vel,heading,useHeld
 	GrabEdge = "RemoteEvent", -- seq (reliable: a press must never be lost)
+	ClientReady = "RemoteEvent", -- client -> server: my listeners are connected, re-send the join state
 	-- server -> client
 	Transforms = "UnreliableRemoteEvent", -- buffer: per-chef transform+flags
 	SimEvents = "RemoteEvent", -- { SimEvent, ... } batched per heartbeat
@@ -36,7 +37,7 @@ Net.REMOTES = {
 	CarryDeltas = "RemoteEvent", -- server -> client: { {chefId, carrying-summary}, ... }
 	EquipDeltas = "RemoteEvent", -- server -> client: { {chefId, hat?, name?, skin?, palette?}, ... }
 	PickSpecies = "RemoteEvent", -- client -> server: species name
-	BotFill = "RemoteEvent", -- client -> server: bots fill empty seats (bool)
+	SeatAction = "RemoteEvent", -- client -> server: { chefId, action = "claim"|"dismiss"|"fill" }
 }
 
 local POS_MIN, POS_MAX = -2, 30

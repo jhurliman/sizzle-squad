@@ -5,36 +5,15 @@
 // vars override it, which is what CI would use. See tools/OPEN-CLOUD.md for how
 // to mint the key.
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 
-const CONFIG = path.join(os.homedir(), ".config", "sizzle", "opencloud.json");
+// Universe/place ids and the key lookup are shared with publish-place.mjs so
+// the two tools cannot disagree about which place is live.
+import { creds, stagingPlaceId, DEFAULT_STAGING_PLACE_ID } from "./opencloud-creds.mjs";
 
-// Override with ROBLOX_UNIVERSE_ID.
-const DEFAULT_UNIVERSE_ID = "10761465304";
-
-function creds() {
-  let file = {};
-  if (fs.existsSync(CONFIG)) file = JSON.parse(fs.readFileSync(CONFIG, "utf8"));
-  const c = {
-    apiKey:
-      process.env.ROBLOX_SIZZLE_SQUAD_API_KEY ||
-      process.env.ROBLOX_API_KEY ||
-      file.apiKey,
-    universeId:
-      process.env.ROBLOX_UNIVERSE_ID || file.universeId || DEFAULT_UNIVERSE_ID,
-    placeId: process.env.ROBLOX_PLACE_ID || file.placeId,
-  };
-  if (!c.apiKey) {
-    console.error(
-      `missing API key. Export ROBLOX_SIZZLE_SQUAD_API_KEY, or create ${CONFIG}:\n` +
-        `{ "apiKey": "...", "universeId": "...", "placeId": "..." }\n` +
-        `See roblox-game/tools/OPEN-CLOUD.md.`,
-    );
-    process.exit(1);
-  }
-  return c;
-}
+// Same refusal as the publisher: a staging command that quietly resolves to
+// live is worse than no staging command.
+const STAGING = process.argv.includes("--staging");
+const targetPlace = () => (STAGING ? stagingPlaceId() : creds().placeId);
 
 // The key must never reach stdout, a log, or an error message.
 async function api(url, { method = "GET", body, headers = {} } = {}) {
@@ -195,8 +174,8 @@ async function wipeBoards(universeId, userId) {
 // prints whatever it logs. This is the piece that makes headless validation of
 // Roblox-only behaviour possible at all.
 async function cmdLuau(file) {
-  const { universeId, placeId } = creds();
-  if (!placeId) throw new Error("placeId is required for luau execution");
+  const { universeId } = creds();
+  const placeId = targetPlace();
   const script = fs.readFileSync(file, "utf8");
   const base = `https://apis.roblox.com/cloud/v2/universes/${universeId}/places/${placeId}`;
   const task = await api(`${base}/luau-execution-session-tasks`, {
@@ -230,7 +209,64 @@ async function cmdLuau(file) {
   }
 }
 
-const [cmd, arg] = process.argv.slice(2);
+const [cmd, arg] = process.argv.slice(2).filter((a) => a !== "--staging");
+// Which places does this universe have, and which one is which?
+//
+// NOT on apis.roblox.com. Open Cloud v2 exposes a place by id but has no
+// listing, and there is no create-place operation there at all -- creating one
+// is AssetService:CreatePlaceAsync, a LUAU call, and the Open Cloud Luau
+// sandbox is refused it (HTTP 403). So a new place is made from Studio's
+// command bar and this is how you find its id afterwards without hunting
+// through the dashboard.
+async function cmdPlaces() {
+  const { apiKey, universeId, placeId } = creds();
+  const res = await fetch(
+    `https://develop.roblox.com/v1/universes/${universeId}/places?limit=50`,
+    { headers: { "x-api-key": apiKey } },
+  );
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`places -> ${res.status} ${text.slice(0, 200)}`);
+  }
+  // The default counts: the id lives in opencloud-creds.mjs now, not only in
+  // somebody's shell, so a place can be "the staging one" without the variable
+  // being set anywhere.
+  const staging = (process.env.SIZZLE_STAGING_PLACE_ID || "").trim() || DEFAULT_STAGING_PLACE_ID;
+  const rows = JSON.parse(text).data || [];
+  console.log(`universe ${universeId}: ${rows.length} place(s)`);
+  for (const p of rows) {
+    const id = String(p.id);
+    let tag = "";
+    if (id === placeId) tag = "  <-- LIVE";
+    else if (id === staging) tag = "  <-- staging";
+    else tag = "  <-- not pointed at by anything";
+    console.log(`  ${id.padEnd(18)} ${p.name}${tag}`);
+    // A NON-ROOT PLACE HAS NO GAME PAGE OF ITS OWN. roblox.com/games/<id>
+    // redirects to the experience's ROOT place, so that link silently drops
+    // you into live looking perfectly normal -- which is exactly how somebody
+    // reviews the wrong build. games/start?placeId= is the one that joins it.
+    if (id !== placeId) {
+      console.log(`${" ".repeat(21)}join: https://www.roblox.com/games/start?placeId=${id}`);
+    }
+  }
+  if (rows.length === 1) {
+    console.log(
+      "\nOnly the live place exists. To add a staging one, use Studio's publish\n" +
+        "dialog -- NOT the API. Open Cloud has no create-place operation, and\n" +
+        "AssetService:CreatePlaceAsync returns HTTP 403 even from an owner's\n" +
+        "server session on the live place. Two authenticated routes refusing it\n" +
+        "is a platform restriction, not a context mistake.\n\n" +
+        "  File -> Publish to Roblox As... -> the Sizzle Squad tile ->\n" +
+        "  Add as a new place -> Create\n\n" +
+        "It publishes whatever you have open into the new place, so staging\n" +
+        "starts as your current build. Careful: the same dialog will publish\n" +
+        "over the EXISTING place, which is live -- 'Add as a new place' is the\n" +
+        "option, the tile on its own is not.\n\n" +
+        "Then export SIZZLE_STAGING_PLACE_ID=<id> in ~/.zshrc and re-run this.",
+    );
+  }
+}
+
 const run = {
   check: cmdCheck,
   list: cmdList,
@@ -238,10 +274,12 @@ const run = {
   boards: () => wipeBoards(creds().universeId, arg),
   wipe: () => cmdWipe(arg),
   luau: () => cmdLuau(arg),
+  places: cmdPlaces,
 }[cmd];
 if (!run) {
   console.error(`usage:
   node tools/opencloud.mjs check              verify the key and list datastores
+  node tools/opencloud.mjs places             list the universe's places and which is which
   node tools/opencloud.mjs list               list stored profile keys
   node tools/opencloud.mjs profile <userId>   read one profile (--raw for all fields)
   node tools/opencloud.mjs boards <userId>    clear just the leaderboard rows

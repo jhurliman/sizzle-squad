@@ -9,6 +9,26 @@ CrewManager.__index = CrewManager
 
 local AFK_SECONDS = 20
 
+-- A LOBBY IS NOT A KITCHEN, AND STANDING STILL MEANS SOMETHING DIFFERENT IN IT.
+--
+-- 20s of no input during a shift means you are not cooking, and the sooner a
+-- bot covers for you the better. 20s of no input in the lobby means you are
+-- reading the panel -- and since the lobby now deliberately walks you onto a
+-- mark and parks you there for the crew shot, being motionless is the NORMAL
+-- state rather than evidence of anything. At 20s that combination marked
+-- present players away while they stood on their own marks.
+local AFK_LOBBY_SECONDS = 90
+
+-- Velocity quantizes to i8 over +/-8 cells/s, so one unit is ~0.063 cells/s and
+-- a released stick packs to exactly 0. Anything above half a quantum is real
+-- movement rather than rounding.
+local MOVE_EPSILON = 0.03
+
+--- Does this packet represent a player actually doing something?
+local function isActive(p: any): boolean
+	return math.abs(p.vx) > MOVE_EPSILON or math.abs(p.vy) > MOVE_EPSILON or p.useHeld == true
+end
+
 export type Seat = {
 	player: any, -- Player
 	chefId: number,
@@ -31,6 +51,7 @@ function CrewManager.new(
 	self.replicator = replicator
 	self.now = now
 	self.skinFor = skinFor
+	self.lobby = false
 	self.seats = {} :: { [any]: Seat } -- keyed by Player
 	self.byChef = {} :: { [number]: Seat }
 	-- Reports how far a player has got (see Progression.noteReach). Assigned
@@ -47,10 +68,27 @@ function CrewManager.new(
 		if p == nil then
 			return
 		end
-		self:touch(seat)
-		-- A move packet arrives every frame whether or not the stick is being
-		-- held, so only a non-zero velocity counts as "this player moved".
-		-- Without that test every joiner would look like they had moved.
+		-- ARRIVING IS NOT ACTIVITY.
+		--
+		-- The client streams a move packet every 1/30s for as long as it has a
+		-- mirror, whether or not anybody is touching the controls. Touching the
+		-- seat on every packet reset lastInputAt thirty times a second, so
+		-- `t - lastInputAt > AFK_SECONDS` was arithmetically unreachable and
+		-- the whole AFK path below was dead code: no bot ever took over, and
+		-- because readyTally counts non-AFK seats, one abandoned tab held the
+		-- ready lobby open for everyone else indefinitely. A round never starts
+		-- on a timer, so there was nothing else to break the deadlock.
+		--
+		-- Velocity is the honest signal: it is derived from the player's own
+		-- input on the client and quantizes to exactly zero when they let go.
+		-- `useHeld` covers standing still on purpose -- working a station is
+		-- input even though nothing moves.
+		if isActive(p) then
+			self:touch(seat)
+		end
+		-- The funnel's "moved" is stricter still: only actual velocity counts,
+		-- so a joiner holding the action button on arrival does not read as
+		-- having worked out how to move.
 		if p.vx * p.vx + p.vy * p.vy > 0.01 then
 			self.onReach(player, "moved")
 		end
@@ -120,6 +158,96 @@ function CrewManager:claimSkin(chefId: number, want: string?): string?
 	return mine.skin
 end
 
+--- Act on a chair: take it, empty it, or hand it back to a bot.
+---
+--- LIVES HERE RATHER THAN IN main.server.luau BECAUSE THAT FILE IS UNTESTABLE.
+--- The first version of this was a remote handler in the composition root, and
+--- server-harness does not load that script -- so a set of checks that fired
+--- the remote and asserted on the result passed while doing nothing at all.
+--- Two of them only failed because the real behaviour was missing; the rest
+--- were green on an empty room. Rule of thumb the hard way: if main.server can
+--- hold it, a harness cannot reach it.
+---
+--- Returns the species the caller ended up wearing when a claim succeeded, so
+--- the caller can persist the preference; nil for everything else.
+---
+--- No host role, deliberately. Any seated player may rearrange a lobby that
+--- takes one tap to rearrange back. Spectators and unseated clients are
+--- ignored so a passer-by cannot reorganise a shift they are not working.
+function CrewManager:seatAction(player: any, msg: any): string?
+	local seat = self.seats[player]
+	if seat == nil or typeof(msg) ~= "table" then
+		return nil
+	end
+	local chefId = tonumber(msg.chefId)
+	if chefId == nil then
+		return nil
+	end
+	local target = nil
+	for _, chef in self.simService.sim.chefs do
+		if chef.id == chefId then
+			target = chef
+		end
+	end
+	if target == nil then
+		return nil
+	end
+	local action = msg.action
+
+	if action == "claim" then
+		-- A chair with a person in it is not on offer. The client does not draw
+		-- it that way and the server does not honour it either.
+		if self.byChef[chefId] ~= nil then
+			return nil
+		end
+		local want = target.skin
+		-- Claiming a chair somebody emptied is exactly what emptying it was
+		-- for, so a claim always un-dismisses.
+		self.simService:setDismissed(want, false)
+		return self:claimSkin(seat.chefId, want)
+	elseif action == "dismiss" then
+		if self.byChef[chefId] ~= nil then
+			return nil
+		end
+		self.simService:setDismissed(target.skin, true)
+	elseif action == "fill" then
+		self.simService:setDismissed(target.skin, false)
+	end
+	return nil
+end
+
+--- Appearance for EVERY chef, for EquipDeltas.
+---
+--- LIVES HERE BECAUSE main.server.luau IS UNREACHABLE FROM A HARNESS. This was
+--- a local function in the composition root, and it iterated crew.seats -- so
+--- only humans were ever described. Claiming a character SWAPS species between
+--- two chefs, and the bot on the other end of the swap was never mentioned to
+--- anybody: the client went on rendering it as the character it used to be.
+--- Take Mochi from a bot and you get two Mochis and no Bramble, which is
+--- exactly what the lobby looked like. Nothing could have caught it there.
+---
+--- Hats, palettes and names belong to the PERSON, so a bot chair has none of
+--- them. The skin belongs to the chair and always ships.
+function CrewManager:appearanceList(profileFor: (any) -> any, nameFor: (any) -> string): { any }
+	local seatByChef = {}
+	for player, seat in self.seats do
+		seatByChef[seat.chefId] = player
+	end
+	local list = {}
+	for _, chef in self.simService.sim.chefs do
+		local player = seatByChef[chef.id]
+		local profile = if player ~= nil then profileFor(player) else nil
+		table.insert(list, {
+			chefId = chef.id,
+			skin = chef.skin,
+			hat = profile and profile.equipped and profile.equipped.hat or nil,
+			palette = profile and profile.equipped and profile.equipped.palette or nil,
+			name = if player ~= nil then nameFor(player) else nil,
+		})
+	end
+	return list
+end
+
 --- Species currently worn by a SEATED HUMAN, mapped to that human's UserId.
 ---
 --- The value is the owner rather than `true` because this is broadcast to
@@ -139,6 +267,23 @@ function CrewManager:takenSkins(): { [string]: number }
 	return taken
 end
 
+--- Everything a client needs to take its seat, in one place.
+---
+--- These are one-shot RemoteEvents: Roblox does not hold them for a listener
+--- that connects later, so a client still wiring itself up when this fires
+--- simply never learns its chefId, never builds a mirror, and never sends a
+--- move packet again. It looks exactly like a player who joined as a
+--- spectator. main.server.luau re-sends this when the client announces itself,
+--- which is what makes the send above best-effort rather than the only chance.
+function CrewManager:sendSeat(player: any, seat: Seat)
+	local chef = self.simService.sim.chefs[seat.chefId + 1]
+	self.remotes.ChefAssign:FireClient(player, {
+		chefId = seat.chefId,
+		skin = chef and chef.skin or "bramble",
+	})
+	self.remotes.Snapshot:FireClient(player, self.replicator:snapshotFor(self.simService.sim))
+end
+
 function CrewManager:playerAdded(player: any)
 	local chefId = self.simService:freeChef()
 	if chefId == nil then
@@ -146,18 +291,14 @@ function CrewManager:playerAdded(player: any)
 		-- this, but never crash on the race).
 		return nil
 	end
-	local chef = self.simService:setHuman(chefId, true)
+	self.simService:setHuman(chefId, true)
 	local seat: Seat = { player = player, chefId = chefId, lastInputAt = self.now(), afk = false }
 	self.seats[player] = seat
 	self.byChef[chefId] = seat
 	-- Seat FIRST, then claim: claimSkin consults byChef to decide which
 	-- species are spoken for, and this seat has to be in it.
 	self:claimSkin(chefId, self.skinFor and self.skinFor(player))
-	self.remotes.ChefAssign:FireClient(player, {
-		chefId = chefId,
-		skin = chef and chef.skin or "bramble",
-	})
-	self.remotes.Snapshot:FireClient(player, self.replicator:snapshotFor(self.simService.sim))
+	self:sendSeat(player, seat)
 	return seat
 end
 
@@ -175,10 +316,16 @@ end
 --- Called each heartbeat: AFK chefs fall back to bot control (silently;
 --- resuming is instant on any input via touch()), and any chef the server
 --- had to overrule this tick gets snapped back authoritatively.
+--- Between rounds the AFK window is longer; see AFK_LOBBY_SECONDS.
+function CrewManager:setLobby(on: boolean)
+	self.lobby = on == true
+end
+
 function CrewManager:heartbeat()
 	local t = self.now()
+	local limit = if self.lobby then AFK_LOBBY_SECONDS else AFK_SECONDS
 	for _, seat in self.seats do
-		if not seat.afk and t - seat.lastInputAt > AFK_SECONDS then
+		if not seat.afk and t - seat.lastInputAt > limit then
 			seat.afk = true
 			self.simService:setHuman(seat.chefId, false)
 		end
@@ -212,15 +359,11 @@ function CrewManager:reseat()
 	for player, seat in self.seats do
 		local chefId = self.simService:freeChef()
 		if chefId ~= nil then
-			local chef = self.simService:setHuman(chefId, true)
+			self.simService:setHuman(chefId, true)
 			seat.chefId = chefId
 			self.byChef[chefId] = seat
 			self:claimSkin(chefId, self.skinFor and self.skinFor(player))
-			self.remotes.ChefAssign:FireClient(player, {
-				chefId = chefId,
-				skin = chef and chef.skin or "bramble",
-			})
-			self.remotes.Snapshot:FireClient(player, self.replicator:snapshotFor(self.simService.sim))
+			self:sendSeat(player, seat)
 		end
 	end
 end

@@ -70,9 +70,13 @@ a release.
 
 ## Systems
 
-- 🟢 **AFK stage 2 missing.** 20s → bot/park coverage works; "two idle rounds →
-  non-ready spectator" is not implemented. Roblox's 20-minute kick is the only
-  backstop.
+- 🟢 **AFK stage 2 missing.** 20s → bot/park coverage works — *now*; it did
+  not until the touch gate landed, and this entry claimed otherwise for weeks.
+  The client streams a move packet 30 times a second whether or not anyone is
+  playing, the server counted every one as input, and the threshold was
+  arithmetically unreachable. What is still missing is stage 2: "two idle
+  rounds → non-ready spectator" is not implemented, and Roblox's 20-minute
+  kick remains the only backstop for that.
 - 🟢 **No per-player ready pips** on the shift panel.
 - 🟢 **First Shift does not own its own trigger** — `Menu:maybeAutoStart` still
   starts a first-ever player's round. (It gates on `rounds`/`tutorialDone` now;
@@ -161,6 +165,51 @@ Kept because each one cost real time and would bite again.
   studs above floor benches.
 
 ## Tried and reverted — do not re-attempt without reading this
+
+- 🟢 **Blurring the kitchen behind the crew on the lobby shot (depth of field,
+  then atmospheric haze).** Wanted: the four chefs sharp, the room behind them
+  pushed back. Three attempts, all reverted, and the blocker is the renderer
+  rather than the code.
+
+  Roblox has **no programmable shaders**. The whole toolkit is a fixed set of
+  effects on `Lighting`, and exactly one of them is depth-aware:
+  `DepthOfFieldEffect`. It **does not render in this project**. That is a
+  measured result, not an inference — a DOF at physically impossible settings
+  (`FocusDistance 1`, `InFocusRadius 0`, both intensities `1`, which should
+  reduce the entire viewport to mush) changed nothing on screen, while a
+  greyscale `ColorCorrectionEffect` planted beside it as a control worked
+  perfectly. So post-processing reaches the screen and DOF specifically does
+  not.
+
+  `Atmosphere` was the fallback, on the theory that it is base-render rather
+  than post-processing and attenuates with distance. It **also does not
+  appear**, at the shipping values or after the author tuned the knobs by hand
+  in Edit mode.
+
+  Two effects failing, one of them on a code path that should be immune to
+  quality settings, points at something environmental in this setup rather than
+  at any tuning. That was not chased further because the feature is a garnish.
+  **If anyone revisits this, start by finding out why `Atmosphere` does not
+  draw** — do not start by writing camera code.
+
+  What made this expensive was not the dead end, it was shipping into it
+  blind. `screen_capture` through the Studio MCP returns a flat magenta frame
+  here, so nothing visual is verifiable from the agent side; "verified" twice
+  meant the effect was *configured* correctly — instance present, enabled,
+  sensible numbers — which says nothing about a pixel changing. The bisect that
+  actually answered it (absurd settings + an unrelated post effect as a
+  control) takes about a minute and should have come first.
+
+  Two real defects surfaced on the way and are worth knowing even though the
+  feature is gone. A `Lighting` effect is **not per-instance state** — Lighting
+  takes one `Atmosphere`, and a per-rig one stacks a second copy on every Rojo
+  hot-sync. And `tools/camera-harness.luau`'s `Instance` fake stored properties
+  with `rawset`, so `__newindex` fired only for *absent* keys: the first
+  `Parent = x` worked and every assignment after it bypassed the hook, making
+  "detached during a round" pass while the object stayed attached. That is the
+  third test double in this repo to answer an easier question than the one
+  asked. Both were fixed in the reverted commits (`c6ea878`..`a45e484`) if the
+  code is ever wanted back.
 
 - 🟡 **Bot "thinking beat" (periodic pauses at task boundaries).** Bots pausing
   ~0.4s when picking up a new task, to look less relentless. Shipped once

@@ -16,7 +16,54 @@ npm run build                            # sync -> tstl -> rojo build -> SizzleS
 ```
 
 Open `SizzleSquad.rbxl` in Studio and press Play. Test multiplayer with
-*Clients and Servers → Start Local Server* (2–4 players).
+*Clients and Servers → Start Local Server* (2–4 players) — the roster, the
+ready ticks and the READY-vs-START SHIFT verb only mean anything with a second
+human in the server.
+
+### Use `rojo serve`, not rebuild-and-reopen
+
+```sh
+rojo plugin install     # once: installs the Rojo Studio plugin
+rojo serve              # then: Rojo plugin -> Connect, in Studio
+```
+
+**Studio snapshots the `.rbxl` when it opens it and never re-reads it.** A
+rebuild writes the file on disk and changes nothing in a session that is
+already open, so the place keeps running whatever it was opened with — and the
+only symptom is a change you expected not being there, which looks exactly like
+a change that does not work. This cost two rounds of debugging in one day.
+`check-luau`'s staleness guard cannot help: it compares the `.rbxl` against
+`game-src`, and what Studio holds in memory is not something the filesystem
+knows.
+
+It is worse when the work is in a git worktree, because then the file being
+rebuilt and the file being opened are genuinely different files in different
+directories, and reopening does not help either.
+
+With `rojo serve` connected, a save reaches Studio directly. No rebuild, no
+reopen, no ambiguity about which file is which.
+
+**Whatever you do, the place says which build it is.** Every run prints it,
+next to the familiar startup lines:
+
+```
+[sizzle] build 0fbec49 on jhurliman/soft-launch, built 2026-08-30 01:13
+[sizzle] client up
+```
+
+with `+dirty` when the tree has uncommitted changes. If that sha is not the one
+you just wrote, you are not testing what you think you are testing.
+
+### Studio does not persist anything
+
+`game.PlaceId` is 0 for a rojo-built local file, so DataStore calls fail and no
+profile is saved. The server warns about it on startup rather than leaving you
+to work it out.
+
+The visible consequence: `needsTutorial` is `rounds == 0`, so without
+persistence First Shift would run on *every* playtest. `Config.STUDIO_SKIP_TUTORIAL`
+defaults to skipping it in Studio; set it false when the tutorial is the thing
+you are testing.
 
 ## What's implemented
 
@@ -143,25 +190,134 @@ What works is a **second place inside the same universe**, joinable by its own
 id and invisible in search:
 
 ```sh
-export SIZZLE_STAGING_PLACE_ID=<the staging place id>
 npm run publish:staging     # build + upload to staging only
-npm run smoke:live -- ...   # or: npm run smoke:staging
+npm run smoke:staging       # module load check against staging
 npm run publish             # only after staging is green
 ```
 
-Create it once at **Creator Dashboard → Sizzle Squad → Places → Create Place**
-(Open Cloud cannot create places, only publish to them).
+The staging place id is a default in `tools/opencloud-creds.mjs` alongside the
+live one — neither is a secret, both are in a place URL, and an id that only
+exists in somebody's shell is missing on every machine that is not theirs.
+`SIZZLE_STAGING_PLACE_ID` still overrides it for a second staging place or a
+fork. What does not happen, ever, is falling back to live: `stagingPlaceId()`
+refuses an id equal to the live place whether it came from the environment or
+the constant, and `check-luau` fails the build if the two constants are the
+same.
 
-**The one caveat, and it is sharp:** places in the same universe share
-DataStores and badges. Loading checks are safe — `place-smoke.luau` only
-requires modules, it never writes — but a full playthrough on staging writes to
-real player profiles and can grant real badges. For that, either point
-`Config`'s store names at a `-staging` suffix or use a separate universe and
-accept a second API key.
+**Creating the place, once.** Studio's publish dialog, from whatever file you
+already have open:
+
+**File → Publish to Roblox As… → click the Sizzle Squad tile → Add as a new
+place → Create.**
+
+That makes the place *and* publishes the current build into it, so staging
+starts life as whatever you were just working on rather than an empty
+baseplate.
+
+> **The dangerous click is right next to the safe one.** The same dialog will
+> happily publish over the EXISTING place, which is live. "Add as a new place"
+> is the option; the game tile on its own is not.
+
+**Why not the API.** The dashboard points at a "Create and Save Place API", and
+it is real, but it will not do this:
+
+- Open Cloud has no create-place operation. v2 can GET and PATCH a place by id;
+  there is no POST to a places collection. `develop.roblox.com/v1/universes/
+  {id}/places` lists them, which is what `npm run places` uses, and that is all.
+- Creating one is `AssetService:CreatePlaceAsync`, a **Luau** call, and it is
+  fenced three ways: it refuses on a file whose own `game.PlaceId` is 0 (every
+  rojo build), it refuses outside a server script (the Edit-mode command bar is
+  not one), and with both of those satisfied — live place open, running server,
+  owner authenticated, Studio API services on — it still returns **HTTP 403**.
+  The same 403 comes back through the Open Cloud Luau execution path. Two
+  independent authenticated routes refusing it is a platform restriction, not a
+  context mistake, so stop trying to find the right context.
+
+**Two things to set on a fresh staging place**, because neither comes across
+from the publish:
+
+- **Rename it.** It arrives as something like `jhurliman's Place: 08302026_1`.
+  `PATCH /cloud/v2/universes/{universeId}/places/{placeId}?updateMask=displayName`
+  with `{"displayName": "..."}` does it; the same call takes `description`.
+- **Match `serverSize` to live.** A new place defaults to **50** while live is
+  **4**, and publishing does not carry `Players.MaxPlayers` across to it. That
+  is not cosmetic: the kitchen seats four, and everyone past the fourth is a
+  permanent spectator, so a 50-cap staging server does not behave like live.
+  Same PATCH with `updateMask=serverSize`.
+
+**Joining staging is not the obvious URL.** A non-root place has no game page
+of its own: `roblox.com/games/<placeId>` REDIRECTS to the experience's root
+place, so that link drops you into live, looking perfectly normal, and you
+review the wrong build without ever being told. Use:
+
+```
+https://www.roblox.com/games/start?placeId=<staging place id>
+```
+
+Same link for anyone you want to test with. Note what that implies: the place
+is unlisted, not private. Access is governed by the UNIVERSE's playability
+rather than per place, so on a public experience anybody holding this link can
+join staging, and there is no separate switch to lock it down.
+
+`npm run places` lists the universe's places and says which is live, which is
+staging, and which nothing points at — handy for reading the new id back
+without going through the dashboard.
+
+**These commands used to publish to LIVE.** `publish:staging` was
+`ROBLOX_PLACE_ID=$SIZZLE_STAGING_PLACE_ID node tools/publish-place.mjs`, and
+with the variable unset the shell substitutes an empty string, which is falsy
+in JS, which falls straight through to the live default. The one command whose
+job is to keep a build away from players shipped it to them and printed a
+normal-looking version number. Both staging commands now take `--staging` and
+refuse outright if the id is missing or is the live place. They never infer a
+target, because the inference was live.
+
+**Profiles are isolated automatically.** Places in the same universe share
+DataStores, so a playthrough on staging would otherwise spend real coins and
+write the result over a real save. `Progression` scopes its four store names by
+`game.PlaceId`: live and Studio keep the names they have always had, and any
+other place gets a `__p<placeId>` suffix and its own empty world. The condition
+names LIVE explicitly rather than trying to detect staging — getting it the
+other way round would rename live's stores and lose every profile in the game —
+and `check-luau` asserts the id in `Progression.luau` still matches the one the
+publisher defaults to, so the two copies cannot drift.
+
+Badges are still shared, so a staging playthrough can grant real ones.
 
 Given the failure this was built for was "the client could not even start",
-staging plus `smoke:live` catches that class outright and does not need the
-data isolation.
+staging plus `smoke:live` catches that class outright.
+
+### When Open Cloud will not take the upload
+
+```
+409 Conflict — Save failed. Server is busy and unable to process your upload
+request. Please try again in a couple minutes.
+```
+
+Seen persistently, across days, on both the live and staging places, for both
+`versionType=Published` and `Saved`. It is not a local problem and not a key
+problem: `smoke:staging` runs Luau inside the same place with the same key and
+passes, so the credentials reach it fine. Retrying does not clear it — twelve
+attempts with backoff all return the same thing.
+
+**Studio's publish path still works.** That is the inversion worth writing down,
+because this whole tool exists on the opposite premise: Open Cloud was built
+here after Studio's uploader failed on "Server is busy" and left live serving an
+empty blue sky. Right now the failure has swapped ends — Studio's *File →
+Publish to Roblox As…* is what got the current build onto staging, while Open
+Cloud is the one being refused.
+
+So when this happens, publish from Studio and then confirm what actually landed
+rather than trusting either path:
+
+```sh
+npm run smoke:staging     # every module loads inside a real server
+node tools/opencloud.mjs luau <a script that prints BuildInfo.summary> --staging
+```
+
+The build stamp is what makes that check meaningful — it reports the sha the
+place is really running, which is the only way to tell a silent publish failure
+from a successful one.
 
 **Publishing is live and outward-facing, so it happens on explicit approval —
 never as a side effect of a build.**

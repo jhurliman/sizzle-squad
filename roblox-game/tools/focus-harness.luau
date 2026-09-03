@@ -176,6 +176,55 @@ for _, kind in KINDS do
 	end
 end
 
+-- --------------------------------------- D. THE RACK NEVER STOPS DISPENSING
+--
+-- This block used to drain the racks and check the client agreed they were
+-- empty: applyScore wrote the counts to display fields only, while focusPrompt
+-- plans against mirrorSim, whose stock stayed at its opening value forever --
+-- so an empty rack went on glowing and advertising 'dispense' while the server
+-- answered 'none'.
+--
+-- There is no stock to disagree about now. What is left is still worth
+-- pinning, because it is the property the whole prompt system rests on: server
+-- and client must plan the SAME verb for the rack, whatever else has happened
+-- in the round.
+for _, held in { "nothing", "plate", "ingredient" } do
+	local sim = newServerSim()
+	local st = stationByKind(sim)["plates"]
+	local chef = sim.chefs[1]
+	if held == "plate" then
+		chef.carrying = { type = "plate", plate = { id = 901, contents = {}, dirty = false } }
+	elseif held == "ingredient" then
+		chef.carrying = {
+			type = "ingredient",
+			ingredient = { id = 902, kind = "tomato", state = "raw", progress = 0, overcook = 0 },
+		}
+	end
+
+	local rep = Replicator.new(shared, Net, remotes, function()
+		return 0
+	end)
+	local client = ClientState.new(shared, Net)
+	client:assign({ chefId = chef.id, skin = "bramble" })
+	client:applySnapshot(rep:snapshotFor(sim))
+	client:applyScore(rep:scoreSummary(sim))
+
+	local mst = nil
+	for _, sst in client.mirrorSim.kitchen.stations do
+		if sst.id == st.id then
+			mst = sst
+			break
+		end
+	end
+
+	local want = shared.planGrab(sim, chef, st)
+	local got = shared.planGrab(client.mirrorSim, client.mirror, mst)
+	check(
+		want == got,
+		`plates, holding {held}: server says '{want}', client says '{got}'`
+	)
+end
+
 local nMis = 0
 for _ in mismatch do
 	nMis += 1
@@ -213,7 +262,7 @@ local function fingerprint(sim: any, st: any, chef: any): string
 		end
 		return "?"
 	end
-	return `{c(st.holding)}|{c(chef.carrying)}|{sim.plateStock}|{sim.dirtyPlates}|{sim.score.served}|{sim.score.coins}|{st.active}`
+	return `{c(st.holding)}|{c(chef.carrying)}|{sim.score.served}|{sim.score.coins}|{st.active}`
 end
 
 local bChecks, bFail = 0, 0

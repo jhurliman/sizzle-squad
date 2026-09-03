@@ -25,9 +25,11 @@ local Menu = require(script.Parent.Menu) :: any
 local ItemViz = require(script.Parent.ItemViz) :: any
 local Results = require(script.Parent.Results) :: any
 local BinDress = require(script.Parent.BinDress) :: any
+local HearthFire = require(script.Parent.HearthFire) :: any
 
 local SCALE = 5
 local Config = require(gameShared:WaitForChild("Config")) :: any
+local Staging = require(gameShared:WaitForChild("Staging")) :: any
 local remotes = Net.client(ReplicatedStorage)
 local state = ClientState.new(shared, Net)
 local visualsFolder = Instance.new("Folder")
@@ -211,6 +213,11 @@ local function indexStations(stations: { any })
 			root = nested
 		end
 	end
+	if root ~= nil then
+		-- The hearth is the biggest thing in the room and the lobby closeup
+		-- frames it dead centre behind the crew. An unlit one is conspicuous.
+		HearthFire.apply(root)
+	end
 	local folder = root and root:FindFirstChild("Stations")
 	if folder ~= nil then
 		local bin = folder:FindFirstChild("Bin_13_4")
@@ -284,6 +291,56 @@ local menu = Menu.new({
 		remotes.PickSpecies:FireServer(species)
 	end,
 })
+
+-- HAND THE SHOT TO THE PLATFORM, BECAUSE WE CANNOT REACH THE CAMERA ROLL.
+--
+-- Checked against the running Studio rather than assumed. On this build
+-- (0.736) CaptureService has no PromptSaveCapturesToGalleryAsync at all, and
+-- SaveScreenshotCapture refuses anything without the RobloxScript capability
+-- ("lacking capability RobloxScript"), so a game cannot put a picture in
+-- Photos by itself. PromptShareCapture opens the platform share sheet instead,
+-- which on iOS carries Save Image -- and also Messages and TikTok, which for a
+-- game that needs to be found is the better half of the deal.
+--
+-- The signature was recovered the same way, by asking: it wants four arguments
+-- (content id, launch data, and two callbacks), and the enums the documented
+-- form mentions do not exist on this build.
+--
+-- UI COMES OFF FIRST. CaptureScreenshot grabs what is on the screen, so
+-- photographing the results card would produce a picture of a scoreboard with
+-- a SHARE button on it. One frame with the HUD and the menu hidden is enough.
+local function shareTheShot()
+	local captureService = game:GetService("CaptureService")
+	local hudWas, menuWas = hud.gui.Enabled, menu.gui.Enabled
+	hud.gui.Enabled = false
+	menu.gui.Enabled = false
+	task.spawn(function()
+		-- Two frames: one for the hide to be composited, one to be safe.
+		RunService.RenderStepped:Wait()
+		RunService.RenderStepped:Wait()
+		local ok = pcall(function()
+			captureService:CaptureScreenshot(function(contentId)
+				hud.gui.Enabled = hudWas
+				menu.gui.Enabled = menuWas
+				local shared2 = pcall(function()
+					captureService:PromptShareCapture(contentId, "", function() end, function() end)
+				end)
+				if not shared2 then
+					-- Sharing can be off for younger accounts, and there is no
+					-- in-game gallery to fall back to. Say so rather than
+					-- leaving a button that visibly does nothing.
+					hud:toast("Sharing is not available on this account")
+				end
+			end)
+		end)
+		if not ok then
+			hud.gui.Enabled = hudWas
+			menu.gui.Enabled = menuWas
+			hud:toast("Could not take the photo")
+		end
+	end)
+end
+results.onShare = shareTheShot
 
 -- The coach's target, distinct from the focus glow: focus is "this is what
 -- the button will act on right now", coach is "this is where you should be
@@ -407,7 +464,6 @@ end)
 
 local lastPhase = ""
 remotes.RoundPhase.OnClientEvent:Connect(function(phase)
-	menu:setBots(phase.botFill == true, phase.botFillPending ~= false, phase.phase)
 	if phase.phase == "round" and lastPhase ~= "round" then
 		state.simTime = 0 -- fresh round: restart the local clock
 	end
@@ -420,21 +476,37 @@ remotes.RoundPhase.OnClientEvent:Connect(function(phase)
 	end
 	-- The one call site for the phase gate.
 	menu:setPhase(phase, state.myChefId == nil)
-	-- Photo moment: a 3-star finish gets a celebratory push-in on the pass.
-	if phase.phase == "results" and lastPhase ~= "results" and phase.results ~= nil and phase.results.stars >= 3 then
-		local camera = Workspace.CurrentCamera :: Camera
-		local focus = Vector3.new(7.5 * SCALE, 1.2 * SCALE, 1.5 * SCALE)
-		local from = camera.CFrame
-		local to = CFrame.lookAt(focus + Vector3.new(0, 4 * SCALE, 7 * SCALE), focus)
-		local t0 = os.clock()
-		local conn
-		conn = RunService.RenderStepped:Connect(function()
-			local f = math.clamp((os.clock() - t0) / 1.2, 0, 1)
-			camera.CFrame = from:Lerp(to, 1 - (1 - f) ^ 3)
-			if os.clock() - t0 > 4 then
-				conn:Disconnect()
-			end
-		end)
+	-- The action button is for gameplay. Walking around the lobby stays on --
+	-- people like it and it is what puts you on your mark -- but there is
+	-- nothing to press it on between rounds, so it goes.
+	input:setActionEnabled(phase.phase == "round")
+
+	-- CAMERA: ONE OWNER, THREE SHOTS, REAL MOVES BETWEEN THEM.
+	--
+	-- This used to be a push-in written inline here, on its own RenderStepped,
+	-- which beat CameraRig only because it connected later and therefore ran
+	-- after it every frame. It held for four seconds and then Disconnect()ed,
+	-- snapping the camera back in a single frame with eight seconds of the
+	-- ceremony still to go. CameraRig owns the camera now and a move has
+	-- somewhere to land.
+	if phase.phase ~= lastPhase then
+		if phase.phase == "round" then
+			-- Go time. Ease-OUT rather than the slower smootherstep used
+			-- elsewhere: the round is already live and tickets are already
+			-- ticking, so the pull-back has to hand over a playable frame
+			-- immediately and spend its remaining time settling, not the other
+			-- way round.
+			cameraRig:cutTo("gameplay", 0.9, "out")
+		elseif phase.phase == "results" then
+			cameraRig:cutTo("photo", 1.1, "smooth")
+			-- Confetti over the crew, scaled by stars rather than gated on
+			-- them. The old push-in fired only at three, so two finishes in
+			-- three ended on nothing at all.
+			vfx:celebrate(Staging.POSE, (phase.results and phase.results.stars) or 0)
+		else
+			-- countdown / intermission: the lobby closeup on the crew.
+			cameraRig:cutTo("lobby", if lastPhase == "" then 0 else 1.2, "smooth")
+		end
 	end
 	lastPhase = phase.phase
 end)
@@ -526,10 +598,54 @@ remotes.SimEvents.OnClientEvent:Connect(function(events)
 	end
 end)
 
+-- EVERY LISTENER IS UP; ASK FOR THE JOIN STATE AGAIN.
+--
+-- The server sends ChefAssign, Snapshot, RoundPhase, Leaderboards and Progress
+-- once, from PlayerAdded. Those are one-shot RemoteEvents and Roblox drops
+-- them for a listener that is not connected yet -- and this script spends the
+-- whole race requiring modules and loading 55 sounds before it reaches the
+-- connections above. Lose it and there is no chefId, so no mirror, so no move
+-- packets ever leave: an ordinary join that silently becomes a spectator.
+--
+-- Sending this AFTER the connections is the entire point; it must be the last
+-- thing the remotes section does.
+remotes.ClientReady:FireServer()
+
 -- --------------------------------------------------------------- main loop
 
 local acc = 0
 local sendAcc = 0
+
+--- The nametag over a chef, with a ready tick while the crew is deciding.
+---
+--- The lobby roster and the chef in the world are the same fact shown twice,
+--- so they have to agree: the roster names who has pressed Start, and this is
+--- what lets you look up from the panel and see WHICH of the four it was. Only
+--- while the lobby is up -- a tick over somebody's head mid-service would just
+--- be a tick nobody asked about.
+local function nameTagFor(chefId: number): string?
+	local base = state.names[chefId]
+	if base == nil then
+		return nil
+	end
+	local seats = state.phase.seats
+	if seats == nil or state.phase.phase == "round" then
+		return base
+	end
+	for _, seat in seats do
+		if seat.chefId == chefId and seat.ready then
+			return `✅ {base}`
+		end
+	end
+	return base
+end
+
+--- Are we in a phase where the crew should be standing on its marks?
+--- Everything that is not a live round: the lobby closeup and the end-of-shift
+--- photo both frame Staging.LINEUP.
+local function stagingActive(): boolean
+	return state.phase.phase ~= "round"
+end
 local seq = 0
 
 RunService.RenderStepped:Connect(function(dt)
@@ -538,6 +654,7 @@ RunService.RenderStepped:Connect(function(dt)
 	results:step(dt)
 	cameraRig:update(dt)
 	vfx:tick(dt)
+	HearthFire.tick(state.clock)
 	state:advanceClock(dt, state.phase.phase == "round")
 	-- heat mirrors the sim's ramp (min(1, time/240)); tension is 1 - patience
 	music:update(
@@ -549,7 +666,32 @@ RunService.RenderStepped:Connect(function(dt)
 
 	-- fixed-step the own-chef mirror
 	acc = math.min(acc + dt, 0.25)
-	local snapshot = { move = input:move(), grabPressed = false, useHeld = input.useHeld }
+	local mv = input:move()
+	local mx, my = mv.x, mv.y
+	-- BETWEEN ROUNDS, WALK YOURSELF ONTO YOUR MARK.
+	--
+	-- The lobby camera frames Staging.LINEUP, so somebody has to be standing on
+	-- it. This drives the LOCAL player there as ordinary synthetic input rather
+	-- than the server repositioning them: the client stays the only thing that
+	-- moves the client, so there is no authority handover between rounds to get
+	-- wrong -- which is exactly the trap KNOWN-GAPS records under "sim.time is
+	-- frozen while tickMovementOnly runs".
+	--
+	-- Touching the stick wins instantly and completely. The lobby is still a
+	-- place you can walk around; it just tidies itself up when you stop.
+	if stagingActive() and mx == 0 and my == 0 and state.mirror ~= nil and state.myChefId ~= nil then
+		local mark = Staging.markFor(state.skins[state.myChefId])
+		local sx, sy, arrived = Staging.moveToward(state.mirror.pos, mark)
+		if arrived then
+			-- Turn to face the lens. movePhase only advances heading while
+			-- there is motion, so writing it here sticks.
+			local d = ((Staging.FACE_CAMERA - state.mirror.heading + math.pi) % (2 * math.pi)) - math.pi
+			state.mirror.heading += d * math.min(1, dt * 6)
+		else
+			mx, my = sx, sy
+		end
+	end
+	local snapshot = { move = { x = mx, y = my }, grabPressed = false, useHeld = input.useHeld }
 	while acc >= shared.SIM_DT do
 		acc -= shared.SIM_DT
 		state:stepOwn(snapshot, shared.SIM_DT)
@@ -594,8 +736,8 @@ RunService.RenderStepped:Connect(function(dt)
 	for id, skin in state.skins do
 		if id ~= state.myChefId then
 			local pose = state:remotePose(id)
-			if pose ~= nil and state.clock - (state.lastSeen[id] or -10) < 2 then
-				visuals:update(id, skin, pose, state.flags[id] or 0, dt, state.carrying[id], state.hats[id], state.names[id], state.palettes[id])
+			if pose ~= nil and state:shouldShowChef(id) then
+				visuals:update(id, skin, pose, state.flags[id] or 0, dt, state.carrying[id], state.hats[id], nameTagFor(id), state.palettes[id])
 			elseif visuals.chefs[id] ~= nil then
 				-- parked / departed chefs stop streaming: clear their body
 				visuals:remove(id)
@@ -606,7 +748,6 @@ RunService.RenderStepped:Connect(function(dt)
 	-- station contents + progress bars
 	ensureStations(state.clock)
 	stationViz:update(state.stations, stationModels)
-	stationViz:updateDishPile(state.stations, state.dirtyPlates)
 
 	-- focus highlight + verb chip (local planGrab over mirrored state)
 	local focusId, action = state:focusPrompt()
@@ -668,4 +809,5 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
+print(`[sizzle] build {require(gameShared:WaitForChild("BuildInfo")).summary}`)
 print("[sizzle] client up")
