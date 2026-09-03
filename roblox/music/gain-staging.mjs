@@ -25,15 +25,19 @@ function mix(names, gains) {
 }
 const lin = (db) => 10 ** (db / 20);
 
-// The mixes Music.luau actually produces (target gains from Music:update).
+// Per-stem target gains as Music.luau will apply them at full heat. These are
+// the mix decision; MASTER is derived from them.
+const G = { base: 0.85, groove: 1.2, melody: 1.15, tension: 1.0 };
+
+// The mixes Music.luau actually produces at those gains.
 const cases = {
-  'lobby (base 0.35)':                 [['base'], [0.35]],
-  'early round (base 1)':              [['base'], [1]],
-  'mid round (base+groove)':           [['base', 'groove'], [1, 1]],
-  'busy (base+groove+melody)':         [['base', 'groove', 'melody'], [1, 1, 1]],
-  'desperate (base+groove+tension)':   [['base', 'groove', 'tension'], [1, 1, 1]],
-  'worst case (all four)':             [['base', 'groove', 'melody', 'tension'], [1, 1, 1, 1]],
+  'lobby (base only)':                 [['base'], [G.base]],
+  'round start (base+groove)':         [['base', 'groove'], [G.base, G.groove]],
+  'hook (base+groove+melody)':         [['base', 'groove', 'melody'], [G.base, G.groove, G.melody]],
+  'desperate (base+groove+tension)':   [['base', 'groove', 'tension'], [G.base, G.groove, G.tension]],
+  'worst case (all four)':             [['base', 'groove', 'melody', 'tension'], [G.base, G.groove, G.melody, G.tension]],
 };
+console.log('gains:', JSON.stringify(G));
 console.log('pre-MASTER, at Music.luau target gains:');
 let worstPeak = -Infinity;
 const results = {};
@@ -54,6 +58,6 @@ const master = Math.min(1.0, lin(-1) / lin(worstPeak));
 console.log(`\nMASTER = ${master.toFixed(2)}   (worst-case sum peaks ${worstPeak.toFixed(1)} dBFS -> ${(worstPeak + 20 * Math.log10(master)).toFixed(1)} dBFS after MASTER)`);
 
 // Lobby gain: bring the lobby bed to the old loudness under that MASTER.
-const baseRms = results['early round (base 1)'].rms;
-const lobbyGain = Math.min(1.0, lin(oldLobbyRms) / (lin(baseRms) * master));
-console.log(`lobby gain = ${lobbyGain.toFixed(2)}   (base alone is ${baseRms.toFixed(1)} dB RMS; x MASTER x gain -> ${(baseRms + 20 * Math.log10(master * lobbyGain)).toFixed(1)} dB RMS)`);
+const baseRms = results['lobby (base only)'].rms;
+console.log(`lobby bed  = ${(baseRms + 20 * Math.log10(master)).toFixed(1)} dB RMS after MASTER  (old sine bed ~${oldLobbyRms.toFixed(1)})`);
+for (const [name, r] of Object.entries(results)) console.log(`  ${name.padEnd(34)} -> ${(r.rms + 20 * Math.log10(master)).toFixed(1)} dB RMS, peak ${(r.peak + 20 * Math.log10(master)).toFixed(1)} dBFS`);
