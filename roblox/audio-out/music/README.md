@@ -21,4 +21,7 @@ The client plays all four in sync and cross-fades volume:
 - melody  : vibes lead — fades in with heat, ducks out at high tension
 - tension : clock ride + riser — fades in as patience drains
 
-Summed at full gain they peak at +1.6 dBFS, so Music.luau's MASTER is 0.38.
+Summed at full gain they peak at +1.6 dBFS, so Music.luau's MASTER is 0.74
+(the worst case lands at -1.0 dBFS). Set it by LOUDNESS, never by peak alone:
+`node roblox/music/gain-staging.mjs` measures the real combinations and
+prints the value. 0.38, matched on peak, made the lobby bed inaudible.

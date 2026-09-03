@@ -29,11 +29,16 @@ local STEM_IDS: { [string]: number } = {
 	tension = 72491671314574,
 }
 
--- The four stems summed at full gain peak at +1.6 dBFS (measured, see
--- roblox/audio-out/music/README.md). MASTER brings that to about -7 dBFS at
--- full heat and tension -- the same bed level the old sine stems sat at --
--- so the SFX (volumes 0.15-0.7) still sit on top.
-local MASTER = 0.38
+-- GAIN STAGING, FROM MEASUREMENT (roblox/music/gain-staging.mjs).
+--
+-- The four stems summed at full gain peak at +1.6 dBFS, so MASTER = 0.74 is
+-- the most the mix can take before the worst case clips (it lands at -1.0).
+-- The first value shipped here was 0.38, calibrated on PEAK against the old
+-- sine stems -- but real music has ~13 dB more crest factor than a sine, so
+-- matching peaks put the lobby bed at -36 dB RMS against the old -20, and
+-- players heard no music at all. Loudness is what to match; peak is only
+-- the ceiling.
+local MASTER = 0.74
 -- 8 bars at 124 BPM: 32 beats * 60 / 124. Must match the rendered files to the
 -- sample or the resync in step() fights the loop point every few seconds.
 local LOOP_SECONDS = 15.483871
@@ -110,8 +115,10 @@ function Music:update(dt: number, heat: number, patience: number, playing: boole
 	-- target mix (mirrors tickMusic's gates, as continuous fades)
 	local target
 	if not playing then
-		-- between rounds: just the bed, low
-		target = { base = 0.35, groove = 0, melody = 0, tension = 0 }
+		-- between rounds: just the bed. At full, not "low": the round is lifted
+		-- by the groove arriving, not by the bed getting louder, and 0.35 here
+		-- (tuned for the sine stems) was a third of what made the lobby inaudible.
+		target = { base = 1, groove = 0, melody = 0, tension = 0 }
 	else
 		target = {
 			base = 1,
