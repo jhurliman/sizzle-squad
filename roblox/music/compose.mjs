@@ -169,10 +169,6 @@ const lead = [
   n(G5, 28.75, 0.25, 96), n(F5, 29.0, 0.5, 96), n(E5, 29.5, 0.25, 92), n(D5, 29.75, 0.25, 92), n(B4, 30.0, 1.5, 104),
 ];
 
-// The vocal stab. A chopped, pitched "SIZZLE!" on the top of each phrase —
-// its own track so it gets its own sampler. One note = one trigger.
-const stab = [n(C4, 0, 0.5, 120), n(C4, 16, 0.5, 116)];
-
 // --------------------------------------------------------------- TENSION
 //
 // v3. Two elements, both rhythmic: a clock and a riser. Everything sustained
@@ -247,7 +243,6 @@ export const STEMS = {
   ],
   melody: [
     { name: 'melody — lead',          channel: 2, voice: 'lead',   notes: lead },
-    { name: 'melody — "sizzle!" stab',channel: 3, voice: 'stab',   notes: stab },
   ],
   tension: [
     { name: 'tension — clock (ride)', channel: 9, voice: 'drums',  notes: clock },
