@@ -200,7 +200,7 @@ const str = (s) => [...Buffer.from(s, 'utf8')];
 const u32 = (v) => [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255];
 const u16 = (v) => [(v >>> 8) & 255, v & 255];
 
-function trackChunk(name, channel, notes, extra = []) {
+function trackChunk(name, channel, notes, extra = [], endBeats = LOOP) {
   // absolute-tick events, then sort and delta-encode
   const ev = [];
   // byteLength, not .length: the em dashes in the names are 3 bytes each
@@ -221,7 +221,7 @@ function trackChunk(name, channel, notes, extra = []) {
     body.push(...vlq(e.t - last), ...e.b);
     last = e.t;
   }
-  body.push(...vlq(Math.max(0, LOOP * PPQ - last)), 0xff, 0x2f, 0x00);
+  body.push(...vlq(Math.max(0, endBeats * PPQ - last)), 0xff, 0x2f, 0x00);
   return [...str('MTrk'), ...u32(body.length), ...body];
 }
 
@@ -249,7 +249,9 @@ export const STEMS = {
     { name: 'tension — riser',        channel: 5, voice: 'riser',  notes: riser },
   ],
 };
-export { BPM, BARS, LOOP };
+export { BPM, BARS, LOOP, PPQ };
+// Building blocks for arrange.mjs, which turns this loop into a song.
+export { n, tile, bassCell, CHORDS, drumBar, KICK, SNARE, CLAP, RIM, CHAT, OHAT, CRASH, trackChunk, tempoMeta, str, u32, u16 };
 
 export function writeMidi(out) {
   const all = Object.values(STEMS).flat();
