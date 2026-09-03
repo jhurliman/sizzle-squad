@@ -195,6 +195,18 @@ function renderStem(tracks) {
   const out = new Float32Array(LOOP_N);
   for (let i = 0; i < LOOP_N; i++) out[i] = buf[i];
   for (let i = 0; i < TAIL_N; i++) out[i] += buf[LOOP_N + i];
+  // Tail-wrap only handles what RINGS past the seam. A voice that is still
+  // sustaining at the last sample (the drone) or that starts at full swing
+  // on the first (the stab) still steps at the join, and a step is a click.
+  // A raised-cosine fade over the last and first few ms brings both ends to
+  // zero; 5 ms is below the ear's transient resolution, so the downbeat
+  // still lands.
+  const XF = Math.round(0.005 * SR);
+  for (let i = 0; i < XF; i++) {
+    const w = 0.5 - 0.5 * Math.cos((Math.PI * (i + 1)) / (XF + 1));
+    out[i] *= w;
+    out[LOOP_N - 1 - i] *= w;
+  }
   return out;
 }
 

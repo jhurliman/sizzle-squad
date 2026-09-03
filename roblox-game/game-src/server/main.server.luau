@@ -22,6 +22,11 @@ local Analytics = require(script.Parent.Analytics) :: any
 
 local remotes = Net.server(ReplicatedStorage)
 
+-- Why a player left, when we know. Set before we teleport them out; read by
+-- analytics on PlayerRemoving so a hop is not counted as a quit. Declared up
+-- here because the round-end handler below tags the teleport home.
+local exitReason: { [any]: string } = {}
+
 local simService = SimService.new(shared, { seed = os.time() % 2 ^ 31, botFill = Config.BOT_FILL })
 local replicator = Replicator.new(shared, Net, remotes, function(chef)
 	return simService:chefFlags(chef)
@@ -68,6 +73,13 @@ local director = RoundDirector.new(shared, Config, simService, crew, replicator,
 		if Tutorial.isTutorialServer() then
 			task.delay(Config.RESULTS + 1.5, function()
 				for _, p in Players:GetPlayers() do
+					-- Tag the hop BEFORE it happens, or a completed First Shift's
+					-- departure is recorded as a quit and the return leg is
+					-- invisible to the exit-reason analytics. In Studio finish()
+					-- only clears a flag, so there is no hop to tag.
+					if not Tutorial.isStudio() then
+						exitReason[p] = "teleport_home"
+					end
 					Tutorial.finish(p)
 				end
 			end)
@@ -281,9 +293,6 @@ end
 -- round, hold the joiner as a spectator (they get the snapshot and watch the
 -- kitchen) and seat them at the next phase change instead.
 local pendingJoins: { [any]: boolean } = {}
--- Why a player left, when we know. Set before we teleport them out; read by
--- analytics on PlayerRemoving so a hop is not counted as a quit.
-local exitReason: { [any]: string } = {}
 
 --- Is the person they came here FOR actually in this server?
 ---
@@ -310,6 +319,10 @@ local function seatPending()
 	for player in pendingJoins do
 		pendingJoins[player] = nil
 		crew:playerAdded(player)
+		-- The same accounting an immediate arrival gets in seatArrival; without
+		-- it a late joiner who quit before moving read as never having a chef.
+		analytics:onboarding(player, "seated")
+		progression:noteReach(player, "seated")
 	end
 	broadcastEquips()
 end
@@ -420,10 +433,13 @@ Players.PlayerRemoving:Connect(function(player)
 	-- Read the funnel stage BEFORE progression drops the profile. The same
 	-- value is persisted for Open Cloud; this copy is for the dashboard, which
 	-- is the only place a distribution across all players can be eyeballed.
+	-- Once per player, at the TERMINAL end of their FIRST session: a teleport
+	-- leg is the same session continuing, and a later session would count
+	-- returners twice and skew the distribution toward completers.
 	local profile = progression.profiles[player]
 	local reached = profile and profile.reach or ""
-	if reached ~= "" then
-		analytics:custom(player, "first_shift_reach", 1, { reached, exitReason[player] or "quit" })
+	if reached ~= "" and exitReason[player] == nil and (profile.sessions or 1) <= 1 then
+		analytics:custom(player, "first_shift_reach", 1, { reached, "quit" })
 	end
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
@@ -472,6 +488,13 @@ local function noteSimReach()
 		if seat == nil then
 			continue -- a bot, or a chef nobody is sitting in
 		end
+		-- Only the player's OWN doing counts. An AFK seat is being driven by
+		-- the bot, and a freshly seated player can inherit a chef already
+		-- mid-task; neither says the player did anything. Requiring an active
+		-- seat and a prior `pressed` ties both stages to their own input.
+		if seat.afk or not progression:reached(seat.player, "pressed") then
+			continue
+		end
 		if chef.carrying ~= nil then
 			progression:noteReach(seat.player, "carried")
 		end
@@ -485,6 +508,7 @@ RunService.Heartbeat:Connect(function(dt)
 	crew:heartbeat()
 	director:heartbeat(dt)
 	noteSimReach()
+	progression:heartbeat()
 	leaderboards:heartbeat(os.clock())
 end)
 

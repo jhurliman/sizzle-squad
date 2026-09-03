@@ -21,7 +21,11 @@ The client plays all four in sync and cross-fades volume:
 - melody  : vibes lead — fades in with heat, ducks out at high tension
 - tension : clock ride + riser — fades in as patience drains
 
-Summed at full gain they peak at +1.6 dBFS, so Music.luau's MASTER is 0.74
-(the worst case lands at -1.0 dBFS). Set it by LOUDNESS, never by peak alone:
-`node roblox/music/gain-staging.mjs` measures the real combinations and
-prints the value. 0.38, matched on peak, made the lobby bed inaudible.
+Music.luau does not sum them at unity. In a round the per-stem gains are
+base 0.85, groove 1.2, melody 1.15, tension 1.0 (the drums and lead were
+inaudible under the bed at 1.0); in the lobby the base plays alone at 1.0.
+At those gains the worst case (all four) peaks at +2.2 dBFS, so MASTER is
+0.69 and it lands at -1.0 dBFS, with the lobby bed at -22 dB RMS. Set it by
+LOUDNESS, never by peak alone: `node roblox/music/gain-staging.mjs` measures
+the real combinations and prints the value. 0.38, matched on peak, made the
+lobby bed inaudible.

@@ -253,6 +253,16 @@ function Progression:noteReach(player: any, stage: string)
 	self.dirty[player] = true
 end
 
+--- Has this player got at least as far as `stage`? Lets a caller gate one
+--- stage on another (you cannot have carried a plate before you pressed).
+function Progression:reached(player: any, stage: string): boolean
+	local profile = self.profiles[player]
+	if profile == nil then
+		return false
+	end
+	return (REACH_ORDER[profile.reach] or 0) >= (REACH_ORDER[stage] or math.huge)
+end
+
 function Progression:playerRemoving(player: any)
 	self:accrue(player)
 	self.joinedAt[player] = nil
@@ -525,29 +535,7 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 		end
 	end
 
-	-- Periodic autosave. This also REFRESHES the lock, which is why LOCK_TTL
-	-- has to be comfortably longer than the autosave interval.
-	if os.clock() - self.lastSave > AUTOSAVE_SECONDS then
-		self.lastSave = os.clock()
-		-- Fold elapsed play time in BEFORE snapshotting the dirty set, so a
-		-- server that dies between autosaves loses at most one interval of
-		-- playSeconds rather than the whole session. accrue() marks dirty, so
-		-- anyone currently in the kitchen is included below.
-		for player in self.profiles do
-			self:accrue(player)
-		end
-		local pending = {}
-		for player in self.dirty do
-			table.insert(pending, player)
-		end
-		table.clear(self.dirty)
-		-- save() yields on retry, so snapshot the list first.
-		task.spawn(function()
-			for _, player in pending do
-				self:save(player)
-			end
-		end)
-	end
+	self:heartbeat()
 end
 
 -- ------------------------------------------------------------------- shop
@@ -710,9 +698,44 @@ end
 --- without this a shutdown ate everything since the last autosave -- up to a
 --- full round of coins, XP and unlocks. Saves run in parallel and the whole
 --- thing is bounded, because a hung DataStore must not eat the entire budget.
+--- The periodic path: autosave and time accrual. Called every frame from the
+--- composition root; cheap unless AUTOSAVE_SECONDS have passed.
+---
+--- This used to live inside awardRound, which meant "periodic" was really
+--- "whenever a round ends" -- so for the majority of players, who never finish
+--- one, nothing here ever ran, and the lock refresh it provides never happened
+--- during a 180 s round against a 150 s LOCK_TTL.
+function Progression:heartbeat()
+	if os.clock() - self.lastSave <= AUTOSAVE_SECONDS then
+		return
+	end
+	self.lastSave = os.clock()
+	-- Fold elapsed play time in BEFORE snapshotting the dirty set, so a server
+	-- that dies between autosaves loses at most one interval of playSeconds
+	-- rather than the whole session. accrue() marks dirty, so anyone currently
+	-- in the kitchen is included below.
+	for player in self.profiles do
+		self:accrue(player)
+	end
+	local pending = {}
+	for player in self.dirty do
+		table.insert(pending, player)
+	end
+	table.clear(self.dirty)
+	-- save() yields on retry, so snapshot the list first.
+	task.spawn(function()
+		for _, player in pending do
+			self:save(player)
+		end
+	end)
+end
+
 function Progression:flushAll()
 	local pending = {}
 	for player in self.profiles do
+		-- Everyone still connected gets their time folded in first, or the
+		-- shutdown save persists a playSeconds that stops at the last accrual.
+		self:accrue(player)
 		table.insert(pending, player)
 	end
 	local left = #pending
