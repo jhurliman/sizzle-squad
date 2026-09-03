@@ -10,6 +10,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
+// Just the id, not creds(): --verify SKIPS without a key rather than exiting,
+// which creds() would do.
+import { DEFAULT_UNIVERSE_ID } from './opencloud-creds.mjs';
+
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(HERE, '..');
 const src = JSON.parse(fs.readFileSync(path.join(ROOT, 'loc/source.json'), 'utf8'));
@@ -100,7 +104,17 @@ const covered = new Set(src.entries.map((e) => e.source));
 // Glyphs, digits and placeholder values that are overwritten before anyone
 // sees them. Listed explicitly so the exemption is a decision, not a gap.
 const IGNORE = new Set(['0', '0 coins', '3:00', 'X', '★', '☆', '🍳 ', '🔥', '🔪',
-  'Level 1', 'Lv 1  ·  0 coins', 'BLT']);
+  'Level 1', 'Lv 1  ·  0 coins', 'BLT',
+  // Punctuation standing in for a word, not a word. The roster shows this
+  // against a chair whose player has not pressed Start yet; there is nothing
+  // in an ellipsis for a translator to do.
+  '…',
+  // The dismiss glyph on a bot chair. A lower-case x rather than U+2715 or
+  // U+2717, both of which KNOWN-GAPS records shipping as empty boxes because
+  // they depend on the TEXT font and FredokaOne has neither.
+  'x',
+  // The invite glyph on an empty chair's corner button, next to 'x'.
+  '+']);
 const missing = [];
 for (const kind of ['static', 'content']) {
   for (const e of found[kind]) {
@@ -166,7 +180,7 @@ if (orphanCalls.length) {
 let langMismatch = 0;
 if (process.argv.includes('--verify')) {
   const key = process.env.ROBLOX_SIZZLE_SQUAD_API_KEY;
-  const universe = process.env.ROBLOX_UNIVERSE_ID || '10761465304';
+  const universe = process.env.ROBLOX_UNIVERSE_ID || DEFAULT_UNIVERSE_ID;
   if (!key) {
     console.log('\n--verify skipped: no API key in the environment');
   } else {

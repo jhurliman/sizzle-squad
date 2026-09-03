@@ -68,7 +68,10 @@ local playerA = { UserId = 1001, Name = "Alice" }
 
 -- ---------------------------------------------------------------- stack
 
-local simService = SimService.new(shared, { seed = 4242, botFill = true })
+local Staging = require("../game-src/shared/Staging")
+-- Injected here as it is in the real server, or walkToMark no-ops and the
+-- lobby checks below would pass by doing nothing.
+local simService = SimService.new(shared, { seed = 4242, botFill = true, staging = Staging })
 local replicator = Replicator.new(shared, Net, remotes, function(chef)
 	return simService:chefFlags(chef)
 end)
@@ -236,6 +239,268 @@ check(profile.equipped.hat == "hat_bandana_red", "shop equip works")
 check(#remotes.Transforms.allFired > 100, `transforms streamed ({#remotes.Transforms.allFired} packets)`)
 check(#remotes.SimEvents.allFired > 10, `events streamed ({#remotes.SimEvents.allFired} batches)`)
 check(#remotes.RoundPhase.allFired > 5, "round phases broadcast")
+
+-- ------------------------------------------------- the lobby seat roster
+--
+-- The phase payload used to carry `readyIds`, a bare list of UserIds of the
+-- players who had pressed Start. The lobby roster cannot be drawn from that:
+-- names and skins are keyed by chefId, so it needed a two-hop join through the
+-- skin table, and there was no way at all to learn who had NOT pressed, since
+-- an absent UserId and an absent player look identical.
+--
+-- The 3/2 bug is the one worth pinning. readyIds did not check seat.afk while
+-- readyTally excluded AFK seats from BOTH halves of its count, so an
+-- AFK-but-ready player made #readyIds exceed readyCount and any roster built
+-- from it rendered more ready players than there were players.
+local function lastPhasePayload()
+	local fired = remotes.RoundPhase.allFired
+	return fired[#fired][1]
+end
+
+-- The emulated client above spends the whole round sending packets with no
+-- real movement in them, so by now the AFK gate has correctly parked it. Clear
+-- that first: the AFK case gets its own check below, and this one is about the
+-- shape of the payload.
+crew:touch(crew.seats[playerA])
+-- setReady no-ops outside a lobby phase and the round has just ended, so set
+-- the flag and ask for the broadcast directly rather than reading a payload
+-- from thirty seconds ago.
+director.ready[playerA] = true
+director:broadcastPhase()
+local pay = lastPhasePayload()
+check(pay.seats ~= nil, "the phase payload carries a seat roster")
+check(pay.readyIds == nil, "and the old readyIds list is gone")
+check(pay.awaitingStart == nil and pay.waiting == nil, "along with two fields nothing ever read")
+
+local seatA = nil
+for _, st in pay.seats do
+	if st.userId == playerA.UserId then
+		seatA = st
+	end
+end
+check(seatA ~= nil, "the seated player is in the roster")
+if seatA ~= nil then
+	check(seatA.chefId ~= nil, `carrying a chefId ({tostring(seatA.chefId)}), so names need no join`)
+	check(seatA.name ~= nil and seatA.name ~= "", `and a display name ({tostring(seatA.name)})`)
+	check(seatA.ready == true, "and their ready state")
+end
+
+-- AFK SEATS STAY ON THE ROSTER, FLAGGED.
+--
+-- The first version of this dropped them, on the theory that it fixed the 3/2
+-- bug. It did, and it broke something worse: the lobby parks you on a mark for
+-- the crew shot, standing still counted as idle, and a present player watched
+-- their own chair turn into a bot and back. The roster answers "who is in this
+-- room"; readyTally answers "who can still answer". Different questions, and
+-- conflating them is what produced both bugs.
+crew.seats[playerA].afk = true
+director:broadcastPhase()
+local afkPay = lastPhasePayload()
+local n, total = director:readyTally()
+local afkRow = nil
+for _, st in afkPay.seats do
+	if st.userId == playerA.UserId then
+		afkRow = st
+	end
+end
+check(afkRow ~= nil, "an AFK player is still on the roster -- the lobby must not deny they are here")
+if afkRow ~= nil then
+	check(afkRow.afk == true, "and is flagged so the chair can say 'away'")
+end
+check(total == 0, `but readyTally still excludes them ({total} seats can answer)`)
+check(n == 0, "so an AFK-but-ready player cannot start the round on their own")
+crew.seats[playerA].afk = false
+director:broadcastPhase()
+
+-- ---------------------------------------------- a chair is a character
+--
+-- Replaces a single global BOTS: ON toggle, which could not express "three
+-- bots but not a fourth" and hid a server-wide setting behind a button that
+-- said nothing about its scope. Every chef slot is now a chair with three
+-- possible occupants, and the chair is the control.
+local function chairs()
+	return lastPhasePayload().seats
+end
+-- seatAction mutates; the payload is only rebuilt on a broadcast, which the
+-- remote handler does for us in the real server.
+local function act(who: any, msg: any)
+	local claimed = crew:seatAction(who, msg)
+	director:broadcastPhase()
+	return claimed
+end
+local function chairFor(chefId: number): any
+	for _, c in chairs() do
+		if c.chefId == chefId then
+			return c
+		end
+	end
+	return nil
+end
+
+director:broadcastPhase()
+check(#chairs() == #simService.sim.chefs, `every chef slot is a chair ({#chairs()})`)
+local mine = chairFor(crew.seats[playerA].chefId)
+check(mine ~= nil and mine.kind == "player", "the seated player's chair says player")
+check(mine ~= nil and mine.species ~= nil, `and names the character in it ({tostring(mine and mine.species)})`)
+
+-- find a chair a bot is in
+local botChair = nil
+for _, c in chairs() do
+	if c.kind == "bot" then
+		botChair = c
+	end
+end
+check(botChair ~= nil, "and there is a bot chair to take")
+
+if botChair ~= nil then
+	local wanted = botChair.species
+	local before = chairFor(crew.seats[playerA].chefId).species
+	check(wanted ~= before, `the bot chair is a different character ({before} -> {wanted})`)
+
+	-- CLAIM: play as that character.
+	act(playerA, { chefId = botChair.chefId, action = "claim" })
+	local after = chairFor(crew.seats[playerA].chefId).species
+	check(after == wanted, `claiming a bot chair makes you that character ({after})`)
+	local stillFour = #chairs()
+	check(stillFour == 4, `still four chairs afterwards ({stillFour})`)
+	local players = 0
+	for _, c in chairs() do
+		if c.kind == "player" then
+			players += 1
+		end
+	end
+	check(players == 1, "and still exactly one person at the table, not two")
+end
+
+-- DISMISS: send a bot away and leave the chair for a human.
+local target = nil
+for _, c in chairs() do
+	if c.kind == "bot" then
+		target = c
+	end
+end
+if target ~= nil then
+	act(playerA, { chefId = target.chefId, action = "dismiss" })
+	local now = chairFor(target.chefId)
+	check(now.kind == "empty", `dismissing a bot empties its chair ({now.kind})`)
+
+	-- FILL: and it can be given back.
+	act(playerA, { chefId = target.chefId, action = "fill" })
+	check(chairFor(target.chefId).kind == "bot", "and a bot can be put back into it")
+	act(playerA, { chefId = target.chefId, action = "dismiss" })
+end
+
+-- A CHAIR WITH A PERSON IN IT IS NOT ON OFFER, whatever the client sends.
+local occupied = crew.seats[playerA].chefId
+local speciesBefore = chairFor(occupied).species
+act(playerA, { chefId = occupied, action = "dismiss" })
+check(chairFor(occupied).kind == "player", "a crafted dismiss cannot evict a person")
+check(chairFor(occupied).species == speciesBefore, "and cannot change what they are playing as")
+
+-- AND A PASSER-BY CANNOT REARRANGE A SHIFT THEY ARE NOT WORKING.
+local stranger = { UserId = 999999, Name = "Stranger" }
+local kindBefore = chairFor(occupied).kind
+act(stranger, { chefId = occupied, action = "claim" })
+check(chairFor(occupied).kind == kindBefore, "an unseated client's seat action is ignored")
+act(playerA, { chefId = 0, action = "nonsense" })
+act(playerA, "not a table")
+check(#chairs() == 4, "and junk on the wire changes nothing")
+
+-- ------------------------------- everybody's appearance reaches the client
+--
+-- THE DUPLICATE-CHARACTER BUG. EquipDeltas used to be built from crew.seats,
+-- so it described only humans. Claiming a character swaps species between two
+-- chefs, and the bot on the other end of that swap was never mentioned to
+-- anyone -- the client kept drawing it as the character it used to be. Take
+-- Mochi from a bot and the room has two Mochis and no Bramble.
+local function appearance()
+	return crew:appearanceList(function(player)
+		return progression.profiles[player]
+	end, function(player)
+		return player.DisplayName or player.Name
+	end)
+end
+
+local look = appearance()
+check(#look == #simService.sim.chefs, `every chef is described, not just the seated ones ({#look})`)
+local seenSkin, dupes = {}, 0
+for _, e in look do
+	check(e.skin ~= nil, `chef {e.chefId} ships a skin`)
+	if seenSkin[e.skin] then
+		dupes += 1
+	end
+	seenSkin[e.skin] = true
+end
+check(dupes == 0, `and no two chefs claim the same character ({dupes} duplicates)`)
+
+-- the invariant has to survive a claim, which is when it used to break
+local botToTake = nil
+for _, c in chairs() do
+	if c.kind == "bot" then
+		botToTake = c
+	end
+end
+if botToTake ~= nil then
+	act(playerA, { chefId = botToTake.chefId, action = "claim" })
+	local after = appearance()
+	local seen2, dupes2 = {}, 0
+	for _, e in after do
+		if seen2[e.skin] then
+			dupes2 += 1
+		end
+		seen2[e.skin] = true
+	end
+	check(dupes2 == 0, `still four distinct characters after claiming one ({dupes2} duplicates)`)
+	check(#after == 4, "and still four of them")
+	local named = 0
+	for _, e in after do
+		if e.name ~= nil then
+			named += 1
+		end
+	end
+	check(named == 1, `exactly one chef carries a player name ({named})`)
+end
+
+-- ------------------------------- the first lobby anybody sees is a lobby
+--
+-- tickMovementOnly ran for results and intermission only. It is also what
+-- walks bots onto their marks now, so on a fresh server -- countdown, the one
+-- phase a player actually starts in -- nobody walked anywhere and the crew
+-- shot framed an empty floor with one person in it.
+local moved = 0
+for _, chef in simService.sim.chefs do
+	if simService.humans[chef.id] == nil then
+		chef.pos.x, chef.pos.y = 2.5, 2.5
+	end
+end
+director.phase = "countdown"
+for _ = 1, 240 do
+	director:heartbeat(1 / 60)
+end
+for _, chef in simService.sim.chefs do
+	if simService.humans[chef.id] == nil and (math.abs(chef.pos.x - 2.5) > 0.5 or math.abs(chef.pos.y - 2.5) > 0.5) then
+		moved += 1
+	end
+end
+check(moved > 0, `bots walk to their marks during countdown too ({moved} moved)`)
+
+-- ORDERED BY CHARACTER, so the four chairs never move.
+--
+-- This asserted chefId order until the chairs became characters. Ordering by
+-- chefId kept the chairs in step with the bodies, but claiming a character
+-- swaps species between chefs, so the LABELS slid along the row every time
+-- anybody picked anybody -- the chair you were about to tap had moved by the
+-- time you tapped it.
+local ordered = true
+local prev = -1
+for _, st in lastPhasePayload().seats do
+	local at = Staging.indexOf(st.species)
+	if at <= prev then
+		ordered = false
+	end
+	prev = at
+end
+check(ordered, "the roster is ordered by character, so the chairs never move")
 
 -- buffer round-trip
 local b = Net.packMove(7, 3.25, 4.5, 1.5, -2.25, 0.7, true)
@@ -446,24 +711,83 @@ check(plainFirst ~= nil, `an unscripted board still issues tickets ({plainFirst}
 check(#plain.director.scriptedRecipes == 0, "the default board carries no script")
 
 -- ==========================================================================
--- The plate economy. Washing up used to be unreachable: nothing ever set
--- plate.dirty and the racks were bottomless, so the sink, its verb, its timer
--- and its art were all dead. These pin the loop that makes it real.
+-- THE RACK ALWAYS HANDS OVER A CLEAN PLATE.
+--
+-- It used to own eight, and every serve dirtied one, so the NINTH plate of a
+-- round came out dirty -- and a dirty plate is refused by every plating action
+-- there is. Nothing outside First Shift explains washing-up and the only cue
+-- is that the plate looks slightly grey, so the ninth plate silently stopped
+-- accepting food. Deterministic, and it fires for every crew that serves eight
+-- dishes, which is to say the ones playing well.
+--
+-- Washing-up returns in a content update with legible crockery and a tutorial
+-- beat. Until then the contract is: press the rack, get a clean plate, always.
 -- ==========================================================================
 
 local pe = shared.createSim({ seed = 5, botCount = 0 })
-check(pe.plateStock == shared.TUNING.plateStock, `racks start stocked ({pe.plateStock})`)
-check(pe.dirtyPlates == 0, "nothing is dirty at the start")
+local peRack
+for _, st in pe.kitchen.stations do
+	if st.kind == "plates" then
+		peRack = st
+		break
+	end
+end
+check(peRack ~= nil, "the kitchen has a plate rack")
 
--- Drive a full round with bots and watch the whole loop, rather than poking
--- the private verbs: serve -> dishes pile up -> someone washes -> plates come
--- back. Every earlier attempt at this mechanic failed somewhere in that cycle
--- rather than in any single step.
+-- Through the real input path, not by poking the private verb: stand at the
+-- rack and press, a hundred times, discarding each plate rather than putting
+-- it back. The old rack owned eight, so anything past the ninth press is the
+-- regime where this used to break.
+local peChef = pe.chefs[1]
+peChef.isPlayer = true
+peChef.pos.x = peRack.cell.x + 0.5 + peRack.facing.x * 1.4
+peChef.pos.y = peRack.cell.y + 0.5 + peRack.facing.y * 1.4
+peChef.vel.x, peChef.vel.y = 0, 0
+peChef.heading = math.atan2(-(peRack.facing.y), -(peRack.facing.x))
+
+local peInputs = {}
+for _, c in pe.chefs do
+	peInputs[c.id + 1] = shared.NO_INPUT
+end
+for _ = 1, 10 do
+	shared.step(pe, peInputs)
+	pe.events = {}
+end
+
+local handed, everDirty = 0, false
+for _ = 1, 100 do
+	peChef.carrying = nil
+	-- Rising edge, then release: grabPressed is an edge, not a held state.
+	peInputs[peChef.id + 1] = { move = { x = 0, y = 0 }, grabPressed = true, useHeld = false }
+	shared.step(pe, peInputs)
+	peInputs[peChef.id + 1] = shared.NO_INPUT
+	shared.step(pe, peInputs)
+	pe.events = {}
+	local held = peChef.carrying
+	if held ~= nil and held.type == "plate" then
+		handed += 1
+		if held.plate.dirty then
+			everDirty = true
+		end
+	end
+end
+check(handed == 100, `the rack is bottomless (handed over {handed} of 100)`)
+check(not everDirty, "and never hands over a dirty one")
+
+-- And across a whole round with bots actually serving, which is where the
+-- dirty plates used to come from.
 local live = shared.createSim({ seed = 11, botCount = 0 })
 shared.seedPans(live)
 local botDir = shared.makeBotDirector()
 botDir:setDrivePlayer(true)
-local washes, peakDirty, everStarved, deadlocked = 0, 0, false, false
+local sawDirty, refused = false, false
+local liveRack
+for _, st in live.kitchen.stations do
+	if st.kind == "plates" then
+		liveRack = st
+		break
+	end
+end
 for _ = 1, 60 * 190 do
 	local bi = botDir:update(live, shared.SIM_DT)
 	local inputs = {}
@@ -471,45 +795,28 @@ for _ = 1, 60 * 190 do
 		inputs[chef.id + 1] = bi:get(chef.id) or shared.NO_INPUT
 	end
 	shared.step(live, inputs)
-	for _, ev in live.events do
-		if ev.t == "washDone" then
-			washes += 1
-		end
-	end
 	live.events = {}
-	peakDirty = math.max(peakDirty, live.dirtyPlates)
-	if live.plateStock <= 0 then
-		everStarved = true
-		-- No clean plates AND nothing dirty to wash would be unrecoverable.
-		if live.dirtyPlates <= 0 then
-			local anyPlate = false
-			for _, chef in live.chefs do
-				if chef.carrying ~= nil and chef.carrying.type == "plate" then
-					anyPlate = true
-				end
-			end
-			for _, st in live.kitchen.stations do
-				if st.holding ~= nil and st.holding.type == "plate" then
-					anyPlate = true
-				end
-			end
-			if not anyPlate then
-				deadlocked = true
-			end
+	for _, chef in live.chefs do
+		local c = chef.carrying
+		if c ~= nil and c.type == "plate" and c.plate.dirty then
+			sawDirty = true
 		end
-	end
-	if live.plateStock < 0 or live.dirtyPlates < 0 then
-		deadlocked = true
+		-- An empty-handed chef must always be offered a plate. This is the
+		-- exact check that would have caught the original bug: it went false
+		-- the moment the eighth plate was served.
+		if c == nil and shared.planGrab(live, chef, liveRack) ~= "dispense" then
+			refused = true
+		end
 	end
 	if live.over then
 		break
 	end
 end
-check(live.score.served > 0, `the round served dishes ({live.score.served})`)
-check(peakDirty > 0, `serving sends plates to the wash-up ({peakDirty} at peak)`)
-check(everStarved, "the racks actually run dry during a round -- the mechanic is reachable")
-check(washes > 0, `and somebody washes up ({washes} times)`)
-check(not deadlocked, "the kitchen never reaches a state with no plates and nothing to wash")
+-- Past the old cliff, or the round proves nothing: the eighth serve is where
+-- the rack used to start handing out dirty plates.
+check(live.score.served > 8, `the round serves past the old eight-plate cliff ({live.score.served})`)
+check(not sawDirty, "no dirty plate reaches anybody's hands over a full round")
+check(not refused, "and an empty-handed chef is never refused a plate")
 
 print(if failures > 0 then `{failures} FAILURES` else "PASS: equip slots")
 if failures > 0 then

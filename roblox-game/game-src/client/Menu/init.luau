@@ -20,6 +20,7 @@ local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Game"):WaitForChild("Config")) :: any
 local Theme = require(script.Theme) :: any
 local ShiftPanel = require(script.ShiftPanel) :: any
 local KitchenCard = require(script.KitchenCard) :: any
@@ -91,8 +92,9 @@ function Menu.new(deps: any)
 		onOpenTab = function(tab)
 			self:openTab(tab)
 		end,
-		onToggleBots = function(on)
-			self.remotes.BotFill:FireServer(on)
+		-- A chair is a character; see the SeatAction handler on the server.
+		onSeatAction = function(chefId, action)
+			self.remotes.SeatAction:FireServer({ chefId = chefId, action = action })
 		end,
 		onNewServer = function()
 			-- Never mid-shift: walking out on three crewmates is not a button.
@@ -110,6 +112,14 @@ function Menu.new(deps: any)
 			end
 		end,
 	})
+	-- IN STUDIO, GO STRAIGHT TO THE LOBBY.
+	--
+	-- The returning-player shim sets sessions >= 2, which is what a returning
+	-- player is -- and the Kitchen Card is what a returning player sees first,
+	-- a full-screen welcome-back over the Start Shift panel that clears itself
+	-- after twelve seconds. Correct in production, and in Studio it is twelve
+	-- seconds of nothing in front of the screen being worked on.
+	self.skipCard = RunService:IsStudio() and Config.STUDIO_RETURNING_PLAYER
 	self.kitchenCard = KitchenCard.new(gui, {
 		onOpenTab = function(tab)
 			self:openTab(tab)
@@ -143,7 +153,10 @@ function Menu.new(deps: any)
 	end)
 
 	-- Gameplay, so it lives in the HUD gui and survives the menu's phase gate
-	-- (you can still ping mid-round); it only hides behind an open panel.
+	-- (you can still ping mid-round). It is hidden the rest of the time:
+	-- pinging "Order up!" at a lobby is pinging nobody about nothing, and the
+	-- row sat across the bottom of the crew shot and the results card, which
+	-- is where a player's eye actually is between rounds.
 	self.emoteBar = EmoteBar.new(deps.hudGui, {
 		catalog = self.catalog,
 		onEmote = function(id)
@@ -160,6 +173,9 @@ function Menu.new(deps: any)
 		end)
 	end
 	self:relayout()
+	-- Hidden until a round starts, rather than flashing across the first lobby
+	-- before the first RoundPhase arrives.
+	self:refreshEmoteBar()
 	return self
 end
 
@@ -390,7 +406,7 @@ function Menu:setOpen(on: boolean)
 	self.scrim.Visible = on
 	self.panel.Visible = on
 	self.shiftPanel:setHidden(on)
-	self.emoteBar:setHidden(on)
+	self:refreshEmoteBar()
 
 	-- One switch solves movement-while-blind, drag-vs-thumbstick, and stray
 	-- E/Space grabs: ControlModule:Disable() also hides the touch thumbstick,
@@ -416,6 +432,18 @@ end
 
 -- ------------------------------------------------------------------ state
 
+--- Hidden only behind an open panel.
+---
+--- It was briefly hidden on the Start Shift screen too, but that was treating
+--- a symptom: the panel had grown a roster row and its info chip was landing
+--- on the emote buttons on a short screen. The panel lifts itself clear now
+--- (see ShiftPanel:relayout), measured at 8px of clearance down to 740x360, so
+--- there is nothing to hide from -- and standing in a lobby with three other
+--- people is one of the better times to have emotes.
+function Menu:refreshEmoteBar()
+	self.emoteBar:setHidden(self.open)
+end
+
 function Menu:setPhase(phase: any, spectating: boolean)
 	self.phase = phase
 	self.spectating = spectating
@@ -427,15 +455,12 @@ function Menu:setPhase(phase: any, spectating: boolean)
 	self.gui.Enabled = allowed
 	self.shiftPanel:setPhase(phase, spectating)
 	self.kitchenCard:setPhase(phase)
+	self:refreshEmoteBar()
 	self:maybeAutoStart()
 end
 
 --- Species other seated players are wearing (species -> UserId), from the
 --- EquipDeltas broadcast. Held here so a wardrobe built later still gets it.
-function Menu:setBots(on: boolean, pending: boolean, phase: string?)
-	self.shiftPanel:setBots(on, pending, phase)
-end
-
 function Menu:setTaken(taken: any)
 	self.taken = taken
 	local w = self.tabs and self.tabs.wardrobe
@@ -447,6 +472,9 @@ end
 function Menu:setProgress(progress: any)
 	self.progress = progress
 	self.shiftPanel:setProgress(progress)
+	if self.skipCard then
+		self.kitchenCard.consumed = true
+	end
 	self.kitchenCard:setProgress(progress)
 	self.emoteBar:setProgress(progress)
 	self:maybeAutoStart()

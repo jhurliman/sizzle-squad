@@ -72,6 +72,8 @@ function RoundDirector.new(
 end
 
 function RoundDirector:setPhase(phase: Phase, timer: number)
+	-- The AFK window is longer between rounds: see CrewManager.AFK_LOBBY_SECONDS.
+	self.crew:setLobby(phase ~= "round")
 	self.phase = phase
 	self.timer = timer
 	-- A fresh lobby always starts un-readied, so nobody is dragged into the
@@ -83,14 +85,79 @@ function RoundDirector:setPhase(phase: Phase, timer: number)
 end
 
 function RoundDirector:broadcastPhase()
-	-- readyIds is what lets the client render its own ready caption as a pure
-	-- function of server state instead of remembering that it clicked.
-	local readyIds = {}
-	for player in self.crew.seats do
-		if self.ready[player] then
-			table.insert(readyIds, player.UserId)
+	-- THE SEAT ROSTER: WHO IS HERE, NOT JUST HOW MANY.
+	--
+	-- This used to be `readyIds`, a bare list of UserIds of the players who had
+	-- pressed Start. Two problems with that. Names, skins and hats are all
+	-- keyed by chefId, so drawing a crew row meant bridging UserId to chefId
+	-- through the skin table -- a two-hop join that only worked because skins
+	-- happen to be a unique permutation. And there was no way at all to learn
+	-- who had NOT pressed Start, because an absent UserId and an absent player
+	-- look identical.
+	--
+	-- Carrying chefId here makes the lobby roster a lookup instead of an
+	-- inference, and carrying the not-ready seats is what lets it show four
+	-- chairs rather than a count.
+	--
+	-- AFK seats are excluded, matching readyTally. They used not to be: an
+	-- AFK-but-ready player landed in readyIds while readyTally left them out of
+	-- both halves of the count, so #readyIds could exceed readyCount and a
+	-- roster built from it would render "3/2".
+	-- ALL FOUR CHAIRS, ALWAYS, IN THE ORDER THEY STAND IN.
+	--
+	-- This used to send only the seated humans, which cannot describe a lobby:
+	-- the empty chairs and the bot-filled ones are most of what a player is
+	-- looking at and deciding about. Now every chef slot reports what is in it.
+	--
+	-- Ordered by chefId rather than by species, so chair order matches the
+	-- lineup left-to-right in the crew shot. Claiming a character SWAPS species
+	-- between two chefs (see CrewManager:claimSkin), so ordering by species
+	-- would keep the labels still and let the chairs slide around behind them --
+	-- the wrong half to hold constant when the whole point of the closeup is
+	-- that the panel and the room show the same four people.
+	local seats = {}
+	for _, chef in self.simService.sim.chefs do
+		local seat = self.crew.byChef[chef.id]
+		local kind
+		if seat ~= nil then
+			kind = "player"
+		elseif self.simService:isActive(chef) then
+			kind = "bot"
+		else
+			kind = "empty"
 		end
+		table.insert(seats, {
+			chefId = chef.id,
+			-- The character in this chair. This is what the label says and what
+			-- claiming the chair gets you.
+			species = chef.skin,
+			kind = kind,
+			userId = if seat ~= nil then seat.player.UserId else nil,
+			name = if seat ~= nil then (seat.player.DisplayName or seat.player.Name) else nil,
+			-- AFK seats STAY on the roster, flagged. Dropping them made the
+			-- lobby lie: the panel parks you on a mark, standing still used to
+			-- count as idle, and a present player watched their own chair turn
+			-- into a bot. The roster answers "who is in this room", which is not
+			-- the same question as readyTally's "who can still answer".
+			ready = seat ~= nil and self.ready[seat.player] == true,
+			afk = seat ~= nil and seat.afk == true,
+		})
 	end
+	-- BY CHARACTER, so the four chairs never move. Ordering by chefId kept the
+	-- chairs in step with the bodies, but claiming a character swaps species
+	-- between chefs, so the LABELS slid along the row every time anybody picked
+	-- somebody -- the chair you were about to tap was somewhere else by the
+	-- time you tapped it. The marks are pinned to characters now too, so the
+	-- panel and the room agree without either of them shuffling.
+	-- Staging comes off SimService because it is injected there; requiring it
+	-- here would put a Roblox lookup inside a module the harnesses drive.
+	local staging = self.simService.staging
+	table.sort(seats, function(a, b)
+		if staging ~= nil then
+			return staging.indexOf(a.species) < staging.indexOf(b.species)
+		end
+		return a.chefId < b.chefId
+	end)
 	local readyCount, readyTotal = self:readyTally()
 	self.remotes.RoundPhase:FireAllClients({
 		phase = self.phase,
@@ -100,14 +167,11 @@ function RoundDirector:broadcastPhase()
 		tutorial = self.tutorialFn(),
 		timer = self.timer,
 		round = self.round,
-		waiting = not self.simService.botFill and self.crew:humanCount() == 0,
 		botFill = self.simService.botFill,
 		botFillPending = self.pendingBotFill,
-		readyIds = readyIds,
+		seats = seats,
 		readyCount = readyCount,
 		readyTotal = readyTotal,
-		-- countdown/intermission are lobbies waiting on Start, not countdowns
-		awaitingStart = self.phase == "countdown" or self.phase == "intermission",
 		results = if self.phase == "results" or self.phase == "intermission" then self.lastResults else nil,
 	})
 end
@@ -406,7 +470,15 @@ function RoundDirector:heartbeat(dt: number)
 
 	-- Between rounds chefs still walk and bump (plan §2.2: the intermission
 	-- IS the lobby); only the kitchen itself sleeps.
-	if self.phase == "results" or self.phase == "intermission" then
+	-- COUNTDOWN IS A LOBBY TOO, and it is the FIRST one anybody sees.
+	--
+	-- This ran for results and intermission only, which was fine when the
+	-- between-rounds tick just let chefs wander. Now it is also what walks bots
+	-- onto their marks -- so on a fresh server, in the one phase a player
+	-- actually starts in, nobody walked anywhere and the crew shot framed an
+	-- empty floor with one person standing in it. Reported as "only my
+	-- character was standing".
+	if self.phase ~= "round" then
 		self.simService:tickMovementOnly(dt)
 		self.replicator:flush(self.simService.sim, {}, dt)
 	end

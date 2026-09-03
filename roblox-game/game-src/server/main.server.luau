@@ -27,7 +27,9 @@ local remotes = Net.server(ReplicatedStorage)
 -- here because the round-end handler below tags the teleport home.
 local exitReason: { [any]: string } = {}
 
-local simService = SimService.new(shared, { seed = os.time() % 2 ^ 31, botFill = Config.BOT_FILL })
+local Staging = require(gameShared:WaitForChild("Staging")) :: any
+local simService =
+	SimService.new(shared, { seed = os.time() % 2 ^ 31, botFill = Config.BOT_FILL, staging = Staging })
 local replicator = Replicator.new(shared, Net, remotes, function(chef)
 	return simService:chefFlags(chef)
 end, function(chef)
@@ -39,6 +41,21 @@ local crew = CrewManager.new(simService, Net, remotes, replicator, os.clock, fun
 	return profile and profile.species or nil
 end)
 progression = Progression.new(Config, remotes, require(gameShared:WaitForChild("Catalog")))
+-- STUDIO LOOKS LIKE A FIRST-EVER VISIT, FOREVER, AND TWO THINGS KEY OFF THAT.
+--
+-- Nothing persists from a rojo-built local file (PlaceId 0, so no DataStore),
+-- so `rounds` and `sessions` reset every session. needsTutorial is
+-- `rounds == 0` and Menu:maybeAutoStart readies a `sessions <= 1` player
+-- automatically -- between them, every playtest was either the tutorial again
+-- or being dropped straight into a shift with three bots, never the lobby.
+--
+-- Progression applies this to the profile BEFORE the first push, which is the
+-- part that matters: the client acts on that push, so correcting it afterwards
+-- is already too late.
+progression.studioReturning = Tutorial.isStudio() and Config.STUDIO_RETURNING_PLAYER
+if progression.studioReturning then
+	print("[sizzle] Studio: profiles shimmed to a returning player (Config.STUDIO_RETURNING_PLAYER)")
+end
 
 -- CrewManager sees the input, Progression owns the profile; connect them once
 -- both exist (CrewManager is built before progression, hence the late assign).
@@ -102,20 +119,6 @@ remotes.ReadyUp.OnServerEvent:Connect(function(player, on)
 	director:setReady(player, on == true)
 end)
 
--- BOTS ARE OPTIONAL, AND ANY SEATED PLAYER MAY DECIDE.
---
--- No host role exists in this game and inventing one for a four-player co-op
--- kitchen is not worth it: the worst case is somebody flipping a toggle their
--- crewmates did not want, in a lobby, where it is one tap to flip back.
--- Spectators and unseated clients are ignored so a passer-by cannot change a
--- shift they are not working.
-remotes.BotFill.OnServerEvent:Connect(function(player, on)
-	if crew.seats[player] == nil then
-		return
-	end
-	director.pendingBotFill = on == true
-	director:broadcastPhase()
-end)
 
 -- Emotes travel as IDS. This used to rebroadcast any client-supplied string
 -- (<=24 chars) to every player, which is an unmoderated free-text channel in
@@ -170,27 +173,16 @@ local function electKitchen(): { [string]: string }
 	return out
 end
 
+-- The list is CrewManager:appearanceList; this only supplies the lookups it
+-- cannot have. Keeping it out of here is the point -- server-harness cannot
+-- load this file, and the last version of this logic shipped a bug precisely
+-- because nothing could reach it.
 local function broadcastEquips()
-	local list = {}
-	for player, seat in crew.seats do
-		local profile = progression.profiles[player]
-		local skin = nil
-		for _, chef in simService.sim.chefs do
-			if chef.id == seat.chefId then
-				skin = chef.skin
-			end
-		end
-		table.insert(list, {
-			chefId = seat.chefId,
-			hat = profile and profile.equipped and profile.equipped.hat or nil,
-			palette = profile and profile.equipped and profile.equipped.palette or nil,
-			skin = skin,
-			name = monetization:flairFor(player) .. (player.DisplayName or player.Name),
-		})
-	end
-	-- `taken` is the species other SEATED HUMANS are wearing right now. The
-	-- wardrobe still previews every character (trying hats on is the whole
-	-- point of it) but cannot select one that is spoken for in this server.
+	local list = crew:appearanceList(function(player)
+		return progression.profiles[player]
+	end, function(player)
+		return monetization:flairFor(player) .. (player.DisplayName or player.Name)
+	end)
 	remotes.EquipDeltas:FireAllClients({ chefs = list, kitchen = electKitchen(), taken = crew:takenSkins() })
 end
 
@@ -207,6 +199,18 @@ local function queueEquips()
 		broadcastEquips()
 	end)
 end
+
+-- A CHAIR IS A CHARACTER. The logic is CrewManager:seatAction, not here --
+-- server-harness cannot load this file, so anything that lives in it is
+-- untestable by construction, which a set of vacuously-passing checks proved.
+remotes.SeatAction.OnServerEvent:Connect(function(player, msg)
+	local claimed = crew:seatAction(player, msg)
+	if claimed ~= nil then
+		progression:setSpecies(player, claimed)
+	end
+	queueEquips()
+	director:broadcastPhase()
+end)
 
 -- Premium grants land in the profile like any other unlock, so the wardrobe
 -- and shop need no special case for them.
@@ -422,6 +426,41 @@ Players.PlayerAdded:Connect(function(player)
 	seatArrival(player)
 end)
 
+-- THE JOIN SEND IS BEST-EFFORT; THIS IS THE ONE THAT COUNTS.
+--
+-- Everything PlayerAdded hands a new client -- ChefAssign, Snapshot,
+-- RoundPhase, Leaderboards, EquipDeltas, Progress -- is a one-shot
+-- RemoteEvent, and Roblox does not hold those for a listener that connects
+-- later. PlayerAdded runs behind a yielding DataStore claim, while the client
+-- is still requiring modules and loading 55 sounds before it reaches its
+-- OnClientEvent lines, so which side wins is a coin toss on a cold phone.
+--
+-- Losing it was silent and total: no chefId means no mirror, no mirror means
+-- the client never sends a move packet, and the player sits as a spectator
+-- until the next reseat happens to re-send everything. So the client now says
+-- when it is actually listening, and we send the lot again.
+local lastReadyAt: { [any]: number } = {}
+remotes.ClientReady.OnServerEvent:Connect(function(player)
+	-- Cheap guard: snapshotFor walks the whole sim, so this must not be a free
+	-- amplifier for a client that fires it in a loop.
+	local now = os.clock()
+	if now - (lastReadyAt[player] or -math.huge) < 1 then
+		return
+	end
+	lastReadyAt[player] = now
+
+	local seat = crew.seats[player]
+	if seat ~= nil then
+		crew:sendSeat(player, seat)
+	elseif pendingJoins[player] then
+		remotes.Snapshot:FireClient(player, replicator:snapshotFor(simService.sim))
+	end
+	director:broadcastPhase()
+	leaderboards:pushTo(player)
+	broadcastEquips()
+	progression:push(player)
+end)
+
 -- Roblox gives us ~30s at shutdown; without this, everything since the last
 -- 60s autosave is lost -- up to a whole round of coins, XP and unlocks.
 game:BindToClose(function()
@@ -441,6 +480,7 @@ Players.PlayerRemoving:Connect(function(player)
 	if reached ~= "" and exitReason[player] == nil and (profile.sessions or 1) <= 1 then
 		analytics:custom(player, "first_shift_reach", 1, { reached, "quit" })
 	end
+	lastReadyAt[player] = nil
 	crew:playerRemoving(player)
 	progression:playerRemoving(player)
 	monetization:playerRemoving(player)
@@ -512,4 +552,10 @@ RunService.Heartbeat:Connect(function(dt)
 	leaderboards:heartbeat(os.clock())
 end)
 
+-- WHICH BUILD IS THIS? Studio holds the .rbxl it was opened with for the whole
+-- session, so a rebuilt place on disk changes nothing in an open window. Say
+-- it out loud rather than leaving people to infer it from whether a feature
+-- they expected is present.
+local BuildInfo = require(gameShared:WaitForChild("BuildInfo")) :: any
+print(`[sizzle] build {BuildInfo.summary}`)
 print("[sizzle] server up — kitchen open")

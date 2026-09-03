@@ -45,6 +45,18 @@ function SimService.new(shared: any, opts: { seed: number, chefCount: number?, b
 	self.shared = shared
 	self.chefCount = opts.chefCount or 4
 	self.botFill = opts.botFill == true
+	-- PER-CHAIR BOT DISMISSAL, keyed by species.
+	--
+	-- Bots used to be one boolean for the whole server, flipped by one button,
+	-- which made "I want three bots but not a fourth" unsayable. A chair is a
+	-- character, so a dismissal is about a character: no bot as Nori.
+	-- Keyed by species rather than chef id because claimSkin swaps species
+	-- between chefs, and the thing a player dismissed was the chair they were
+	-- looking at, not whichever slot index happened to hold it.
+	self.dismissed = {} :: { [string]: boolean }
+	-- Injected, never required: this module is deliberately Roblox-free so the
+	-- Lune harnesses can drive it. nil simply means nobody lines up.
+	self.staging = opts.staging
 	self.humans = {} :: { [number]: HumanSlot }
 	self.tickEvents = {} :: { any }
 	-- MONOTONIC service clock, deliberately NOT sim.time.
@@ -82,7 +94,7 @@ end
 
 --- Chefs that play: humans always; bot-driven slots only when botFill is on.
 function SimService:isActive(chef: any): boolean
-	return chef.isPlayer or self.botFill
+	return chef.isPlayer or (self.botFill and not self.dismissed[chef.skin])
 end
 
 --- Move every non-human chef to its parking spot (no-op when bots fill in).
@@ -321,6 +333,44 @@ function SimService:tick(dt: number, _now: number?): ({ any }, number)
 end
 
 --- Movement-only advance for results/intermission.
+--- Leave a chair empty, or let a bot have it again.
+function SimService:setDismissed(species: string, on: boolean)
+	self.dismissed[species] = if on then true else nil
+end
+
+--- Walk a bot to its lobby mark and stand it facing the camera.
+---
+--- BETWEEN ROUNDS, NOTHING ELSE MOVES A BOT AT ALL. tickMovementOnly never
+--- calls movePhase, and botInputs only run inside `tick`, so a bot spent the
+--- whole lobby standing exactly where the final whistle left it -- usually
+--- somewhere behind a bench, which is no use to a camera pointed at the crew.
+---
+--- Humans are deliberately NOT steered here. Their position comes from their
+--- own move stream and the client walks itself to its mark through ordinary
+--- synthetic input (see Staging.moveToward), so a player who touches the stick
+--- just wins, and no authority changes hands between rounds. That is the trap
+--- in KNOWN-GAPS about between-rounds movement, and it is worth not repeating.
+function SimService:walkToMark(chef: any, dt: number)
+	local staging = self.staging
+	if staging == nil or not self:isActive(chef) then
+		return
+	end
+	-- By character, not by slot index: the marks belong to the four faces and
+	-- the bodies move between them.
+	local mark = staging.markFor(chef.skin)
+	local mx, my, arrived = staging.moveToward(chef.pos, mark)
+	if arrived then
+		chef.vel.x, chef.vel.y = 0, 0
+		chef.heading = staging.FACE_CAMERA
+		return
+	end
+	local speed = self.shared.TUNING.moveSpeed
+	chef.vel.x, chef.vel.y = mx * speed, my * speed
+	chef.pos.x += chef.vel.x * dt
+	chef.pos.y += chef.vel.y * dt
+	chef.heading = math.atan2(my, mx)
+end
+
 function SimService:tickMovementOnly(dt: number, _now: number?)
 	local shared = self.shared
 	local sim = self.sim
@@ -348,9 +398,21 @@ function SimService:tickMovementOnly(dt: number, _now: number?)
 			-- for every chef rather than decrementing it.
 			chef.working = nil
 			chef.stun = 0
+			-- AND NOBODY IS HOLDING ANYTHING EITHER.
+			--
+			-- Whatever was in your hands when the whistle went stayed there
+			-- through the whole lobby and into the crew photo -- the shot that
+			-- prompted this had somebody posing with a fistful of bacon. There
+			-- is nothing to carry between rounds: the kitchen is asleep, and
+			-- startRound rebuilds the sim from scratch anyway (simService:reset),
+			-- so the plate economy is not losing anything that would otherwise
+			-- have been counted.
+			chef.carrying = nil
 			local slot = self.humans[chef.id]
 			if slot then
 				self:applyHuman(chef, slot, shared.SIM_DT, t)
+			else
+				self:walkToMark(chef, shared.SIM_DT)
 			end
 		end
 		shared.collidePhase(sim, shared.SIM_DT)

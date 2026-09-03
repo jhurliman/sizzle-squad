@@ -33,10 +33,6 @@ function ClientState.new(shared: any, net: any)
 	self.stations = {} :: { [number]: any }
 	self.orders = {} :: { any }
 	self.score = { coins = 0, served = 0, missed = 0, combo = 0, bestCombo = 0, patience = 1, time = 0 }
-	-- Mirrored plate economy: clean plates left on the racks, dirty ones
-	-- stacked at the wash-up.
-	self.plateStock = 0
-	self.dirtyPlates = 0
 	-- Round clock, advanced locally (see advanceClock).
 	self.simTime = 0
 	self.phase = { phase = "countdown", timer = 0, round = 0, results = nil }
@@ -257,13 +253,38 @@ end
 
 function ClientState:applyScore(score: any)
 	self.score = score
-	if score.plateStock ~= nil then
-		self.plateStock = score.plateStock
-		self.dirtyPlates = score.dirtyPlates or 0
-	end
 	if score.time ~= nil then
 		self.simTime = score.time
 	end
+end
+
+--- Two seconds of silence before a chef's body is culled.
+---
+--- Guessing "gone" sooner makes bodies blink on a bad connection, which is
+--- worse than a body that lingers.
+local STALE = 2
+
+--- Should this chef be drawn at all?
+---
+--- EXPLICIT BEATS INFERRED. The silence timeout above is the right guess when
+--- a chef stops streaming for reasons nobody knows. It is the wrong one when
+--- the server has just said the chair is empty -- dismissing a bot stops its
+--- transform stream, so the body used to stand there for the full two seconds
+--- before vanishing and the delay read as lag on a button press. It was never
+--- lag: the roster arrives in the same breath as the dismissal and says
+--- outright that nobody is there.
+---
+--- Lives here rather than in the render loop so a harness can reach it.
+function ClientState:shouldShowChef(chefId: number): boolean
+	local seats = self.phase ~= nil and self.phase.seats or nil
+	if seats ~= nil then
+		for _, seat in seats do
+			if seat.chefId == chefId then
+				return seat.kind ~= "empty"
+			end
+		end
+	end
+	return self.clock - (self.lastSeen[chefId] or -10) < STALE
 end
 
 --- Server correction: snap the SIMULATED position (authority) but park the

@@ -394,6 +394,12 @@ function Hud:updatePhase(phase: any, cards: any?)
 	local inRound = p == "round"
 	self.timerLabel.Visible = inRound
 	self.patienceFill.Parent.Visible = inRound
+	-- And so is the coin chip. It sat in the top-left of the lobby reading a
+	-- bare "0", which is both meaningless there -- the panel's own line already
+	-- says "Lv 1 · 0 coins", in words -- and the last thing worth spending the
+	-- corner of a crew shot on. Every other live readout on this HUD already
+	-- goes away between rounds; this one was simply missed.
+	self.scoreLabel.Visible = inRound
 	-- A combo belongs to a shift too: it must not hang over the results screen
 	-- advertising a streak that is already over.
 	if not inRound then

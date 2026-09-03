@@ -10,6 +10,33 @@ Progression.__index = Progression
 local PROFILE_STORE = "SizzleProfiles_v1"
 local BOARD_ALLTIME = "SizzleBestRound_v1"
 local BOARD_DISHES = "SizzleCareerDishes_v1"
+
+-- DATASTORES ARE PER-UNIVERSE, NOT PER-PLACE.
+--
+-- The only way to get a staging place on Roblox is a second place in the SAME
+-- universe -- there is no other kind -- and that means it shares every
+-- DataStore with live by default. Not a subtle overlap: the same profiles, the
+-- same leaderboards. One playthrough on staging spends a real player's coins
+-- and writes the result back over their save.
+--
+-- So anything that is not live gets its own namespace. Live is matched by id
+-- and left exactly as it was, and so is Studio (PlaceId 0, or nil under a
+-- Lune harness), which means the names change for precisely one thing: a
+-- staging place, which has no data to lose. Getting this wrong in the other
+-- direction would rename live's stores and lose everybody's progression, which
+-- is why the condition names live rather than trying to detect staging.
+--
+-- check-luau asserts this id matches the one the publish tooling defaults to,
+-- so the two cannot drift apart the way the place id already did once.
+local LIVE_PLACE_ID = 113028832194057
+
+local function scoped(name: string): string
+	local placeId = tonumber((game :: any).PlaceId) or 0
+	if placeId == 0 or placeId == LIVE_PLACE_ID then
+		return name
+	end
+	return `{name}__p{placeId}`
+end
 local AUTOSAVE_SECONDS = 60
 
 -- DataStore hardening --------------------------------------------------------
@@ -18,6 +45,20 @@ local AUTOSAVE_SECONDS = 60
 -- lost everything since the last autosave.
 local RETRIES = 4
 local RETRY_BASE = 0.6 -- seconds; doubles each attempt (0.6/1.2/2.4/4.8)
+
+-- CLAIMING A PROFILE GETS ITS OWN, LONGER BUDGET.
+--
+-- The contended case this exists for is a TELEPORT: First Shift runs in a
+-- reserved server and sends the player home, and the origin server's
+-- PlayerRemoving (which releases the lock) can land after the destination has
+-- already tried to claim. That gap is a second or two, so a claim that gives
+-- up instantly turns a routine handoff into a lost tutorial payout, while one
+-- that waits ~5s rides straight over it.
+--
+-- Bounded on purpose: the player is held on the loading screen for this, so a
+-- lock that is genuinely live must lose rather than hang the join.
+local CLAIM_RETRIES = 5
+local CLAIM_BASE = 0.35 -- 0.35/0.7/1.4/2.8 -> ~5.25s before giving up
 -- How long another server's claim is respected before we assume it died. Must
 -- comfortably exceed the autosave interval, which refreshes the claim.
 local LOCK_TTL = 150
@@ -40,15 +81,16 @@ end)()
 --- Backoff rather than a tight loop on purpose: DataStore throttling is a
 --- BUDGET, so hammering a failing key makes the outage worse for every other
 --- request on the server.
-local function withRetry<T>(what: string, fn: () -> T): (boolean, T?)
-	local delay = RETRY_BASE
-	for attempt = 1, RETRIES do
+local function withRetry<T>(what: string, fn: () -> T, attempts: number?, base: number?): (boolean, T?)
+	local tries = attempts or RETRIES
+	local delay = base or RETRY_BASE
+	for attempt = 1, tries do
 		local ok, res = pcall(fn)
 		if ok then
 			return true, res
 		end
-		if attempt == RETRIES then
-			warn(`[progression] {what} failed after {RETRIES} attempts: {res}`)
+		if attempt == tries then
+			warn(`[progression] {what} failed after {tries} attempts: {res}`)
 			return false, nil
 		end
 		task.wait(delay)
@@ -140,12 +182,21 @@ function Progression.new(config: any, remotes: { [string]: any }, catalog: any, 
 	pcall(function()
 		local DataStoreService = dataStores or game:GetService("DataStoreService")
 		self.stores = {
-			profiles = DataStoreService:GetDataStore(PROFILE_STORE),
-			allTime = DataStoreService:GetOrderedDataStore(BOARD_ALLTIME),
-			weekly = DataStoreService:GetOrderedDataStore("SizzleWeekly_" .. weekKey()),
-			dishes = DataStoreService:GetOrderedDataStore(BOARD_DISHES),
+			profiles = DataStoreService:GetDataStore(scoped(PROFILE_STORE)),
+			allTime = DataStoreService:GetOrderedDataStore(scoped(BOARD_ALLTIME)),
+			weekly = DataStoreService:GetOrderedDataStore(scoped("SizzleWeekly_" .. weekKey())),
+			dishes = DataStoreService:GetOrderedDataStore(scoped(BOARD_DISHES)),
 		}
 	end)
+	if self.stores == nil then
+		-- SILENCE HERE COSTS AN HOUR. With no DataStore every session starts
+		-- from nothing, which in Studio means `rounds` is 0 forever, which
+		-- means needsTutorial is true forever, which means First Shift runs on
+		-- every single playtest -- and none of that announces itself. The pcall
+		-- is right (a DataStore outage must not stop the game) but it should
+		-- not be quiet.
+		warn("[progression] no DataStore — nothing will persist this session (Studio: PlaceId 0, or API services off)")
+	end
 	return self
 end
 
@@ -157,33 +208,57 @@ function Progression:playerAdded(player: any, sameSession: boolean?)
 		-- Load AND claim in one UpdateAsync, so the read and the lock write
 		-- cannot interleave with another server doing the same thing.
 		local key = `p{player.UserId}`
-		local ok, loaded = withRetry(`load {key}`, function()
+		local ok, loaded = withRetry(`claim {key}`, function()
 			local out
+			local contended = false
 			self.stores.profiles:UpdateAsync(key, function(old)
 				local p = old or {}
 				local lock = p.__lock
 				if lock ~= nil and lock.server ~= SERVER_ID and (os.time() - (lock.at or 0)) < LOCK_TTL then
-					-- Live elsewhere. Abort the write; the retry loop backs off
-					-- and the claim expires on its own if that server died.
+					-- Live elsewhere. Cancel the write and say so LOUDLY --
+					-- see the error below.
+					contended = true
 					return nil
 				end
 				p.__lock = { server = SERVER_ID, at = os.time() }
 				out = p
 				return p
 			end)
+			if contended then
+				-- ONLY A THROWN ERROR REACHES THE BACKOFF.
+				--
+				-- Returning nil from an UpdateAsync transform cancels the write
+				-- WITHOUT throwing, so UpdateAsync returns perfectly normally
+				-- and withRetry saw a clean success carrying nil. It went
+				-- straight to a read-only session on the very first attempt,
+				-- with no wait and no second look -- while the comment above it
+				-- claimed a backoff that had never once run.
+				--
+				-- Contention is the retryable case, not the terminal one: the
+				-- holder is usually a server that is in the middle of letting
+				-- go. Raising it converts "give up instantly" into "wait for
+				-- the handoff", which is the whole point of the lock TTL.
+				error(`{key} is claimed by another server`, 0)
+			end
 			return out
-		end)
+		end, self.claimRetries or CLAIM_RETRIES, self.claimBase or CLAIM_BASE)
 		if ok and loaded ~= nil then
 			for k, v in loaded do
 				if k ~= "__lock" then
 					profile[k] = v
 				end
 			end
-		elseif ok then
-			-- Someone else holds the profile and would not let go. Play on with
-			-- a session-only profile rather than blocking the join, but never
-			-- write it back: that is how you overwrite a live session.
-			warn(`[progression] {player.Name} profile is locked by another server; session-only`)
+		else
+			-- We do not own this profile: either another server held it for the
+			-- whole backoff, or the DataStore itself would not answer. Play on
+			-- with a session-only copy rather than blocking the join, and never
+			-- write it back -- that is how you overwrite a live session.
+			--
+			-- The DataStore-failure case used to fall through this branch
+			-- entirely and leave __readOnly unset, so a transient outage at join
+			-- handed the player a DEFAULT profile that the next autosave then
+			-- wrote over the top of their real one.
+			warn(`[progression] {player.Name} profile not claimed; session-only`)
 			profile.__readOnly = true
 		end
 	end
@@ -215,6 +290,18 @@ function Progression:playerAdded(player: any, sameSession: boolean?)
 	profile.firstJoinAt = profile.firstJoinAt or nowEpoch
 	profile.lastSeenAt = nowEpoch
 	self.joinedAt[player] = os.clock()
+	-- STUDIO RETURNING-PLAYER SHIM, APPLIED BEFORE THE FIRST PUSH.
+	--
+	-- Set by main.server when Config.STUDIO_RETURNING_PLAYER is on. It has to
+	-- land here rather than after playerAdded returns, because push() is the
+	-- thing the client's maybeAutoStart reacts to: shimming afterwards and
+	-- pushing again means the client has already seen sessions = 1, already
+	-- decided this is somebody's first ever visit, and already readied them
+	-- into a round before the correction arrives.
+	if self.studioReturning then
+		profile.sessions = math.max(profile.sessions or 1, 2)
+		profile.rounds = math.max(profile.rounds or 0, 1)
+	end
 	self.dirty[player] = true
 	self.profiles[player] = profile
 	self:push(player)

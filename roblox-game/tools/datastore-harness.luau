@@ -13,10 +13,15 @@ local function check(c: boolean, m: string)
 end
 
 -- a DataStore that fails the first N calls, then succeeds
-local store = { data = {}, calls = 0, failFirst = 0 }
+local store = { data = {}, calls = 0, failFirst = 0, releaseAfter = 0 }
 function store:UpdateAsync(key, fn)
 	self.calls += 1
 	if self.calls <= self.failFirst then error("throttled") end
+	-- `releaseAfter` simulates the OTHER server letting go mid-backoff, which
+	-- is what actually happens during a First Shift teleport home.
+	if self.releaseAfter > 0 and self.calls >= self.releaseAfter and self.data[key] ~= nil then
+		self.data[key].__lock = nil
+	end
 	local new = fn(self.data[key])
 	if new ~= nil then self.data[key] = new end
 	return self.data[key]
@@ -26,12 +31,16 @@ function store:SetAsync(key, v) self.data[key] = v end
 function store:UpdateAsyncOrdered() end
 local ordered = { UpdateAsync = function() end, IncrementAsync = function() end }
 
-local fakeDSS = {
-	GetDataStore = function() return store end,
-	GetOrderedDataStore = function() return ordered end,
-}
-fakeDSS.GetDataStore = function(_self) return store end
-fakeDSS.GetOrderedDataStore = function(_self) return ordered end
+local asked = {}
+local fakeDSS = {}
+fakeDSS.GetDataStore = function(_self, name)
+	table.insert(asked, name)
+	return store
+end
+fakeDSS.GetOrderedDataStore = function(_self, name)
+	table.insert(asked, name)
+	return ordered
+end
 
 local env = {
 	game = { JobId = "server-A", GetService = function() return fakeDSS end, BindToClose = function() end },
@@ -64,11 +73,38 @@ env.game.JobId = "server-B"
 local ProgressionB = luau.load(luau.compile(fs.readFile("game-src/server/Progression.luau")), { environment = env })()
 local p2 = ProgressionB.new(Config, remotes, Catalog, fakeDSS)
 store.failFirst = 0
+store.calls = 0
+-- Real task.wait still runs; only the base delay is shrunk so the suite does
+-- not spend five seconds proving a loop it can prove in fifty milliseconds.
+p2.claimBase = 0.01
 p2:playerAdded(playerA)
 check(p2.profiles[playerA].__readOnly == true, "server B is locked out and goes session-only")
+check(store.calls > 1, "and it RETRIED before giving up rather than folding on attempt one")
 p2.profiles[playerA].coins = 999999
 p2:save(playerA)
 check(store.data["p7"].coins == 1234, "a locked-out server never overwrites the live profile")
+
+-- 2b. A LOCK THAT CLEARS DURING THE BACKOFF MUST BE CLAIMED, NOT ABANDONED.
+--
+-- The teleport case. First Shift runs in a reserved server and sends the player
+-- home; the origin server releases the lock a moment AFTER the destination has
+-- already asked for it. The claim used to give up on attempt one -- returning
+-- nil from an UpdateAsync transform cancels the write without throwing, so the
+-- backoff never saw a failure to back off from -- and the whole tutorial payout
+-- went to a read-only session and was discarded.
+store.failFirst = 0
+store.calls = 0
+store.releaseAfter = 2 -- the holder lets go just before the second attempt
+store.data["p7"].__lock = { server = "server-A", at = os.time() }
+local p2b = ProgressionB.new(Config, remotes, Catalog, fakeDSS)
+p2b.claimBase = 0.01
+p2b:playerAdded(playerA)
+check(p2b.profiles[playerA].__readOnly ~= true, "a lock released mid-backoff is claimed, not abandoned")
+check(p2b.profiles[playerA].coins == 1234, "and the REAL profile loads rather than a blank one")
+store.releaseAfter = 0
+-- Hand the claim back to server A so the release test below reads the state it
+-- was written against.
+store.data["p7"].__lock = { server = "server-A", at = os.time() }
 
 -- 3. releasing the claim lets the next server in
 p1:save(playerA, true)
@@ -81,6 +117,90 @@ check(p3.profiles[playerA].__readOnly ~= true and p3.profiles[playerA].coins == 
 p3.profiles[playerA].coins = 4321
 p3:flushAll()
 check(store.data["p7"].coins == 4321, "flushAll persisted on shutdown")
+
+-- ------------------------------------------- 5. staging must not share live's data
+--
+-- DataStores are per-UNIVERSE, and the only staging place Roblox will give you
+-- is a second place in the same universe. So without a namespace, a playthrough
+-- on staging spends a real player's coins and writes the result over their
+-- save.
+--
+-- The direction that matters most here is the boring one: LIVE MUST BE
+-- UNCHANGED. Renaming live's stores would lose every profile in the game, so
+-- that is what these check first.
+local LIVE = 113028832194057
+
+local function namesFor(placeId: any): { string }
+	asked = {}
+	env.game.PlaceId = placeId
+	local P = luau.load(luau.compile(fs.readFile("game-src/server/Progression.luau")), { environment = env })()
+	P.new(Config, remotes, Catalog, fakeDSS)
+	return asked
+end
+
+local liveNames = namesFor(LIVE)
+check(table.find(liveNames, "SizzleProfiles_v1") ~= nil, "on the live place the profile store keeps its name")
+check(table.find(liveNames, "SizzleBestRound_v1") ~= nil, "and so does the all-time board")
+check(table.find(liveNames, "SizzleCareerDishes_v1") ~= nil, "and the dishes board")
+
+-- Studio reports PlaceId 0 for a local file, and a Lune harness has no PlaceId
+-- at all. Neither should move either, or every existing test profile vanishes.
+local studioNames = namesFor(0)
+check(table.find(studioNames, "SizzleProfiles_v1") ~= nil, "Studio (PlaceId 0) is left alone too")
+local harnessNames = namesFor(nil)
+check(table.find(harnessNames, "SizzleProfiles_v1") ~= nil, "and so is a harness with no PlaceId at all")
+
+-- A staging place is the one thing that moves.
+local stagingNames = namesFor(987654321)
+check(
+	table.find(stagingNames, "SizzleProfiles_v1") == nil,
+	"a staging place does NOT open live's profile store"
+)
+local sawScoped = false
+for _, n in stagingNames do
+	if string.find(n, "__p987654321", 1, true) ~= nil then
+		sawScoped = true
+	end
+end
+check(sawScoped, `staging gets its own namespace instead ({stagingNames[1]})`)
+check(#stagingNames == #liveNames, `and the same number of stores ({#stagingNames})`)
+for _, n in stagingNames do
+	check(#n <= 50, `"{n}" is within the 50-character DataStore name limit ({#n})`)
+end
+env.game.PlaceId = nil
+
+-- ------------------------------- 6. the Studio returning-player shim
+--
+-- Studio persists nothing (PlaceId 0), so every session looks like a first-ever
+-- visit and the client both replays the tutorial and auto-readies the player
+-- into a shift. The shim fixes that -- but ONLY if it lands before the first
+-- push, because the push is what the client acts on. The first attempt shimmed
+-- the profile after playerAdded returned and pushed again, by which point the
+-- client had already seen sessions = 1 and readied itself into a round.
+local pushed = {}
+local pushRemotes = { Progress = { FireClient = function(_, _p, payload)
+	table.insert(pushed, payload)
+end } }
+
+env.game.PlaceId = nil
+local Pshim = luau.load(luau.compile(fs.readFile("game-src/server/Progression.luau")), { environment = env })()
+local shimmed = Pshim.new(Config, pushRemotes, Catalog, nil)
+shimmed.studioReturning = true
+shimmed:playerAdded({ UserId = 4242, Name = "Studio" })
+check(#pushed >= 1, "the profile is pushed to the client")
+local first = pushed[1]
+check(first ~= nil and first.sessions ~= nil and first.sessions > 1,
+	`the FIRST push already says returning ({tostring(first and first.sessions)} sessions)`)
+check(first ~= nil and (first.rounds or 0) > 0,
+	`and already has a round on the clock ({tostring(first and first.rounds)}), so needsTutorial is false`)
+
+-- and without the flag, nothing is faked
+pushed = {}
+local Pplain = luau.load(luau.compile(fs.readFile("game-src/server/Progression.luau")), { environment = env })()
+local plain = Pplain.new(Config, pushRemotes, Catalog, nil)
+plain:playerAdded({ UserId = 4343, Name = "Real" })
+check(pushed[1] ~= nil and pushed[1].sessions == 1, "a real first-ever player is still a first-ever player")
+check(pushed[1] ~= nil and (pushed[1].rounds or 0) == 0, "with no rounds behind them")
 
 print(if failures > 0 then `{failures} FAILURES` else "PASS: datastore hardening")
 if failures > 0 then error(`{failures} checks failed`) end

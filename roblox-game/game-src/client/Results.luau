@@ -30,6 +30,11 @@ local T_COINS = 2.7
 local T_XP = 4.1
 local T_SUPER = 5.5
 local SUPER_GAP = 0.55
+-- The last superlative card lands at 7.15s and the phase runs 12s
+-- (Config.RESULTS), so roughly five seconds of the ceremony were already dead
+-- air. That is where the share offer goes: after the scoring has finished
+-- saying what it has to say, and while the picture is still on screen.
+local T_SHARE = 7.6
 
 local TICK = 1.9 -- how fast a counter chases its target (higher = snappier)
 
@@ -160,6 +165,38 @@ function Results.new(gui: Instance)
 			Text = "",
 		}, self.card)
 	end
+	-- SHARE, ONCE THE CEREMONY HAS STOPPED TALKING.
+	--
+	-- Roblox cannot write to the camera roll from a game: this build has no
+	-- PromptSaveCapturesToGalleryAsync, and SaveScreenshotCapture is barred to
+	-- anything without the RobloxScript capability (checked against the running
+	-- Studio, both of them). What it can do is hand the shot to the platform's
+	-- own share sheet, where Save Image reaches Photos -- and, more usefully for
+	-- a game trying to be found, so do Messages and TikTok.
+	local shareCta = Theme.cta({
+		Size = UDim2.fromOffset(200, 44),
+		Fill = Theme.BLUE,
+		TextSize = 18,
+		ZIndex = 11,
+		Text = "SHARE PHOTO",
+	}, self.card)
+	self.shareRoot = shareCta.root
+	-- POSITION GOES ON THE ROOT, NOT THROUGH Theme.cta.
+	--
+	-- cta() builds its own root frame and copies across exactly Size,
+	-- BackgroundTransparency and LayoutOrder -- a Position in its props is
+	-- dropped without a word. Every other caller lays cta roots out with a
+	-- UIListLayout so nobody had noticed; this one is absolutely positioned,
+	-- and shipped sitting in the top-left corner of the results card.
+	self.shareRoot.AnchorPoint = Vector2.new(0.5, 1)
+	self.shareRoot.Position = UDim2.new(0.5, 0, 1, -12)
+	self.shareRoot.Visible = false
+	shareCta.button.Activated:Connect(function()
+		if self.onShare ~= nil then
+			self.onShare()
+		end
+	end)
+
 	return self
 end
 
@@ -197,11 +234,13 @@ function Results:show(results: any, cards: any?)
 	for _, c in self.cards do
 		c.Visible = false
 	end
+	self.shareRoot.Visible = false
 end
 
 function Results:hide()
 	self.t = -1
 	self.scrim.Visible = false
+	self.shareRoot.Visible = false
 end
 
 function Results:step(dt: number)
@@ -236,7 +275,11 @@ function Results:step(dt: number)
 		end
 	end
 	for i = 1, 3 do
-		local target = if i <= self.shownStars then 46 else 46
+		-- Earned stars settle back to 46 from the 64 they punch in at; unearned
+		-- ones sit at 46 the whole time. This was written as a ternary with 46
+		-- in both arms, which is the same number twice pretending to be a
+		-- decision.
+		local target = 46
 		self.stars[i].TextSize += (target - self.stars[i].TextSize) * math.min(1, dt * 7)
 	end
 
@@ -310,6 +353,10 @@ function Results:step(dt: number)
 				self.onCard()
 			end
 		end
+	end
+
+	if self.shareRoot ~= nil and not self.shareRoot.Visible and self.t >= T_SHARE then
+		self.shareRoot.Visible = true
 	end
 end
 

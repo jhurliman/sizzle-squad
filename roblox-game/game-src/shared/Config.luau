@@ -24,6 +24,28 @@ Config.LATE_JOIN_CUTOFF = 15 -- <15s left: hold joiner in kitchen-cam until resu
 -- freezes every bot where it stands.
 Config.BOT_FILL = true
 
+-- STUDIO SHOULD LOOK LIKE A RETURNING PLAYER.
+--
+-- Studio cannot persist a profile from a rojo-built local file: game.PlaceId is
+-- 0, so DataStore calls fail and every session starts from nothing. That makes
+-- Studio permanently look like somebody's first ever visit, and TWO separate
+-- things key off that:
+--
+--   * needsTutorial is `rounds == 0`, so First Shift ran on every playtest.
+--   * Menu:maybeAutoStart readies a first-session player automatically, so
+--     with the tutorial skipped you get dropped straight into a shift with
+--     three bots and never see the lobby at all.
+--
+-- Fixing only the first one is what produced the second. So rather than two
+-- skips, the profile is shimmed to a returning one and both behaviours follow
+-- from that -- which is also the state you actually want to develop against,
+-- since the lobby is what a returning player sees.
+--
+-- Set false to test the genuine first-run experience. With `rojo serve`
+-- running the flip reaches Studio as soon as the file is saved. Studio only:
+-- a real client is unaffected either way.
+Config.STUDIO_RETURNING_PLAYER = true
+
 -- Difficulty by (non-AFK) human count.
 --
 -- MEASURED, not guessed (tools/economy-probe.luau): dishes served plateaus at

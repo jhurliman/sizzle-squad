@@ -8,6 +8,51 @@
 
 local Theme = {}
 
+-- THE FACE BAND: WHERE NO UI GOES.
+--
+-- The lobby camera frames four chefs head-and-shoulders, and that framing is
+-- the whole point of the screen -- so the band their faces occupy is a dead
+-- zone that UI has to stay out of, above it or below it.
+--
+-- Measured off a screenshot on iPhone 16 Pro landscape (874x402pt): the heads
+-- and shoulders run y 87..190, i.e. 0.216..0.472 of the height. Fractions
+-- rather than pixels because the band is set by the CAMERA, not the screen --
+-- CameraRig solves the same head-and-shoulders fill at every aspect ratio, so
+-- it lands in the same proportion of the frame on every device.
+Theme.FACE_BAND_TOP = 0.216
+Theme.FACE_BAND_BOTTOM = 0.472
+
+-- Roblox's own topbar is ~36px and always present in a real session. Its
+-- controls sit at the LEFT; anything of ours in that band goes to the right of
+-- them. The fallbacks are for where the inset API reports nothing -- the Studio
+-- editor, and the layout harness -- and 280 is roughly where Roblox's own row
+-- of pills ends, measured off the same screenshot.
+Theme.TOPBAR_MIN = 36
+Theme.TOPBAR_MARGIN = 8
+Theme.TOPBAR_LEFT_FALLBACK = 280
+
+--- The strip of the topbar Roblox is NOT using: y, height, left edge, right edge.
+---
+--- TopbarInset is exactly this question answered by the platform -- Min.X is
+--- the right edge of Roblox's own controls, Max.X the left edge of anything it
+--- keeps on the right -- so our row can sit level with those controls instead
+--- of guessing a safe y and hoping.
+function Theme.topbarBand(viewport: Vector2): (number, number, number, number)
+	-- GuiService is resolved HERE, not at module scope. Theme is loaded by
+	-- three harnesses against fake environments that have no `game` at all, and
+	-- a top-level GetService made merely requiring the design system depend on
+	-- a running platform -- which broke a harness that does not lay anything
+	-- out and had no business caring.
+	local ok, y, h, l, r = pcall(function()
+		local rect = game:GetService("GuiService").TopbarInset
+		return rect.Min.Y, rect.Height, rect.Min.X, rect.Max.X
+	end)
+	if ok and h ~= nil and h > 0 and r ~= nil and l ~= nil and r > l then
+		return y, h, l, math.min(r, viewport.X)
+	end
+	return 0, Theme.TOPBAR_MIN, Theme.TOPBAR_LEFT_FALLBACK, viewport.X
+end
+
 -- The kitchen's own palette, lifted from the existing HUD chips so the menu
 -- reads as part of the same game rather than a bolted-on storefront.
 Theme.BROWN_DEEP = Color3.fromRGB(30, 16, 8)
