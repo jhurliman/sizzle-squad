@@ -1,15 +1,18 @@
 --!strict
--- Adaptive background music: the web game's tickMusic score, pre-rendered as
--- four beat-aligned looping stems (roblox/render-music.mjs) and cross-faded
--- at runtime instead of synthesized note-by-note.
+-- Adaptive background music: "Service Starts Now" (roblox/music), rendered as
+-- four beat-aligned looping stems and cross-faded at runtime.
 --
---   base    bass + comp chords + shaker   always on (the bed)
---   groove  swing hats                    fades in with HEAT
---   melody  the sine lead                 fades in with HEAT, ducks at high TENSION
---   tension low drone + heartbeat kick    fades in as patience drains
+--   base    bass + Rhodes comp + shaker   always on (the bed; the lobby)
+--   groove  drums + kitchen percussion    fades in with HEAT
+--   melody  the vibes lead                fades in with HEAT, ducks at high TENSION
+--   tension clock ride + riser            fades in as patience drains
 --
 -- heat    = round progress (sim: min(1, time/240)) -> density/energy
--- tension = 1 - patience                           -> dread
+-- tension = 1 - patience                           -> hurry
+--
+-- The loop is 8 bars at 124 BPM. The stems were rendered from the Ableton set
+-- with the returns baked in and the master limiter bypassed, because they are
+-- summed HERE, and a limiter applied per-stem breaks the balance between them.
 --
 -- Ids are empty until the stems are uploaded; empty ids make this a silent
 -- no-op, exactly like Sfx before its upload.
@@ -17,20 +20,23 @@
 local Music = {}
 Music.__index = Music
 
--- Uploaded stems (roblox/audio-out/music/*.wav); ids also in
--- roblox/audio-out/asset-ids.csv
+-- Uploaded stems (roblox/audio-out/music/*.wav, uploaded as OGG so the loop
+-- seam is gapless); ids also in roblox/audio-out/asset-ids.csv
 local STEM_IDS: { [string]: number } = {
-	base = 129864158072696,
-	groove = 118440772838108,
-	melody = 102104965215015,
-	tension = 83239315866871,
+	base = 103917816819685,
+	groove = 124381822721660,
+	melody = 102525063094031,
+	tension = 72491671314574,
 }
 
--- The stems are rendered at the web engine's own note gains, which are quiet
--- by design (peaks ~0.1-0.26). MASTER lifts them to a musical bed level that
--- still sits UNDER the SFX (whose volumes are 0.15-0.7).
-local MASTER = 1.6
-local LOOP_SECONDS = 7.5
+-- The four stems summed at full gain peak at +1.6 dBFS (measured, see
+-- roblox/audio-out/music/README.md). MASTER brings that to about -7 dBFS at
+-- full heat and tension -- the same bed level the old sine stems sat at --
+-- so the SFX (volumes 0.15-0.7) still sit on top.
+local MASTER = 0.38
+-- 8 bars at 124 BPM: 32 beats * 60 / 124. Must match the rendered files to the
+-- sample or the resync in step() fights the loop point every few seconds.
+local LOOP_SECONDS = 15.483871
 local RESYNC_TOLERANCE = 0.04
 
 function Music.new(parent: Instance)
