@@ -175,15 +175,27 @@ const stab = [n(C4, 0, 0.5, 120), n(C4, 16, 0.5, 116)];
 
 // --------------------------------------------------------------- TENSION
 //
-// The dread. A sub drone, a heartbeat, and a riser that resolves at the loop.
-const drone = [n(48, 0, LOOP, 96)]; // Live's C2 (~130 Hz). 24 and 36 were both inaudible on speakers
-const heartbeat = tile([n(41, 0.0, 0.3, 104), n(41, 0.5, 0.3, 84)], 4); // lub-dub, low tom
-// riser: ONE note for a slow-attack pad to swell on over the last two bars.
-// The chromatic climb this replaced read as "weird metallic" -- a riser is a
-// filter opening, not a scale, and that is the instrument's job not MIDI's.
-// Three stacked notes entering in turn over the last bar and a half: the
-// octave and the fifth arriving mid-swell are what make it RISE rather than
-// merely swell -- a single held note read as too slow and not high enough.
+// v2. The first tension layer was a sub drone and a heartbeat tom -- and both
+// sat exactly where the bass and the kick already live, so stacking all three
+// just thickened the low end. It muddied the track and added nothing.
+//
+// The mistake was treating tension as DREAD. In this game, patience draining
+// is a CLOCK: the feeling wanted is hurry, not fear. So the layer moves UP and
+// gets faster, out of the register the bed owns:
+//
+//   colour  one high sustained b7 -- bluesy, unsettled, fits the Mixolydian
+//           lean, never ugly. Over each chord it becomes something different
+//           (4th over F, b6 over Dm, b3 over G) so it keeps shifting underfoot.
+//   clock   a 16th-note ride tick. Time pressure you can hear.
+//   riser   three stacked notes climbing into the loop point.
+//
+// Music.luau already ducks the melody as tension rises, which is the other
+// half of the effect and needs no change.
+const colour = [n(82, 0, LOOP, 84)]; // Live's Bb4
+const clock = tile(
+  Array.from({ length: 16 }, (_, i) => n(51, i * 0.25, 0.1, i === 0 ? 80 : i % 2 === 0 ? 62 : 44)),
+  4,
+); // GM 51 = ride
 const riser = [n(55, 26, 6, 88), n(62, 28, 4, 96), n(67, 29.5, 2.5, 108)];
 
 // ------------------------------------------------------------- MIDI out
@@ -243,8 +255,8 @@ export const STEMS = {
     { name: 'melody — "sizzle!" stab',channel: 3, voice: 'stab',   notes: stab },
   ],
   tension: [
-    { name: 'tension — drone',        channel: 4, voice: 'drone',  notes: drone },
-    { name: 'tension — heartbeat',    channel: 9, voice: 'drums',  notes: heartbeat },
+    { name: 'tension — colour (b7)',  channel: 4, voice: 'drone',  notes: colour },
+    { name: 'tension — clock (ride)', channel: 9, voice: 'drums',  notes: clock },
     { name: 'tension — riser',        channel: 5, voice: 'riser',  notes: riser },
   ],
 };
