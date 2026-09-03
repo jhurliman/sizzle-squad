@@ -54,7 +54,7 @@ client-side (walk/hop/squash/stun/carry). See `../docs/art/chefs-preview.png`.
 | `npm run parity` | TS and Luau builds tick-identical (3 seeds × 10,800 ticks: discrete state exact, floats ≤ 8e-11) |
 | `lune run tools/server-harness.luau` | Full server stack end-to-end: round loop, drop-in/AFK, pacing, progression, shop, replication (22 checks) |
 | `lune run tools/client-harness.luau` | Mirror movement + working-freeze, interpolation, verb prompt, delta mirroring |
-| `lune run tools/first-session-harness.luau` | A first-ever player across the First Shift teleport: session accounting, where they arrived from, and that a hop is never scored as a drop-off (44 checks) |
+| `lune run tools/first-session-harness.luau` | A first-ever player across the First Shift teleport: session accounting, where they arrived from, that a hop is never scored as a drop-off, and the reach/playSeconds funnel (59 checks) |
 | `lune run tools/check-luau.luau` | Syntax gate over all Luau sources |
 | `lune run tools/smoke.luau` | A full bot round in Luau (~6,200 ticks/s) |
 | `node tools/smoke-ts.mjs` | The same round under Node — outputs match |
