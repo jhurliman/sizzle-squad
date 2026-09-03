@@ -56,23 +56,23 @@ const CHORDS = [
 //
 // The lobby. Bass + comp + shaker; has to stand alone.
 
-// A two-bar funk cell on root R. Octave pop, chromatic b7 walk, a little run
-// up to hand off to the next root. `third` is 4 (major) or 3 (minor).
-function bassCell(R, third) {
+// v2. The first bass was a two-bar FUNK cell -- octave pops, a chromatic b7
+// walk, thirteen notes -- and once the Rhodes and the drums were in it was
+// the odd channel out; the track sounded better with it off. Same lesson as
+// the lead: this has settled into something smoother than funk, and a busy
+// line fights the comp instead of holding it up.
+//
+// So: a HOUSE bass. Sustained roots locked to the kick, the classic push on
+// the "and" of 3 and 4, and one pickup (the fifth) into each chord change.
+// Six notes a chord instead of thirteen. It is a floor, not a soloist.
+function bassCell(R, _third) {
   return [
-    n(R,      0.00, 0.50, 112),
-    n(R + 12, 0.75, 0.25,  92),
-    n(R + 10, 1.50, 0.25,  86), // b7
-    n(R,      2.00, 0.50, 106),
-    n(R + 7,  2.75, 0.25,  92),
-    n(R + 10, 3.50, 0.50,  96),
-    n(R,      4.00, 0.50, 112),
-    n(R + 12, 4.75, 0.25,  92),
-    n(R + third, 5.50, 0.25, 86),
-    n(R + 5,  6.00, 0.50, 100),
-    n(R + 7,  6.50, 0.50, 100),
-    n(R + 10, 7.00, 0.50,  96),
-    n(R + 12, 7.50, 0.50, 102),
+    n(R,     0.0, 1.5, 104),
+    n(R,     2.5, 0.5,  88),
+    n(R,     3.5, 0.5,  92),
+    n(R,     4.0, 1.5, 104),
+    n(R,     6.5, 0.5,  88),
+    n(R + 7, 7.5, 0.5,  86), // the fifth, leaning into the next root
   ];
 }
 const bass = [];
@@ -176,12 +176,15 @@ const stab = [n(C4, 0, 0.5, 120), n(C4, 16, 0.5, 116)];
 // --------------------------------------------------------------- TENSION
 //
 // The dread. A sub drone, a heartbeat, and a riser that resolves at the loop.
-const drone = [n(36, 0, LOOP, 96)]; // C2 -- C1 was inaudible on anything but a sub
+const drone = [n(48, 0, LOOP, 96)]; // Live's C2 (~130 Hz). 24 and 36 were both inaudible on speakers
 const heartbeat = tile([n(41, 0.0, 0.3, 104), n(41, 0.5, 0.3, 84)], 4); // lub-dub, low tom
 // riser: ONE note for a slow-attack pad to swell on over the last two bars.
 // The chromatic climb this replaced read as "weird metallic" -- a riser is a
 // filter opening, not a scale, and that is the instrument's job not MIDI's.
-const riser = [n(55, 24, 8, 92)]; // G3, bars 7-8
+// Three stacked notes entering in turn over the last bar and a half: the
+// octave and the fifth arriving mid-swell are what make it RISE rather than
+// merely swell -- a single held note read as too slow and not high enough.
+const riser = [n(55, 26, 6, 88), n(62, 28, 4, 96), n(67, 29.5, 2.5, 108)];
 
 // ------------------------------------------------------------- MIDI out
 
