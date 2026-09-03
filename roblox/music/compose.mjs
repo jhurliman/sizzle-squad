@@ -139,32 +139,34 @@ drums.push(n(RIM, 30.5, 0.15, 96), n(RIM, 30.75, 0.15, 100), n(KICK, 31.5, 0.25,
 
 // ---------------------------------------------------------------- MELODY
 //
-// The earworm. The motif is the name: G G C — SIZ-zle SQUAD — a rising
-// fourth, short-short-LONG. It answers itself, and comes back a step higher
-// over the Dm so the second half isn't a copy.
-const G4 = 67, A4 = 69, B4 = 71, C5 = 72, D5 = 74, E5 = 76, F5 = 77, G5 = 79;
+// v2. The first lead was a sung-style diatonic tune (G G C, "SIZ-zle SQUAD")
+// and it read as a kids' jingle over this groove -- the set was better with it
+// muted. That is the right instinct about the genre: funk hooks are not sung
+// melodies, they are short riffs that poke into the gaps the comp leaves.
+//
+// So: pentatonic, sparse (4-5 notes a bar, plenty of rests), and placed OFF
+// the Rhodes stabs -- a pickup on the "a" of beat 1 landing on beat 2, an
+// answer around beat 4. The last note of the loop is B, the leading tone,
+// so the loop pulls itself back round to C.
+const C5 = 72, D5 = 74, E5 = 76, F5 = 77, G5 = 79, A5 = 81, B5 = 83, C6 = 84, B4 = 71;
 
 const lead = [
-  // bar 1 — the motif
-  n(G4, 0.0, 0.5, 100), n(G4, 0.5, 0.5, 100), n(C5, 1.0, 1.0, 116),
-  n(E5, 2.5, 0.25, 90), n(D5, 2.75, 0.25, 90), n(C5, 3.0, 0.5, 96),
-  // bar 2 — the answer, falling home
-  n(E5, 4.0, 0.5, 100), n(D5, 4.5, 0.5, 96), n(C5, 5.0, 0.5, 96), n(A4, 5.5, 0.5, 92), n(G4, 6.0, 1.5, 100),
-  // bar 3 — motif over F (A A C)
-  n(A4, 8.0, 0.5, 100), n(A4, 8.5, 0.5, 100), n(C5, 9.0, 1.0, 114),
-  n(F5, 10.5, 0.25, 90), n(E5, 10.75, 0.25, 90), n(C5, 11.0, 0.5, 96),
-  // bar 4 — answer
-  n(F5, 12.0, 0.5, 100), n(E5, 12.5, 0.5, 96), n(D5, 13.0, 0.5, 96), n(C5, 13.5, 0.5, 92), n(A4, 14.0, 1.5, 100),
-  // bar 5 — motif UP A STEP over Dm (A A D): the lift
-  n(A4, 16.0, 0.5, 104), n(A4, 16.5, 0.5, 104), n(D5, 17.0, 1.0, 118),
-  n(F5, 18.5, 0.25, 92), n(E5, 18.75, 0.25, 92), n(D5, 19.0, 0.5, 98),
-  // bar 6 — answer
-  n(F5, 20.0, 0.5, 100), n(E5, 20.5, 0.5, 96), n(D5, 21.0, 0.5, 96), n(C5, 21.5, 0.5, 92), n(A4, 22.0, 1.0, 100),
-  // bar 7 — motif over G (B B D)
-  n(B4, 24.0, 0.5, 104), n(B4, 24.5, 0.5, 104), n(D5, 25.0, 1.0, 116),
-  n(G5, 26.5, 0.25, 94), n(F5, 26.75, 0.25, 94), n(D5, 27.0, 0.5, 98),
-  // bar 8 — the run home, then a breath so the loop restarts on the motif
-  n(F5, 28.0, 0.5, 100), n(E5, 28.5, 0.5, 98), n(D5, 29.0, 0.5, 96), n(B4, 29.5, 0.5, 94), n(G4, 30.0, 0.75, 104),
+  // bar 1 (C): pickup into beat 2, answer on 4
+  n(E5, 0.75, 0.25, 96), n(G5, 1.0, 0.5, 108),                  n(A5, 2.75, 0.25, 92), n(G5, 3.0, 0.75, 100),
+  // bar 2: fall home, then space
+  n(E5, 4.75, 0.25, 92), n(D5, 5.0, 0.5, 96),  n(C5, 6.0, 1.0, 100),
+  // bar 3 (F)
+  n(F5, 8.75, 0.25, 96), n(A5, 9.0, 0.5, 108),                  n(C6, 10.75, 0.25, 94), n(A5, 11.0, 0.75, 100),
+  // bar 4: the maj7 (E over F) is the colour note
+  n(G5, 12.75, 0.25, 92), n(F5, 13.0, 0.5, 96), n(E5, 14.0, 0.5, 98), n(D5, 14.5, 0.5, 92),
+  // bar 5 (Dm): same shape a step up -- the lift
+  n(D5, 16.75, 0.25, 98), n(F5, 17.0, 0.5, 110),                n(A5, 18.75, 0.25, 94), n(G5, 19.0, 0.75, 102),
+  // bar 6
+  n(F5, 20.75, 0.25, 92), n(E5, 21.0, 0.5, 96), n(D5, 22.0, 1.0, 100),
+  // bar 7 (G)
+  n(D5, 24.75, 0.25, 98), n(G5, 25.0, 0.5, 110),                n(B5, 26.75, 0.25, 96), n(A5, 27.0, 0.75, 102),
+  // bar 8: run down to the leading tone and hold it -- B wants C, and C is beat 1
+  n(G5, 28.75, 0.25, 96), n(F5, 29.0, 0.5, 96), n(E5, 29.5, 0.25, 92), n(D5, 29.75, 0.25, 92), n(B4, 30.0, 1.5, 104),
 ];
 
 // The vocal stab. A chopped, pitched "SIZZLE!" on the top of each phrase —
@@ -174,11 +176,12 @@ const stab = [n(C4, 0, 0.5, 120), n(C4, 16, 0.5, 116)];
 // --------------------------------------------------------------- TENSION
 //
 // The dread. A sub drone, a heartbeat, and a riser that resolves at the loop.
-const drone = [n(24, 0, LOOP, 96)]; // C1, the whole loop
+const drone = [n(36, 0, LOOP, 96)]; // C2 -- C1 was inaudible on anything but a sub
 const heartbeat = tile([n(41, 0.0, 0.3, 104), n(41, 0.5, 0.3, 84)], 4); // lub-dub, low tom
-// riser: a rising minor-third figure over the last 2 bars, into the drone
-const riser = [];
-for (let i = 0; i < 8; i++) riser.push(n(48 + i, 24 + i, 1.0, 70 + i * 4)); // chromatic climb C3..G3
+// riser: ONE note for a slow-attack pad to swell on over the last two bars.
+// The chromatic climb this replaced read as "weird metallic" -- a riser is a
+// filter opening, not a scale, and that is the instrument's job not MIDI's.
+const riser = [n(55, 24, 8, 92)]; // G3, bars 7-8
 
 // ------------------------------------------------------------- MIDI out
 
