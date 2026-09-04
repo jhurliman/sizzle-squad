@@ -47,16 +47,23 @@ local analytics
 --- the teleport tried once more.
 local function sendHomeTagged(p: Player, retry: boolean)
 	exitReason[p] = "teleport_home"
-	if not Tutorial.sendHome(p) then
+	local requested = Tutorial.sendHome(p)
+	if not requested then
+		-- TeleportAsync threw outright. Same outcome as a stranding, and it
+		-- gets the same second attempt: a finished First Shift player left
+		-- in the reserved server has no public-server controls and no way
+		-- home except quitting.
 		exitReason[p] = nil
-		return
 	end
 	task.delay(TELEPORT_RESCUE, function()
-		if p.Parent == nil or exitReason[p] ~= "teleport_home" then
-			return
+		if p.Parent == nil then
+			return -- gone: the teleport (or a quit) took them
+		end
+		if requested and exitReason[p] ~= "teleport_home" then
+			return -- somebody else already untagged and dealt with them
 		end
 		exitReason[p] = nil
-		analytics:custom(p, "tutorial_return", 1, { "stranded" })
+		analytics:custom(p, "tutorial_return", 1, { if requested then "stranded" else "failed" })
 		if retry then
 			sendHomeTagged(p, false)
 		end

@@ -415,6 +415,65 @@ if target ~= nil then
 	act(playerA, { chefId = target.chefId, action = "dismiss" })
 end
 
+-- AND THE DISMISSAL FOLLOWS THE SPECIES THROUGH A SKIN SWAP. A joiner dealt
+-- the parked chef is stood on the floor and its dismissal ends; a claim that
+-- swaps a dismissed species onto a bot parks THAT bot. Either way there is
+-- never an inactive chef standing on the walkable floor.
+do
+	local function noGhosts(): (boolean, string)
+		for _, c in simService.sim.chefs do
+			local onFloor = shared.isWalkable(simService.sim.kitchen, math.floor(c.pos.x), math.floor(c.pos.y))
+			if not c.isPlayer and not simService:isActive(c) and onFloor then
+				return false, `chef {c.id} ({c.skin}) is inactive but on the floor`
+			end
+			if (c.isPlayer or simService:isActive(c)) and not onFloor then
+				return false, `chef {c.id} ({c.skin}) is active but parked`
+			end
+		end
+		return true, "no inactive chef is on the floor and no active one is parked"
+	end
+	local G = { UserId = 7777, Name = "Ghost" }
+	if target ~= nil then
+		-- Every bot dismissed, so the only free chefs are parked ones and the
+		-- joiner is certain to be dealt one.
+		for _, c in chairs() do
+			if c.kind == "bot" then
+				act(playerA, { chefId = c.chefId, action = "dismiss" })
+			end
+		end
+		check(simService:activeBotCount() == 0, "every bot is dismissed and parked")
+		local seatG = crew:playerAdded(G)
+		local gChef = simService.sim.chefs[seatG.chefId + 1]
+		check(seatG ~= nil, "a joiner is dealt one of the parked chefs")
+		check(shared.isWalkable(simService.sim.kitchen, math.floor(gChef.pos.x), math.floor(gChef.pos.y)), "and stood on the floor")
+		check(simService.dismissed[gChef.skin] == nil, "and their character is no longer dismissed")
+		check(noGhosts())
+		-- Now G claims a dismissed chair's character: the swap moves G's old
+		-- species onto that chef, which must then be a live bot on the floor,
+		-- while the two still-dismissed species stay parked.
+		local emptyChair = nil
+		for _, c in chairs() do
+			if c.kind == "empty" then
+				emptyChair = c
+			end
+		end
+		act(G, { chefId = emptyChair.chefId, action = "claim" })
+		local ok, why = noGhosts()
+		check(ok, `after the claim swaps species: {why}`)
+		check(simService:activeBotCount() == 1, `the bot that took G's old character is live ({simService:activeBotCount()} active)`)
+		crew:playerRemoving(G)
+		ok, why = noGhosts()
+		check(ok, `after G leaves: {why}`)
+		-- Restore the room the later checks expect: one dismissed chair.
+		for _, c in chairs() do
+			if c.kind == "empty" then
+				act(playerA, { chefId = c.chefId, action = "fill" })
+			end
+		end
+		act(playerA, { chefId = target.chefId, action = "dismiss" })
+	end
+end
+
 -- PACING FOLLOWS WHO IS ACTUALLY COOKING. Sending bots away leaves botFill
 -- true, and the pacing used to key off that switch alone: a solo player who
 -- dismissed all three bots kept the four-chef order rate and ticket clock.

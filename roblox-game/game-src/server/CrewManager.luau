@@ -149,6 +149,10 @@ function CrewManager:claimSkin(chefId: number, want: string?): string?
 				return mine.skin -- a human is wearing it; keep ours
 			end
 			other.skin, mine.skin = mine.skin, want
+			-- Dismissal is by species and the bodies just swapped: whichever
+			-- chef now wears a dismissed species is parked, and one that
+			-- stopped wearing it comes back onto the floor.
+			self.simService:placeAll()
 			return mine.skin
 		end
 	end

@@ -123,6 +123,32 @@ function SimService:park(chef: any)
 	chef.stun = 0
 end
 
+--- Put one chef where its state says it belongs: an inactive chef on the
+--- apron, an active one on walkable floor. Idempotent, so it can be applied
+--- after anything that changes who is active -- a dismissal, a handoff, or a
+--- skin swap that moves a dismissed species onto a different body.
+function SimService:place(chef: any)
+	local k = self.sim.kitchen
+	local onFloor = self.shared.isWalkable(k, math.floor(chef.pos.x), math.floor(chef.pos.y))
+	if chef.isPlayer or self:isActive(chef) then
+		if not onFloor then
+			local spawned = self.shared.safeSpawn(k, { x = 7.5, y = 6.5 })
+			chef.pos.x, chef.pos.y = spawned.x, spawned.y
+			chef.vel.x, chef.vel.y = 0, 0
+		end
+	elseif onFloor then
+		self:park(chef)
+	end
+end
+
+--- place() for every chef. claimSkin calls this after swapping species, since
+--- the dismissal is keyed by species and the bodies just changed hands.
+function SimService:placeAll()
+	for _, chef in self.sim.chefs do
+		self:place(chef)
+	end
+end
+
 --- Move every chef that is not in play to its parking spot.
 ---
 --- That is every non-human chef without bot fill, and every DISMISSED chef
@@ -146,16 +172,16 @@ function SimService:setHuman(chefId: number, on: boolean)
 		if chef.id == chefId then
 			chef.isPlayer = on
 			if on then
+				-- A person in the chair is the end of its dismissal, the same
+				-- as a claim. Left set, the flag would ride the species through
+				-- the next claimSkin swap onto a bot that is then inactive but
+				-- unparked -- the invisible body again.
+				self.dismissed[chef.skin] = nil
 				-- Entering play from the parking row -- every chef without bot
 				-- fill, and a DISMISSED chef with it, which freeChef can still
 				-- deal to a joiner -- spawn somewhere sane. A player left on
 				-- the apron is off-camera with nothing to walk on.
-				local k = self.sim.kitchen
-				if not self.shared.isWalkable(k, math.floor(chef.pos.x), math.floor(chef.pos.y)) then
-					local spawned = self.shared.safeSpawn(k, { x = 7.5, y = 6.5 })
-					chef.pos.x, chef.pos.y = spawned.x, spawned.y
-					chef.vel.x, chef.vel.y = 0, 0
-				end
+				self:place(chef)
 				self.humans[chefId] = {
 					packet = nil,
 					lastSeq = -1,
@@ -415,20 +441,10 @@ end
 --- inside the kitchen rather than left on the apron, which is not walkable
 --- and which a bot cannot path out of.
 function SimService:setDismissed(species: string, on: boolean)
-	local was = self.dismissed[species] == true
 	self.dismissed[species] = if on then true else nil
-	if was == on then
-		return
-	end
 	for _, chef in self.sim.chefs do
-		if chef.skin == species and not chef.isPlayer then
-			if on then
-				self:park(chef)
-			else
-				local spawned = self.shared.safeSpawn(self.sim.kitchen, { x = 7.5, y = 6.5 })
-				chef.pos.x, chef.pos.y = spawned.x, spawned.y
-				chef.vel.x, chef.vel.y = 0, 0
-			end
+		if chef.skin == species then
+			self:place(chef)
 		end
 	end
 end
