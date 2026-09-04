@@ -1,6 +1,7 @@
 --!strict
 -- Fans authoritative sim state out to clients:
---   * transforms: packed buffer, 20 Hz, unreliable (clients interpolate)
+--   * transforms: packed buffer, 20 Hz, unreliable, stamped with the sim's
+--     step clock (clients interpolate in server time)
 --   * sim events: reliable, batched per heartbeat (the presentation contract)
 --   * station/order/score deltas: reliable, on change, diffed at 10 Hz
 --   * full snapshot for new joiners
@@ -10,6 +11,7 @@ local Replicator = {}
 Replicator.__index = Replicator
 
 local TRANSFORM_HZ = 20
+local TRANSFORM_INTERVAL = 1 / TRANSFORM_HZ
 local DIFF_HZ = 10
 
 function Replicator.new(
@@ -28,6 +30,9 @@ function Replicator.new(
 		return true
 	end
 	self.transformAcc = 0
+	-- Fallback stamp when the caller has no step clock to offer (harnesses
+	-- that drive flush directly): plain accumulated dt.
+	self.sendClock = 0
 	self.diffAcc = 0
 	self.stationCache = {} :: { [number]: string }
 	self.carryCache = {} :: { [number]: string }
@@ -159,17 +164,40 @@ function Replicator:scoreSummary(sim: any): any
 	}
 end
 
---- Per-heartbeat fanout. `events` is SimService's drained batch.
-function Replicator:flush(sim: any, events: { any }, dt: number, carryingChanged: boolean?)
+--- Per-heartbeat fanout. `events` is SimService's drained batch. `stepClock`
+--- is the time the chef positions are TRUE AT -- SimService.clock, which
+--- advances by SIM_DT per fixed step -- and goes into the transforms packet
+--- so clients can interpolate in server time instead of arrival time.
+function Replicator:flush(sim: any, events: { any }, dt: number, stepClock: number?)
 	local remotes = self.remotes
 
 	if #events > 0 then
 		remotes.SimEvents:FireAllClients(events)
 	end
 
+	-- THE STAMP IS THE STEP CLOCK, NOT THE HEARTBEAT CLOCK.
+	--
+	-- A heartbeat runs zero, one or two fixed steps depending on how its dt
+	-- lands against the sim accumulator, so "positions as of this heartbeat"
+	-- are really "positions as of the last step", up to a step early. Stamping
+	-- the heartbeat time would put that step's worth of error back into every
+	-- sample -- a third of a packet interval, the same order as the jitter the
+	-- stamp exists to remove. The step clock is exact.
+	self.sendClock += dt
+	local stamp = stepClock or self.sendClock
+
+	-- SUBTRACT THE INTERVAL; DO NOT ZERO THE ACCUMULATOR.
+	--
+	-- `acc = 0` on a 60 Hz heartbeat threw away the remainder every send, so
+	-- packets went out on alternating 3- and 4-frame gaps (50 ms, 66 ms, 50,
+	-- 66...) -- an intrinsic +-33% cadence wobble before the network touched
+	-- anything, and the client used to stamp on arrival, so it rendered that
+	-- wobble as speed. Carrying the remainder makes the cadence average
+	-- exactly TRANSFORM_HZ. The cap is so a long server hitch sends at most
+	-- one catch-up packet rather than a burst of them.
 	self.transformAcc += dt
-	if self.transformAcc >= 1 / TRANSFORM_HZ then
-		self.transformAcc = 0
+	if self.transformAcc >= TRANSFORM_INTERVAL then
+		self.transformAcc = math.min(self.transformAcc - TRANSFORM_INTERVAL, TRANSFORM_INTERVAL)
 		local transforms = {}
 		for _, chef in sim.chefs do
 			if not self.isActive(chef) then
@@ -187,7 +215,7 @@ function Replicator:flush(sim: any, events: { any }, dt: number, carryingChanged
 				stun = chef.stun,
 			})
 		end
-		remotes.Transforms:FireAllClients(self.net.packTransforms(transforms))
+		remotes.Transforms:FireAllClients(self.net.packTransforms(transforms, stamp))
 	end
 
 	self.diffAcc += dt

@@ -51,18 +51,21 @@ end
 check(math.abs(state.mirror.pos.x - xw) < 0.01, "mirror frozen while working")
 state.mirror.working = nil
 
--- 3. remote interpolation: feed two transform packets, sample between
+-- 3. remote interpolation: feed two transform packets (server-stamped 0 and
+-- 0.1, arriving 10 s later on the local clock), sample between
 state.clock = 10
 local pkt1 = Net.packTransforms({
 	{ id = 1, px = 3, py = 3, vx = 0, vy = 0, heading = 0, flags = 0, effort = 0.5, stun = 0 },
-})
+}, 0)
 state:applyTransforms(pkt1)
 state.clock = 10.1
 local pkt2 = Net.packTransforms({
 	{ id = 1, px = 4, py = 3, vx = 0, vy = 0, heading = 0, flags = 0, effort = 0.5, stun = 0 },
-})
+}, 0.1)
 state:applyTransforms(pkt2)
-state.clock = 10.24 -- target = 10.06 -> 60% between packets (INTERP_DELAY 0.18)
+-- offset estimate is 10, so local 10.18 is server 0.18; target = 0.06
+-- (INTERP_DELAY 0.12) -> 60% between packets
+state.clock = 10.18
 local pose = state:remotePose(1)
 check(pose ~= nil and pose.x > 3.3 and pose.x < 3.9, `remote interpolates between packets (x={pose and pose.x})`)
 

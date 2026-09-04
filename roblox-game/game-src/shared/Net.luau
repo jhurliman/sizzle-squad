@@ -108,6 +108,22 @@ end
 -- 1 produce, 2 plate/pan), 5 isPlayer-controlled (vs bot).
 Net.CHEF_STRIDE = 11 -- id u8 | px u16 | py u16 | vx i8 | vy i8 | heading u8 | flags u8 | effort u8 | stun u8(1/30s units)
 
+-- THE PACKET SAYS WHEN ITS POSITIONS WERE TRUE.
+--
+-- Header: count u8 | stamp f32. The stamp is the server's step clock at the
+-- moment the positions were sampled. Without it the client had to stamp
+-- samples on ARRIVAL, which turns every millisecond of network jitter into a
+-- millisecond of speed error when it interpolates between them -- that was
+-- the visible stutter on other players' chefs.
+--
+-- An f32 keeps sub-millisecond precision only for a few thousand seconds,
+-- and a populated server lives far longer than that, so the stamp goes over
+-- the wire modulo STAMP_WRAP and the receiver unwraps it (see
+-- ClientState.unwrapStamp). 1024 s leaves 13 mantissa bits below the
+-- second: ~0.12 ms, fine against a 50 ms packet interval.
+Net.TRANSFORMS_HEADER = 5
+Net.STAMP_WRAP = 1024
+
 export type ChefTransform = {
 	id: number,
 	px: number,
@@ -120,10 +136,12 @@ export type ChefTransform = {
 	stun: number,
 }
 
-function Net.packTransforms(chefs: { ChefTransform }): buffer
-	local b = buffer.create(1 + #chefs * Net.CHEF_STRIDE)
+--- `stamp` is the server clock (seconds) at which these positions were true.
+function Net.packTransforms(chefs: { ChefTransform }, stamp: number): buffer
+	local b = buffer.create(Net.TRANSFORMS_HEADER + #chefs * Net.CHEF_STRIDE)
 	buffer.writeu8(b, 0, #chefs)
-	local o = 1
+	buffer.writef32(b, 1, stamp % Net.STAMP_WRAP)
+	local o = Net.TRANSFORMS_HEADER
 	for _, c in chefs do
 		buffer.writeu8(b, o, c.id)
 		buffer.writeu16(b, o + 1, q16(c.px, POS_MIN, POS_MAX))
@@ -139,16 +157,19 @@ function Net.packTransforms(chefs: { ChefTransform }): buffer
 	return b
 end
 
-function Net.unpackTransforms(b: buffer): { ChefTransform }
+--- Returns the chef list and the (wrapped) server stamp; a malformed buffer
+--- yields an empty list and a zero stamp.
+function Net.unpackTransforms(b: buffer): ({ ChefTransform }, number)
 	local out: { ChefTransform } = {}
-	if buffer.len(b) < 1 then
-		return out
+	if buffer.len(b) < Net.TRANSFORMS_HEADER then
+		return out, 0
 	end
 	local n = buffer.readu8(b, 0)
-	if buffer.len(b) < 1 + n * Net.CHEF_STRIDE then
-		return out
+	if buffer.len(b) < Net.TRANSFORMS_HEADER + n * Net.CHEF_STRIDE then
+		return out, 0
 	end
-	local o = 1
+	local stamp = buffer.readf32(b, 1)
+	local o = Net.TRANSFORMS_HEADER
 	for _ = 1, n do
 		table.insert(out, {
 			id = buffer.readu8(b, o),
@@ -163,7 +184,7 @@ function Net.unpackTransforms(b: buffer): { ChefTransform }
 		})
 		o += Net.CHEF_STRIDE
 	end
-	return out
+	return out, stamp
 end
 
 Net.FLAG_STUN = 1

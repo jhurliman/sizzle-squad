@@ -87,8 +87,48 @@ function SimService.new(shared: any, opts: { seed: number, chefCount: number?, b
 	-- This clock advances in BOTH tick paths and never resets, so a packet is
 	-- judged against the time that actually passed.
 	self.clock = 0
+	-- WALL TIME THE SIM NEVER RAN. Both tick paths cap the accumulator at
+	-- ACC_CAP so a stalled heartbeat does not become a burst of catch-up
+	-- steps; whatever is over the cap is thrown away, and `clock` -- being a
+	-- count of steps -- falls behind wall time by that much, permanently. The
+	-- excess is kept here so wireClock can say how much wall time really
+	-- passed (see wireClock for who needs that and why).
+	self.lostTime = 0
 	self:reset(opts.seed)
 	return self
+end
+
+--- Longest stretch of wall time one heartbeat is allowed to simulate.
+local ACC_CAP = 0.25
+
+--- Fold a heartbeat's dt into the accumulator, capped, and book the excess.
+function SimService:accumulate(dt: number)
+	local total = self.acc + dt
+	if total > ACC_CAP then
+		self.lostTime += total - ACC_CAP
+		total = ACC_CAP
+	end
+	self.acc = total
+end
+
+--- The clock the transform stream is stamped with: the step clock plus the
+--- wall time the cap threw away, so it stays in step with wall time.
+---
+--- The client tracks localClock - serverStamp and trusts that difference to
+--- be constant. The step clock alone is not: a one-second server hitch runs
+--- a quarter second of steps and drops the rest, so every stamp after it is
+--- three quarters of a second behind the wall, the client reads that as a
+--- sudden change of latency, and its tracker -- which only raises its
+--- estimate at 20 ms/s once settled, for good reasons of its own -- has
+--- remote chefs extrapolated against the wrong server time for the best
+--- part of a minute. With the lost time added the stamps keep pace with the
+--- wall; the sample's STATE is still the state at the last step, so through
+--- the hitch the client sees a second of stamp carrying a quarter second of
+--- motion and draws the chef moving slowly through it, which is exactly
+--- what happened. Still step-ALIGNED (it moves when the step clock moves),
+--- so the reason for preferring it over the heartbeat time holds.
+function SimService:wireClock(): number
+	return self.clock + self.lostTime
 end
 
 --- `director` is applied at CONSTRUCTION, not after: createSim seeds the
@@ -328,7 +368,7 @@ end
 function SimService:tick(dt: number, _now: number?): ({ any }, number)
 	local shared = self.shared
 	local sim = self.sim
-	self.acc = math.min(self.acc + dt, 0.25)
+	self:accumulate(dt)
 	local ticks = 0
 	local batch = self.tickEvents
 	table.clear(batch)
@@ -483,7 +523,7 @@ end
 function SimService:tickMovementOnly(dt: number, _now: number?)
 	local shared = self.shared
 	local sim = self.sim
-	self.acc = math.min(self.acc + dt, 0.25)
+	self:accumulate(dt)
 	while self.acc >= shared.SIM_DT do
 		self.acc -= shared.SIM_DT
 		self.clock += shared.SIM_DT
