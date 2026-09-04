@@ -121,6 +121,16 @@ local MonetizationDefs = require(gameShared:WaitForChild("Monetization")) :: any
 local monetization = MonetizationServer.new(Catalog, MonetizationDefs)
 
 
+-- THE CALLBACKS BELOW MUST NOT NAME `director`.
+--
+-- They are closures inside director's own initializer, and a local is not in
+-- scope inside its own initializer: `director.round` in there was the GLOBAL
+-- director, nil, and the round-end callback threw on its first seated player
+-- -- every round, in every server, since the funnel shipped. Everything after
+-- the throw was lost: the shift_finished analytics, and the funnel's last
+-- stage, which is why no completer's profile ever read reach = "finished".
+-- The results carry the round index now, and check-luau refuses a strict
+-- file that reads an undeclared global.
 local director = RoundDirector.new(shared, Config, simService, crew, replicator, remotes, {
 	assistFn = function()
 		return progression:crewQualifiesForAssist(crew)
@@ -148,9 +158,9 @@ local director = RoundDirector.new(shared, Config, simService, crew, replicator,
 			end)
 		end
 		badges:onRoundEnd(crew, progression, results)
+		-- (awardRound notes the funnel's "finished" itself; see there.)
 		for player in crew.seats do
-			analytics:roundFinished(player, director.round, results, progression.lastAward[player])
-			progression:noteReach(player, "finished")
+			analytics:roundFinished(player, results.round, results, progression.lastAward[player])
 		end
 	end,
 	onRoundStart = function(roundIndex)

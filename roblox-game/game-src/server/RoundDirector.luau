@@ -379,6 +379,10 @@ function RoundDirector:buildResults(): any
 		end
 	end
 	return {
+		-- Which round this was. onRoundEnd is a closure built inside the
+		-- director's own constructor call, so it cannot read `director.round`
+		-- (see main.server); the results carry it instead.
+		round = self.round,
 		coins = score.coins,
 		served = score.served,
 		missed = score.missed,

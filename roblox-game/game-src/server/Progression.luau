@@ -601,6 +601,12 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 			streak.lastDay = today
 		end
 
+		-- The funnel's last stage, noted HERE with the round it belongs to,
+		-- not by the caller afterwards: the two used to be separated by a
+		-- callback tail that threw before it got there, and every completer
+		-- persisted as "worked". Whatever happens after awardRound returns,
+		-- a paid round is a finished one.
+		self:noteReach(player, "finished")
 		self.dirty[player] = true
 		self:push(player)
 

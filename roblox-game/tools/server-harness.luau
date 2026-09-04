@@ -226,6 +226,7 @@ check(simService.sim.director.botServeValueMul == Config.BOT_SERVE_VALUE_MUL, "b
 local profile = progression.profiles[playerA]
 check(profile.coins > 0, `career coins paid out ({profile.coins})`)
 check(profile.rounds >= 1, `rounds counted ({profile.rounds})`)
+check(profile.reach == "finished", `the funnel says finished after a finished round (reach={tostring(profile.reach)})`)
 check(profile.xp > 0 or profile.level > 1, `xp granted (level {profile.level}, xp {profile.xp})`)
 
 -- shop: buy + equip

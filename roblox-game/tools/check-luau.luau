@@ -31,6 +31,71 @@ walk("tools")
 print(`{checked} files checked, {failed} failed`)
 
 -- ------------------------------------------------------------------------
+-- A LOCAL IS NOT IN SCOPE INSIDE ITS OWN INITIALIZER.
+--
+-- `local director = RoundDirector.new({ onRoundEnd = function() ...
+-- director.round ... end })` compiles, and `director` in there is the
+-- GLOBAL director: nil. That closure threw on its first seated player every
+-- round in every server, and everything after the throw -- the shift
+-- analytics and the funnel's "finished" stage -- was silently lost for the
+-- life of the feature. No harness could reach it (main.server is not
+-- loadable headless) and luau.compile does not care.
+--
+-- There is no luau-analyze on this path, so this is the narrow check: for
+-- every `local NAME = ` whose initializer runs past its own line, the body
+-- of that initializer must not mention NAME. Forward-declare (`local x` then
+-- `x = ...`) or pass the value in instead.
+local selfRefs = 0
+local function stripComment(line: string): string
+	return (line:gsub("%-%-.*$", ""))
+end
+local function selfReferencing(path: string)
+	local lines = fs.readFile(path):split("\n")
+	local i = 1
+	while i <= #lines do
+		local line = lines[i]
+		local name = line:match("^%s*local%s+([%a_][%w_]*)%s*=")
+		if name ~= nil then
+			local code = stripComment(line)
+			local depth = 0
+			for c in code:gmatch("[%(%){}]") do
+				depth += if c == "(" or c == "{" then 1 else -1
+			end
+			local j = i
+			while depth > 0 and j < #lines do
+				j += 1
+				local body = stripComment(lines[j])
+				if body:find(`%f[%w_]{name}%f[^%w_]`) then
+					selfRefs += 1
+					print(`FAIL {path}:{j}: \`{name}\` is used inside its own initializer (it is the global {name} there, nil)`)
+				end
+				for c in body:gmatch("[%(%){}]") do
+					depth += if c == "(" or c == "{" then 1 else -1
+				end
+			end
+			i = j
+		end
+		i += 1
+	end
+end
+local function walkSelfRefs(dir: string)
+	for _, name in fs.readDir(dir) do
+		local path = `{dir}/{name}`
+		if fs.isDir(path) then
+			walkSelfRefs(path)
+		elseif name:match("%.luau$") then
+			selfReferencing(path)
+		end
+	end
+end
+walkSelfRefs("game-src")
+if selfRefs > 0 then
+	failed += selfRefs
+else
+	print("no local is read inside its own initializer")
+end
+
+-- ------------------------------------------------------------------------
 -- CODEGEN GUARD: `0` IS TRUTHY IN LUA AND FALSY IN TYPESCRIPT.
 --
 -- TSTL compiles a bare `arr.length` truthiness test to `#arr`, which silently

@@ -34,6 +34,7 @@ check(src(clientState):find("OFFSET_DRIFT") ~= nil, "#19: client tracks the cloc
 
 local menu = root and root:FindFirstChild("Menu")
 local shiftPanel = menu and menu:FindFirstChild("ShiftPanel")
+check(src(shiftPanel):find("WORD_MAX_UNITS") ~= nil, "#21: streak under the career line, word floor (WORD_MAX_UNITS)")
 check(src(shiftPanel):find("DISMISS_TAP") ~= nil, "#18: bot-dismiss has a 44px target (DISMISS_TAP)")
 check(src(shiftPanel):find("introHold") ~= nil, "#17: the character-centric lobby (ShiftPanel.introHold)")
 
