@@ -82,6 +82,14 @@ local MIN_BAR_SQUEEZED = 52
 -- face's own padding.
 local BTN_PX_PER_UNIT = 8
 local BTN_PAD = 14
+-- ...UP TO A POINT. The word floor exists so a Latin word is never split;
+-- Japanese and Chinese labels have no spaces at all, so "山田太郎に参加" is one
+-- "word" of 12.6 units that would claim more than a phone's bar can give.
+-- Eight is WARDROBE, the longest word the bar has of its own.
+-- Past this many units the label may break -- which in a script without
+-- word boundaries is ordinary typesetting, not a broken word. NAME_MAX
+-- keeps a cut Latin name inside the same bound, so the cap never bites one.
+local WORD_MAX_UNITS = 8
 
 -- The smallest square a finger reliably lands on. Below this, a control in
 -- the corner of a bigger one is hit by the bigger one about as often as by
@@ -94,7 +102,7 @@ local DISMISS_TAP = 44
 -- bar can hold and would push the whole strip into a second row over the
 -- chefs. Past this many characters the name is cut with an ellipsis; the
 -- button says who, the chair says the rest.
-local NAME_MAX = 12
+local NAME_MAX = 8
 
 --- `name` cut to NAME_MAX codepoints (not bytes: a kanji is one character).
 local function compactName(name: string): string
@@ -801,7 +809,8 @@ local function floorFor(it: any, buttonFloor: number): number
 	if it.chip then
 		return math.min(math.floor(it.weight * CHIP_PX_PER_UNIT + CHIP_PAD), MAX_BAR_CHIP)
 	end
-	return math.max(buttonFloor, math.floor((it.word or 0) * BTN_PX_PER_UNIT + BTN_PAD))
+	local word = math.min(it.word or 0, WORD_MAX_UNITS)
+	return math.max(buttonFloor, math.floor(word * BTN_PX_PER_UNIT + BTN_PAD))
 end
 
 --- Share `budget` out between items in proportion to how much label each has

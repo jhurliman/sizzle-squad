@@ -413,7 +413,7 @@ do
 				for w in string.gmatch(b.Text, "%S+") do
 					word = math.max(word, textWeight(w))
 				end
-				local need = math.floor(word * 8 + 14)
+				local need = math.floor(math.min(word, 8) * 8 + 14)
 				check(
 					b.Parent.Size.X.Offset >= need,
 					`       "{b.Text}" holds its longest word whole ({b.Parent.Size.X.Offset} >= {need})`
@@ -674,6 +674,19 @@ do
 end
 panel:setFriends({ { name = "山田太郎の料理長です", jobId = "abc" } })
 check(string.find(panel.inviteButton.Text, "山田太郎", 1, true) ~= nil, `a multibyte name is cut by character, not by byte ({panel.inviteButton.Text})`)
+-- AND A LANGUAGE WITH NO SPACES DOES NOT GET TO CLAIM THE BAR. The shipping
+-- Japanese template renders "山田太郎に参加" -- one token -- and with the
+-- Japanese career readout at a maxed save this has to stay one row on an
+-- iPhone SE. The word floor is capped, so it does.
+panel:setProgress({ level = 99, coins = 9999999, streak = 365 })
+panel.progressChip.Text = "Lv99  ·  9999999コイン\n🔥365日連続"
+panel.inviteButton.Text = "山田太郎に参加"
+do
+	local m = measure(667, 375)
+	check(m.barBottom <= m.bandTop, `a spaceless Japanese join label keeps the bar to one row on an iPhone SE ({m.barBottom} <= {m.bandTop})`)
+	check(m.barLeft >= m.pillsEnd, `and clear of Roblox's controls ({m.barLeft} >= {m.pillsEnd})`)
+end
+panel:setProgress({ level = 1, coins = 0, streak = 0 })
 panel:setFriends({})
 acted = {}
 panel.slots[2].face.__press()
