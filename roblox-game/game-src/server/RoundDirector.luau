@@ -447,7 +447,7 @@ function RoundDirector:heartbeat(dt: number)
 		for _, ev in events do
 			self:attribute(ev)
 		end
-		self.replicator:flush(self.simService.sim, events, dt)
+		self.replicator:flush(self.simService.sim, events, dt, self.simService.clock)
 		-- The tutorial board is endless, so nothing inside the sim will ever
 		-- set `over`. Two dishes is the whole shift; tripping `over` here means
 		-- results, payout and the career counters all run through the ordinary
@@ -490,7 +490,7 @@ function RoundDirector:heartbeat(dt: number)
 	-- character was standing".
 	if self.phase ~= "round" then
 		self.simService:tickMovementOnly(dt)
-		self.replicator:flush(self.simService.sim, {}, dt)
+		self.replicator:flush(self.simService.sim, {}, dt, self.simService.clock)
 	end
 
 	-- Without bot fill an empty kitchen has no reason to start a round:

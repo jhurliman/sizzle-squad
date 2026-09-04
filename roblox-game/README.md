@@ -75,7 +75,10 @@ invites, emotes; chefs still walk around) → next round.
 input resumes instantly. Own-chef movement runs the real `movePhase` locally
 (zero latency); the server validates displacement + walkability and owns
 collisions, interactions, stations, orders, and scoring. Transforms stream as
-packed buffers (20 Hz down / 30 Hz up); everything else diffs on change.
+packed buffers (20 Hz down / 30 Hz up), stamped with the server's step clock;
+remote chefs are drawn in server time (clock-offset tracking, Hermite
+between samples, velocity extrapolation over a gap). Everything else diffs on
+change.
 
 **Difficulty** — human-count pacing table + an invisible pressure director
 (±20% order-gap rubber band) + auto assist mode for new crews (gentler
@@ -101,6 +104,7 @@ client-side (walk/hop/squash/stun/carry). See `../docs/art/chefs-preview.png`.
 | `npm run parity` | TS and Luau builds tick-identical (3 seeds × 10,800 ticks: discrete state exact, floats ≤ 8e-11) |
 | `lune run tools/server-harness.luau` | Full server stack end-to-end: round loop, drop-in/AFK, pacing, progression, shop, replication (22 checks) |
 | `lune run tools/client-harness.luau` | Mirror movement + working-freeze, interpolation, verb prompt, delta mirroring |
+| `lune run tools/smoothing-harness.luau` | Remote chefs render at true speed under jitter, loss, a network stall, a client frame stall, and the real send cadence |
 | `lune run tools/first-session-harness.luau` | A first-ever player across the First Shift teleport: session accounting, where they arrived from, that a hop is never scored as a drop-off, and the reach/playSeconds funnel (59 checks) |
 | `lune run tools/check-luau.luau` | Syntax gate over all Luau sources |
 | `lune run tools/smoke.luau` | A full bot round in Luau (~6,200 ticks/s) |

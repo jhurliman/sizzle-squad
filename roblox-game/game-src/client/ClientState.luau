@@ -6,7 +6,66 @@
 local ClientState = {}
 ClientState.__index = ClientState
 
-local INTERP_DELAY = 0.18 -- render remotes this far in the past (>2 packet intervals)
+-- ---------------------------------------------------------- remote smoothing
+--
+-- Remote chefs are drawn from a buffer of server samples, INTERPOLATED IN
+-- SERVER TIME. Every sample carries the server's step clock (Net header), and
+-- the client keeps an estimate of `localClock - serverClock` so it can ask
+-- "where was this chef at server time T" for a T just far enough in the past
+-- that the samples around it have usually arrived.
+--
+-- The previous version stamped samples with their ARRIVAL time. Over a real
+-- connection arrival is the send time plus a latency that wanders by tens of
+-- milliseconds packet to packet, so two samples 50 ms apart on the server
+-- were 30 ms or 70 ms apart in the buffer, and a chef covering a fixed
+-- distance in a wandering time is a chef whose speed wanders. That was the
+-- stutter on other players' chefs in the three-human playtest.
+
+-- How far behind the estimated server-now remotes are drawn. Packets come at
+-- 20 Hz (Replicator.TRANSFORM_HZ), so the budget has to cover: one lost
+-- packet (the gap to the next one is two intervals, 100 ms) plus the
+-- arrival jitter of that next packet, measured from the
+-- EARLIEST arrivals because that is where the offset tracker sits. 120 ms
+-- leaves ~20 ms for jitter on a single loss; a double loss or a heavier
+-- jitter spike runs into extrapolation below, which on a walking chef is
+-- close to invisible. Going higher buys robustness at the price of everyone
+-- else's chef reacting later; 180 ms (the old value) was a visible lag
+-- against one's own chef in bump exchanges.
+local INTERP_DELAY = 0.12
+
+-- Past the newest sample the chef is carried along its sampled velocity for
+-- this long, then held. Long enough to bridge a 150 ms server hitch or two
+-- lost packets; short enough that a chef whose stream really has stopped
+-- does not walk through a counter.
+local EXTRAP_MAX = 0.15
+
+-- Clock-offset tracker (see noteStamp). An early packet is nearer the truth
+-- than a late one, so the estimate moves toward a smaller offset FAST and
+-- toward a larger one SLOWLY, each as a rate over the local time since the
+-- last packet:
+--   * OFFSET_DROP  0.3 s/s: 15 ms per 50 ms packet, which swallows arrival
+--     jitter in a packet or two. It is a rate rather than a snap because of
+--     the one way a packet can look early without being early -- a script
+--     stall inside the render frame, after the clock was advanced and before
+--     the queued packets were dispatched. Those all land with the SAME local
+--     clock, so their elapsed time is zero and they move nothing.
+--   * OFFSET_DRIFT 0.02 s/s: a single late packet moves it by a millisecond;
+--     a genuine +50 ms route change is absorbed in 2.5 s.
+-- A sample further than OFFSET_RESET from the estimate is a discontinuity
+-- (server restart, a clock that wrapped badly) and restarts the tracker
+-- rather than drifting for minutes.
+local OFFSET_DROP = 0.3
+local OFFSET_DRIFT = 0.02
+local OFFSET_RESET = 1.0
+
+-- Per-chef visual offset decay (per second). When a real sample lands
+-- behind an extrapolated position the difference is parked here and bled
+-- off, exactly as visOffset does for the own chef's corrections.
+local VIS_DECAY = 8
+
+-- Samples kept per chef: ~1.5 s at 20 Hz, far more than INTERP_DELAY needs
+-- and enough to ride out a burst of late arrivals.
+local HISTORY = 30
 
 function ClientState.new(shared: any, net: any)
 	local self = setmetatable({}, ClientState)
@@ -18,8 +77,17 @@ function ClientState.new(shared: any, net: any)
 	self.myChefId = nil :: number?
 	self.mirror = nil :: any
 	self.seq = 0
-	-- Remote chef interpolation buffers: id -> { {t, x, y, vx, vy, heading, flags, effort, stun} }
+	-- Remote chef sample buffers, sorted by SERVER time:
+	-- id -> { {t, x, y, vx, vy, heading, effort, stun} }
 	self.buffers = {} :: { [number]: { any } }
+	-- Per-chef decaying visual offset + the clock it was last decayed at.
+	self.remoteVis = {} :: { [number]: { x: number, y: number, h: number, at: number } }
+	-- Server stamp unwrapping (Net.STAMP_WRAP) and the clock-offset estimate.
+	self.stampLast = nil :: number?
+	self.stampBase = 0
+	self.offset = nil :: number? -- localClock - serverClock, or nil before the first packet
+	self.offsetAt = 0 -- local clock of the last tracker update
+	self.newestStamp = nil :: number? -- latest server time in any buffer
 	self.flags = {} :: { [number]: number }
 	self.effort = {} :: { [number]: number }
 	self.skins = {} :: { [number]: string }
@@ -104,8 +172,162 @@ function ClientState:syncMirrorStations()
 	end
 end
 
+--- Turn a wire stamp (modulo Net.STAMP_WRAP) back into a monotonic server
+--- clock. Unreliable packets can arrive out of order, so a step of more
+--- than half the window in either direction is read as a wrap, not a jump;
+--- that keeps a straggler from just before the wrap on the right side of it.
+function ClientState:unwrapStamp(raw: number): number
+	local wrap = self.net.STAMP_WRAP
+	local last = self.stampLast
+	if last ~= nil then
+		local d = raw - last
+		if d < -wrap / 2 then
+			self.stampBase += wrap
+		elseif d > wrap / 2 then
+			self.stampBase -= wrap
+		end
+	end
+	self.stampLast = raw
+	return self.stampBase + raw
+end
+
+--- Fold one packet's (localClock - serverStamp) into the offset estimate.
+--- See OFFSET_DROP / OFFSET_DRIFT for why the two directions differ.
+--- `starved` is how far the render target had run past the newest buffered
+--- sample when this packet arrived, if it had. Returns true when the tracker
+--- restarted: everything buffered was stamped in a clock domain that no
+--- longer exists and has to go.
+function ClientState:noteStamp(serverT: number, starved: number): boolean
+	local sample = self.clock - serverT
+	local est = self.offset
+	local elapsed = math.max(0, self.clock - self.offsetAt)
+	self.offsetAt = self.clock
+	if est == nil or math.abs(sample - est) > OFFSET_RESET then
+		self.offset = sample
+		return est ~= nil
+	end
+	-- THE HOLD REGIME IS PROOF THE ESTIMATE IS WRONG. Extrapolation covers
+	-- the honest reasons the target runs past the data (a lost packet or
+	-- two, a short stall) and those never reach EXTRAP_MAX. Being held means
+	-- the estimate itself is too small -- the first packet was dispatched in
+	-- a slow frame, say -- and the slow drift would take seconds to find
+	-- out. Put the target back on the newest sample now; the visual offset
+	-- glides the body over.
+	if starved > EXTRAP_MAX then
+		est += starved
+	end
+	if sample < est then
+		self.offset = math.max(sample, est - OFFSET_DROP * elapsed)
+	else
+		self.offset = math.min(sample, est + OFFSET_DRIFT * elapsed)
+	end
+	return false
+end
+
+--- The server time remotes are drawn at right now, or nil before any packet.
+function ClientState:renderTarget(): number?
+	if self.offset == nil then
+		return nil
+	end
+	return self.clock - self.offset - INTERP_DELAY
+end
+
+--- Is a sampled velocity believable against the displacement it claims to
+--- have produced? A cubic Hermite stays monotone as long as each tangent is
+--- at most three chord lengths (Fritsch-Carlson); beyond that the curve
+--- doubles back on itself, which on screen is a chef taking a step
+--- backwards. The same test guards extrapolation: a velocity that did not
+--- move the chef over the last interval is not going to move it over the
+--- next one either. The slack covers i8 velocity quantization (~0.06
+--- cells/s) at rest.
+local function plausible(vx: number, vy: number, dx: number, dy: number, span: number): boolean
+	local reach = math.sqrt(vx * vx + vy * vy) * span
+	local chord = math.sqrt(dx * dx + dy * dy)
+	return reach <= 3 * chord + 0.02
+end
+
+--- Pose at server time `target` from the sample buffer alone: Hermite between
+--- straddling samples, velocity extrapolation past the newest, a hold at
+--- either end. Pure -- applyTransforms calls it before and after inserting a
+--- sample to measure how much the picture moved.
+local function poseAt(buf: { any }, target: number): any
+	local n = #buf
+	local last = buf[n]
+	if target >= last.t then
+		local ahead = math.min(target - last.t, EXTRAP_MAX)
+		local vx, vy = last.vx, last.vy
+		if n >= 2 then
+			local prev = buf[n - 1]
+			if not plausible(vx, vy, last.x - prev.x, last.y - prev.y, last.t - prev.t) then
+				vx, vy = 0, 0
+			end
+		end
+		-- Heading holds: a guessed turn is worse than a late one.
+		return {
+			x = last.x + vx * ahead,
+			y = last.y + vy * ahead,
+			heading = last.heading,
+			effort = last.effort,
+			stun = last.stun,
+		}
+	end
+	for i = n - 1, 1, -1 do
+		local a, b = buf[i], buf[i + 1]
+		if a.t <= target then
+			local span = math.max(1e-4, b.t - a.t)
+			local f = math.clamp((target - a.t) / span, 0, 1)
+			local dx, dy = b.x - a.x, b.y - a.y
+			local x, y
+			if plausible(a.vx, a.vy, dx, dy, span) and plausible(b.vx, b.vy, dx, dy, span) then
+				-- Cubic Hermite with the sampled velocities as tangents: the
+				-- rendered speed follows the chef's real accel/decel curve
+				-- through the sample instead of stepping at it.
+				local f2, f3 = f * f, f * f * f
+				local h00 = 2 * f3 - 3 * f2 + 1
+				local h10 = f3 - 2 * f2 + f
+				local h01 = -2 * f3 + 3 * f2
+				local h11 = f3 - f2
+				x = h00 * a.x + h10 * span * a.vx + h01 * b.x + h11 * span * b.vx
+				y = h00 * a.y + h10 * span * a.vy + h01 * b.y + h11 * span * b.vy
+			else
+				x = a.x + dx * f
+				y = a.y + dy * f
+			end
+			local ha, hb = a.heading, b.heading
+			local dh = math.atan2(math.sin(hb - ha), math.cos(hb - ha))
+			return {
+				x = x,
+				y = y,
+				heading = ha + dh * f,
+				effort = a.effort + (b.effort - a.effort) * f,
+				stun = b.stun,
+			}
+		end
+	end
+	local first = buf[1]
+	return { x = first.x, y = first.y, heading = first.heading, effort = first.effort, stun = first.stun }
+end
+
 function ClientState:applyTransforms(b: buffer)
-	local list = self.net.unpackTransforms(b)
+	local list, rawStamp = self.net.unpackTransforms(b)
+	if #list == 0 then
+		return
+	end
+	local serverT = self:unwrapStamp(rawStamp)
+	-- The render target can move on its own when the offset estimate snaps
+	-- to an earlier packet, so "before" is measured against the target as it
+	-- was and "after" against the target as it is: both the new data and the
+	-- clock adjustment land in the visual offset, and neither shows as a hop.
+	local oldTarget = self:renderTarget()
+	local starved = if oldTarget ~= nil and self.newestStamp ~= nil then oldTarget - self.newestStamp else 0
+	if self:noteStamp(serverT, starved) then
+		table.clear(self.buffers)
+		table.clear(self.remoteVis)
+		self.newestStamp = nil
+		oldTarget = nil
+	end
+	self.newestStamp = math.max(self.newestStamp or serverT, serverT)
+	local target = self:renderTarget()
 	for _, t in list do
 		self.flags[t.id] = t.flags
 		self.effort[t.id] = t.effort
@@ -130,8 +352,17 @@ function ClientState:applyTransforms(b: buffer)
 				buf = {}
 				self.buffers[t.id] = buf
 			end
-			table.insert(buf, {
-				t = self.clock,
+			-- Where was this chef being drawn before the new sample? If the
+			-- sample changes the answer (it landed behind an extrapolated
+			-- guess, or the chef was held waiting for it) the difference is
+			-- parked in the visual offset so the body glides rather than
+			-- snapping.
+			local before = if #buf > 0 and oldTarget ~= nil then poseAt(buf, oldTarget) else nil
+			-- Insert by server time: unreliable packets can overtake each
+			-- other, and a straggler appended to the end would read as the
+			-- chef stepping backwards.
+			local sample = {
+				t = serverT,
 				x = t.px,
 				y = t.py,
 				vx = t.vx,
@@ -139,10 +370,29 @@ function ClientState:applyTransforms(b: buffer)
 				heading = t.heading,
 				effort = t.effort,
 				stun = t.stun,
-			})
-			-- keep ~1s of history
-			while #buf > 30 do
+			}
+			local at = #buf + 1
+			while at > 1 and buf[at - 1].t > serverT do
+				at -= 1
+			end
+			if at > 1 and buf[at - 1].t == serverT then
+				continue -- duplicate
+			end
+			table.insert(buf, at, sample)
+			while #buf > HISTORY do
 				table.remove(buf, 1)
+			end
+			if before ~= nil and target ~= nil then
+				local after = poseAt(buf, target)
+				local vis = self.remoteVis[t.id]
+				if vis == nil then
+					vis = { x = 0, y = 0, h = 0, at = self.clock }
+					self.remoteVis[t.id] = vis
+				end
+				vis.x += before.x - after.x
+				vis.y += before.y - after.y
+				local dh = before.heading - after.heading
+				vis.h += math.atan2(math.sin(dh), math.cos(dh))
 			end
 		end
 	end
@@ -164,32 +414,29 @@ function ClientState:stepOwn(input: any, dt: number)
 	return mirror
 end
 
---- Interpolated pose for a remote chef at render time.
+--- Pose for a remote chef at render time: the buffer's answer for the current
+--- render target (server time) plus the chef's decaying visual offset. The
+--- offset decays against this clock rather than a passed dt so a harness
+--- can sample it the way the render loop does.
 function ClientState:remotePose(id: number): any?
 	local buf = self.buffers[id]
-	if buf == nil or #buf == 0 then
+	local target = self:renderTarget()
+	if buf == nil or #buf == 0 or target == nil then
 		return nil
 	end
-	local target = self.clock - INTERP_DELAY
-	-- find the straddling pair
-	for i = #buf - 1, 1, -1 do
-		local a, b = buf[i], buf[i + 1]
-		if a.t <= target then
-			local span = math.max(1e-4, b.t - a.t)
-			local f = math.clamp((target - a.t) / span, 0, 1)
-			local ha, hb = a.heading, b.heading
-			local dh = math.atan2(math.sin(hb - ha), math.cos(hb - ha))
-			return {
-				x = a.x + (b.x - a.x) * f,
-				y = a.y + (b.y - a.y) * f,
-				heading = ha + dh * f,
-				effort = a.effort + (b.effort - a.effort) * f,
-				stun = b.stun,
-			}
-		end
+	local pose = poseAt(buf, target)
+	local vis = self.remoteVis[id]
+	if vis ~= nil then
+		local decay = math.exp(-VIS_DECAY * math.max(0, self.clock - vis.at))
+		vis.at = self.clock
+		vis.x *= decay
+		vis.y *= decay
+		vis.h *= decay
+		pose.x += vis.x
+		pose.y += vis.y
+		pose.heading += vis.h
 	end
-	local last = buf[#buf]
-	return { x = last.x, y = last.y, heading = last.heading, effort = last.effort, stun = last.stun }
+	return pose
 end
 
 function ClientState:applyStationDeltas(deltas: { any })
