@@ -157,6 +157,12 @@ local Theme = luau.load(luau.compile(fs.readFile("game-src/client/Menu/Theme.lua
 local Loc = {
 	f = function(key: string, ...)
 		local a = { ... }
+		-- The join label keeps the English SHAPE -- "JOIN <name>" -- because
+		-- the bar's word floor is measured off it, and "fmt.join_name:<name>"
+		-- is one 20-character word that no real language produces.
+		if key == "fmt.join_name" then
+			return `JOIN {tostring(a[1])}`
+		end
 		return `{key}:{tostring(a[1])}`
 	end,
 }
@@ -360,6 +366,13 @@ local function textWeight(text: string): number
 	end
 	return w
 end
+local function widestLine(text: string): number
+	local w = 0
+	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
+		w = math.max(w, textWeight(line))
+	end
+	return w
+end
 for _, case in
 	{
 		{ name = "no streak", progress = { level = 1, coins = 0, streak = 0 } },
@@ -379,12 +392,31 @@ do
 		-- weight unit plus padding is what the text costs at the smallest size
 		-- it is allowed to shrink to; under that the plate clips its own text,
 		-- which is the bug this section exists for.
-		for _, chip in { panel.progressChip, panel.streakChip } do
-			if chip.Visible and chip.Parent ~= nil then
-				local need = math.floor(textWeight(chip.Text) * 5.5 + 12)
+		do
+			local chip = panel.progressChip
+			local need = math.floor(widestLine(chip.Text) * 5.5 + 12)
+			check(
+				chip.Size.X.Offset >= need,
+				`       "{chip.Text:gsub("\n", " / ")}" has room to be read ({chip.Size.X.Offset} >= {need})`
+			)
+			local lines = select(2, chip.Text:gsub("\n", "")) + 1
+			check(
+				lines == (if (case.progress.streak or 0) > 1 then 2 else 1),
+				`       the streak is line two of the career plate, not a plate of its own ({lines} line(s))`
+			)
+		end
+		-- NO BUTTON NARROWER THAN ITS LONGEST WORD. "WARDR / OBE" on an iPhone
+		-- was a button given less than the word needs at its smallest text.
+		for _, b in panel.rowButtons do
+			if b.Parent ~= nil and b.Parent.Visible then
+				local word = 0
+				for w in string.gmatch(b.Text, "%S+") do
+					word = math.max(word, textWeight(w))
+				end
+				local need = math.floor(math.min(word, 8) * 8 + 14)
 				check(
-					chip.Size.X.Offset >= need,
-					`       "{chip.Text}" has room to be read ({chip.Size.X.Offset} >= {need})`
+					b.Parent.Size.X.Offset >= need,
+					`       "{b.Text}" holds its longest word whole ({b.Parent.Size.X.Offset} >= {need})`
 				)
 			end
 		end
@@ -401,7 +433,13 @@ do
 						kids += 1
 					end
 				end
-				local width = sum + 8 * math.max(0, kids - 1)
+				-- With the gap the row's LAYOUT will actually render, read off
+				-- the UIListLayout rather than assumed: a row budgeted at 4px
+				-- gaps and laid out at 8 is 12px wider than its own model.
+				local layout = row:FindFirstChildWhichIsA("UIListLayout")
+				local pad = layout and layout.Padding.Offset or 8
+				check(pad == (if vp.w < 720 then 4 else 8), `       row layout pads {pad}px, matching the budget`)
+				local width = sum + pad * math.max(0, kids - 1)
 				check(width <= row.Size.X.Offset, `       row holds its {kids} children ({width} <= {row.Size.X.Offset})`)
 			end
 		end
@@ -424,19 +462,17 @@ do
 	for _, vp in { { w = 874, h = 402, name = "iPhone 16 Pro" }, { w = 667, h = 375, name = "iPhone SE" }, { w = 1920, h = 1080, name = "desktop" } } do
 		-- Set the text, then lay out: relayout measures whatever is there.
 		panel:setProgress({ level = 99, coins = 9999999, streak = 365 })
-		panel.progressChip.Text = case.lv
-		panel.streakChip.Text = case.streak
+		panel.progressChip.Text = case.lv .. "\n" .. case.streak
 		local m = measure(vp.w, vp.h)
 		check(m.barLeft >= m.pillsEnd, `{case.name} @ {vp.name}: bar clears Roblox's controls ({m.barLeft} >= {m.pillsEnd})`)
 		check(m.barBottom <= m.bandTop, `       and stays above the face band ({m.barBottom} <= {m.bandTop})`)
-		for _, chip in { panel.progressChip, panel.streakChip } do
-			if chip.Visible and chip.Parent ~= nil then
-				local need = math.floor(textWeight(chip.Text) * 5.5 + 12)
-				check(
-					chip.Size.X.Offset >= need,
-					`       "{chip.Text}" is readable ({chip.Size.X.Offset} >= {need})`
-				)
-			end
+		do
+			local chip = panel.progressChip
+			local need = math.floor(widestLine(chip.Text) * 5.5 + 12)
+			check(
+				chip.Size.X.Offset >= need,
+				`       "{chip.Text:gsub("\n", " / ")}" is readable ({chip.Size.X.Offset} >= {need})`
+			)
 		end
 	end
 end
@@ -623,6 +659,35 @@ check(
 	string.find(panel.inviteButton.Text, "INVITE", 1, true) ~= nil,
 	`and asks for one when nobody is cooking ({panel.inviteButton.Text})`
 )
+-- A FRIEND'S NAME MUST NOT WRAP THE BAR. Twenty characters and no spaces is
+-- a legal Roblox name, and as the invite button's longest word it would have
+-- pushed the whole strip into a second row over the chefs on a phone.
+panel:setFriends({ { name = "Xx_SuperDuperChef_xX", jobId = "abc" } })
+check(
+	string.find(panel.inviteButton.Text, "Xx_SuperDuperChef_xX", 1, true) == nil,
+	`a long name is cut short on the button ({panel.inviteButton.Text})`
+)
+check(string.find(panel.inviteButton.Text, "…", 1, true) ~= nil, "and says so with an ellipsis")
+do
+	local m = measure(667, 375)
+	check(m.barBottom <= m.bandTop, `and the bar stays one row above the face band on an iPhone SE ({m.barBottom} <= {m.bandTop})`)
+end
+panel:setFriends({ { name = "山田太郎の料理長です", jobId = "abc" } })
+check(string.find(panel.inviteButton.Text, "山田太郎", 1, true) ~= nil, `a multibyte name is cut by character, not by byte ({panel.inviteButton.Text})`)
+-- AND A LANGUAGE WITH NO SPACES DOES NOT GET TO CLAIM THE BAR. The shipping
+-- Japanese template renders "山田太郎に参加" -- one token -- and with the
+-- Japanese career readout at a maxed save this has to stay one row on an
+-- iPhone SE. The word floor is capped, so it does.
+panel:setProgress({ level = 99, coins = 9999999, streak = 365 })
+panel.progressChip.Text = "Lv99  ·  9999999コイン\n🔥365日連続"
+panel.inviteButton.Text = "山田太郎に参加"
+do
+	local m = measure(667, 375)
+	check(m.barBottom <= m.bandTop, `a spaceless Japanese join label keeps the bar to one row on an iPhone SE ({m.barBottom} <= {m.bandTop})`)
+	check(m.barLeft >= m.pillsEnd, `and clear of Roblox's controls ({m.barLeft} >= {m.pillsEnd})`)
+end
+panel:setProgress({ level = 1, coins = 0, streak = 0 })
+panel:setFriends({})
 acted = {}
 panel.slots[2].face.__press()
 check(#acted == 0, "tapping somebody else's chair does nothing")
