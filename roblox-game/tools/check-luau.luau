@@ -31,6 +31,141 @@ walk("tools")
 print(`{checked} files checked, {failed} failed`)
 
 -- ------------------------------------------------------------------------
+-- A LOCAL IS NOT IN SCOPE INSIDE ITS OWN INITIALIZER.
+--
+-- `local director = RoundDirector.new({ onRoundEnd = function() ...
+-- director.round ... end })` compiles, and `director` in there is the
+-- GLOBAL director: nil. That closure threw on its first seated player every
+-- round in every server, and everything after the throw -- the shift
+-- analytics and the funnel's "finished" stage -- was silently lost for the
+-- life of the feature. No harness could reach it (main.server is not
+-- loadable headless) and luau.compile does not care.
+--
+-- There is no luau-analyze on this path, so this is the narrow check: for
+-- every `local NAME = ` whose initializer runs past its own line, the body
+-- of that initializer must not mention NAME. Forward-declare (`local x` then
+-- `x = ...`) or pass the value in instead.
+local selfRefs = 0
+local function stripComment(line: string): string
+	return (line:gsub("%-%-.*$", ""))
+end
+--- Code only: string literals can hold "end" or "function" and are not code.
+local function stripStrings(line: string): string
+	local out = line:gsub('"[^"]*"', '""'):gsub("'[^']*'", "''"):gsub("`[^`]*`", "``")
+	return out
+end
+--- How much deeper this line leaves us: brackets AND blocks. An initializer
+--- is not only `f({ ... })`; it is also `function() ... end`, whose body has
+--- no bracket to keep the scan inside it.
+--- `function` opens a block wherever it appears (statement or expression);
+--- `if`, `do` and `repeat` only in STATEMENT position -- Luau's
+--- `x = if c then a else b` is an expression with no `end`, and counting it
+--- as a block ran the scan off the end of every file that uses one.
+---
+--- `expression` is the declaration line's own right-hand side: by definition
+--- an expression, so an `if` at its start is the expression form and the
+--- statement rules do not apply to it.
+local function depthDelta(body: string, expression: boolean?): number
+	local d = 0
+	for c in body:gmatch("[%(%){}]") do
+		d += if c == "(" or c == "{" then 1 else -1
+	end
+	for _ in body:gmatch("%f[%w_]function%f[^%w_]") do
+		d += 1
+	end
+	for _ in body:gmatch("%f[%w_]end%f[^%w_]") do
+		d -= 1
+	end
+	if expression then
+		return d
+	end
+	if body:match("^%s*if%f[^%w_]") or body:match("^%s*repeat%f[^%w_]") then
+		d += 1
+	end
+	if body:match("^%s*do%f[^%w_]") or body:match("%f[%w_]do%s*$") then
+		d += 1
+	end
+	if body:match("^%s*until%f[^%w_]") then
+		d -= 1
+	end
+	return d
+end
+--- Does `body` read the variable `name` -- not the field `.name` or method
+--- `:name`, which belong to whatever is before the dot.
+local function mentions(body: string, name: string): boolean
+	local at = 1
+	while true do
+		local i, j = body:find(`%f[%w_]{name}%f[^%w_]`, at)
+		if i == nil then
+			return false
+		end
+		local before = if i > 1 then body:sub(i - 1, i - 1) else ""
+		if before ~= "." and before ~= ":" then
+			return true
+		end
+		at = j + 1
+	end
+end
+local function selfReferencing(path: string)
+	local lines = fs.readFile(path):split("\n")
+	local i = 1
+	while i <= #lines do
+		local line = lines[i]
+		-- With or without a type annotation: `local x = ` and `local x: T = `.
+		local name, rest = line:match("^%s*local%s+([%a_][%w_]*)%s*:[^=]*=(.*)$")
+		if name == nil then
+			name, rest = line:match("^%s*local%s+([%a_][%w_]*)%s*=(.*)$")
+		end
+		if name ~= nil then
+			local code = stripStrings(stripComment(rest))
+			local depth = depthDelta(code, true)
+			-- `local x =` with the value on the next line: the initializer has
+			-- not started yet, so keep reading until it opens, or until a line
+			-- shows it was a one-liner after all.
+			local pending = code:match("^%s*$") ~= nil
+			-- A multi-line if-EXPRESSION has no `end`: it runs until the line
+			-- that carries its `else`.
+			local openIf = code:match("^%s*if%f[^%w_]") ~= nil and not code:find("%f[%w_]else%f[^%w_]")
+			local j = i
+			while (depth > 0 or pending or openIf) and j < #lines do
+				j += 1
+				local body = stripStrings(stripComment(lines[j]))
+				if mentions(body, name) then
+					selfRefs += 1
+					print(`FAIL {path}:{j}: \`{name}\` is used inside its own initializer (it is the global {name} there, nil)`)
+				end
+				depth += depthDelta(body)
+				if pending and body:match("%S") then
+					pending = false
+				end
+				if openIf and body:find("%f[%w_]else%f[^%w_]") then
+					openIf = false
+				end
+			end
+			-- Deliberately NOT skipping to j: a declaration nested inside this
+			-- initializer (a local in a callback) gets its own scan.
+		end
+		i += 1
+	end
+end
+local function walkSelfRefs(dir: string)
+	for _, name in fs.readDir(dir) do
+		local path = `{dir}/{name}`
+		if fs.isDir(path) then
+			walkSelfRefs(path)
+		elseif name:match("%.luau$") then
+			selfReferencing(path)
+		end
+	end
+end
+walkSelfRefs("game-src")
+if selfRefs > 0 then
+	failed += selfRefs
+else
+	print("no local is read inside its own initializer")
+end
+
+-- ------------------------------------------------------------------------
 -- CODEGEN GUARD: `0` IS TRUTHY IN LUA AND FALSY IN TYPESCRIPT.
 --
 -- TSTL compiles a bare `arr.length` truthiness test to `#arr`, which silently
