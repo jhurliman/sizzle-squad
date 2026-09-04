@@ -474,6 +474,35 @@ do
 	end
 end
 
+-- AND A DISMISSAL SURVIVES THE ROUND. startRound resets the sim (default
+-- skins back on default chefs) and reseats every human through a default
+-- chef before claimSkin restores their species. The dismissal is by species
+-- and must come through that untouched: a Nori player who sent Bramble away
+-- must not find Bramble back in the shift because the reseat passed them
+-- through Bramble's chair on the way.
+do
+	local dismissedBefore = {}
+	for species, on in simService.dismissed do
+		if on then
+			table.insert(dismissedBefore, species)
+		end
+	end
+	local botsBefore = simService:activeBotCount()
+	check(#dismissedBefore == 1, `one character is dismissed going into the round ({table.concat(dismissedBefore, ",")})`)
+	simService:reset(99)
+	crew:reseat()
+	director:broadcastPhase() -- the chair list the checks below read is rebuilt here
+	local still = simService.dismissed[dismissedBefore[1]] == true
+	check(still, `{dismissedBefore[1]} is still dismissed after reset + reseat`)
+	check(simService:activeBotCount() == botsBefore, `and the bot count is unchanged ({simService:activeBotCount()} vs {botsBefore})`)
+	for _, c in simService.sim.chefs do
+		local onFloor = shared.isWalkable(simService.sim.kitchen, math.floor(c.pos.x), math.floor(c.pos.y))
+		if not c.isPlayer and not simService:isActive(c) then
+			check(not onFloor, `the dismissed chef ({c.skin}) is parked after the reseat`)
+		end
+	end
+end
+
 -- PACING FOLLOWS WHO IS ACTUALLY COOKING. Sending bots away leaves botFill
 -- true, and the pacing used to key off that switch alone: a solo player who
 -- dismissed all three bots kept the four-chef order rate and ticket clock.

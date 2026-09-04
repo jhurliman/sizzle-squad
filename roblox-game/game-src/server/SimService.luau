@@ -172,11 +172,6 @@ function SimService:setHuman(chefId: number, on: boolean)
 		if chef.id == chefId then
 			chef.isPlayer = on
 			if on then
-				-- A person in the chair is the end of its dismissal, the same
-				-- as a claim. Left set, the flag would ride the species through
-				-- the next claimSkin swap onto a bot that is then inactive but
-				-- unparked -- the invisible body again.
-				self.dismissed[chef.skin] = nil
 				-- Entering play from the parking row -- every chef without bot
 				-- fill, and a DISMISSED chef with it, which freeChef can still
 				-- deal to a joiner -- spawn somewhere sane. A player left on

@@ -303,7 +303,17 @@ function CrewManager:playerAdded(player: any)
 	self.byChef[chefId] = seat
 	-- Seat FIRST, then claim: claimSkin consults byChef to decide which
 	-- species are spoken for, and this seat has to be in it.
-	self:claimSkin(chefId, self.skinFor and self.skinFor(player))
+	local skin = self:claimSkin(chefId, self.skinFor and self.skinFor(player))
+	-- A person in the chair is the end of its dismissal, the same as a claim.
+	-- Left set, the flag would ride the species through their next claim's
+	-- swap onto a bot that is then inactive but unparked -- the invisible
+	-- body again. Done HERE, on the species they actually settled into, and
+	-- not in setHuman: reseat passes every human through a default-skin chef
+	-- for a moment on the way to their own, and clearing there revived
+	-- whichever bot happened to hold that default every round.
+	if skin ~= nil then
+		self.simService:setDismissed(skin, false)
+	end
 	self:sendSeat(player, seat)
 	return seat
 end
