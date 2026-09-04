@@ -18,7 +18,10 @@ local Progression = require(server.Progression) :: any
 local Config = require(gameShared.Config) :: any
 local Catalog = require(gameShared.Catalog) :: any
 
-local USER_ID = 7 -- a test key nobody owns; removed at the end
+-- A NEGATIVE UserId: Roblox never issues one, so `p-1` cannot be a real
+-- player's profile. A small positive number is somebody's account, and the
+-- RemoveAsync below would have been their whole progression.
+local USER_ID = -1
 local KEY = `p{USER_ID}`
 local store = DataStoreService:GetDataStore("SizzleProfiles_v1")
 
@@ -46,20 +49,33 @@ prog.lastSave = os.clock() - 999
 local crew = { seats = { [player] = { chefId = 0 } }, humanCount = function() return 1 end }
 local results = { coins = 120, stars = 3, served = 4, missed = 0, bestCombo = 3, stats = { [0] = { serves = 4, chops = 2, cooks = 1, washes = 0 } }, tutorial = false }
 prog:awardRound(crew, results, false)
-print(`       in memory after awardRound: reach={prog.profiles[player].reach} rounds={prog.profiles[player].rounds}`)
+-- awardRound itself is what has to say "finished" now -- nothing here
+-- nudges it, so a regression there fails this probe rather than being
+-- papered over by a second call.
+local inMemory = prog.profiles[player].reach
+print(`       in memory after awardRound: reach={inMemory} rounds={prog.profiles[player].rounds}`)
 task.wait(1.5)
-readBack("after awardRound autosave")
-
-prog:noteReach(player, "finished")
-print(`       in memory after noteReach: reach={prog.profiles[player].reach} dirty={tostring(prog.dirty[player])}`)
+local autosaved = readBack("after awardRound autosave")
 
 prog:playerRemoving(player)
 task.wait(1.5)
 local final = readBack("after leave")
 
 pcall(function() store:RemoveAsync(KEY) end)
-if final ~= nil and final.reach == "finished" then
+local failures = 0
+local function check(cond: boolean, msg: string)
+	if cond then
+		print(`  ok   {msg}`)
+	else
+		failures += 1
+		print(`  FAIL {msg}`)
+	end
+end
+check(inMemory == "finished", `awardRound notes finished in memory ({inMemory})`)
+check(autosaved ~= nil and autosaved.reach == "finished", `and its own autosave persists it ({autosaved and autosaved.reach or "nil"})`)
+check(final ~= nil and final.reach == "finished" and final.__lock == nil, `and the leave-save keeps it and releases the lock ({final and final.reach or "nil"})`)
+if failures == 0 then
 	print("REACH OK — finished persists through the round-end sequence")
 else
-	error(`REACH LOST — stored reach is {final and final.reach or "nil"}`)
+	error(`REACH LOST — {failures} check(s) failed`)
 end
