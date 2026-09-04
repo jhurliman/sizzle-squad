@@ -397,6 +397,148 @@ act(playerA, { chefId = occupied, action = "dismiss" })
 check(chairFor(occupied).kind == "player", "a crafted dismiss cannot evict a person")
 check(chairFor(occupied).species == speciesBefore, "and cannot change what they are playing as")
 
+-- A DISMISSED BOT IS NOT A BODY IN THE KITCHEN.
+--
+-- Dismissal only flipped a flag. The chef stayed exactly where it was --
+-- invisible, because the client hides inactive chefs, but still in every
+-- collidePhase: players walked into it, were shoved by it, and could be
+-- stunned by it. Now it is parked on the apron with the other out-of-play
+-- chefs, and brought back inside when a bot is put back in the chair.
+if target ~= nil then
+	local parked = simService.sim.chefs[target.chefId + 1]
+	local inPlay = shared.isWalkable(simService.sim.kitchen, math.floor(parked.pos.x), math.floor(parked.pos.y))
+	check(not inPlay, `a dismissed bot is parked off the walkable floor ({parked.pos.x}, {parked.pos.y})`)
+	check(not simService:isActive(parked), "and it is inactive")
+	act(playerA, { chefId = target.chefId, action = "fill" })
+	inPlay = shared.isWalkable(simService.sim.kitchen, math.floor(parked.pos.x), math.floor(parked.pos.y))
+	check(inPlay, `filling the chair stands the bot back inside the kitchen ({parked.pos.x}, {parked.pos.y})`)
+	act(playerA, { chefId = target.chefId, action = "dismiss" })
+end
+
+-- AND THE DISMISSAL FOLLOWS THE SPECIES THROUGH A SKIN SWAP. A joiner dealt
+-- the parked chef is stood on the floor and its dismissal ends; a claim that
+-- swaps a dismissed species onto a bot parks THAT bot. Either way there is
+-- never an inactive chef standing on the walkable floor.
+do
+	local function noGhosts(): (boolean, string)
+		for _, c in simService.sim.chefs do
+			local onFloor = shared.isWalkable(simService.sim.kitchen, math.floor(c.pos.x), math.floor(c.pos.y))
+			if not c.isPlayer and not simService:isActive(c) and onFloor then
+				return false, `chef {c.id} ({c.skin}) is inactive but on the floor`
+			end
+			if (c.isPlayer or simService:isActive(c)) and not onFloor then
+				return false, `chef {c.id} ({c.skin}) is active but parked`
+			end
+		end
+		return true, "no inactive chef is on the floor and no active one is parked"
+	end
+	local G = { UserId = 7777, Name = "Ghost" }
+	if target ~= nil then
+		-- Every bot dismissed, so the only free chefs are parked ones and the
+		-- joiner is certain to be dealt one.
+		for _, c in chairs() do
+			if c.kind == "bot" then
+				act(playerA, { chefId = c.chefId, action = "dismiss" })
+			end
+		end
+		check(simService:activeBotCount() == 0, "every bot is dismissed and parked")
+		local seatG = crew:playerAdded(G)
+		local gChef = simService.sim.chefs[seatG.chefId + 1]
+		check(seatG ~= nil, "a joiner is dealt one of the parked chefs")
+		check(shared.isWalkable(simService.sim.kitchen, math.floor(gChef.pos.x), math.floor(gChef.pos.y)), "and stood on the floor")
+		check(simService.dismissed[gChef.skin] == nil, "and their character is no longer dismissed")
+		check(noGhosts())
+		-- Now G claims a dismissed chair's character: the swap moves G's old
+		-- species onto that chef, which must then be a live bot on the floor,
+		-- while the two still-dismissed species stay parked.
+		local emptyChair = nil
+		for _, c in chairs() do
+			if c.kind == "empty" then
+				emptyChair = c
+			end
+		end
+		act(G, { chefId = emptyChair.chefId, action = "claim" })
+		local ok, why = noGhosts()
+		check(ok, `after the claim swaps species: {why}`)
+		check(simService:activeBotCount() == 1, `the bot that took G's old character is live ({simService:activeBotCount()} active)`)
+		crew:playerRemoving(G)
+		ok, why = noGhosts()
+		check(ok, `after G leaves: {why}`)
+		-- Restore the room the later checks expect: one dismissed chair.
+		for _, c in chairs() do
+			if c.kind == "empty" then
+				act(playerA, { chefId = c.chefId, action = "fill" })
+			end
+		end
+		act(playerA, { chefId = target.chefId, action = "dismiss" })
+	end
+end
+
+-- AND A DISMISSAL SURVIVES THE ROUND. startRound resets the sim (default
+-- skins back on default chefs) and reseats every human through a default
+-- chef before claimSkin restores their species. The dismissal is by species
+-- and must come through that untouched: a Nori player who sent Bramble away
+-- must not find Bramble back in the shift because the reseat passed them
+-- through Bramble's chair on the way.
+do
+	local dismissedBefore = {}
+	for species, on in simService.dismissed do
+		if on then
+			table.insert(dismissedBefore, species)
+		end
+	end
+	local botsBefore = simService:activeBotCount()
+	check(#dismissedBefore == 1, `one character is dismissed going into the round ({table.concat(dismissedBefore, ",")})`)
+	simService:reset(99)
+	crew:reseat()
+	director:broadcastPhase() -- the chair list the checks below read is rebuilt here
+	local still = simService.dismissed[dismissedBefore[1]] == true
+	check(still, `{dismissedBefore[1]} is still dismissed after reset + reseat`)
+	check(simService:activeBotCount() == botsBefore, `and the bot count is unchanged ({simService:activeBotCount()} vs {botsBefore})`)
+	for _, c in simService.sim.chefs do
+		local onFloor = shared.isWalkable(simService.sim.kitchen, math.floor(c.pos.x), math.floor(c.pos.y))
+		if not c.isPlayer and not simService:isActive(c) then
+			check(not onFloor, `the dismissed chef ({c.skin}) is parked after the reseat`)
+		end
+	end
+end
+
+-- PACING FOLLOWS WHO IS ACTUALLY COOKING. Sending bots away leaves botFill
+-- true, and the pacing used to key off that switch alone: a solo player who
+-- dismissed all three bots kept the four-chef order rate and ticket clock.
+do
+	local before = simService:activeBotCount()
+	for _, c in chairs() do
+		if c.kind == "bot" then
+			act(playerA, { chefId = c.chefId, action = "dismiss" })
+		end
+	end
+	check(simService:activeBotCount() == 0, `every bot dismissed ({before} -> 0 active)`)
+	director:applyPacing()
+	local solo = Config.PACING[1]
+	local knobs = simService.sim.director
+	-- orderGapMul/maxOrdersBonus are the knobs ASSIST leaves alone, so they
+	-- identify the table without an assist multiplier in the way.
+	check(
+		knobs.orderGapMul == solo.orderGapMul and knobs.maxOrdersBonus == solo.maxOrdersBonus,
+		`alone with no bots, pacing is the one-human table (gap x{knobs.orderGapMul}, bonus {knobs.maxOrdersBonus})`
+	)
+	for _, c in chairs() do
+		if c.kind == "empty" then
+			act(playerA, { chefId = c.chefId, action = "fill" })
+		end
+	end
+	director:applyPacing()
+	local full = Config.PACING_BOTFILL[1]
+	check(
+		simService:activeBotCount() == 3 and knobs.orderGapMul == full.orderGapMul,
+		`with the bots back, pacing is the bot-fill table again (gap x{knobs.orderGapMul})`
+	)
+	-- Leave one chair empty so the passer-by checks below see the same room
+	-- they used to.
+	act(playerA, { chefId = target.chefId, action = "dismiss" })
+end
+
 -- AND A PASSER-BY CANNOT REARRANGE A SHIFT THEY ARE NOT WORKING.
 local stranger = { UserId = 999999, Name = "Stranger" }
 local kindBefore = chairFor(occupied).kind
@@ -539,6 +681,24 @@ check(
 svc2.sim.events = {}
 local batch2 = svc2:tick(0.1, 0)
 check(true, "bots-off: sim ticks without a bot director")
+
+-- AFK WITH BOTS OFF PARKS THE CHEF, NOT THE PLATE. First Shift runs with bot
+-- fill off, and a learner idle for AFK_SECONDS is handed to setHuman(false),
+-- which parks them. Parking used to keep what they held; a version of it
+-- briefly cleared hands, so a learner back from AFK had lost the plate they
+-- had prepared. Pinned here through the real handoff.
+do
+	local held = { type = "plate", plate = { id = 1, contents = {}, dirty = false } }
+	humanChef.carrying = held
+	svc2:setHuman(humanChef.id, false)
+	check(humanChef.pos.y >= 11, "bots-off: an AFK learner's chef is parked")
+	check(humanChef.carrying == held, "bots-off: and still holding what they had")
+	svc2:setHuman(humanChef.id, true)
+	check(
+		humanChef.carrying == held and shared.isWalkable(svc2.sim.kitchen, math.floor(humanChef.pos.x), math.floor(humanChef.pos.y)),
+		"bots-off: back from AFK, on the floor, plate still in hand"
+	)
+end
 
 print(if failures > 0 then `{failures} FAILURES` else "PASS: bots-off mode")
 if failures > 0 then

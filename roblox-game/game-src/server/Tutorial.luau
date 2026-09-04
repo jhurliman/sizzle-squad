@@ -111,16 +111,18 @@ end
 --- which is the whole point of doing the tutorial somewhere else first.
 --- Where a finished tutorial goes. In Studio there is nowhere to go, so the
 --- flag simply clears and play continues in the same server.
-function Tutorial.finish(player: Player)
+--- Returns whether a teleport was actually REQUESTED, so the caller can tag
+--- the departure only when there is going to be one.
+function Tutorial.finish(player: Player): boolean
 	if Tutorial.isStudio() then
 		Tutorial.forced = false
 		print("[sizzle] First Shift complete — Studio, so staying put instead of teleporting")
-		return
+		return false
 	end
-	Tutorial.sendHome(player)
+	return Tutorial.sendHome(player)
 end
 
-function Tutorial.sendHome(player: Player)
+function Tutorial.sendHome(player: Player): boolean
 	local options = Instance.new("TeleportOptions")
 	options:SetTeleportData({ fromTutorial = true })
 	local ok, err = pcall(function()
@@ -128,7 +130,9 @@ function Tutorial.sendHome(player: Player)
 	end)
 	if not ok then
 		warn(`[sizzle] tutorial return teleport failed: {err}`)
+		return false
 	end
+	return true
 end
 
 --- WHERE THIS PLAYER CAME FROM.

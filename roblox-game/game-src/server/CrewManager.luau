@@ -149,6 +149,10 @@ function CrewManager:claimSkin(chefId: number, want: string?): string?
 				return mine.skin -- a human is wearing it; keep ours
 			end
 			other.skin, mine.skin = mine.skin, want
+			-- Dismissal is by species and the bodies just swapped: whichever
+			-- chef now wears a dismissed species is parked, and one that
+			-- stopped wearing it comes back onto the floor.
+			self.simService:placeAll()
 			return mine.skin
 		end
 	end
@@ -285,7 +289,9 @@ function CrewManager:sendSeat(player: any, seat: Seat)
 end
 
 function CrewManager:playerAdded(player: any)
-	local chefId = self.simService:freeChef()
+	-- byChef is the reservation list: an AFK seat's chef is bot-driven but
+	-- still that player's, and must not be dealt to the next arrival.
+	local chefId = self.simService:freeChef(self.byChef)
 	if chefId == nil then
 		-- 4 humans already seated; server is full (MaxPlayers should prevent
 		-- this, but never crash on the race).
@@ -297,7 +303,17 @@ function CrewManager:playerAdded(player: any)
 	self.byChef[chefId] = seat
 	-- Seat FIRST, then claim: claimSkin consults byChef to decide which
 	-- species are spoken for, and this seat has to be in it.
-	self:claimSkin(chefId, self.skinFor and self.skinFor(player))
+	local skin = self:claimSkin(chefId, self.skinFor and self.skinFor(player))
+	-- A person in the chair is the end of its dismissal, the same as a claim.
+	-- Left set, the flag would ride the species through their next claim's
+	-- swap onto a bot that is then inactive but unparked -- the invisible
+	-- body again. Done HERE, on the species they actually settled into, and
+	-- not in setHuman: reseat passes every human through a default-skin chef
+	-- for a moment on the way to their own, and clearing there revived
+	-- whichever bot happened to hold that default every round.
+	if skin ~= nil then
+		self.simService:setDismissed(skin, false)
+	end
 	self:sendSeat(player, seat)
 	return seat
 end
@@ -341,6 +357,46 @@ function CrewManager:heartbeat()
 	end
 end
 
+--- WHAT THE PLAYER ACTUALLY MANAGED, read off the sim rather than reported by
+--- the client. A chef that starts carrying means they worked out pick-up; one
+--- that starts working means they committed to a station. Neither needs a
+--- remote or any client trust.
+---
+--- TRANSITIONS UNDER THEIR OWN CONTROL, NOT STATE. The first version asked
+--- "is this human's chef carrying?", and with bot fill on the answer is often
+--- yes for reasons that have nothing to do with the human: an AFK seat's chef
+--- is being driven by the bot, a joiner is dealt a chef the bot was already
+--- using, and a player waking from AFK inherits whatever the bot was holding.
+--- Each of those permanently advanced a funnel whose whole job is to say what
+--- a NEW PLAYER worked out on their own.
+---
+--- So SimService records, PER SIM STEP and only for chefs with a human slot,
+--- the step in which carrying/working went from nil to set (see
+--- SimService.reach for why per step). A bot's chef and an AFK seat's chef
+--- have no slot and are never examined; a slot begins with whatever the chef
+--- already had, so inherited state is the baseline, never the event. This
+--- drains those records and hands them to onReach by seat. (main.server adds
+--- a second lock on the other end: nothing past `pressed` counts for a player
+--- who has not pressed, because nothing past it is possible without the
+--- press that does it.)
+---
+--- Lives here rather than in main.server.luau so the crew harness can drive
+--- every handoff path against it; see seatAction for why that matters.
+function CrewManager:noteSimReach()
+	for chefId, r in self.simService:drainReach() do
+		local seat = self.byChef[chefId]
+		if seat == nil or seat.afk then
+			continue -- nobody's, or the bot's for now
+		end
+		if r.carried then
+			self.onReach(seat.player, "carried")
+		end
+		if r.worked then
+			self.onReach(seat.player, "worked")
+		end
+	end
+end
+
 function CrewManager:humanCount(): number
 	local n = 0
 	for _, seat in self.seats do
@@ -356,8 +412,15 @@ function CrewManager:reseat()
 	-- Drop the old chef->seat map first. Reseating moves everyone, and a stale
 	-- entry would make claimSkin think a chef nobody occupies is spoken for.
 	table.clear(self.byChef)
+	-- Release every old chef first. startRound resets the sim before this, so
+	-- there they are already free; a reseat on a LIVE sim (the harnesses do
+	-- it) would otherwise leave the old chefs flagged human with nobody in
+	-- them, and freeChef would run out of chefs while chairs stood empty.
+	for _, seat in self.seats do
+		self.simService:setHuman(seat.chefId, false)
+	end
 	for player, seat in self.seats do
-		local chefId = self.simService:freeChef()
+		local chefId = self.simService:freeChef(self.byChef)
 		if chefId ~= nil then
 			self.simService:setHuman(chefId, true)
 			seat.chefId = chefId

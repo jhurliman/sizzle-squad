@@ -179,8 +179,18 @@ end
 function RoundDirector:applyPacing()
 	local sim = self.simService.sim
 	local humans = math.clamp(self.crew:humanCount(), 0, 4)
-	local pacing = if self.simService.botFill then self.config.PACING_BOTFILL else self.config.PACING
-	local row = pacing[humans]
+	-- SIZED TO WHO IS ACTUALLY COOKING, not to the bot switch. PACING_BOTFILL
+	-- assumes a full four-chef kitchen with `humans` of them human; per-chair
+	-- dismissal made that assumption false while leaving botFill true, so a
+	-- solo player who sent all three bots away kept the four-chef order rate
+	-- and ticket clock. With no bots left this is the human-only table; with
+	-- some gone, the human table at the real crew size -- a bot does about a
+	-- human's work, and that table is tuned for exactly that many hands.
+	local bots = self.simService:activeBotCount()
+	local crewSize = math.clamp(humans + bots, 0, 4)
+	local row = if bots > 0 and crewSize >= 4
+		then self.config.PACING_BOTFILL[humans]
+		else self.config.PACING[crewSize]
 	local knobs = sim.director
 	knobs.orderGapMul = row.orderGapMul
 	knobs.maxOrdersBonus = row.maxOrdersBonus
