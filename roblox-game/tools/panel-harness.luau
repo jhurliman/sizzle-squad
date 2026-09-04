@@ -157,6 +157,12 @@ local Theme = luau.load(luau.compile(fs.readFile("game-src/client/Menu/Theme.lua
 local Loc = {
 	f = function(key: string, ...)
 		local a = { ... }
+		-- The join label keeps the English SHAPE -- "JOIN <name>" -- because
+		-- the bar's word floor is measured off it, and "fmt.join_name:<name>"
+		-- is one 20-character word that no real language produces.
+		if key == "fmt.join_name" then
+			return `JOIN {tostring(a[1])}`
+		end
 		return `{key}:{tostring(a[1])}`
 	end,
 }
@@ -427,8 +433,13 @@ do
 						kids += 1
 					end
 				end
-				-- The bar's own gap: 4px on a compact viewport (< 720), 8 otherwise.
-				local width = sum + (if vp.w < 720 then 4 else 8) * math.max(0, kids - 1)
+				-- With the gap the row's LAYOUT will actually render, read off
+				-- the UIListLayout rather than assumed: a row budgeted at 4px
+				-- gaps and laid out at 8 is 12px wider than its own model.
+				local layout = row:FindFirstChildWhichIsA("UIListLayout")
+				local pad = layout and layout.Padding.Offset or 8
+				check(pad == (if vp.w < 720 then 4 else 8), `       row layout pads {pad}px, matching the budget`)
+				local width = sum + pad * math.max(0, kids - 1)
 				check(width <= row.Size.X.Offset, `       row holds its {kids} children ({width} <= {row.Size.X.Offset})`)
 			end
 		end
@@ -648,6 +659,22 @@ check(
 	string.find(panel.inviteButton.Text, "INVITE", 1, true) ~= nil,
 	`and asks for one when nobody is cooking ({panel.inviteButton.Text})`
 )
+-- A FRIEND'S NAME MUST NOT WRAP THE BAR. Twenty characters and no spaces is
+-- a legal Roblox name, and as the invite button's longest word it would have
+-- pushed the whole strip into a second row over the chefs on a phone.
+panel:setFriends({ { name = "Xx_SuperDuperChef_xX", jobId = "abc" } })
+check(
+	string.find(panel.inviteButton.Text, "Xx_SuperDuperChef_xX", 1, true) == nil,
+	`a long name is cut short on the button ({panel.inviteButton.Text})`
+)
+check(string.find(panel.inviteButton.Text, "…", 1, true) ~= nil, "and says so with an ellipsis")
+do
+	local m = measure(667, 375)
+	check(m.barBottom <= m.bandTop, `and the bar stays one row above the face band on an iPhone SE ({m.barBottom} <= {m.bandTop})`)
+end
+panel:setFriends({ { name = "山田太郎の料理長です", jobId = "abc" } })
+check(string.find(panel.inviteButton.Text, "山田太郎", 1, true) ~= nil, `a multibyte name is cut by character, not by byte ({panel.inviteButton.Text})`)
+panel:setFriends({})
 acted = {}
 panel.slots[2].face.__press()
 check(#acted == 0, "tapping somebody else's chair does nothing")

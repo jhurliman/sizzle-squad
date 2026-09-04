@@ -88,6 +88,24 @@ local BTN_PAD = 14
 -- the thumb aiming for it.
 local DISMISS_TAP = 44
 
+-- A NAME ON A BUTTON IS SHOWN, NOT SPELLED. "JOIN <name>" makes the invite
+-- button's longest word whatever the friend called themselves -- up to 20
+-- characters with no spaces, which as a word floor is wider than a phone's
+-- bar can hold and would push the whole strip into a second row over the
+-- chefs. Past this many characters the name is cut with an ellipsis; the
+-- button says who, the chair says the rest.
+local NAME_MAX = 12
+
+--- `name` cut to NAME_MAX codepoints (not bytes: a kanji is one character).
+local function compactName(name: string): string
+	local ok, n = pcall(utf8.len, name)
+	if not ok or n == nil or n <= NAME_MAX then
+		return name
+	end
+	local cut = utf8.offset(name, NAME_MAX) -- byte index of the (NAME_MAX)th character
+	return string.sub(name, 1, cut - 1) .. "…"
+end
+
 -- The Start button will shrink to fit a short screen, but not below this --
 -- past it the hero button stops reading as the hero and the screen would be
 -- better off scrolling.
@@ -199,7 +217,10 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		BackgroundTransparency = 1,
 		LayoutOrder = 2,
 	}, self.root)
-	mk("UIListLayout", {
+	-- Kept as a field: relayout sets the real gap, and the layout has to agree
+	-- with the arithmetic that sized the row or the row renders wider than
+	-- it was budgeted.
+	self.friendLayout = mk("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
 		Padding = UDim.new(0, 8),
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -375,15 +396,16 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	}, self.topBar)
 
 	self.rows = {}
+	self.rowLayouts = {}
 	for i = 1, 2 do
 		local row = mk("Frame", {
 			Size = UDim2.fromOffset(600, Theme.MIN_TAP),
 			BackgroundTransparency = 1,
 			LayoutOrder = i,
 		}, self.topBar)
-		mk("UIListLayout", {
+		self.rowLayouts[i] = mk("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
-			Padding = UDim.new(0, 8),
+			Padding = UDim.new(0, 8), -- relayout sets the real gap
 			-- Right: the bar is pinned by its right edge, so its contents hug
 			-- that edge and any spare width opens up on the left, away from
 			-- Roblox's controls.
@@ -521,7 +543,7 @@ function ShiftPanel:setFriends(friends: { any })
 	self.friend = friends ~= nil and friends[1] or nil
 	if self.inviteButton ~= nil then
 		self.inviteButton.Text = if self.friend ~= nil
-			then Loc.f("fmt.join_name", self.friend.name)
+			then Loc.f("fmt.join_name", compactName(self.friend.name))
 			else "＋ INVITE A FRIEND"
 	end
 	self:renderRoster()
@@ -834,6 +856,12 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	-- it -- which on a 667-wide phone at a maxed-out German save costs the 12px
 	-- that three 8px gaps were spending on air.
 	local gap = if compact then 4 else 8
+	-- The layouts must agree with the arithmetic, or a row modelled at 4px
+	-- gaps renders at 8 and its left end walks into Roblox's controls.
+	for _, layout in self.rowLayouts do
+		layout.Padding = UDim.new(0, gap)
+	end
+	self.friendLayout.Padding = UDim.new(0, gap)
 
 	-- ---------------------------------------------------------- the top bar
 	--
