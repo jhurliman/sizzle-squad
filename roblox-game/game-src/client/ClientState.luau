@@ -289,17 +289,35 @@ function ClientState:renderTarget(): number?
 end
 
 --- Is a sampled velocity believable against the displacement it claims to
---- have produced? A cubic Hermite stays monotone as long as each tangent is
---- at most three chord lengths (Fritsch-Carlson); beyond that the curve
---- doubles back on itself, which on screen is a chef taking a step
---- backwards. The same test guards extrapolation: a velocity that did not
---- move the chef over the last interval is not going to move it over the
---- next one either. The slack covers i8 velocity quantization (~0.06
---- cells/s) at rest.
+--- have produced? Two tests, and a tangent has to pass both:
+---   * SIZE: at most three chord lengths (Fritsch-Carlson). Beyond that a
+---     cubic Hermite doubles back on itself, which on screen is a chef
+---     taking a step backwards.
+---   * DIRECTION: it has to point along the chord, not merely be short
+---     enough. A chef that reverses inside one interval -- a bump rewrites
+---     both chefs' velocities on the spot -- can have an endpoint velocity
+---     pointing straight against the displacement and still pass the size
+---     test, and Hermite then runs backwards at that end of the segment.
+---     The threshold is a small positive cosine (~84 degrees): a sharp
+---     corner still curves, a reversal goes linear.
+--- A velocity too small to matter (i8 quantization at rest, ~0.06 cells/s)
+--- passes regardless: zero tangents are the accelerate-from-rest curve. A
+--- zero-length chord is a chef standing still, and only that tiny velocity
+--- is believable against it. The same test guards extrapolation: a
+--- velocity that did not move the chef over the last interval -- or moved
+--- it the other way -- is not carried into the next one; the chef holds
+--- until a sample confirms it.
 local function plausible(vx: number, vy: number, dx: number, dy: number, span: number): boolean
-	local reach = math.sqrt(vx * vx + vy * vy) * span
+	local mag = math.sqrt(vx * vx + vy * vy)
+	local reach = mag * span
+	if reach <= 0.02 then
+		return true
+	end
 	local chord = math.sqrt(dx * dx + dy * dy)
-	return reach <= 3 * chord + 0.02
+	if chord < 1e-4 or reach > 3 * chord + 0.02 then
+		return false
+	end
+	return vx * dx + vy * dy > 0.1 * mag * chord
 end
 
 --- Pose at server time `target` from the sample buffer alone: Hermite between

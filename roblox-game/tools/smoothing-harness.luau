@@ -32,6 +32,8 @@
 --              clock never restarts in a session (see (i) below).
 --   * resumed stream: a chef back after seconds away is somewhere else;
 --              gliding from where it last stood took many seconds.
+--   * bump:    a sampled velocity pointing against the displacement passed
+--              the size-only tangent check, and Hermite stepped backwards.
 -- The assertions are on RENDERED SPEED (what the gait and the eye react to)
 -- rather than position: within 15% of the true speed on every frame after
 -- warm-up, never faster than 1.15x true speed even while recovering, never
@@ -77,10 +79,11 @@ local function truthX(serverT: number): number
 end
 
 --- A packet for the chef's position at server time `serverT` (from `truth`,
---- the straight walk unless a case says otherwise).
-local function packet(serverT: number, truth: ((number) -> number)?): buffer
+--- the straight walk unless a case says otherwise), carrying velocity `vx`
+--- (the walking speed unless a case says otherwise).
+local function packet(serverT: number, truth: ((number) -> number)?, vx: number?): buffer
 	return Net.packTransforms({
-		{ id = 1, px = (truth or truthX)(serverT), py = 5, vx = SPEED, vy = 0, heading = 0, flags = 0, effort = 1, stun = 0 },
+		{ id = 1, px = (truth or truthX)(serverT), py = 5, vx = vx or SPEED, vy = 0, heading = 0, flags = 0, effort = 1, stun = 0 },
 	}, serverT)
 end
 
@@ -96,6 +99,7 @@ type Profile = {
 	stragglerAt: number?, -- one extra packet, `stragglerAge` seconds old, arrives at this time
 	stragglerAge: number?,
 	truth: ((number) -> number)?, -- where the chef really is at a server time (default: the walk)
+	flipAt: number?, -- the sample at this time reports velocity -SPEED (a bump), position unchanged
 	duration: number?,
 }
 
@@ -119,7 +123,8 @@ local function schedule(opts: Profile): { Pkt }
 			-- everything sent during the stall lands together once it clears
 			arrive = opts.hitchAt + (opts.hitchLen or 0) + LATENCY
 		end
-		table.insert(pkts, { stamp = t, arrive = arrive + CLOCK_SKEW, b = packet(t, opts.truth) })
+		local vx = if opts.flipAt ~= nil and math.abs(t - opts.flipAt) < INTERVAL / 2 then -SPEED else nil
+		table.insert(pkts, { stamp = t, arrive = arrive + CLOCK_SKEW, b = packet(t, opts.truth, vx) })
 	end
 	if opts.stragglerAt ~= nil then
 		local t = opts.stragglerAt - (opts.stragglerAge or 0)
@@ -341,6 +346,17 @@ do
 	check(probe ~= nil and math.abs(probe.x - teleported(6)) < 0.05, `first frame after the resume is at the new position (x={probe and probe.x}, new={teleported(6)})`)
 	check(state.remoteVis[1] == nil or (math.abs(state.remoteVis[1].x) < 1e-6), "no parked offset left to glide through")
 end
+
+-- ------------------------------------------------------ (k) a bump
+--
+-- One sample reports the velocity pointing straight back the way the chef
+-- came -- a bump rewrites both chefs' velocities on the spot -- while the
+-- positions keep advancing. That tangent is short enough to pass a size
+-- check, and Hermite built on it runs backwards at that end of the
+-- segment: a visible step back. The constant-speed cases cannot see this
+-- because their velocities always agree with the chord; this one exists
+-- to make the direction test in `plausible` load-bearing.
+run("bump (one reversed velocity)", schedule({ flipAt = 3 }))
 
 -- --------------------------------------------- (f) the real send cadence
 --
