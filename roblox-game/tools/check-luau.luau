@@ -111,7 +111,11 @@ local function selfReferencing(path: string)
 	local i = 1
 	while i <= #lines do
 		local line = lines[i]
-		local name, rest = line:match("^%s*local%s+([%a_][%w_]*)%s*=(.*)$")
+		-- With or without a type annotation: `local x = ` and `local x: T = `.
+		local name, rest = line:match("^%s*local%s+([%a_][%w_]*)%s*:[^=]*=(.*)$")
+		if name == nil then
+			name, rest = line:match("^%s*local%s+([%a_][%w_]*)%s*=(.*)$")
+		end
 		if name ~= nil then
 			local code = stripStrings(stripComment(rest))
 			local depth = depthDelta(code, true)
