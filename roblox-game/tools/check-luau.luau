@@ -49,6 +49,47 @@ local selfRefs = 0
 local function stripComment(line: string): string
 	return (line:gsub("%-%-.*$", ""))
 end
+--- Code only: string literals can hold "end" or "function" and are not code.
+local function stripStrings(line: string): string
+	local out = line:gsub('"[^"]*"', '""'):gsub("'[^']*'", "''"):gsub("`[^`]*`", "``")
+	return out
+end
+--- How much deeper this line leaves us: brackets AND blocks. An initializer
+--- is not only `f({ ... })`; it is also `function() ... end`, whose body has
+--- no bracket to keep the scan inside it.
+--- `function` opens a block wherever it appears (statement or expression);
+--- `if`, `do` and `repeat` only in STATEMENT position -- Luau's
+--- `x = if c then a else b` is an expression with no `end`, and counting it
+--- as a block ran the scan off the end of every file that uses one.
+---
+--- `expression` is the declaration line's own right-hand side: by definition
+--- an expression, so an `if` at its start is the expression form and the
+--- statement rules do not apply to it.
+local function depthDelta(body: string, expression: boolean?): number
+	local d = 0
+	for c in body:gmatch("[%(%){}]") do
+		d += if c == "(" or c == "{" then 1 else -1
+	end
+	for _ in body:gmatch("%f[%w_]function%f[^%w_]") do
+		d += 1
+	end
+	for _ in body:gmatch("%f[%w_]end%f[^%w_]") do
+		d -= 1
+	end
+	if expression then
+		return d
+	end
+	if body:match("^%s*if%f[^%w_]") or body:match("^%s*repeat%f[^%w_]") then
+		d += 1
+	end
+	if body:match("^%s*do%f[^%w_]") or body:match("%f[%w_]do%s*$") then
+		d += 1
+	end
+	if body:match("^%s*until%f[^%w_]") then
+		d -= 1
+	end
+	return d
+end
 local function selfReferencing(path: string)
 	local lines = fs.readFile(path):split("\n")
 	local i = 1
@@ -56,11 +97,8 @@ local function selfReferencing(path: string)
 		local line = lines[i]
 		local name, rest = line:match("^%s*local%s+([%a_][%w_]*)%s*=(.*)$")
 		if name ~= nil then
-			local code = stripComment(rest)
-			local depth = 0
-			for c in code:gmatch("[%(%){}]") do
-				depth += if c == "(" or c == "{" then 1 else -1
-			end
+			local code = stripStrings(stripComment(rest))
+			local depth = depthDelta(code, true)
 			-- `local x =` with the value on the next line: the initializer has
 			-- not started yet, so keep reading until it opens, or until a line
 			-- shows it was a one-liner after all.
@@ -68,14 +106,12 @@ local function selfReferencing(path: string)
 			local j = i
 			while (depth > 0 or pending) and j < #lines do
 				j += 1
-				local body = stripComment(lines[j])
+				local body = stripStrings(stripComment(lines[j]))
 				if body:find(`%f[%w_]{name}%f[^%w_]`) then
 					selfRefs += 1
 					print(`FAIL {path}:{j}: \`{name}\` is used inside its own initializer (it is the global {name} there, nil)`)
 				end
-				for c in body:gmatch("[%(%){}]") do
-					depth += if c == "(" or c == "{" then 1 else -1
-				end
+				depth += depthDelta(body)
 				if pending and body:match("%S") then
 					pending = false
 				end
