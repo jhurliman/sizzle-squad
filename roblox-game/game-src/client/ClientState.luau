@@ -435,8 +435,13 @@ function ClientState:applyTransforms(b: buffer)
 		local silence = self.clock - (self.lastSeen[t.id] or self.clock)
 		self.lastSeen[t.id] = self.clock
 		if stale then
+			-- A straggler still inside the window goes into history, and it
+			-- can land in the very segment being drawn -- on a turn, a stop
+			-- or a bump the segment then resolves somewhere else -- so it
+			-- gets the same before/after compensation as a fresh sample.
+			-- Without it the chef snapped, or stepped back, in one frame.
 			if t.id ~= self.myChefId then
-				self:insertSample(t, serverT)
+				self:parkDifference(t.id, befores[t.id], self:insertSample(t, serverT), target)
 			end
 			continue
 		end
@@ -468,22 +473,30 @@ function ClientState:applyTransforms(b: buffer)
 			-- an extrapolated guess, or the chef was held waiting for it) the
 			-- difference is parked in the visual offset so the body glides
 			-- rather than snapping.
-			local before = befores[t.id]
-			buf = self:insertSample(t, serverT)
-			if before ~= nil and target ~= nil then
-				local after = poseAt(buf, target)
-				local vis = self.remoteVis[t.id]
-				if vis == nil then
-					vis = { x = 0, y = 0, h = 0, at = self.clock }
-					self.remoteVis[t.id] = vis
-				end
-				vis.x += before.x - after.x
-				vis.y += before.y - after.y
-				local dh = before.heading - after.heading
-				vis.h += math.atan2(math.sin(dh), math.cos(dh))
-			end
+			self:parkDifference(t.id, befores[t.id], self:insertSample(t, serverT), target)
 		end
 	end
+end
+
+--- Park whatever a buffer change did to a chef's drawn pose -- position and
+--- heading -- in its visual offset, so the frame draws what it would have
+--- drawn and the difference is released over the frames that follow.
+--- `before` is the pose as it was going to be drawn (nil for a chef with no
+--- history yet: nothing to be continuous with).
+function ClientState:parkDifference(id: number, before: any?, buf: { any }, target: number?)
+	if before == nil or target == nil then
+		return
+	end
+	local after = poseAt(buf, target)
+	local vis = self.remoteVis[id]
+	if vis == nil then
+		vis = { x = 0, y = 0, h = 0, at = self.clock }
+		self.remoteVis[id] = vis
+	end
+	vis.x += before.x - after.x
+	vis.y += before.y - after.y
+	local dh = before.heading - after.heading
+	vis.h += math.atan2(math.sin(dh), math.cos(dh))
 end
 
 --- Put one chef's transform into its sample history, in SERVER-time order:

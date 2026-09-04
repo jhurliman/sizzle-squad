@@ -36,6 +36,8 @@
 --              the size-only tangent check, and Hermite stepped backwards.
 --   * server hitch: a stalled heartbeat drops the sim time it cannot catch
 --              up, and a stamp made of steps alone fell behind the wall.
+--   * late straggler: a kept out-of-order sample rewrote the segment being
+--              drawn without the compensation a fresh sample gets.
 -- The assertions are on RENDERED SPEED (what the gait and the eye react to)
 -- rather than position: within 15% of the true speed on every frame after
 -- warm-up, never faster than 1.15x true speed even while recovering, never
@@ -360,6 +362,109 @@ do
 	local state, probe = run("stream resumes elsewhere", pkts, { exemptFrom = 3, exemptTo = 6 + LATENCY + INTERP_DELAY + 2 * FRAME, snapExpected = true, truth = teleported, probeAt = resumed, duration = 8 })
 	check(probe ~= nil and math.abs(probe.x - teleported(6)) < 0.05, `first frame after the resume is at the new position (x={probe and probe.x}, new={teleported(6)})`)
 	check(state.remoteVis[1] == nil or (math.abs(state.remoteVis[1].x) < 1e-6), "no parked offset left to glide through")
+end
+
+-- ------------------------------- (m) a straggler lands in the drawn segment
+--
+-- A healthy stream through a bump -- the chef is knocked straight back at
+-- full speed and its heading comes round at the sim's own turn rate, 12
+-- rad/s -- with the bump's own sample delivered 100 ms late: out of order,
+-- but well inside the history window, so it is kept. It lands in the very
+-- segment being drawn. Until it arrived that segment ran from the sample
+-- before the bump to the one after, whose positions are the SAME (out and
+-- back), so the chef was drawn standing still; with it the segment is the
+-- outbound half, and the chef is drawn 0.07 cells further on -- in one
+-- frame, one and a third walking speeds. The in-window insert path used
+-- to skip the before/after compensation every fresh sample gets, so that
+-- is what the chef did. (A smooth turn cannot show this: Hermite on true
+-- tangents fits an arc, and the late sample moves the pose by a hair.)
+-- Checks: never over 1.15x, never a step against the true direction of
+-- travel at the render target, the heading never turning faster in one
+-- frame than the sim can (turnRate * dt, with room), and the speed
+-- magnitude within the band -- except while the render is inside the
+-- interval the late sample closes: until it arrives that interval is drawn
+-- from a chord that says "standing still", nothing can draw what has not
+-- come, and continuity means the correction eases in rather than snapping.
+-- The cusp frame itself is the truth turning on a point.
+do
+	local BUMP_AT, RATE = 3.05, 12
+	local XB = truthX(BUMP_AT)
+	local function bumpPose(t: number)
+		if t < BUMP_AT then
+			return { x = truthX(t), y = 5, heading = 0, vx = SPEED, vy = 0 }
+		end
+		return { x = XB - SPEED * (t - BUMP_AT), y = 5, heading = math.min(math.pi, RATE * (t - BUMP_AT)), vx = -SPEED, vy = 0 }
+	end
+	local function bumpPacket(t: number): buffer
+		local p = bumpPose(t)
+		return Net.packTransforms({
+			{ id = 1, px = p.x, py = p.y, vx = p.vx, vy = p.vy, heading = p.heading, flags = 0, effort = 1, stun = 0 },
+			{ id = 2, px = 10, py = 8, vx = 0, vy = 0, heading = 0, flags = 0, effort = 0, stun = 0 },
+		}, t)
+	end
+	local LATE_BY = 0.1
+	local pkts: { Pkt } = {}
+	local k = 0
+	while k * INTERVAL <= DURATION do
+		local t = k * INTERVAL
+		k += 1
+		local late = if math.abs(t - BUMP_AT) < INTERVAL / 2 then LATE_BY else 0
+		table.insert(pkts, { stamp = t, arrive = t + LATENCY + late + CLOCK_SKEW, b = bumpPacket(t) })
+	end
+	table.sort(pkts, function(a, b)
+		if a.arrive == b.arrive then
+			return a.stamp < b.stamp
+		end
+		return a.arrive < b.arrive
+	end)
+	local state = ClientState.new(shared, Net)
+	state:assign({ chefId = 0, skin = "bramble" })
+	state.clock = CLOCK_SKEW
+	local pi, prev = 1, nil
+	local badFrames, fastFrames, against, headingJumps, worstDev, worstTurn = 0, 0, 0, 0, 0, 0
+	local HEADING_STEP = RATE * FRAME * 1.5
+	local elapsed = 0
+	while elapsed < DURATION do
+		elapsed += FRAME
+		state.clock += FRAME
+		while pi <= #pkts and pkts[pi].arrive <= state.clock do
+			state:applyTransforms(pkts[pi].b)
+			pi += 1
+		end
+		local pose = state:remotePose(1)
+		local serverNow = state.clock - CLOCK_SKEW
+		if serverNow >= WARMUP and pose ~= nil and prev ~= nil then
+			local target = state:renderTarget()
+			local dx, dy = pose.x - prev.x, pose.y - prev.y
+			local v = math.sqrt(dx * dx + dy * dy) / FRAME
+			local dev = math.abs(v - SPEED) / SPEED
+			local dataGap = target >= BUMP_AT - INTERVAL and target < BUMP_AT + FRAME
+			if not dataGap then
+				worstDev = math.max(worstDev, dev)
+				if dev > SPEED_BAND then
+					badFrames += 1
+				end
+			end
+			if v > SPEED * (1 + SPEED_BAND) then
+				fastFrames += 1
+			end
+			local truthDir = bumpPose(target)
+			if dx * truthDir.vx + dy * truthDir.vy < -1e-3 * SPEED then
+				against += 1
+			end
+			local dh = math.abs(math.atan2(math.sin(pose.heading - prev.heading), math.cos(pose.heading - prev.heading)))
+			worstTurn = math.max(worstTurn, dh)
+			if dh > HEADING_STEP then
+				headingJumps += 1
+			end
+		end
+		prev = pose
+	end
+	print(`bump + late straggler: worst speed dev {math.floor(worstDev * 1000) / 10}%, {badFrames} outside the band, {fastFrames} over 1.15x, {against} against travel, worst heading step {math.floor(worstTurn * 1000) / 1000} rad`)
+	check(badFrames == 0, "straggler in the drawn segment: speed within the band on every frame")
+	check(fastFrames == 0, "straggler in the drawn segment: never over 1.15x")
+	check(against == 0, "straggler in the drawn segment: never a step against the direction of travel")
+	check(headingJumps == 0, `straggler in the drawn segment: heading never turns more than {math.floor(HEADING_STEP * 100) / 100} rad in a frame`)
 end
 
 -- ------------------------------------------------------ (k) a bump
