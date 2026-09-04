@@ -90,14 +90,22 @@ local OFFSET_WARMUP = 20
 -- from the last sample before the silence to the first after it, or worse
 -- parking the jump in the visual offset and walking it off at CATCHUP_FRAC,
 -- had the chef reappear where it used to stand and slide across the kitchen
--- for many seconds. So a gap of more than CHEF_GAP in SERVER time between a
--- chef's newest buffered sample and an incoming one -- or STALE of local
--- silence, the same threshold the cull uses -- is a discontinuity for that
--- chef: its history and visual offset go, and it starts over at the new
--- sample, i.e. it snaps, which for a chef that genuinely teleported is the
--- truth. One second is well past anything the smoother bridges (EXTRAP_MAX
--- plus a few lost packets) and well short of the cull, so the body is
--- moved before it could have blinked.
+-- for many seconds. So a chef that has been MISSING FROM MORE THAN CHEF_GAP
+-- OF PACKETS THAT DID ARRIVE -- its newest sample more than that behind the
+-- newest sample of anyone's -- or that has been silent for STALE, the same
+-- threshold the cull uses, is a discontinuity: its history and visual
+-- offset go, and it starts over at the new sample, i.e. it snaps, which
+-- for a chef that genuinely teleported is the truth. One second is well
+-- past anything the smoother bridges (EXTRAP_MAX plus a few lost packets)
+-- and well short of the cull, so the body is moved before it could have
+-- blinked.
+--
+-- Measured against everyone's newest stamp and not the wall, deliberately:
+-- a server hitch pauses the whole cast at once and stamps the packet after
+-- it a second on (SimService.wireClock keeps pace with the wall through a
+-- hitch), and that chef did not go anywhere -- it is drawn moving slowly
+-- through the second the server lost, which is what happened. Only a chef
+-- that missed packets the others were in has been away.
 local CHEF_GAP = 1.0
 
 --- Two seconds of silence before a chef's body is culled (shouldShowChef).
@@ -451,7 +459,7 @@ function ClientState:applyTransforms(b: buffer)
 		else
 			-- A resumed stream starts over (see CHEF_GAP).
 			local buf = self.buffers[t.id]
-			if buf ~= nil and #buf > 0 and (serverT - buf[#buf].t > CHEF_GAP or silence >= STALE) then
+			if buf ~= nil and #buf > 0 and ((newest ~= nil and newest - buf[#buf].t > CHEF_GAP) or silence >= STALE) then
 				self.buffers[t.id] = nil
 				self.remoteVis[t.id] = nil
 				befores[t.id] = nil

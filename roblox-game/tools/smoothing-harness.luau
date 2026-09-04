@@ -34,6 +34,8 @@
 --              gliding from where it last stood took many seconds.
 --   * bump:    a sampled velocity pointing against the displacement passed
 --              the size-only tangent check, and Hermite stepped backwards.
+--   * server hitch: a stalled heartbeat drops the sim time it cannot catch
+--              up, and a stamp made of steps alone fell behind the wall.
 -- The assertions are on RENDERED SPEED (what the gait and the eye react to)
 -- rather than position: within 15% of the true speed on every frame after
 -- warm-up, never faster than 1.15x true speed even while recovering, never
@@ -78,13 +80,19 @@ local function truthX(serverT: number): number
 	return 2 + SPEED * serverT
 end
 
---- A packet for the chef's position at server time `serverT` (from `truth`,
---- the straight walk unless a case says otherwise), carrying velocity `vx`
---- (the walking speed unless a case says otherwise).
-local function packet(serverT: number, truth: ((number) -> number)?, vx: number?): buffer
-	return Net.packTransforms({
-		{ id = 1, px = (truth or truthX)(serverT), py = 5, vx = vx or SPEED, vy = 0, heading = 0, flags = 0, effort = 1, stun = 0 },
-	}, serverT)
+--- A packet for server time `serverT`: the walker (chef 1) at its position
+--- from `truth` (the straight walk unless a case says otherwise), carrying
+--- velocity `vx` (the walking speed unless a case says otherwise), plus a
+--- bystander (chef 2) standing still -- every real packet carries the whole
+--- cast, and a chef that has been away is one that missed packets the
+--- others were in. `withWalker = false` leaves the walker out.
+local function packet(serverT: number, truth: ((number) -> number)?, vx: number?, withWalker: boolean?): buffer
+	local chefs = {}
+	if withWalker ~= false then
+		table.insert(chefs, { id = 1, px = (truth or truthX)(serverT), py = 5, vx = vx or SPEED, vy = 0, heading = 0, flags = 0, effort = 1, stun = 0 })
+	end
+	table.insert(chefs, { id = 2, px = 10, py = 8, vx = 0, vy = 0, heading = 0, flags = 0, effort = 0, stun = 0 })
+	return Net.packTransforms(chefs, serverT)
 end
 
 type Pkt = { stamp: number, arrive: number, b: buffer }
@@ -100,6 +108,8 @@ type Profile = {
 	stragglerAge: number?,
 	truth: ((number) -> number)?, -- where the chef really is at a server time (default: the walk)
 	flipAt: number?, -- the sample at this time reports velocity -SPEED (a bump), position unchanged
+	awayAt: number?, -- the walker is left out of packets sent in [awayAt, awayAt+awayLen); packets still flow
+	awayLen: number?,
 	duration: number?,
 }
 
@@ -124,7 +134,8 @@ local function schedule(opts: Profile): { Pkt }
 			arrive = opts.hitchAt + (opts.hitchLen or 0) + LATENCY
 		end
 		local vx = if opts.flipAt ~= nil and math.abs(t - opts.flipAt) < INTERVAL / 2 then -SPEED else nil
-		table.insert(pkts, { stamp = t, arrive = arrive + CLOCK_SKEW, b = packet(t, opts.truth, vx) })
+		local away = opts.awayAt ~= nil and t >= opts.awayAt and t < opts.awayAt + (opts.awayLen or 0)
+		table.insert(pkts, { stamp = t, arrive = arrive + CLOCK_SKEW, b = packet(t, opts.truth, vx, not away) })
 	end
 	if opts.stragglerAt ~= nil then
 		local t = opts.stragglerAt - (opts.stragglerAge or 0)
@@ -224,7 +235,10 @@ local function run(name: string, pkts: { Pkt }, ropts: RunOpts?): (any, any)
 					fastFrames += 1
 				end
 			end
-			if dx < -1e-6 then
+			-- A frame is "backwards" when the eye could see it go back: a
+			-- held chef releasing the last thousandth of a cell of a parked
+			-- offset is not that (a cell is ~100 px at the play camera).
+			if dx < -1e-3 then
 				backwards += 1
 			end
 		end
@@ -325,18 +339,19 @@ end
 
 -- ------------------------------------------ (j) a stream that resumes
 --
--- The chef stops streaming for three seconds (parked, dismissed, the slot
--- between players) and comes back ten cells away. Its old history is not a
--- past to interpolate from and the jump is not a correction to glide
--- through -- CHEF_GAP / STALE start the chef over at the new sample, and
--- the first frame after the resume already draws it there. Before this the
--- body reappeared where it used to stand and slid across the kitchen.
+-- The chef drops out of the packets for three seconds (parked, dismissed,
+-- the slot between players) while the rest of the cast streams on, and
+-- comes back three cells away. Its old history is not a past to
+-- interpolate from and the jump is not a correction to glide through --
+-- CHEF_GAP / STALE start the chef over at the new sample, and the first
+-- frame after the resume already draws it there. Before this the body
+-- reappeared where it used to stand and slid across the kitchen.
 do
 	local JUMP = 3 -- cells; keeps the walk inside the wire's [-2, 30] range
 	local function teleported(t: number): number
 		return truthX(t) + (if t >= 6 then JUMP else 0)
 	end
-	local pkts = schedule({ outageAt = 3, outageLen = 3, truth = teleported, duration = 8 })
+	local pkts = schedule({ awayAt = 3, awayLen = 3, truth = teleported, duration = 8 })
 	-- The first resumed packet lands at 6 + latency; the frame after it must
 	-- already draw the chef at the new spot. The render target then takes
 	-- INTERP_DELAY to reach that first sample (the chef holds there), after
@@ -360,13 +375,25 @@ run("bump (one reversed velocity)", schedule({ flipAt = 3 }))
 
 -- --------------------------------------------- (f) the real send cadence
 --
--- The Replicator is driven by a 60 Hz heartbeat whose dt wanders by a
--- millisecond, as a real one does. The old accumulator zeroed itself on every
--- send, so whether the next send took three frames or four depended on that
--- wander -- 50 ms, 66 ms, 50, 66 -- and the mean rate sagged well under 20
--- Hz. With the stamp in the packet the client no longer cares about the
--- spacing, but it still needs the RATE: half the packets means twice the
--- extrapolation.
+-- The real SimService and Replicator, driven by a 60 Hz heartbeat whose dt
+-- wanders by a millisecond, as a real one does. The old accumulator zeroed
+-- itself on every send, so whether the next send took three frames or four
+-- depended on that wander -- 50 ms, 66 ms, 50, 66 -- and the mean rate
+-- sagged well under 20 Hz. With the stamp in the packet the client no
+-- longer cares about the spacing, but it still needs the RATE: half the
+-- packets means twice the extrapolation.
+--
+-- (l) With a hitch, one heartbeat takes a whole second. SimService caps the
+-- steps it will run for one heartbeat at a quarter second and throws the
+-- rest away, so its step clock falls three quarters of a second behind the
+-- wall for good. Stamped with that clock, every packet after the hitch
+-- looks 750 ms late to the client, whose tracker takes that for a change
+-- of latency and -- raising its estimate at 20 ms/s once settled -- keeps
+-- remote chefs extrapolated against the wrong server time for the best
+-- part of a minute. The stamp is SimService:wireClock, the step clock plus
+-- the lost time, which keeps pace with the wall; through the hitch the
+-- chef is drawn moving slowly through a second of stamp that carries a
+-- quarter second of motion, which is what actually happened.
 local function stubRemote()
 	local remote = { allFired = {} }
 	function remote:FireAllClients(...)
@@ -375,34 +402,77 @@ local function stubRemote()
 	function remote:FireClient() end
 	return remote
 end
-local remotes = {}
-for name in Net.REMOTES do
-	remotes[name] = stubRemote()
-end
-local sim = shared.createSim({ seed = 1, botCount = 3 })
-local walker = sim.chefs[2] -- id 1
-walker.pos.x, walker.pos.y = truthX(0), 5
-walker.vel.x, walker.vel.y = SPEED, 0
-local rep = Replicator.new(shared, Net, remotes, function()
-	return 0
-end)
-local stepClock = 0
-local sent: { Pkt } = {}
-local sentCount = 0
-while stepClock < DURATION do
-	local dt = FRAME + (rand() * 2 - 1) * 0.001
-	stepClock += dt
-	walker.pos.x = truthX(stepClock)
-	local before = #remotes.Transforms.allFired
-	rep:flush(sim, {}, dt, stepClock)
-	if #remotes.Transforms.allFired > before then
-		sentCount += 1
-		table.insert(sent, { stamp = stepClock, arrive = stepClock + LATENCY + CLOCK_SKEW, b = remotes.Transforms.allFired[#remotes.Transforms.allFired][1] })
+local SimService = require("../game-src/server/SimService")
+local ACC_CAP = 0.25 -- SimService's; a hitch loses (hitchLen - ACC_CAP)
+
+--- Run the server side for a while; `stampWith` is "wire" for the real
+--- stamp or "step" for the bare step clock (to show why it is not that).
+local function serverRun(name: string, hitchAt: number?, hitchLen: number?, stampWith: string)
+	local remotes = {}
+	for rname in Net.REMOTES do
+		remotes[rname] = stubRemote()
 	end
+	local svc = SimService.new(shared, { seed = 1, botFill = false })
+	local sim = svc.sim
+	local walker = sim.chefs[2] -- id 1
+	local rep = Replicator.new(shared, Net, remotes, function()
+		return 0
+	end)
+	local wall = 0
+	local sent: { Pkt } = {}
+	local hitched = false
+	local duration = if hitchAt ~= nil then 8 else DURATION
+	while wall < duration do
+		local dt = FRAME + (rand() * 2 - 1) * 0.001
+		if hitchAt ~= nil and not hitched and wall >= hitchAt then
+			dt = hitchLen or 0
+			hitched = true
+		end
+		wall += dt
+		local events = svc:tick(dt)
+		-- the walker is where the sim's steps have taken the world: its step
+		-- clock, not the wall
+		walker.pos.x, walker.pos.y = truthX(svc.clock), 5
+		walker.vel.x, walker.vel.y = SPEED, 0
+		local before = #remotes.Transforms.allFired
+		rep:flush(sim, events, dt, if stampWith == "wire" then svc:wireClock() else svc.clock)
+		if #remotes.Transforms.allFired > before then
+			table.insert(sent, { stamp = svc:wireClock(), arrive = wall + LATENCY + CLOCK_SKEW, b = remotes.Transforms.allFired[#remotes.Transforms.allFired][1] })
+		end
+	end
+	check(not sim.over, `{name}: the round ran the whole way`)
+	return sent, svc, duration
 end
-print(`replicator: {sentCount} packets in {DURATION}s ({math.floor(sentCount / DURATION * 10) / 10} Hz)`)
-check(sentCount >= DURATION / INTERVAL - 2, `replicator sends at TRANSFORM_HZ on average ({sentCount} in {DURATION}s)`)
-run("replicator cadence", sent)
+
+do
+	local sent, svc = serverRun("replicator cadence", nil, nil, "wire")
+	print(`replicator: {#sent} packets in {DURATION}s ({math.floor(#sent / DURATION * 10) / 10} Hz)`)
+	check(#sent >= DURATION / INTERVAL - 2, `replicator sends at TRANSFORM_HZ on average ({#sent} in {DURATION}s)`)
+	check(svc.lostTime == 0, "no wall time lost without a hitch")
+	run("replicator cadence", sent)
+end
+
+do
+	local H, LEN = 3, 1.0
+	local lost = LEN - ACC_CAP
+	local sent, svc, duration = serverRun("1s server hitch", H, LEN, "wire")
+	-- plus whatever the accumulator was carrying into the hitch (under a step)
+	check(svc.lostTime >= lost - 1e-6 and svc.lostTime < lost + shared.SIM_DT, `the hitch lost {lost} s of wall time, give or take a step ({svc.lostTime})`)
+	-- Truth in WALL time: the chef is where the steps put it, and the steps
+	-- stopped for `lost` seconds at the hitch.
+	local function truth(wallT: number): number
+		if wallT < H then
+			return truthX(wallT)
+		elseif wallT < H + LEN then
+			return truthX(H + ACC_CAP * (wallT - H) / LEN)
+		end
+		return truthX(wallT - svc.lostTime)
+	end
+	-- the one packet sent during the hitch spans it; bands are back on once
+	-- the render target is past that span
+	local state = run("1s server hitch", sent, { exemptFrom = H, exemptTo = H + LEN + LATENCY + INTERP_DELAY + 0.5, truth = truth, duration = duration })
+	check(math.abs(state.offset - (CLOCK_SKEW + LATENCY)) < 0.05, `offset estimate is within drift of where it was before the hitch ({state.offset})`)
+end
 
 -- ------------------------------------------------- the stamp survives a wrap
 --
