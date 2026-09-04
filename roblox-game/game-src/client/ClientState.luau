@@ -65,20 +65,46 @@ local EXTRAP_MAX = 0.15
 -- had run past the data; a 500 ms outage then left it 230 ms too large and
 -- the chef ran at 1.3x for most of a second catching up.)
 --
--- A sample further than OFFSET_RESET from the estimate belongs to another
--- clock domain (a server restart, a client whose frame clock was capped
--- through a long background) -- OR it is one unreliable packet that arrived
--- a second and a half late. One packet cannot tell those apart, and taking
--- the straggler's word wiped every buffer and rewound the chef. A restart
--- therefore needs RESET_CONFIRM consecutive far packets whose stamps run
--- forward together (within RESET_GAP of each other); until then far packets
--- are dropped, and a lone straggler is simply history.
+-- AND THERE IS ONE CLOCK DOMAIN FOR THE LIFE OF THIS OBJECT. SimService.clock
+-- is set once when the server instance starts and never reset -- not by a
+-- round, not by SimService:reset -- and a client never outlives its server
+-- instance: it is kicked or teleported, and the whole client script starts
+-- over with a fresh ClientState. So a sample far from the estimate is never
+-- a new clock; it is a packet that arrived very late (a straggler, or the
+-- head of the burst after a long stall), and the right response is the
+-- ordinary one: a stamp newer than anything buffered is folded in however
+-- late it came (sample > estimate, so it moves the estimate by the slow
+-- drift only, which is correct -- the offset was never wrong), and a stamp
+-- older than the history window is dropped. Earlier revisions tried to
+-- detect a restart, first from one far packet and then from a confirmed
+-- run of them; the first took a 1.5 s straggler for a restart and rewound
+-- the chef, the second took the in-order burst after a >1 s stall for one
+-- and cleared every buffer twice.
 local OFFSET_DROP = 0.3
 local OFFSET_DRIFT = 0.02
 local OFFSET_WARMUP = 20
-local OFFSET_RESET = 1.0
-local RESET_CONFIRM = 3
-local RESET_GAP = 0.5
+
+-- A chef whose stream stops and starts again much later has not been
+-- walking in the dark: parked chefs stop streaming, and the chair is filled
+-- -- or the slot dealt to a joiner -- somewhere else entirely. Interpolating
+-- from the last sample before the silence to the first after it, or worse
+-- parking the jump in the visual offset and walking it off at CATCHUP_FRAC,
+-- had the chef reappear where it used to stand and slide across the kitchen
+-- for many seconds. So a gap of more than CHEF_GAP in SERVER time between a
+-- chef's newest buffered sample and an incoming one -- or STALE of local
+-- silence, the same threshold the cull uses -- is a discontinuity for that
+-- chef: its history and visual offset go, and it starts over at the new
+-- sample, i.e. it snaps, which for a chef that genuinely teleported is the
+-- truth. One second is well past anything the smoother bridges (EXTRAP_MAX
+-- plus a few lost packets) and well short of the cull, so the body is
+-- moved before it could have blinked.
+local CHEF_GAP = 1.0
+
+--- Two seconds of silence before a chef's body is culled (shouldShowChef).
+---
+--- Guessing "gone" sooner makes bodies blink on a bad connection, which is
+--- worse than a body that lingers.
+local STALE = 2
 
 -- Per-chef visual offset. When a sample or a clock adjustment moves where
 -- the chef should be drawn, the difference is parked here and released --
@@ -90,14 +116,21 @@ local RESET_GAP = 0.5
 -- So the release is the exponential decay or CATCHUP_FRAC of the rendered
 -- speed, whichever is SLOWER -- a chef walking at 3 cells/s catches up at
 -- 0.3 cells/s, an eye-level 10% -- with CATCHUP_FLOOR so a chef standing
--- still still glides home.
+-- still still glides home. Past VIS_SNAP the offset is not parked at all:
+-- a chef a whole floor tile from where it should be is not "slightly off",
+-- and gliding it there at a tenth of walking pace would take the best part
+-- of ten seconds. A 500 ms outage leaves 0.84 cells at walking speed and
+-- glides; the backlog after a 1.5 s stall leaves four and snaps.
 local VIS_DECAY = 8
 local CATCHUP_FRAC = 0.1
 local CATCHUP_FLOOR = 0.3
+local VIS_SNAP = 1.0
 
 -- Samples kept per chef: ~1.5 s at 20 Hz, far more than INTERP_DELAY needs
--- and enough to ride out a burst of late arrivals.
+-- and enough to ride out a burst of late arrivals. HISTORY_SPAN is the same
+-- window in seconds, for deciding whether a straggler is worth keeping.
 local HISTORY = 30
+local HISTORY_SPAN = 1.5
 
 function ClientState.new(shared: any, net: any)
 	local self = setmetatable({}, ClientState)
@@ -121,9 +154,6 @@ function ClientState.new(shared: any, net: any)
 	self.offsetAt = 0 -- local clock of the last tracker update
 	self.offsetPackets = 0 -- samples folded in since the last (re)start
 	self.newestStamp = nil :: number? -- latest server time in any buffer
-	-- Consecutive far-off packets seen so far, and the stamp of the last one.
-	self.resetRun = 0
-	self.resetStamp = 0
 	self.flags = {} :: { [number]: number }
 	self.effort = {} :: { [number]: number }
 	self.skins = {} :: { [number]: string }
@@ -228,35 +258,18 @@ function ClientState:unwrapStamp(raw: number): number
 end
 
 --- Fold one packet's (localClock - serverStamp) into the offset estimate.
---- See OFFSET_DROP / OFFSET_DRIFT for why the two directions differ.
----
---- Returns "ok" when the sample was folded in, "drop" when it belongs to
---- neither the current clock domain nor a confirmed new one, and "reset"
---- when it confirmed a new domain: everything buffered was stamped in a
---- clock that no longer exists and has to go.
-function ClientState:noteStamp(serverT: number): "ok" | "drop" | "reset"
+--- See OFFSET_DROP / OFFSET_DRIFT for why the two directions differ. The
+--- first sample IS the estimate; every one after it moves the estimate by
+--- a bounded rate, and nothing ever restarts it (one clock domain, above).
+function ClientState:noteStamp(serverT: number)
 	local sample = self.clock - serverT
 	local est = self.offset
-	local hadEstimate = est ~= nil
-	if est ~= nil and math.abs(sample - est) > OFFSET_RESET then
-		-- Far off. Count it toward a restart only if it continues a run of
-		-- far packets whose stamps advance together; a straggler breaks the
-		-- run (or starts one that the next current packet ends).
-		local continues = self.resetRun > 0 and serverT > self.resetStamp and serverT - self.resetStamp < RESET_GAP
-		self.resetRun = if continues then self.resetRun + 1 else 1
-		self.resetStamp = serverT
-		if self.resetRun < RESET_CONFIRM then
-			return "drop"
-		end
-		est = nil
-	end
-	self.resetRun = 0
 	local elapsed = math.max(0, self.clock - self.offsetAt)
 	self.offsetAt = self.clock
 	if est == nil then
 		self.offset = sample
 		self.offsetPackets = 1
-		return if hadEstimate then "reset" else "ok"
+		return
 	end
 	self.offsetPackets += 1
 	local up = if self.offsetPackets <= OFFSET_WARMUP then OFFSET_DROP else OFFSET_DRIFT
@@ -265,7 +278,6 @@ function ClientState:noteStamp(serverT: number): "ok" | "drop" | "reset"
 	else
 		self.offset = math.min(sample, est + up * elapsed)
 	end
-	return "ok"
 end
 
 --- The server time remotes are drawn at right now, or nil before any packet.
@@ -366,18 +378,18 @@ function ClientState:applyTransforms(b: buffer)
 	-- overtook nothing: it is LATE by definition, so it says nothing about
 	-- how early a packet can arrive and does not touch the tracker, and its
 	-- flags are older than the flags already shown. It still goes into
-	-- history where it fits -- a sample is a sample.
-	-- A packet from another clock domain looks stale too (a restarted server
-	-- counts from zero), so "far" is judged first and goes to the tracker's
-	-- restart logic; only a near-and-old packet is a plain straggler.
+	-- history where it fits -- a sample is a sample -- and is dropped when
+	-- it is older than the history window.
 	local newest = self.newestStamp
-	local far = self.offset ~= nil and math.abs(self.clock - serverT - self.offset) > OFFSET_RESET
-	local stale = not far and newest ~= nil and serverT < newest
+	local stale = newest ~= nil and serverT < newest
+	if stale and newest - serverT > HISTORY_SPAN then
+		return
+	end
 	-- Where was each chef being drawn before this packet? The render target
 	-- can move on its own when the offset estimate moves, so "before" is
 	-- measured against the target as it was and "after" against the target
-	-- as it is: the new data, a clock adjustment, even a confirmed restart
-	-- all land in the visual offset, and none shows as a hop.
+	-- as it is: both the new data and the clock adjustment land in the
+	-- visual offset, and neither shows as a hop.
 	local oldTarget = self:renderTarget()
 	local befores: { [number]: any } = {}
 	if oldTarget ~= nil then
@@ -389,16 +401,12 @@ function ClientState:applyTransforms(b: buffer)
 		end
 	end
 	if not stale then
-		local verdict = self:noteStamp(serverT)
-		if verdict == "drop" then
-			return
-		elseif verdict == "reset" then
-			table.clear(self.buffers)
-		end
+		self:noteStamp(serverT)
 		self.newestStamp = serverT
 	end
 	local target = self:renderTarget()
 	for _, t in list do
+		local silence = self.clock - (self.lastSeen[t.id] or self.clock)
 		self.lastSeen[t.id] = self.clock
 		if stale then
 			if t.id ~= self.myChefId then
@@ -423,12 +431,19 @@ function ClientState:applyTransforms(b: buffer)
 				end
 			end
 		else
+			-- A resumed stream starts over (see CHEF_GAP).
+			local buf = self.buffers[t.id]
+			if buf ~= nil and #buf > 0 and (serverT - buf[#buf].t > CHEF_GAP or silence >= STALE) then
+				self.buffers[t.id] = nil
+				self.remoteVis[t.id] = nil
+				befores[t.id] = nil
+			end
 			-- If the sample changes where the chef is drawn (it landed behind
 			-- an extrapolated guess, or the chef was held waiting for it) the
 			-- difference is parked in the visual offset so the body glides
 			-- rather than snapping.
 			local before = befores[t.id]
-			local buf = self:insertSample(t, serverT)
+			buf = self:insertSample(t, serverT)
 			if before ~= nil and target ~= nil then
 				local after = poseAt(buf, target)
 				local vis = self.remoteVis[t.id]
@@ -512,8 +527,17 @@ function ClientState:remotePose(id: number): any?
 		local decay = math.exp(-VIS_DECAY * dt)
 		-- Position: the exponential release, capped at a fraction of the
 		-- rendered speed (see CATCHUP_FRAC) so a large correction is walked
-		-- off rather than zipped through.
+		-- off rather than zipped through -- unless it is too far to glide at
+		-- all (VIS_SNAP), in which case the whole thing is let go here. Here
+		-- and not as each packet lands: the backlog after a long stall is
+		-- thirty packets in one frame, each parking a small step, and judged
+		-- one at a time they crossed the line mid-way, were cleared, and
+		-- left the remainder to glide.
 		local mag = math.sqrt(vis.x * vis.x + vis.y * vis.y)
+		if mag > VIS_SNAP then
+			self.remoteVis[id] = nil
+			return pose
+		end
 		if mag > 0 then
 			local step = math.min(mag * (1 - decay), math.max(CATCHUP_FLOOR, CATCHUP_FRAC * pose.speed) * dt)
 			local keep = (mag - step) / mag
@@ -593,12 +617,6 @@ function ClientState:applyScore(score: any)
 		self.simTime = score.time
 	end
 end
-
---- Two seconds of silence before a chef's body is culled.
----
---- Guessing "gone" sooner makes bodies blink on a bad connection, which is
---- worse than a body that lingers.
-local STALE = 2
 
 --- Should this chef be drawn at all?
 ---

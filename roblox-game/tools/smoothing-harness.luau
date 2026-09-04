@@ -4,9 +4,10 @@
 -- connections: perfectly regular packets, +-25 ms arrival jitter, 10% loss,
 -- a 150 ms network stall that delivers its packets in one burst, a 150 ms
 -- stall of the client's own render frame, a 500 ms outage (lost, and
--- delayed-then-burst), a packet 1.5 s out of order, and a server whose
--- clock restarts. One more case drives the real Replicator to check the
--- send cadence itself.
+-- delayed-then-burst), a packet 1.5 s out of order, a 1.5 s stall whose
+-- backlog arrives in order, and a chef whose stream stops for 3 s and
+-- resumes somewhere else. One more case drives the real Replicator to
+-- check the send cadence itself.
 --
 -- What each case catches (the first four were live in the three-human
 -- playtest that reported the stutter; against the old ClientState this file
@@ -27,6 +28,10 @@
 --              through the deficit at 3x.
 --   * straggler: a single far-off packet must not be taken for a server
 --              restart -- that wiped the buffers and rewound the chef.
+--   * long stall: nor may the in-order backlog after a >1 s stall; the
+--              clock never restarts in a session (see (i) below).
+--   * resumed stream: a chef back after seconds away is somewhere else;
+--              gliding from where it last stood took many seconds.
 -- The assertions are on RENDERED SPEED (what the gait and the eye react to)
 -- rather than position: within 15% of the true speed on every frame after
 -- warm-up, never faster than 1.15x true speed even while recovering, never
@@ -71,12 +76,12 @@ local function truthX(serverT: number): number
 	return 2 + SPEED * serverT
 end
 
---- A packet for the chef's position at server time `serverT`, stamped
---- `stamp` (the same, unless the server has restarted its clock).
-local function packet(serverT: number, stamp: number?): buffer
+--- A packet for the chef's position at server time `serverT` (from `truth`,
+--- the straight walk unless a case says otherwise).
+local function packet(serverT: number, truth: ((number) -> number)?): buffer
 	return Net.packTransforms({
-		{ id = 1, px = truthX(serverT), py = 5, vx = SPEED, vy = 0, heading = 0, flags = 0, effort = 1, stun = 0 },
-	}, stamp or serverT)
+		{ id = 1, px = (truth or truthX)(serverT), py = 5, vx = SPEED, vy = 0, heading = 0, flags = 0, effort = 1, stun = 0 },
+	}, serverT)
 end
 
 type Pkt = { stamp: number, arrive: number, b: buffer }
@@ -90,7 +95,7 @@ type Profile = {
 	outageLen: number?,
 	stragglerAt: number?, -- one extra packet, `stragglerAge` seconds old, arrives at this time
 	stragglerAge: number?,
-	restartAt: number?, -- the server's clock restarts from zero here; positions carry on
+	truth: ((number) -> number)?, -- where the chef really is at a server time (default: the walk)
 	duration: number?,
 }
 
@@ -114,12 +119,11 @@ local function schedule(opts: Profile): { Pkt }
 			-- everything sent during the stall lands together once it clears
 			arrive = opts.hitchAt + (opts.hitchLen or 0) + LATENCY
 		end
-		local stamp = if opts.restartAt ~= nil and t >= opts.restartAt then t - opts.restartAt else t
-		table.insert(pkts, { stamp = stamp, arrive = arrive + CLOCK_SKEW, b = packet(t, stamp) })
+		table.insert(pkts, { stamp = t, arrive = arrive + CLOCK_SKEW, b = packet(t, opts.truth) })
 	end
 	if opts.stragglerAt ~= nil then
 		local t = opts.stragglerAt - (opts.stragglerAge or 0)
-		table.insert(pkts, { stamp = t, arrive = opts.stragglerAt + LATENCY + CLOCK_SKEW, b = packet(t) })
+		table.insert(pkts, { stamp = t, arrive = opts.stragglerAt + LATENCY + CLOCK_SKEW, b = packet(t, opts.truth) })
 	end
 	table.sort(pkts, function(a, b)
 		if a.arrive == b.arrive then
@@ -135,6 +139,9 @@ type RunOpts = {
 	stallLen: number?,
 	exemptFrom: number?, -- speed band and lag bounds are not asserted in [exemptFrom, exemptTo)
 	exemptTo: number?,
+	snapExpected: boolean?, -- the case expects ONE snap inside the window: the 1.15x cap is lifted there
+	truth: ((number) -> number)?,
+	probeAt: number?, -- also return the pose at the first frame at or after this server time
 	duration: number?,
 }
 
@@ -147,8 +154,11 @@ type RunOpts = {
 --- chef held through an outage is legitimately slow and late); what IS
 --- asserted on every frame, exempt or not, is that the render never runs
 --- faster than 1+SPEED_BAND times true speed and never steps backwards --
---- catching up must be walked off, not zipped through. Returns the state.
-local function run(name: string, pkts: { Pkt }, ropts: RunOpts?): any
+--- catching up must be walked off, not zipped through. The one exception
+--- is a case that says `snapExpected`: a chef a whole tile from where it
+--- should be is meant to snap (ClientState's VIS_SNAP / CHEF_GAP), and the
+--- window may then contain exactly one fast frame. Returns the state.
+local function run(name: string, pkts: { Pkt }, ropts: RunOpts?): (any, any)
 	local o: RunOpts = ropts or {}
 	local duration = o.duration or DURATION
 	local state = ClientState.new(shared, Net)
@@ -156,7 +166,9 @@ local function run(name: string, pkts: { Pkt }, ropts: RunOpts?): any
 	state.clock = CLOCK_SKEW
 	local pi = 1
 	local prev = nil
-	local worstDev, badFrames, fastFrames, backwards, worstLag, minLag, nilFrames = 0, 0, 0, 0, -math.huge, math.huge, 0
+	local truth = o.truth or truthX
+	local probe = nil
+	local worstDev, badFrames, fastFrames, snapFrames, backwards, worstLag, minLag, nilFrames = 0, 0, 0, 0, 0, -math.huge, math.huge, 0
 	local frames = 0
 	local pendingStall = 0
 	local elapsed = 0
@@ -176,6 +188,9 @@ local function run(name: string, pkts: { Pkt }, ropts: RunOpts?): any
 		end
 		local pose = state:remotePose(1)
 		local serverNow = state.clock - CLOCK_SKEW
+		if probe == nil and o.probeAt ~= nil and serverNow >= o.probeAt then
+			probe = pose
+		end
 		if serverNow < WARMUP then
 			prev = pose
 			continue
@@ -198,14 +213,18 @@ local function run(name: string, pkts: { Pkt }, ropts: RunOpts?): any
 				end
 			end
 			if v > SPEED * (1 + SPEED_BAND) then
-				fastFrames += 1
+				if exempt and o.snapExpected then
+					snapFrames += 1
+				else
+					fastFrames += 1
+				end
 			end
 			if dx < -1e-6 then
 				backwards += 1
 			end
 		end
 		if not exempt then
-			local lag = (truthX(serverNow) - pose.x) / SPEED
+			local lag = (truth(serverNow) - pose.x) / SPEED
 			worstLag = math.max(worstLag, lag)
 			minLag = math.min(minLag, lag)
 		end
@@ -215,6 +234,9 @@ local function run(name: string, pkts: { Pkt }, ropts: RunOpts?): any
 	check(nilFrames == 0, `{name}: a pose every frame`)
 	check(badFrames == 0, `{name}: rendered speed within {SPEED_BAND * 100}% of true on every frame`)
 	check(fastFrames == 0, `{name}: never faster than {1 + SPEED_BAND}x true speed, outage recovery included`)
+	if o.snapExpected then
+		check(snapFrames == 1, `{name}: exactly one snap frame ({snapFrames})`)
+	end
 	check(backwards == 0, `{name}: never a frame backwards`)
 	check(worstLag <= INTERP_DELAY + LATENCY + JITTER_MARGIN, `{name}: never more than INTERP_DELAY+latency+margin behind the truth`)
 	-- The lower bound matters as much as the upper: a render nearer the truth
@@ -222,7 +244,7 @@ local function run(name: string, pkts: { Pkt }, ropts: RunOpts?): any
 	-- living on extrapolation, which a straight-line walk cannot expose any
 	-- other way.
 	check(minLag >= INTERP_DELAY + LATENCY - JITTER_MARGIN, `{name}: never nearer the truth than INTERP_DELAY+latency-margin`)
-	return state
+	return state, probe
 end
 
 -- ---------------------------------------------------------------- (a) regular
@@ -275,16 +297,49 @@ do
 	check(state.offsetPackets > 100, `straggler did not restart the tracker ({state.offsetPackets} packets folded in)`)
 end
 
--- ------------------------------------------------- (i) a server restart
+-- ------------------------------------------------- (i) a 1.5 s stall
 --
--- The stamps really do start over. Three consecutive far packets whose
--- stamps run forward together confirm it; the buffers go, the estimate
--- restarts, and the chef -- who kept walking -- is carried over the seam
--- by the visual offset rather than snapped. 150 ms of dropped packets plus
--- the walk-off, so the bands resume 1.5 s after the restart.
+-- There is NO "server restart" case here, on purpose. SimService.clock is
+-- set once per server instance and never reset (not by a round, not by
+-- SimService:reset), and a client never outlives its server instance -- it
+-- is kicked or teleported and the client script starts over with a fresh
+-- ClientState. So there is no in-session clock change to detect, and every
+-- attempt to detect one has misfired on something real: a lone 1.5 s
+-- straggler (case h), and this -- a stall longer than a second whose
+-- backlog then arrives in stamp order, three packets of which "confirmed"
+-- a restart and cleared every buffer, twice. The backlog is simply late:
+-- the offset was never wrong, so the estimate must move by the slow drift
+-- only, and the chef -- four cells behind by now -- snaps rather than
+-- gliding for ten seconds (VIS_SNAP).
 do
-	local state = run("server restart", schedule({ restartAt = 3 }), { exemptFrom = 3, exemptTo = 4.5 })
-	check(math.abs(state.offset - (CLOCK_SKEW + LATENCY + 3)) < 0.03, `restart adopted the new clock (offset {state.offset})`)
+	-- the backlog lands at 4.5 + latency; the frame after it is on the bands
+	local state = run("1.5s stall (in-order burst)", schedule({ hitchAt = 3, hitchLen = 1.5, duration = 8 }), { exemptFrom = 3, exemptTo = 4.5 + LATENCY + 2 * FRAME, snapExpected = true, duration = 8 })
+	check(math.abs(state.offset - (CLOCK_SKEW + LATENCY)) < 0.05, `stall moved the clock estimate by the drift rate only (offset {state.offset})`)
+	check(state.offsetPackets > 100, `stall did not restart the tracker ({state.offsetPackets} packets folded in)`)
+end
+
+-- ------------------------------------------ (j) a stream that resumes
+--
+-- The chef stops streaming for three seconds (parked, dismissed, the slot
+-- between players) and comes back ten cells away. Its old history is not a
+-- past to interpolate from and the jump is not a correction to glide
+-- through -- CHEF_GAP / STALE start the chef over at the new sample, and
+-- the first frame after the resume already draws it there. Before this the
+-- body reappeared where it used to stand and slid across the kitchen.
+do
+	local JUMP = 3 -- cells; keeps the walk inside the wire's [-2, 30] range
+	local function teleported(t: number): number
+		return truthX(t) + (if t >= 6 then JUMP else 0)
+	end
+	local pkts = schedule({ outageAt = 3, outageLen = 3, truth = teleported, duration = 8 })
+	-- The first resumed packet lands at 6 + latency; the frame after it must
+	-- already draw the chef at the new spot. The render target then takes
+	-- INTERP_DELAY to reach that first sample (the chef holds there), after
+	-- which the ordinary bands are back on.
+	local resumed = 6 + LATENCY + FRAME
+	local state, probe = run("stream resumes elsewhere", pkts, { exemptFrom = 3, exemptTo = 6 + LATENCY + INTERP_DELAY + 2 * FRAME, snapExpected = true, truth = teleported, probeAt = resumed, duration = 8 })
+	check(probe ~= nil and math.abs(probe.x - teleported(6)) < 0.05, `first frame after the resume is at the new position (x={probe and probe.x}, new={teleported(6)})`)
+	check(state.remoteVis[1] == nil or (math.abs(state.remoteVis[1].x) < 1e-6), "no parked offset left to glide through")
 end
 
 -- --------------------------------------------- (f) the real send cadence
