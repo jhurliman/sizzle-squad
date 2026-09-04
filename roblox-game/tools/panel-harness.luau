@@ -360,6 +360,13 @@ local function textWeight(text: string): number
 	end
 	return w
 end
+local function widestLine(text: string): number
+	local w = 0
+	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
+		w = math.max(w, textWeight(line))
+	end
+	return w
+end
 for _, case in
 	{
 		{ name = "no streak", progress = { level = 1, coins = 0, streak = 0 } },
@@ -379,12 +386,31 @@ do
 		-- weight unit plus padding is what the text costs at the smallest size
 		-- it is allowed to shrink to; under that the plate clips its own text,
 		-- which is the bug this section exists for.
-		for _, chip in { panel.progressChip, panel.streakChip } do
-			if chip.Visible and chip.Parent ~= nil then
-				local need = math.floor(textWeight(chip.Text) * 5.5 + 12)
+		do
+			local chip = panel.progressChip
+			local need = math.floor(widestLine(chip.Text) * 5.5 + 12)
+			check(
+				chip.Size.X.Offset >= need,
+				`       "{chip.Text:gsub("\n", " / ")}" has room to be read ({chip.Size.X.Offset} >= {need})`
+			)
+			local lines = select(2, chip.Text:gsub("\n", "")) + 1
+			check(
+				lines == (if (case.progress.streak or 0) > 1 then 2 else 1),
+				`       the streak is line two of the career plate, not a plate of its own ({lines} line(s))`
+			)
+		end
+		-- NO BUTTON NARROWER THAN ITS LONGEST WORD. "WARDR / OBE" on an iPhone
+		-- was a button given less than the word needs at its smallest text.
+		for _, b in panel.rowButtons do
+			if b.Parent ~= nil and b.Parent.Visible then
+				local word = 0
+				for w in string.gmatch(b.Text, "%S+") do
+					word = math.max(word, textWeight(w))
+				end
+				local need = math.floor(word * 8 + 14)
 				check(
-					chip.Size.X.Offset >= need,
-					`       "{chip.Text}" has room to be read ({chip.Size.X.Offset} >= {need})`
+					b.Parent.Size.X.Offset >= need,
+					`       "{b.Text}" holds its longest word whole ({b.Parent.Size.X.Offset} >= {need})`
 				)
 			end
 		end
@@ -401,7 +427,8 @@ do
 						kids += 1
 					end
 				end
-				local width = sum + 8 * math.max(0, kids - 1)
+				-- The bar's own gap: 4px on a compact viewport (< 720), 8 otherwise.
+				local width = sum + (if vp.w < 720 then 4 else 8) * math.max(0, kids - 1)
 				check(width <= row.Size.X.Offset, `       row holds its {kids} children ({width} <= {row.Size.X.Offset})`)
 			end
 		end
@@ -424,19 +451,17 @@ do
 	for _, vp in { { w = 874, h = 402, name = "iPhone 16 Pro" }, { w = 667, h = 375, name = "iPhone SE" }, { w = 1920, h = 1080, name = "desktop" } } do
 		-- Set the text, then lay out: relayout measures whatever is there.
 		panel:setProgress({ level = 99, coins = 9999999, streak = 365 })
-		panel.progressChip.Text = case.lv
-		panel.streakChip.Text = case.streak
+		panel.progressChip.Text = case.lv .. "\n" .. case.streak
 		local m = measure(vp.w, vp.h)
 		check(m.barLeft >= m.pillsEnd, `{case.name} @ {vp.name}: bar clears Roblox's controls ({m.barLeft} >= {m.pillsEnd})`)
 		check(m.barBottom <= m.bandTop, `       and stays above the face band ({m.barBottom} <= {m.bandTop})`)
-		for _, chip in { panel.progressChip, panel.streakChip } do
-			if chip.Visible and chip.Parent ~= nil then
-				local need = math.floor(textWeight(chip.Text) * 5.5 + 12)
-				check(
-					chip.Size.X.Offset >= need,
-					`       "{chip.Text}" is readable ({chip.Size.X.Offset} >= {need})`
-				)
-			end
+		do
+			local chip = panel.progressChip
+			local need = math.floor(widestLine(chip.Text) * 5.5 + 12)
+			check(
+				chip.Size.X.Offset >= need,
+				`       "{chip.Text:gsub("\n", " / ")}" is readable ({chip.Size.X.Offset} >= {need})`
+			)
 		end
 	end
 end

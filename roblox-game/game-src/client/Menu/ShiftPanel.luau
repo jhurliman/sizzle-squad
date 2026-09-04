@@ -75,6 +75,14 @@ local CHIP_PAD = 12
 -- larger target than the Roblox topbar buttons sitting next to it.
 local MIN_BAR_SQUEEZED = 52
 
+-- A BUTTON IS NEVER NARROWER THAN ITS LONGEST WORD. Scaled text that cannot
+-- fit a word on one line at its minimum size breaks the word ("WARDR / OBE"
+-- was the reported one), and no amount of shrinking makes that legible. At
+-- the 14px floor the title font runs ~8px a character in caps; plus the
+-- face's own padding.
+local BTN_PX_PER_UNIT = 8
+local BTN_PAD = 14
+
 -- The smallest square a finger reliably lands on. Below this, a control in
 -- the corner of a bigger one is hit by the bigger one about as often as by
 -- the thumb aiming for it.
@@ -477,12 +485,14 @@ function ShiftPanel.new(gui: Instance, deps: any)
 	-- LayoutOrder 0 so it leads the bar, furthest from the right edge: the
 	-- controls stay in the corner where a thumb reaches them.
 	--
-	-- TWO PLATES, NOT ONE THAT GROWS. The streak used to be glued onto the end
-	-- of this one as a suffix, which made a fixed-width box hold a string whose
-	-- length depended on the save file -- "Lv 6 · 2978 coins · 🔥3 day streak"
-	-- is twice what it was sized for, and a Roblox TextLabel does not keep its
-	-- text inside its own rect, so it spilled straight over the WARDROBE
-	-- button. A separate plate is measured and placed on its own terms.
+	-- ONE PLATE, TWO LINES. The streak was a suffix on this plate once
+	-- ("Lv 6 · 2978 coins · 🔥3 day streak", twice the width it was sized
+	-- for, spilling over WARDROBE), then its own plate beside it -- which read
+	-- fine on a desktop and on a phone in landscape took a whole column off
+	-- three buttons that needed it: WARDROBE broke mid-word and INVITE A
+	-- FRIEND ran to three lines. The bar is 44px tall and a readout line is
+	-- 15; the streak goes UNDER the career line, where it costs no width at
+	-- all. The plate is measured by its widest line (see chipWeight).
 	self.progressChip = Theme.chip({
 		Size = UDim2.fromOffset(160, Theme.TOPBAR_MIN),
 		TextSize = 15,
@@ -491,31 +501,16 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		LayoutOrder = 0,
 		Text = "Lv 1  ·  0 coins",
 	}, self.rows[1])
-	self.streakChip = Theme.chip({
-		Size = UDim2.fromOffset(120, Theme.TOPBAR_MIN),
-		TextSize = 15,
-		BackgroundTransparency = 0.3,
-		Font = Theme.BOLD_FONT,
-		LayoutOrder = 1,
-		-- EMPTY, not a sample streak. setProgress writes the real localized
-		-- string before this is ever shown, and a placeholder here is a static
-		-- English string as far as the loc extractor is concerned -- it would
-		-- demand a row in source.json and seven translations for text no player
-		-- can see.
-		Text = "",
-		Visible = false,
-	}, self.rows[1])
 	-- BELT AND BRACES AGAINST SPILLING AGAIN. Scaled text shrinks to fit the
 	-- box the allocator gave it, the constraint stops it shrinking past
 	-- legible, and clipping is the hard guarantee for whatever is left --
 	-- because "it fits at the sizes I tried" is exactly what was believed last
-	-- time. Applied to both plates: either can be handed a long translation.
-	for _, chip in { self.progressChip, self.streakChip } do
-		chip.TextScaled = true
-		chip.TextWrapped = false
-		chip.ClipsDescendants = true
-		mk("UITextSizeConstraint", { MinTextSize = CHIP_MIN_TEXT, MaxTextSize = 15 }, chip)
-	end
+	-- time. TextWrapped stays off: the only line break in this plate is the
+	-- explicit one between the two readouts, never one the label invents.
+	self.progressChip.TextScaled = true
+	self.progressChip.TextWrapped = false
+	self.progressChip.ClipsDescendants = true
+	mk("UITextSizeConstraint", { MinTextSize = CHIP_MIN_TEXT, MaxTextSize = 15 }, self.progressChip)
 
 	return self
 end
@@ -632,12 +627,11 @@ function ShiftPanel:setProgress(progress: any)
 	end
 	-- NOT the coin emoji: FredokaOne has no glyph for it and it renders as a
 	-- hollow box (the 🔥 on the streak plate is fine).
-	self.progressChip.Text = Loc.f("fmt.lv_coins", progress.level or 1, progress.coins or 0)
-	local show = streak > 1
-	if show then
-		self.streakChip.Text = Loc.f("fmt.streak", streak)
+	local text = Loc.f("fmt.lv_coins", progress.level or 1, progress.coins or 0)
+	if streak > 1 then
+		text ..= "\n" .. Loc.f("fmt.streak", streak)
 	end
-	self.streakChip.Visible = show
+	self.progressChip.Text = text
 	-- The bar's widths are measured from the text, so text that changes width
 	-- has to re-measure. Safe to call from here: relayout ends in paint(), and
 	-- paint does not touch either plate, so there is no way back into this.
@@ -752,20 +746,40 @@ local function textWeight(text: string): number
 	return w
 end
 
+--- A plate's width is its WIDEST LINE, not its total text: the two readouts
+--- stack, so the streak under the career line costs nothing sideways.
+local function chipWeight(text: string): number
+	local w = 0
+	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
+		w = math.max(w, textWeight(line))
+	end
+	return w
+end
+
+--- The longest word in a label, in weight units. What a button must be able
+--- to fit on one line at its smallest text before it starts breaking words.
+local function longestWord(text: string): number
+	local w = 0
+	for word in string.gmatch(text, "%S+") do
+		w = math.max(w, textWeight(word))
+	end
+	return w
+end
+
 --- The narrowest this item may be drawn.
 ---
 --- A BUTTON AND A READOUT WANT DIFFERENT THINGS HERE, which one shared floor
---- could not express. A button needs to be big enough to hit; its label scales
---- and it still reads as a button at any width. A readout needs to be big
---- enough to READ -- past its minimum text size the plate clips, and half of
---- "Lv 6 · 2978 coins" is worse than none of it. So a readout's floor is
---- whatever its own text costs at that minimum size, and it claims that before
---- anything is shared out.
+--- could not express. A button needs to be big enough to hit and to hold its
+--- longest word whole; its label scales and it still reads as a button at any
+--- width past that. A readout needs to be big enough to READ -- past its
+--- minimum text size the plate clips, and half of "Lv 6 · 2978 coins" is
+--- worse than none of it. So a readout's floor is whatever its own text costs
+--- at that minimum size, and it claims that before anything is shared out.
 local function floorFor(it: any, buttonFloor: number): number
 	if it.chip then
 		return math.min(math.floor(it.weight * CHIP_PX_PER_UNIT + CHIP_PAD), MAX_BAR_CHIP)
 	end
-	return buttonFloor
+	return math.max(buttonFloor, math.floor((it.word or 0) * BTN_PX_PER_UNIT + BTN_PAD))
 end
 
 --- Share `budget` out between items in proportion to how much label each has
@@ -814,7 +828,12 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	self.lastViewport = viewport
 	local compact = viewport.X < 720
 	local narrow = viewport.X < 480
-	local gap = 8
+	-- The gap between bar items is the cheapest width there is. On a phone in
+	-- landscape the bar has ~380px for a readout and three buttons, and every
+	-- button now holds its longest word whole (floorFor) rather than breaking
+	-- it -- which on a 667-wide phone at a maxed-out German save costs the 12px
+	-- that three 8px gaps were spending on air.
+	local gap = if compact then 4 else 8
 
 	-- ---------------------------------------------------------- the top bar
 	--
@@ -842,41 +861,31 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 				root = root,
 				button = self.rowButtons[i],
 				weight = textWeight(self.rowButtons[i].Text),
+				word = longestWord(self.rowButtons[i].Text),
 			})
 		end
 	end
-	-- The readouts lead, so the buttons keep the right corner where a thumb is.
-	if self.streakChip.Visible then
-		table.insert(visible, 1, { root = self.streakChip, weight = textWeight(self.streakChip.Text), chip = true })
-	end
-	table.insert(visible, 1, { root = self.progressChip, weight = textWeight(self.progressChip.Text), chip = true })
+	-- The readout leads, so the buttons keep the right corner where a thumb is.
+	table.insert(visible, 1, { root = self.progressChip, weight = chipWeight(self.progressChip.Text), chip = true })
 	local n = #visible
 
 	-- One row if the whole strip fits beside Roblox's controls; two if it does
 	-- not, which only happens on a very narrow screen. Two still clears the
 	-- face band -- 0.216 of even a 375-tall phone is 81px, and two 36px rows
 	-- with a 4px gap is 76 -- so wrapping is a real fallback, not a cliff.
-	-- THREE THINGS TO GIVE UP, IN ORDER OF WHAT IS LEAST MISSED.
+	-- TWO THINGS TO GIVE UP, IN ORDER OF WHAT IS LEAST MISSED.
 	--
-	-- 1. the streak plate -- lowest-priority readout, and the Career tab spells
-	--    it out in full, so losing it on a small screen costs nothing that is
-	--    not available one tap away;
-	-- 2. button width, down to a floor that is still comfortably a tap target
-	--    and still larger than Roblox's own topbar buttons;
-	-- 3. a second row, which is correct but taller, and height above the face
+	-- 1. button width, down to a floor that is still comfortably a tap target
+	--    and still larger than Roblox's own topbar buttons -- but never below
+	--    what its longest word needs (floorFor);
+	-- 2. a second row, which is correct but taller, and height above the face
 	--    band is the scarcest thing on a phone in landscape.
 	--
-	-- What is never given up is a readout drawn too small to read. On a
-	-- 667x375 phone the bar has room for four items and not five, and this is
-	-- what that decision looks like from the inside.
+	-- What is never given up is a readout drawn too small to read. (The streak
+	-- used to be the first thing dropped; it lives under the career line now
+	-- and costs no width, so there is nothing left to drop before the buttons.)
 	local buttonFloor = MIN_BAR_ITEM
 	local _, oneRowW = allocate(visible, barAvail, gap, buttonFloor)
-	if oneRowW > barAvail and self.streakChip.Visible then
-		table.remove(visible, 2)
-		self.streakChip.Parent = nil
-		n = #visible
-		_, oneRowW = allocate(visible, barAvail, gap, buttonFloor)
-	end
 	if oneRowW > barAvail then
 		buttonFloor = MIN_BAR_SQUEEZED
 		_, oneRowW = allocate(visible, barAvail, gap, buttonFloor)
