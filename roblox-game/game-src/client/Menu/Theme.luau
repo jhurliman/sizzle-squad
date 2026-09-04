@@ -28,6 +28,11 @@ Theme.FACE_BAND_BOTTOM = 0.472
 -- editor, and the layout harness -- and 280 is roughly where Roblox's own row
 -- of pills ends, measured off the same screenshot.
 Theme.TOPBAR_MIN = 36
+-- The shortest a control in that band may be. The platform's own pills are 36,
+-- and ours used to match them exactly; 44 is the floor for anything a thumb
+-- has to hit, so our row is a little taller than Roblox's rather than a little
+-- too small.
+Theme.TOPBAR_TAP = 44
 Theme.TOPBAR_MARGIN = 8
 Theme.TOPBAR_LEFT_FALLBACK = 280
 

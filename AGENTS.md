@@ -127,7 +127,13 @@ leave the contrivance behind as a scenario.
   software rasteriser, so absolute fps is not meaningful; **relative** regressions
   and `worstFrameMs` spikes are.
 - Zero console errors. Warnings should be fixed, not ignored.
-- Portrait iPhone (393×852) is a first-class layout, not an afterthought.
+- The Roblox game is LANDSCAPE ONLY (`ScreenOrientation = LandscapeSensor` in
+  `roblox-game/default.project.json`, decided 2026-08-30): a horizontal lineup
+  of four chairs collapses to a tenth of the frame on a tall screen, so the
+  lobby is designed for a wide viewport and portrait is not a supported layout
+  there. The 393×852 portrait rule below is the web build's, and the web build
+  is dead; do not re-flag landscape-only as a violation.
+- Web build only: portrait iPhone (393×852) is a first-class layout.
 - Nothing may sit under the notch, the home indicator, or off a safe-area edge.
 - No text smaller than 12px. No tap target smaller than 44×44 CSS px.
 - No `localStorage`/`sessionStorage`.

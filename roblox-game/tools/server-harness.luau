@@ -397,6 +397,60 @@ act(playerA, { chefId = occupied, action = "dismiss" })
 check(chairFor(occupied).kind == "player", "a crafted dismiss cannot evict a person")
 check(chairFor(occupied).species == speciesBefore, "and cannot change what they are playing as")
 
+-- A DISMISSED BOT IS NOT A BODY IN THE KITCHEN.
+--
+-- Dismissal only flipped a flag. The chef stayed exactly where it was --
+-- invisible, because the client hides inactive chefs, but still in every
+-- collidePhase: players walked into it, were shoved by it, and could be
+-- stunned by it. Now it is parked on the apron with the other out-of-play
+-- chefs, and brought back inside when a bot is put back in the chair.
+if target ~= nil then
+	local parked = simService.sim.chefs[target.chefId + 1]
+	local inPlay = shared.isWalkable(simService.sim.kitchen, math.floor(parked.pos.x), math.floor(parked.pos.y))
+	check(not inPlay, `a dismissed bot is parked off the walkable floor ({parked.pos.x}, {parked.pos.y})`)
+	check(not simService:isActive(parked), "and it is inactive")
+	act(playerA, { chefId = target.chefId, action = "fill" })
+	inPlay = shared.isWalkable(simService.sim.kitchen, math.floor(parked.pos.x), math.floor(parked.pos.y))
+	check(inPlay, `filling the chair stands the bot back inside the kitchen ({parked.pos.x}, {parked.pos.y})`)
+	act(playerA, { chefId = target.chefId, action = "dismiss" })
+end
+
+-- PACING FOLLOWS WHO IS ACTUALLY COOKING. Sending bots away leaves botFill
+-- true, and the pacing used to key off that switch alone: a solo player who
+-- dismissed all three bots kept the four-chef order rate and ticket clock.
+do
+	local before = simService:activeBotCount()
+	for _, c in chairs() do
+		if c.kind == "bot" then
+			act(playerA, { chefId = c.chefId, action = "dismiss" })
+		end
+	end
+	check(simService:activeBotCount() == 0, `every bot dismissed ({before} -> 0 active)`)
+	director:applyPacing()
+	local solo = Config.PACING[1]
+	local knobs = simService.sim.director
+	-- orderGapMul/maxOrdersBonus are the knobs ASSIST leaves alone, so they
+	-- identify the table without an assist multiplier in the way.
+	check(
+		knobs.orderGapMul == solo.orderGapMul and knobs.maxOrdersBonus == solo.maxOrdersBonus,
+		`alone with no bots, pacing is the one-human table (gap x{knobs.orderGapMul}, bonus {knobs.maxOrdersBonus})`
+	)
+	for _, c in chairs() do
+		if c.kind == "empty" then
+			act(playerA, { chefId = c.chefId, action = "fill" })
+		end
+	end
+	director:applyPacing()
+	local full = Config.PACING_BOTFILL[1]
+	check(
+		simService:activeBotCount() == 3 and knobs.orderGapMul == full.orderGapMul,
+		`with the bots back, pacing is the bot-fill table again (gap x{knobs.orderGapMul})`
+	)
+	-- Leave one chair empty so the passer-by checks below see the same room
+	-- they used to.
+	act(playerA, { chefId = target.chefId, action = "dismiss" })
+end
+
 -- AND A PASSER-BY CANNOT REARRANGE A SHIFT THEY ARE NOT WORKING.
 local stranger = { UserId = 999999, Name = "Stranger" }
 local kindBefore = chairFor(occupied).kind

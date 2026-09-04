@@ -268,6 +268,77 @@ check(seatA.afk == true, "30s idle DURING a shift is still away -- a bot should 
 crew:setLobby(false)
 remotes.MoveStream:receive(C, moving)
 
+-- ---- an AFK seat's chef is still that player's -------------------------
+--
+-- THE BUG: AFK hands the chef to a bot with setHuman(false) but keeps the
+-- seat, and freeChef treated every non-human chef as free. The next arrival
+-- was dealt the same chef: two clients streaming into one slot, and either
+-- one leaving disabled the other's chef.
+clock += 1000
+crew:heartbeat()
+check(seatA.afk == true, "C is AFK again")
+local D = { UserId = 4, Name = "D" }
+local seatD = crew:playerAdded(D)
+check(seatD ~= nil and seatD.chefId ~= seatA.chefId, `a joiner is NOT dealt an AFK player's chef ({seatD and seatD.chefId} vs {seatA.chefId})`)
+remotes.MoveStream:receive(C, moving)
+check(seatA.afk == false and simService.humans[seatA.chefId] ~= nil, "and C gets their own chef back on waking")
+check(simService.humans[seatD.chefId] ~= nil, "while D still has theirs")
+
+-- ---- reach comes from the player's own transitions ----------------------
+--
+-- THE BUG: "is this human's chef carrying?" said yes for an AFK seat's
+-- bot-driven chef, for a chef a joiner inherited mid-task, and for a player
+-- waking from AFK with whatever the bot was holding. Each permanently
+-- advanced a funnel that exists to say what a new player worked out alone.
+local reached: { [any]: { string } } = {}
+crew.onReach = function(player, stage)
+	reached[player] = reached[player] or {}
+	table.insert(reached[player], stage)
+end
+local function has(player, stage): boolean
+	return reached[player] ~= nil and table.find(reached[player], stage) ~= nil
+end
+local chefC = simService.sim.chefs[seatA.chefId + 1]
+local chefD = simService.sim.chefs[seatD.chefId + 1]
+chefC.carrying, chefD.carrying = nil, nil
+chefC.working, chefD.working = nil, nil
+crew:noteSimReach() -- baseline
+-- a) the bot picks something up while C is AFK
+clock += 1000
+crew:heartbeat()
+check(seatA.afk == true, "C is AFK for the bot to act")
+chefC.carrying = { kind = "tomato" }
+crew:noteSimReach()
+check(not has(C, "carried"), "a bot's pick-up on an AFK seat is not the player's carried")
+-- b) C wakes up still holding it: inherited, not earned
+remotes.MoveStream:receive(C, moving)
+crew:noteSimReach()
+check(not has(C, "carried"), "and waking up holding it does not earn it either")
+-- c) a transition under C's own control does
+chefC.carrying = nil
+crew:noteSimReach()
+chefC.carrying = { kind = "tomato" }
+crew:noteSimReach()
+check(has(C, "carried"), "a pick-up while C is in control is C's carried")
+-- d) a joiner dealt a chef already working
+local E = { UserId = 5, Name = "E" }
+local spare = simService:freeChef(crew.byChef)
+if spare ~= nil then
+	simService.sim.chefs[spare + 1].working = { station = 1 }
+	local seatE = crew:playerAdded(E)
+	check(seatE ~= nil and seatE.chefId == spare, "E is dealt the chef that was mid-task")
+	crew:noteSimReach()
+	check(not has(E, "worked"), "and inheriting its station is not E's worked")
+	simService.sim.chefs[spare + 1].working = nil
+	crew:noteSimReach()
+	simService.sim.chefs[spare + 1].working = { station = 1 }
+	crew:noteSimReach()
+	check(has(E, "worked"), "but committing to one themselves is")
+	crew:playerRemoving(E)
+end
+crew:playerRemoving(D)
+crew.onReach = function() end
+
 -- ---- the seat handshake must be re-sendable ------------------------------
 --
 -- ChefAssign and Snapshot are one-shot RemoteEvents and Roblox drops them for

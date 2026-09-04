@@ -97,18 +97,29 @@ function SimService:isActive(chef: any): boolean
 	return chef.isPlayer or (self.botFill and not self.dismissed[chef.skin])
 end
 
---- Move every non-human chef to its parking spot (no-op when bots fill in).
+--- Stand one chef on the apron, out of frame and out of play.
+function SimService:park(chef: any)
+	local spot = PARK[((chef.id) % #PARK) + 1]
+	chef.pos.x, chef.pos.y = spot.x, spot.y
+	chef.vel.x, chef.vel.y = 0, 0
+	chef.working = nil
+	chef.carrying = nil
+	chef.stun = 0
+end
+
+--- Move every chef that is not in play to its parking spot.
+---
+--- That is every non-human chef without bot fill, and every DISMISSED chef
+--- with it. A dismissed bot used to stay exactly where it was -- at its
+--- lobby mark, or the round spawn -- invisible, because the client hides
+--- inactive chefs, but still a body as far as collidePhase is concerned:
+--- players walked into it, were shoved by it, and could be stunned by it.
+--- Parking it puts it where the unassigned chefs already go, which is the
+--- one place in the kitchen nothing can reach.
 function SimService:parkUnassigned()
-	if self.botFill then
-		return
-	end
-	for i, chef in self.sim.chefs do
-		if not chef.isPlayer then
-			local spot = PARK[((chef.id) % #PARK) + 1]
-			chef.pos.x, chef.pos.y = spot.x, spot.y
-			chef.vel.x, chef.vel.y = 0, 0
-			chef.working = nil
-			chef.stun = 0
+	for _, chef in self.sim.chefs do
+		if not chef.isPlayer and not self:isActive(chef) then
+			self:park(chef)
 		end
 	end
 end
@@ -153,13 +164,30 @@ function SimService:setHuman(chefId: number, on: boolean)
 	return nil
 end
 
-function SimService:freeChef(): number?
+--- A chef nobody owns. `reserved` is the caller's own map of chef ids that
+--- are spoken for even though the chef is not currently marked human -- an
+--- AFK seat hands its chef to a bot with setHuman(false) but keeps the seat,
+--- and without this a joiner was handed the SAME chef: two clients streaming
+--- input into one slot, and either one leaving disabled the other's chef.
+function SimService:freeChef(reserved: { [number]: any }?): number?
 	for _, chef in self.sim.chefs do
-		if not chef.isPlayer then
+		if not chef.isPlayer and (reserved == nil or reserved[chef.id] == nil) then
 			return chef.id
 		end
 	end
 	return nil
+end
+
+--- Bots that are actually playing right now: bot fill on, not dismissed,
+--- not a human's chef. What pacing should be sized to.
+function SimService:activeBotCount(): number
+	local n = 0
+	for _, chef in self.sim.chefs do
+		if not chef.isPlayer and self:isActive(chef) then
+			n += 1
+		end
+	end
+	return n
 end
 
 function SimService:humanMove(chefId: number, p: any)
@@ -334,8 +362,28 @@ end
 
 --- Movement-only advance for results/intermission.
 --- Leave a chair empty, or let a bot have it again.
+---
+--- The body moves with the decision: a dismissed chef is parked (see
+--- parkUnassigned for why), and one brought back is stood somewhere sane
+--- inside the kitchen rather than left on the apron, which is not walkable
+--- and which a bot cannot path out of.
 function SimService:setDismissed(species: string, on: boolean)
+	local was = self.dismissed[species] == true
 	self.dismissed[species] = if on then true else nil
+	if was == on then
+		return
+	end
+	for _, chef in self.sim.chefs do
+		if chef.skin == species and not chef.isPlayer then
+			if on then
+				self:park(chef)
+			else
+				local spawned = self.shared.safeSpawn(self.sim.kitchen, { x = 7.5, y = 6.5 })
+				chef.pos.x, chef.pos.y = spawned.x, spawned.y
+				chef.vel.x, chef.vel.y = 0, 0
+			end
+		end
+	end
 end
 
 --- Walk a bot to its lobby mark and stand it facing the camera.

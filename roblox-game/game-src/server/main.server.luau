@@ -27,6 +27,42 @@ local remotes = Net.server(ReplicatedStorage)
 -- here because the round-end handler below tags the teleport home.
 local exitReason: { [any]: string } = {}
 
+-- How long to wait before deciding a queued teleport is never going to happen.
+-- Long enough not to race a slow one; short enough that a stranded player is
+-- rescued while they are still in the room.
+local TELEPORT_RESCUE = 15
+
+-- Forward-declared: built below, used by the round-end handler above it.
+local analytics
+
+--- Send a finished First Shift player home, with the departure tagged.
+---
+--- Tag the hop BEFORE it happens, or a completed First Shift's departure is
+--- recorded as a quit and the return leg is invisible to the exit-reason
+--- analytics. But requested is not gone: the same TeleportInitFailed that can
+--- strand the outbound leg can strand this one, and a player still here long
+--- after the teleport should have fired is stranded -- with a tag that would
+--- turn their eventual quit into a hop and swallow every drop-off metric. So
+--- the tag only survives if they actually leave; otherwise it is cleared and
+--- the teleport tried once more.
+local function sendHomeTagged(p: Player, retry: boolean)
+	exitReason[p] = "teleport_home"
+	if not Tutorial.sendHome(p) then
+		exitReason[p] = nil
+		return
+	end
+	task.delay(TELEPORT_RESCUE, function()
+		if p.Parent == nil or exitReason[p] ~= "teleport_home" then
+			return
+		end
+		exitReason[p] = nil
+		analytics:custom(p, "tutorial_return", 1, { "stranded" })
+		if retry then
+			sendHomeTagged(p, false)
+		end
+	end)
+end
+
 local Staging = require(gameShared:WaitForChild("Staging")) :: any
 local simService =
 	SimService.new(shared, { seed = os.time() % 2 ^ 31, botFill = Config.BOT_FILL, staging = Staging })
@@ -60,13 +96,19 @@ end
 -- CrewManager sees the input, Progression owns the profile; connect them once
 -- both exist (CrewManager is built before progression, hence the late assign).
 crew.onReach = function(player: any, stage: string)
+	-- Carrying and working are read off the sim, and both are downstream of a
+	-- press the player has to make themselves. A player who has never pressed
+	-- cannot have done either, whatever their chef is doing.
+	if (stage == "carried" or stage == "worked") and not progression:reached(player, "pressed") then
+		return
+	end
 	progression:noteReach(player, stage)
 end
 
 local Catalog = require(gameShared:WaitForChild("Catalog")) :: any
 local leaderboards = Leaderboards.new(progression, remotes)
 local badges = Badges.new(Config)
-local analytics = Analytics.new()
+analytics = Analytics.new()
 
 local MonetizationDefs = require(gameShared:WaitForChild("Monetization")) :: any
 local monetization = MonetizationServer.new(Catalog, MonetizationDefs)
@@ -90,14 +132,11 @@ local director = RoundDirector.new(shared, Config, simService, crew, replicator,
 		if Tutorial.isTutorialServer() then
 			task.delay(Config.RESULTS + 1.5, function()
 				for _, p in Players:GetPlayers() do
-					-- Tag the hop BEFORE it happens, or a completed First Shift's
-					-- departure is recorded as a quit and the return leg is
-					-- invisible to the exit-reason analytics. In Studio finish()
-					-- only clears a flag, so there is no hop to tag.
-					if not Tutorial.isStudio() then
-						exitReason[p] = "teleport_home"
+					if Tutorial.isStudio() then
+						Tutorial.finish(p) -- only clears a flag; there is no hop to tag
+					else
+						sendHomeTagged(p, true)
 					end
-					Tutorial.finish(p)
 				end
 			end)
 		end
@@ -352,11 +391,6 @@ local function seatArrival(player: Player)
 	broadcastEquips()
 end
 
--- How long to wait before deciding a queued teleport is never going to happen.
--- Long enough not to race a slow one; short enough that a stranded player is
--- rescued while they are still in the room.
-local TELEPORT_RESCUE = 15
-
 Players.PlayerAdded:Connect(function(player)
 	player.CharacterAdded:Connect(vaultCharacter)
 	if player.Character ~= nil then
@@ -513,41 +547,11 @@ task.spawn(function()
 	end
 end)
 
--- WHAT THE PLAYER ACTUALLY MANAGED, read off the sim rather than reported by
--- the client. `carrying` means they worked out pick-up; `working` means they
--- committed to a station. Both are the cheapest possible check -- two field
--- reads per seated human -- and neither needs a remote or any client trust.
-local function noteSimReach()
-	-- Walk the chefs, not the seats: `byChef` already indexes seat-by-chef, so
-	-- this needs no per-frame lookup table and allocates nothing.
-	for _, chef in simService.sim.chefs do
-		if chef.carrying == nil and chef.working == nil then
-			continue
-		end
-		local seat = crew.byChef[chef.id]
-		if seat == nil then
-			continue -- a bot, or a chef nobody is sitting in
-		end
-		-- Only the player's OWN doing counts. An AFK seat is being driven by
-		-- the bot, and a freshly seated player can inherit a chef already
-		-- mid-task; neither says the player did anything. Requiring an active
-		-- seat and a prior `pressed` ties both stages to their own input.
-		if seat.afk or not progression:reached(seat.player, "pressed") then
-			continue
-		end
-		if chef.carrying ~= nil then
-			progression:noteReach(seat.player, "carried")
-		end
-		if chef.working ~= nil then
-			progression:noteReach(seat.player, "worked")
-		end
-	end
-end
-
 RunService.Heartbeat:Connect(function(dt)
 	crew:heartbeat()
 	director:heartbeat(dt)
-	noteSimReach()
+	-- Funnel stages read off the sim (CrewManager:noteSimReach -> onReach).
+	crew:noteSimReach()
 	progression:heartbeat()
 	leaderboards:heartbeat(os.clock())
 end)

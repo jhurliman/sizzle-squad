@@ -34,6 +34,8 @@ export type Seat = {
 	chefId: number,
 	lastInputAt: number,
 	afk: boolean,
+	-- What noteSimReach last saw of this seat's chef; nil until first observed.
+	seen: { carrying: boolean, working: boolean, afk: boolean }?,
 }
 
 function CrewManager.new(
@@ -285,7 +287,9 @@ function CrewManager:sendSeat(player: any, seat: Seat)
 end
 
 function CrewManager:playerAdded(player: any)
-	local chefId = self.simService:freeChef()
+	-- byChef is the reservation list: an AFK seat's chef is bot-driven but
+	-- still that player's, and must not be dealt to the next arrival.
+	local chefId = self.simService:freeChef(self.byChef)
 	if chefId == nil then
 		-- 4 humans already seated; server is full (MaxPlayers should prevent
 		-- this, but never crash on the race).
@@ -341,6 +345,55 @@ function CrewManager:heartbeat()
 	end
 end
 
+--- WHAT THE PLAYER ACTUALLY MANAGED, read off the sim rather than reported by
+--- the client. A chef that starts carrying means they worked out pick-up; one
+--- that starts working means they committed to a station. Neither needs a
+--- remote or any client trust.
+---
+--- TRANSITIONS UNDER THEIR OWN CONTROL, NOT STATE. The first version asked
+--- "is this human's chef carrying?", and with bot fill on the answer is often
+--- yes for reasons that have nothing to do with the human: an AFK seat's chef
+--- is being driven by the bot, a joiner is dealt a chef the bot was already
+--- using, and a player waking from AFK inherits whatever the bot was holding.
+--- Each of those permanently advanced a funnel whose whole job is to say what
+--- a NEW PLAYER worked out on their own.
+---
+--- So every seated human's chef is observed every heartbeat, and a stage is
+--- noted only when carrying/working goes from nil to set between two
+--- observations during which the seat was active. The observation itself is
+--- always kept -- while AFK, at handoff, on the frame they are seated -- so
+--- inherited state is the baseline, never the event. (main.server adds a
+--- second lock on the other end of onReach: nothing past `pressed` counts
+--- for a player who has not pressed, because nothing past it is possible
+--- without the press that does it.)
+---
+--- Lives here rather than in main.server.luau so the crew harness can drive
+--- every handoff path against it; see seatAction for why that matters.
+function CrewManager:noteSimReach()
+	for _, chef in self.simService.sim.chefs do
+		local seat = self.byChef[chef.id]
+		if seat == nil then
+			continue -- a bot, or a chef nobody is sitting in
+		end
+		local carrying = chef.carrying ~= nil
+		local working = chef.working ~= nil
+		local seen = seat.seen
+		if seen ~= nil and not seen.afk and not seat.afk then
+			if carrying and not seen.carrying then
+				self.onReach(seat.player, "carried")
+			end
+			if working and not seen.working then
+				self.onReach(seat.player, "worked")
+			end
+		end
+		if seen == nil then
+			seen = {}
+			seat.seen = seen
+		end
+		seen.carrying, seen.working, seen.afk = carrying, working, seat.afk
+	end
+end
+
 function CrewManager:humanCount(): number
 	local n = 0
 	for _, seat in self.seats do
@@ -356,11 +409,19 @@ function CrewManager:reseat()
 	-- Drop the old chef->seat map first. Reseating moves everyone, and a stale
 	-- entry would make claimSkin think a chef nobody occupies is spoken for.
 	table.clear(self.byChef)
+	-- Release every old chef first. startRound resets the sim before this, so
+	-- there they are already free; a reseat on a LIVE sim (the harnesses do
+	-- it) would otherwise leave the old chefs flagged human with nobody in
+	-- them, and freeChef would run out of chefs while chairs stood empty.
+	for _, seat in self.seats do
+		self.simService:setHuman(seat.chefId, false)
+	end
 	for player, seat in self.seats do
-		local chefId = self.simService:freeChef()
+		local chefId = self.simService:freeChef(self.byChef)
 		if chefId ~= nil then
 			self.simService:setHuman(chefId, true)
 			seat.chefId = chefId
+			seat.seen = nil -- a new chef is a new baseline for noteSimReach
 			self.byChef[chefId] = seat
 			self:claimSkin(chefId, self.skinFor and self.skinFor(player))
 			self:sendSeat(player, seat)

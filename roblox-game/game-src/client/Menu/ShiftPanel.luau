@@ -61,14 +61,24 @@ local MAX_BAR_ITEM = 176
 local MAX_BAR_CHIP = 260
 
 -- Roughly what one weight unit costs at the smallest text size a readout is
--- allowed to shrink to (UITextSizeConstraint MinTextSize = 11), plus the
+-- allowed to shrink to (UITextSizeConstraint MinTextSize = CHIP_MIN_TEXT), plus the
 -- plate's own padding. Below this a readout is not small, it is cut in half.
-local CHIP_PX_PER_UNIT = 5.5
+-- 12 is the floor for anything a player has to READ, and these are readouts.
+-- It was 11 -- one below the line -- and the allocator sized the narrow and
+-- localized layouts around that, so long labels rendered at a size the rest
+-- of the game has agreed nothing renders at.
+local CHIP_MIN_TEXT = 12
+local CHIP_PX_PER_UNIT = 6
 local CHIP_PAD = 12
 
 -- What a button may be squeezed to when the bar is short of room. Still a
 -- larger target than the Roblox topbar buttons sitting next to it.
 local MIN_BAR_SQUEEZED = 52
+
+-- The smallest square a finger reliably lands on. Below this, a control in
+-- the corner of a bigger one is hit by the bigger one about as often as by
+-- the thumb aiming for it.
+local DISMISS_TAP = 44
 
 -- The Start button will shrink to fit a short screen, but not below this --
 -- past it the hero button stops reading as the hero and the screen would be
@@ -271,10 +281,26 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		-- "x" and "+" rather than U+2715 or U+2717: KNOWN-GAPS records both
 		-- shipping as empty boxes, because they depend on the TEXT font and
 		-- FredokaOne has neither.
-		local dismiss = mk("TextButton", {
+		-- THE GLYPH IS SMALL; THE TARGET IS NOT. The little plate is what you
+		-- see, but a 22px button in the corner of a 48px chair is half a
+		-- fingertip, and a near miss lands on the chair itself -- which claims
+		-- the character instead of dismissing the bot. So the plate is a
+		-- decoration (a sibling drawn under the button, since a child would
+		-- paint over the button's own text) and the thing you actually press
+		-- is an invisible DISMISS_TAP square around it.
+		local dismissPlate = mk("Frame", {
 			Size = UDim2.fromOffset(22, 22),
 			Position = UDim2.new(1, -24, 0, 3),
 			BackgroundColor3 = Theme.BROWN_DEEP,
+			BorderSizePixel = 0,
+			Visible = false,
+		}, face)
+		Theme.corner(dismissPlate, 6)
+		local dismiss = mk("TextButton", {
+			Size = UDim2.fromOffset(DISMISS_TAP, DISMISS_TAP),
+			-- Centred on the plate: plate centre is (-13, 14) from the corner.
+			Position = UDim2.new(1, -13 - DISMISS_TAP / 2, 0, 14 - DISMISS_TAP / 2),
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Theme.BOLD_FONT,
 			TextSize = 15,
@@ -282,7 +308,6 @@ function ShiftPanel.new(gui: Instance, deps: any)
 			Text = "x",
 			Visible = false,
 		}, face)
-		Theme.corner(dismiss, 6)
 
 		local idx = i
 		face.Activated:Connect(function()
@@ -316,7 +341,7 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		end)
 
 		self.slots[i] =
-			{ root = slot, face = face, name = name, state = state, species = species, dismiss = dismiss }
+			{ root = slot, face = face, name = name, state = state, species = species, dismiss = dismiss, dismissPlate = dismissPlate }
 	end
 	-- THE TOP BAR.
 	--
@@ -489,7 +514,7 @@ function ShiftPanel.new(gui: Instance, deps: any)
 		chip.TextScaled = true
 		chip.TextWrapped = false
 		chip.ClipsDescendants = true
-		mk("UITextSizeConstraint", { MinTextSize = 11, MaxTextSize = 15 }, chip)
+		mk("UITextSizeConstraint", { MinTextSize = CHIP_MIN_TEXT, MaxTextSize = 15 }, chip)
 	end
 
 	return self
@@ -551,6 +576,7 @@ function ShiftPanel:renderRoster()
 			-- The corner offers the other verb: dismiss a bot, or invite into
 			-- an empty chair. A person's chair has neither.
 			slot.dismiss.Visible = seat.kind == "bot" or seat.kind == "empty"
+			slot.dismissPlate.Visible = slot.dismiss.Visible
 			slot.dismiss.Text = if seat.kind == "bot" then "x" else "+"
 			if seat.kind == "player" then
 				slot.face.BackgroundColor3 = if mine then Theme.BROWN_LIGHT else Theme.BROWN_MID
@@ -795,10 +821,12 @@ function ShiftPanel:relayout(_L: any, viewport: Vector2)
 	-- Level with Roblox's own controls and to the right of them, which is what
 	-- TopbarInset describes. Height comes from the platform too, so our buttons
 	-- are the same height as the system ones rather than a number picked to
-	-- look about right -- clamped only so a bogus inset cannot produce a row
-	-- too small to hit.
+	-- look about right -- but never below TOPBAR_TAP. Roblox's own pills are
+	-- ~36px, and matching them exactly made WARDROBE, INVITE and NEW SERVER
+	-- 36px targets: these are primary touch controls, and the 44px floor wins
+	-- over lining up with the platform's row by a few pixels.
 	local barY, barH, barLeft, barRight = Theme.topbarBand(viewport)
-	local btnH = math.clamp(barH, 30, 44)
+	local btnH = math.max(barH, Theme.TOPBAR_TAP)
 	local barAvail = math.max(MIN_BAR_ITEM * 2, (barRight - Theme.TOPBAR_MARGIN) - barLeft)
 
 	-- Hidden controls take no space: a tutorial server hides INVITE.
