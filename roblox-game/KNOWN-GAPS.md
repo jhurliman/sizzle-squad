@@ -99,7 +99,7 @@ a release.
   server with `ReferredByPlayerId` still set, and skipping the tutorial on that
   basis would strand a first-timer among strangers.) They learn by
   playing next to the person who brought them, which is the whole reason they
-  came — but they never see the two scripted tickets, so their first round is
+  came — but they never see the scripted ticket, so their first round is
   a live one with a stranger's pacing. `rounds` stays 0, so a later solo join
   still gets First Shift properly. Watch `first_shift_skipped` against
   first-round completion; if those players do worse, the answer is probably a
