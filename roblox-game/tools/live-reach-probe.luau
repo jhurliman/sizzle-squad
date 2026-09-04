@@ -25,6 +25,27 @@ local USER_ID = -1
 local KEY = `p{USER_ID}`
 local store = DataStoreService:GetDataStore("SizzleProfiles_v1")
 
+-- awardRound also writes the ordered leaderboard stores (u<id>), and a probe
+-- row that reaches the top 25 is a user-visible "u-1" on the Ranks tab. Every
+-- store the probe can touch is cleared before and after. Same names as
+-- Progression's; the weekly board is keyed by ISO week like there.
+local weekKey = os.date("!%Y-W%W") :: string
+local boards = {
+	DataStoreService:GetOrderedDataStore("SizzleBestRound_v1"),
+	DataStoreService:GetOrderedDataStore(`SizzleWeekly_{weekKey}`),
+	DataStoreService:GetOrderedDataStore("SizzleCareerDishes_v1"),
+}
+local function cleanup(id: number)
+	pcall(function() store:RemoveAsync(`p{id}`) end)
+	for _, b in boards do
+		pcall(function() b:RemoveAsync(`u{id}`) end)
+	end
+end
+-- Earlier revisions of this probe ran as p7/u7 -- a real account's keys.
+-- Those rows are removed here once, on every run, until nobody can have
+-- written them again.
+cleanup(7)
+
 local function readBack(label: string)
 	local ok, v = pcall(function()
 		return store:GetAsync(KEY)
@@ -37,7 +58,7 @@ local remotes = setmetatable({}, { __index = function() return { FireClient = fu
 local prog = Progression.new(Config, remotes, Catalog)
 local player = { UserId = USER_ID, Name = "ReachProbe", DisplayName = "ReachProbe" }
 
-pcall(function() store:RemoveAsync(KEY) end)
+cleanup(USER_ID)
 prog:playerAdded(player)
 prog:noteReach(player, "joined")
 prog:noteReach(player, "worked")
@@ -54,14 +75,29 @@ prog:awardRound(crew, results, false)
 -- papered over by a second call.
 local inMemory = prog.profiles[player].reach
 print(`       in memory after awardRound: reach={inMemory} rounds={prog.profiles[player].rounds}`)
-task.wait(1.5)
-local autosaved = readBack("after awardRound autosave")
+-- The autosave is task.spawn'd and DataStore latency is what it is: poll for
+-- the write rather than sleep a guess, bounded so a broken path still fails.
+local function waitFor(label: string, pred: (any) -> boolean): any
+	local last = nil
+	for _ = 1, 20 do
+		task.wait(0.5)
+		last = readBack(label)
+		if pred(last) then
+			break
+		end
+	end
+	return last
+end
+local autosaved = waitFor("after awardRound autosave", function(v)
+	return v ~= nil and v.rounds == 1
+end)
 
 prog:playerRemoving(player)
-task.wait(1.5)
-local final = readBack("after leave")
+local final = waitFor("after leave", function(v)
+	return v ~= nil and v.__lock == nil
+end)
 
-pcall(function() store:RemoveAsync(KEY) end)
+cleanup(USER_ID)
 local failures = 0
 local function check(cond: boolean, msg: string)
 	if cond then
