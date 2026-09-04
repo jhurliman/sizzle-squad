@@ -41,10 +41,9 @@ local function cleanup(id: number)
 		pcall(function() b:RemoveAsync(`u{id}`) end)
 	end
 end
--- Earlier revisions of this probe ran as p7/u7 -- a real account's keys.
--- Those rows are removed here once, on every run, until nobody can have
--- written them again.
-cleanup(7)
+-- (Earlier revisions of this probe ran as p7/u7, a real account's keys. Those
+-- rows were removed once and verified gone; a reusable diagnostic must not
+-- keep deleting a positive UserId's data on every run.)
 
 local function readBack(label: string)
 	local ok, v = pcall(function()

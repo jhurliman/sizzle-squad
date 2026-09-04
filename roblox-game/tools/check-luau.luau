@@ -54,15 +54,19 @@ local function selfReferencing(path: string)
 	local i = 1
 	while i <= #lines do
 		local line = lines[i]
-		local name = line:match("^%s*local%s+([%a_][%w_]*)%s*=")
+		local name, rest = line:match("^%s*local%s+([%a_][%w_]*)%s*=(.*)$")
 		if name ~= nil then
-			local code = stripComment(line)
+			local code = stripComment(rest)
 			local depth = 0
 			for c in code:gmatch("[%(%){}]") do
 				depth += if c == "(" or c == "{" then 1 else -1
 			end
+			-- `local x =` with the value on the next line: the initializer has
+			-- not started yet, so keep reading until it opens, or until a line
+			-- shows it was a one-liner after all.
+			local pending = code:match("^%s*$") ~= nil
 			local j = i
-			while depth > 0 and j < #lines do
+			while (depth > 0 or pending) and j < #lines do
 				j += 1
 				local body = stripComment(lines[j])
 				if body:find(`%f[%w_]{name}%f[^%w_]`) then
@@ -71,6 +75,9 @@ local function selfReferencing(path: string)
 				end
 				for c in body:gmatch("[%(%){}]") do
 					depth += if c == "(" or c == "{" then 1 else -1
+				end
+				if pending and body:match("%S") then
+					pending = false
 				end
 			end
 			i = j
