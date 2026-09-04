@@ -347,7 +347,7 @@ function RoundDirector:buildResults(): any
 	end
 	-- FINISHING FIRST SHIFT IS THREE STARS, FULL STOP.
 	--
-	-- Two scripted dishes will never clear an 80-coin threshold, so a player
+	-- A scripted dish will never clear an 80-coin threshold, so a player
 	-- who did exactly what they were told would be shown a one-star result --
 	-- the game's own way of saying "that was poor" -- as the very first thing
 	-- it ever tells them. The tutorial's success condition is completing it,
@@ -453,7 +453,7 @@ function RoundDirector:heartbeat(dt: number)
 		end
 		self.replicator:flush(self.simService.sim, events, dt, self.simService:wireClock())
 		-- The tutorial board is endless, so nothing inside the sim will ever
-		-- set `over`. Two dishes is the whole shift; tripping `over` here means
+		-- set `over`. TUTORIAL.DISHES is the whole shift; tripping `over` here means
 		-- results, payout and the career counters all run through the ordinary
 		-- path rather than a parallel one that could drift from it.
 		if self.tutorialFn() and self.simService.sim.score.served >= self.config.TUTORIAL.DISHES then

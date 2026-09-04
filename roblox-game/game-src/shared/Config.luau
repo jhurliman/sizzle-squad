@@ -175,14 +175,20 @@ end
 -- So a player with no completed shifts is teleported straight into a RESERVED
 -- server, alone, and teleported back into normal matchmaking when they finish.
 Config.TUTORIAL = {
-	-- Two tickets, not three. The funnel is the reason: every extra scripted
-	-- dish is another place to quit before ever seeing a real kitchen.
-	-- `salad` is lettuce + tomato, which teaches chop -> plate -> serve with
-	-- the fewest moving parts; `baconroll` then introduces the stove and the
-	-- plate-scoop, the least discoverable move in the game. Anything beyond
-	-- those two is repetition, and repetition is churn here.
-	RECIPES = { "salad", "baconroll" },
-	DISHES = 2,
+	-- ONE DISH. MEASURED (campaign 002, 341 players with per-stage telemetry):
+	-- the controls converted at 88-98% per stage, and then 47% of the players
+	-- who had reached a station and started working quit before the shift
+	-- ended. A quitter at a station lasted a median 80s; a completer needed a
+	-- median 274s. Two scripted dishes was the largest single loss in the
+	-- whole funnel -- larger than every stage before it combined.
+	--
+	-- `salad` is lettuce + tomato: chop -> plate -> serve with the fewest
+	-- moving parts, and the two 1.15s chops fit inside the 80s the data says
+	-- a new player will give it. The stove and the plate-scoop (`baconroll`)
+	-- are the first real kitchen's job now; a coach tip there beats a second
+	-- scripted ticket here.
+	RECIPES = { "salad" },
+	DISHES = 1,
 	-- Enough to land level 2 on its own: LEVEL_CURVE(1) is exactly 100.
 	-- Arriving in the first real kitchen already ranked up is the point.
 	BONUS_XP = 100,

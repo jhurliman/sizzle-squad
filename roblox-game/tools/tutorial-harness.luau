@@ -106,19 +106,16 @@ check(first ~= nil and first.recipe.id == Config.TUTORIAL.RECIPES[1], `and it is
 -- point at, which is the whole reason for capping the board.
 check(first ~= nil and first.remaining > 1000, `the ticket will not expire while it is read ({math.floor(first.remaining)}s)`)
 
--- 4. the second ticket only arrives once the first is gone
+-- 4. ONE ticket, ONE dish. The shift used to be two; the campaign-002 funnel
+-- showed 47% of players who had reached a station quitting before the second
+-- dish, so the second dish is gone. Nothing may pile on while the one ticket
+-- is open, and the scripted list is exactly one long.
 local before = #sim.orders
 for _ = 1, 60 * 30 do
 	director:heartbeat(1 / 60)
 end
 check(#sim.orders == before, "no second ticket piles on while the first is open")
-table.remove(sim.orders, 1)
-sim.score.served = 1
-for _ = 1, 60 * 40 do
-	director:heartbeat(1 / 60)
-end
-check(#sim.orders == 1, `the next ticket arrives after the first is served (got {#sim.orders})`)
-check(sim.orders[1] ~= nil and sim.orders[1].recipe.id == Config.TUTORIAL.RECIPES[2], `and it is {Config.TUTORIAL.RECIPES[2]} (got {sim.orders[1] and sim.orders[1].recipe.id})`)
+check(#Config.TUTORIAL.RECIPES == 1 and Config.TUTORIAL.DISHES == 1, `First Shift is one dish ({#Config.TUTORIAL.RECIPES} recipe(s), {Config.TUTORIAL.DISHES} to serve)`)
 
 -- 5. run PAST the normal round length with nothing served: it must not end
 local guard = 0
@@ -138,7 +135,7 @@ check(director.phase == "round", "an empty patience meter does not end the tutor
 -- 6. serving the target ends it
 sim.score.served = Config.TUTORIAL.DISHES
 director:heartbeat(1 / 60)
-check(director.phase == "results", `{Config.TUTORIAL.DISHES} dishes ends the shift (phase={director.phase})`)
+check(director.phase == "results", `{Config.TUTORIAL.DISHES} dish ends the shift (phase={director.phase})`)
 check(awarded ~= nil, "and the results/payout path ran")
 
 -- FINISHING IS THREE STARS. Two scripted dishes cannot clear an 80-coin
