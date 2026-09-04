@@ -34,8 +34,6 @@ export type Seat = {
 	chefId: number,
 	lastInputAt: number,
 	afk: boolean,
-	-- What noteSimReach last saw of this seat's chef; nil until first observed.
-	seen: { carrying: boolean, working: boolean, afk: boolean }?,
 }
 
 function CrewManager.new(
@@ -358,39 +356,30 @@ end
 --- Each of those permanently advanced a funnel whose whole job is to say what
 --- a NEW PLAYER worked out on their own.
 ---
---- So every seated human's chef is observed every heartbeat, and a stage is
---- noted only when carrying/working goes from nil to set between two
---- observations during which the seat was active. The observation itself is
---- always kept -- while AFK, at handoff, on the frame they are seated -- so
---- inherited state is the baseline, never the event. (main.server adds a
---- second lock on the other end of onReach: nothing past `pressed` counts
---- for a player who has not pressed, because nothing past it is possible
---- without the press that does it.)
+--- So SimService records, PER SIM STEP and only for chefs with a human slot,
+--- the step in which carrying/working went from nil to set (see
+--- SimService.reach for why per step). A bot's chef and an AFK seat's chef
+--- have no slot and are never examined; a slot begins with whatever the chef
+--- already had, so inherited state is the baseline, never the event. This
+--- drains those records and hands them to onReach by seat. (main.server adds
+--- a second lock on the other end: nothing past `pressed` counts for a player
+--- who has not pressed, because nothing past it is possible without the
+--- press that does it.)
 ---
 --- Lives here rather than in main.server.luau so the crew harness can drive
 --- every handoff path against it; see seatAction for why that matters.
 function CrewManager:noteSimReach()
-	for _, chef in self.simService.sim.chefs do
-		local seat = self.byChef[chef.id]
-		if seat == nil then
-			continue -- a bot, or a chef nobody is sitting in
+	for chefId, r in self.simService:drainReach() do
+		local seat = self.byChef[chefId]
+		if seat == nil or seat.afk then
+			continue -- nobody's, or the bot's for now
 		end
-		local carrying = chef.carrying ~= nil
-		local working = chef.working ~= nil
-		local seen = seat.seen
-		if seen ~= nil and not seen.afk and not seat.afk then
-			if carrying and not seen.carrying then
-				self.onReach(seat.player, "carried")
-			end
-			if working and not seen.working then
-				self.onReach(seat.player, "worked")
-			end
+		if r.carried then
+			self.onReach(seat.player, "carried")
 		end
-		if seen == nil then
-			seen = {}
-			seat.seen = seen
+		if r.worked then
+			self.onReach(seat.player, "worked")
 		end
-		seen.carrying, seen.working, seen.afk = carrying, working, seat.afk
 	end
 end
 
@@ -421,7 +410,6 @@ function CrewManager:reseat()
 		if chefId ~= nil then
 			self.simService:setHuman(chefId, true)
 			seat.chefId = chefId
-			seat.seen = nil -- a new chef is a new baseline for noteSimReach
 			self.byChef[chefId] = seat
 			self:claimSkin(chefId, self.skinFor and self.skinFor(player))
 			self:sendSeat(player, seat)

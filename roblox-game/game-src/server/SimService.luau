@@ -33,6 +33,10 @@ export type HumanSlot = {
 	-- movement was server-locked (working/stun) last tick: grant a grace
 	-- resync on the first packet after the lock releases
 	wasLocked: boolean,
+	-- What this chef was carrying/working at the END of the last sim step (or
+	-- at handoff). Funnel transitions are read against these, per step.
+	sawCarrying: boolean,
+	sawWorking: boolean,
 }
 
 local MAX_QUEUED_GRABS = 3
@@ -59,6 +63,18 @@ function SimService.new(shared: any, opts: { seed: number, chefCount: number?, b
 	self.staging = opts.staging
 	self.humans = {} :: { [number]: HumanSlot }
 	self.tickEvents = {} :: { any }
+	-- FUNNEL TRANSITIONS, PER SIM STEP, FOR HUMAN-DRIVEN CHEFS ONLY.
+	--
+	-- chefId -> { carried = true?, worked = true? }, set inside `tick` the
+	-- step a human's chef goes from empty-handed to carrying, or from idle to
+	-- working, and drained by CrewManager:noteSimReach. Detected per STEP
+	-- rather than per heartbeat because one heartbeat can run several steps
+	-- (a hitch, a slow server), and a pick-up-and-put-down inside one of them
+	-- is invisible to anything that only compares the two ends. A chef with
+	-- no human slot -- a bot, an AFK seat -- is never looked at, and the slot
+	-- starts with whatever the chef already had, so inherited state is the
+	-- baseline and never the event.
+	self.reach = {} :: { [number]: { carried: boolean?, worked: boolean? } }
 	-- MONOTONIC service clock, deliberately NOT sim.time.
 	--
 	-- Human move validation measures "real seconds since the last accepted
@@ -130,9 +146,13 @@ function SimService:setHuman(chefId: number, on: boolean)
 		if chef.id == chefId then
 			chef.isPlayer = on
 			if on then
-				-- Entering play from the parking row: spawn somewhere sane.
-				if not self.botFill then
-					local spawned = self.shared.safeSpawn(self.sim.kitchen, { x = 7.5, y = 6.5 })
+				-- Entering play from the parking row -- every chef without bot
+				-- fill, and a DISMISSED chef with it, which freeChef can still
+				-- deal to a joiner -- spawn somewhere sane. A player left on
+				-- the apron is off-camera with nothing to walk on.
+				local k = self.sim.kitchen
+				if not self.shared.isWalkable(k, math.floor(chef.pos.x), math.floor(chef.pos.y)) then
+					local spawned = self.shared.safeSpawn(k, { x = 7.5, y = 6.5 })
 					chef.pos.x, chef.pos.y = spawned.x, spawned.y
 					chef.vel.x, chef.vel.y = 0, 0
 				end
@@ -145,17 +165,17 @@ function SimService:setHuman(chefId: number, on: boolean)
 					rejectStreak = 0,
 					corrected = false,
 					wasLocked = false,
+					sawCarrying = chef.carrying ~= nil,
+					sawWorking = chef.working ~= nil,
 				}
 			else
 				self.humans[chefId] = nil
-				-- Drop whatever they held back onto... they keep carrying; the
-				-- bot (if any) resumes with it. Without bots, park the chef.
-				if not self.botFill then
-					local spot = PARK[((chef.id) % #PARK) + 1]
-					chef.pos.x, chef.pos.y = spot.x, spot.y
-					chef.vel.x, chef.vel.y = 0, 0
-					chef.working = nil
-					chef.stun = 0
+				-- They keep carrying; the bot (if any) resumes with it. A chef
+				-- nothing will drive -- no bot fill, or a dismissed species --
+				-- is parked, or it would stand invisible in the kitchen as a
+				-- body everyone else collides with.
+				if not self:isActive(chef) then
+					self:park(chef)
 				end
 			end
 			return chef
@@ -188,6 +208,13 @@ function SimService:activeBotCount(): number
 		end
 	end
 	return n
+end
+
+--- Hand over the funnel transitions recorded since the last drain.
+function SimService:drainReach(): { [number]: { carried: boolean?, worked: boolean? } }
+	local out = self.reach
+	self.reach = {}
+	return out
 end
 
 function SimService:humanMove(chefId: number, p: any)
@@ -351,6 +378,26 @@ function SimService:tick(dt: number, _now: number?): ({ any }, number)
 			end
 		end
 		shared.stationPhase(sim, sdt)
+
+		-- The step is over: what did each HUMAN's chef start doing in it?
+		for chefId, slot in self.humans do
+			local chef = sim.chefs[chefId + 1]
+			if chef == nil then
+				continue
+			end
+			local carrying, working = chef.carrying ~= nil, chef.working ~= nil
+			if (carrying and not slot.sawCarrying) or (working and not slot.sawWorking) then
+				local r = self.reach[chefId] or {}
+				self.reach[chefId] = r
+				if carrying and not slot.sawCarrying then
+					r.carried = true
+				end
+				if working and not slot.sawWorking then
+					r.worked = true
+				end
+			end
+			slot.sawCarrying, slot.sawWorking = carrying, working
+		end
 
 		for _, ev in sim.events do
 			table.insert(batch, ev)
