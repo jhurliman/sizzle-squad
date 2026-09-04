@@ -90,6 +90,22 @@ local function depthDelta(body: string, expression: boolean?): number
 	end
 	return d
 end
+--- Does `body` read the variable `name` -- not the field `.name` or method
+--- `:name`, which belong to whatever is before the dot.
+local function mentions(body: string, name: string): boolean
+	local at = 1
+	while true do
+		local i, j = body:find(`%f[%w_]{name}%f[^%w_]`, at)
+		if i == nil then
+			return false
+		end
+		local before = if i > 1 then body:sub(i - 1, i - 1) else ""
+		if before ~= "." and before ~= ":" then
+			return true
+		end
+		at = j + 1
+	end
+end
 local function selfReferencing(path: string)
 	local lines = fs.readFile(path):split("\n")
 	local i = 1
@@ -103,11 +119,14 @@ local function selfReferencing(path: string)
 			-- not started yet, so keep reading until it opens, or until a line
 			-- shows it was a one-liner after all.
 			local pending = code:match("^%s*$") ~= nil
+			-- A multi-line if-EXPRESSION has no `end`: it runs until the line
+			-- that carries its `else`.
+			local openIf = code:match("^%s*if%f[^%w_]") ~= nil and not code:find("%f[%w_]else%f[^%w_]")
 			local j = i
-			while (depth > 0 or pending) and j < #lines do
+			while (depth > 0 or pending or openIf) and j < #lines do
 				j += 1
 				local body = stripStrings(stripComment(lines[j]))
-				if body:find(`%f[%w_]{name}%f[^%w_]`) then
+				if mentions(body, name) then
 					selfRefs += 1
 					print(`FAIL {path}:{j}: \`{name}\` is used inside its own initializer (it is the global {name} there, nil)`)
 				end
@@ -115,8 +134,12 @@ local function selfReferencing(path: string)
 				if pending and body:match("%S") then
 					pending = false
 				end
+				if openIf and body:find("%f[%w_]else%f[^%w_]") then
+					openIf = false
+				end
 			end
-			i = j
+			-- Deliberately NOT skipping to j: a declaration nested inside this
+			-- initializer (a local in a callback) gets its own scan.
 		end
 		i += 1
 	end

@@ -35,11 +35,26 @@ local boards = {
 	DataStoreService:GetOrderedDataStore(`SizzleWeekly_{weekKey}`),
 	DataStoreService:GetOrderedDataStore("SizzleCareerDishes_v1"),
 }
-local function cleanup(id: number)
-	pcall(function() store:RemoveAsync(`p{id}`) end)
-	for _, b in boards do
-		pcall(function() b:RemoveAsync(`u{id}`) end)
+--- Remove the probe's rows from every store, retrying, and say whether it all
+--- went. A throttled RemoveAsync that was silently swallowed would leave a
+--- "u-1" on a live leaderboard behind a green result.
+local function cleanup(id: number): boolean
+	local all = true
+	local function remove(st: any, key: string)
+		for attempt = 1, 4 do
+			if pcall(function() st:RemoveAsync(key) end) then
+				return
+			end
+			task.wait(0.5 * attempt)
+		end
+		print(`  FAIL could not remove {key}`)
+		all = false
 	end
+	remove(store, `p{id}`)
+	for _, b in boards do
+		remove(b, `u{id}`)
+	end
+	return all
 end
 -- (Earlier revisions of this probe ran as p7/u7, a real account's keys. Those
 -- rows were removed once and verified gone; a reusable diagnostic must not
@@ -57,7 +72,9 @@ local remotes = setmetatable({}, { __index = function() return { FireClient = fu
 local prog = Progression.new(Config, remotes, Catalog)
 local player = { UserId = USER_ID, Name = "ReachProbe", DisplayName = "ReachProbe" }
 
-cleanup(USER_ID)
+if not cleanup(USER_ID) then
+	error("could not clear the probe's keys before starting")
+end
 prog:playerAdded(player)
 prog:noteReach(player, "joined")
 prog:noteReach(player, "worked")
@@ -96,7 +113,7 @@ local final = waitFor("after leave", function(v)
 	return v ~= nil and v.__lock == nil
 end)
 
-cleanup(USER_ID)
+local cleaned = cleanup(USER_ID)
 local failures = 0
 local function check(cond: boolean, msg: string)
 	if cond then
@@ -109,6 +126,7 @@ end
 check(inMemory == "finished", `awardRound notes finished in memory ({inMemory})`)
 check(autosaved ~= nil and autosaved.reach == "finished", `and its own autosave persists it ({autosaved and autosaved.reach or "nil"})`)
 check(final ~= nil and final.reach == "finished" and final.__lock == nil, `and the leave-save keeps it and releases the lock ({final and final.reach or "nil"})`)
+check(cleaned, "and every probe row was removed from every store afterwards")
 if failures == 0 then
 	print("REACH OK — finished persists through the round-end sequence")
 else
