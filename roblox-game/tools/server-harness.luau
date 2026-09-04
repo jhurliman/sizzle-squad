@@ -682,6 +682,24 @@ svc2.sim.events = {}
 local batch2 = svc2:tick(0.1, 0)
 check(true, "bots-off: sim ticks without a bot director")
 
+-- AFK WITH BOTS OFF PARKS THE CHEF, NOT THE PLATE. First Shift runs with bot
+-- fill off, and a learner idle for AFK_SECONDS is handed to setHuman(false),
+-- which parks them. Parking used to keep what they held; a version of it
+-- briefly cleared hands, so a learner back from AFK had lost the plate they
+-- had prepared. Pinned here through the real handoff.
+do
+	local held = { type = "plate", plate = { id = 1, contents = {}, dirty = false } }
+	humanChef.carrying = held
+	svc2:setHuman(humanChef.id, false)
+	check(humanChef.pos.y >= 11, "bots-off: an AFK learner's chef is parked")
+	check(humanChef.carrying == held, "bots-off: and still holding what they had")
+	svc2:setHuman(humanChef.id, true)
+	check(
+		humanChef.carrying == held and shared.isWalkable(svc2.sim.kitchen, math.floor(humanChef.pos.x), math.floor(humanChef.pos.y)),
+		"bots-off: back from AFK, on the floor, plate still in hand"
+	)
+end
+
 print(if failures > 0 then `{failures} FAILURES` else "PASS: bots-off mode")
 if failures > 0 then
 	error(`{failures} checks failed`)

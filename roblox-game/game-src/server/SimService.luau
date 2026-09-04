@@ -114,12 +114,15 @@ function SimService:isActive(chef: any): boolean
 end
 
 --- Stand one chef on the apron, out of frame and out of play.
+---
+--- Hands are left alone. Without bot fill an AFK learner is parked here and
+--- takes the chef back on their next input; the plate they had prepared has
+--- to still be in it.
 function SimService:park(chef: any)
 	local spot = PARK[((chef.id) % #PARK) + 1]
 	chef.pos.x, chef.pos.y = spot.x, spot.y
 	chef.vel.x, chef.vel.y = 0, 0
 	chef.working = nil
-	chef.carrying = nil
 	chef.stun = 0
 end
 
