@@ -207,15 +207,18 @@ check(wp.lastSeenAt ~= nil and wp.lastSeenAt >= firstJoin, "lastSeenAt moves for
 -- playSeconds cannot answer that later because it keeps counting through the
 -- live rounds that follow.
 do
-	CLOCK.t = 5130 -- 30s more play since the last accrual, not yet folded in
+	-- 100s already on the cumulative clock from before the tutorial; the
+	-- round itself took 72s. The stamp must be the 72, not the 172.
+	CLOCK.t = 5130
 	local crew = { seats = { [walker] = { chefId = 0 } }, humanCount = function() return 1 end }
-	local results = { coins = 40, stars = 3, served = 1, missed = 0, bestCombo = 1, stats = { [0] = { serves = 1 } }, tutorial = true }
+	local results = { coins = 40, stars = 3, served = 1, missed = 0, bestCombo = 1, time = 72, stats = { [0] = { serves = 1 } }, tutorial = true }
 	fp:awardRound(crew, results, true)
-	check(math.abs((wp.firstShiftSeconds or -1) - 130) < 0.01, `firstShiftSeconds is the clock at the tutorial payout, accrued to the second (got {wp.firstShiftSeconds})`)
+	check(math.abs((wp.firstShiftSeconds or -1) - 72) < 0.01, `firstShiftSeconds is the tutorial round's own duration, not cumulative play (got {wp.firstShiftSeconds})`)
 	check(wp.tutorialDone == true, "alongside tutorialDone")
 	CLOCK.t = 5400
+	results.time = 300
 	fp:awardRound(crew, results, true)
-	check(math.abs((wp.firstShiftSeconds or -1) - 130) < 0.01, `and a later tutorial pass does not overwrite it (got {wp.firstShiftSeconds})`)
+	check(math.abs((wp.firstShiftSeconds or -1) - 72) < 0.01, `and a later tutorial pass does not overwrite it (got {wp.firstShiftSeconds})`)
 	check(math.abs(wp.playSeconds - 400) < 0.01, `while playSeconds keeps counting (got {wp.playSeconds})`)
 end
 
@@ -227,7 +230,7 @@ fp2:playerAdded(walker, false)
 local wp2 = fp2.profiles[walker]
 check(math.abs(wp2.playSeconds - 400) < 0.01, `play time persists across sessions (got {wp2.playSeconds})`)
 check(wp2.reach == "finished", "and so does the furthest stage reached (awardRound noted finished)")
-check(math.abs((wp2.firstShiftSeconds or -1) - 130) < 0.01, `and so does firstShiftSeconds (got {wp2.firstShiftSeconds})`)
+check(math.abs((wp2.firstShiftSeconds or -1) - 72) < 0.01, `and so does firstShiftSeconds (got {wp2.firstShiftSeconds})`)
 check(wp2.firstJoinAt == firstJoin, "firstJoinAt is never overwritten")
 CLOCK.t = 9060
 fp2:accrue(walker)

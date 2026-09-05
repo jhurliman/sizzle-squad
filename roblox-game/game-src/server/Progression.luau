@@ -521,15 +521,16 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 			coinsEarned += t.BONUS_COINS
 			profile.coins += t.BONUS_COINS
 			profile.tutorialDone = true
-			-- HOW LONG FIRST SHIFT TOOK, to the second, once. playSeconds keeps
-			-- counting through whatever they play next, so "did the tutorial
-			-- fit in 80s" cannot be read from it after the fact; this is the
-			-- clock at the moment the tutorial paid out. Accrue first so the
-			-- seconds since the last autosave are in it, and never overwrite:
-			-- a player sent back through First Shift keeps their first time.
+			-- HOW LONG FIRST SHIFT TOOK, once: the tutorial ROUND's own clock,
+			-- from the round starting to the dish being served. Not playSeconds
+			-- -- that is cumulative across every server and session, so a player
+			-- who sat in the public server first, or quit the tutorial once and
+			-- came back, would carry that time into the stamp and read as a
+			-- slow completion. The tutorial auto-starts on join, so the round
+			-- clock is the whole of the experience that matters. Never
+			-- overwritten: a player sent back through keeps their first time.
 			if profile.firstShiftSeconds == nil then
-				self:accrue(player)
-				profile.firstShiftSeconds = profile.playSeconds
+				profile.firstShiftSeconds = results.time or 0
 			end
 		end
 		-- WHERE THE BAR WAS BEFORE THIS SHIFT.

@@ -84,7 +84,7 @@ readBack("after join")
 -- Force the autosave inside awardRound to fire, as it does after a 180s round.
 prog.lastSave = os.clock() - 999
 local crew = { seats = { [player] = { chefId = 0 } }, humanCount = function() return 1 end }
-local results = { coins = 120, stars = 3, served = 4, missed = 0, bestCombo = 3, stats = { [0] = { serves = 4, chops = 2, cooks = 1, washes = 0 } }, tutorial = false }
+local results = { coins = 120, stars = 3, served = 4, missed = 0, bestCombo = 3, time = 61, stats = { [0] = { serves = 4, chops = 2, cooks = 1, washes = 0 } }, tutorial = false }
 prog:awardRound(crew, results, true) -- as a TUTORIAL: also stamps firstShiftSeconds
 -- awardRound itself is what has to say "finished" now -- nothing here
 -- nudges it, so a regression there fails this probe rather than being
@@ -126,7 +126,7 @@ end
 check(inMemory == "finished", `awardRound notes finished in memory ({inMemory})`)
 check(autosaved ~= nil and autosaved.reach == "finished", `and its own autosave persists it ({autosaved and autosaved.reach or "nil"})`)
 check(final ~= nil and final.reach == "finished" and final.__lock == nil, `and the leave-save keeps it and releases the lock ({final and final.reach or "nil"})`)
-check(final ~= nil and type(final.firstShiftSeconds) == "number", `and firstShiftSeconds was stamped at the payout ({final and tostring(final.firstShiftSeconds) or "nil"})`)
+check(final ~= nil and final.firstShiftSeconds == 61, `and firstShiftSeconds is the tutorial round's own time, 61 ({final and tostring(final.firstShiftSeconds) or "nil"})`)
 check(cleaned, "and every probe row was removed from every store afterwards")
 if failures == 0 then
 	print("REACH OK — finished persists through the round-end sequence")
