@@ -202,18 +202,36 @@ fp:accrue(walker)
 check(math.abs(wp.playSeconds - 100) < 0.01, `accrual is incremental, not restated (got {wp.playSeconds})`)
 check(wp.lastSeenAt ~= nil and wp.lastSeenAt >= firstJoin, "lastSeenAt moves forward")
 
+-- HOW LONG FIRST SHIFT TOOK is stamped at the tutorial payout, exactly once.
+-- The target the one-dish shift is measured against is "under 80s", and
+-- playSeconds cannot answer that later because it keeps counting through the
+-- live rounds that follow.
+do
+	CLOCK.t = 5130 -- 30s more play since the last accrual, not yet folded in
+	local crew = { seats = { [walker] = { chefId = 0 } }, humanCount = function() return 1 end }
+	local results = { coins = 40, stars = 3, served = 1, missed = 0, bestCombo = 1, stats = { [0] = { serves = 1 } }, tutorial = true }
+	fp:awardRound(crew, results, true)
+	check(math.abs((wp.firstShiftSeconds or -1) - 130) < 0.01, `firstShiftSeconds is the clock at the tutorial payout, accrued to the second (got {wp.firstShiftSeconds})`)
+	check(wp.tutorialDone == true, "alongside tutorialDone")
+	CLOCK.t = 5400
+	fp:awardRound(crew, results, true)
+	check(math.abs((wp.firstShiftSeconds or -1) - 130) < 0.01, `and a later tutorial pass does not overwrite it (got {wp.firstShiftSeconds})`)
+	check(math.abs(wp.playSeconds - 400) < 0.01, `while playSeconds keeps counting (got {wp.playSeconds})`)
+end
+
 -- A second session continues the same totals rather than resetting them.
 fp:playerRemoving(walker)
 CLOCK.t = 9000
 local fp2 = Progression.new(Config, remotes, Catalog, funnelDSS)
 fp2:playerAdded(walker, false)
 local wp2 = fp2.profiles[walker]
-check(math.abs(wp2.playSeconds - 100) < 0.01, `play time persists across sessions (got {wp2.playSeconds})`)
-check(wp2.reach == "worked", "and so does the furthest stage reached")
+check(math.abs(wp2.playSeconds - 400) < 0.01, `play time persists across sessions (got {wp2.playSeconds})`)
+check(wp2.reach == "finished", "and so does the furthest stage reached (awardRound noted finished)")
+check(math.abs((wp2.firstShiftSeconds or -1) - 130) < 0.01, `and so does firstShiftSeconds (got {wp2.firstShiftSeconds})`)
 check(wp2.firstJoinAt == firstJoin, "firstJoinAt is never overwritten")
 CLOCK.t = 9060
 fp2:accrue(walker)
-check(math.abs(wp2.playSeconds - 160) < 0.01, `a later session adds to it (got {wp2.playSeconds})`)
+check(math.abs(wp2.playSeconds - 460) < 0.01, `a later session adds to it (got {wp2.playSeconds})`)
 
 --------------------------------------------------------------------------
 -- Where a player came from. Roblox tells a running server almost nothing --
