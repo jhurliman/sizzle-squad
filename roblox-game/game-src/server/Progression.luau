@@ -521,6 +521,16 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 			coinsEarned += t.BONUS_COINS
 			profile.coins += t.BONUS_COINS
 			profile.tutorialDone = true
+			-- HOW LONG FIRST SHIFT TOOK, to the second, once. playSeconds keeps
+			-- counting through whatever they play next, so "did the tutorial
+			-- fit in 80s" cannot be read from it after the fact; this is the
+			-- clock at the moment the tutorial paid out. Accrue first so the
+			-- seconds since the last autosave are in it, and never overwrite:
+			-- a player sent back through First Shift keeps their first time.
+			if profile.firstShiftSeconds == nil then
+				self:accrue(player)
+				profile.firstShiftSeconds = profile.playSeconds
+			end
 		end
 		-- WHERE THE BAR WAS BEFORE THIS SHIFT.
 		--
