@@ -116,6 +116,37 @@ function KitchenCard.new(gui: Instance, deps: any)
 		}, self.card)
 	end
 
+	-- THE TWO THINGS THAT GROW THE GAME, SAID WHERE 45% OF NEW PLAYERS LOOK.
+	--
+	-- This card is the first thing a First Shift completer sees in a real
+	-- kitchen, and the first thing every returning player sees each session
+	-- -- the one screen with both the people worth keeping and the moment they
+	-- are pleased with themselves. The streak line makes tomorrow concrete:
+	-- not "keep your streak" but the number it pays. The like line is the
+	-- cheapest discovery signal there is on this platform, and the one thing
+	-- no code can do for the player, so it is asked for plainly.
+	--
+	-- Sized off the streak bonus in Progression:settleDailies (10% per day,
+	-- capped at +50%), so the promise is exactly what the server pays.
+	self.streakLine = Theme.label({
+		Size = UDim2.new(1, -32, 0, 22),
+		Position = UDim2.fromOffset(16, 204),
+		TextSize = 15,
+		TextColor3 = Theme.GOLD,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 8,
+		Text = "",
+	}, self.card)
+	self.likeLine = Theme.label({
+		Size = UDim2.new(1, -32, 0, 22),
+		Position = UDim2.fromOffset(16, 232),
+		TextSize = 14,
+		TextColor3 = Theme.CREAM,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 8,
+		Text = "👍 Enjoying the kitchen? A like helps more chefs find it",
+	}, self.card)
+
 	local row = mk("Frame", {
 		Size = UDim2.new(1, -32, 0, Theme.MIN_TAP),
 		-- Two stacked rows now: actions here, "who with" underneath.
@@ -254,7 +285,18 @@ end
 function KitchenCard:setProgress(progress: any)
 	self.progress = progress
 	local player = Players.LocalPlayer
-	self.title.Text = Loc.f("fmt.welcome_named", player.DisplayName)
+	-- A player straight out of First Shift has never been here before, so
+	-- "welcome back" is a lie the first time. One round, one session, and
+	-- the tutorial done is exactly that player.
+	local fresh = (progress.rounds or 0) == 1 and (progress.sessions or 1) <= 1 and progress.tutorialDone == true
+	self.title.Text = if fresh
+		then Loc.f("fmt.first_shift_done", player.DisplayName)
+		else Loc.f("fmt.welcome_named", player.DisplayName)
+	-- Tomorrow's bonus: the streak multiplier is 1 + 0.1 x (days - 1), capped
+	-- at 1.5, so the day AFTER a `streak`-day streak pays 10 x streak percent.
+	local streak = math.max(1, progress.streak or 1)
+	local tomorrowPct = math.min(50, 10 * streak)
+	self.streakLine.Text = Loc.f("fmt.streak_tomorrow", streak, tomorrowPct)
 	local xp, toNext = progress.xp or 0, progress.xpToNext
 	self.subtitle.Text = Loc.f("fmt.level_coins", progress.level or 1, progress.coins or 0, progress.rounds or 0)
 	if toNext ~= nil and toNext > 0 then

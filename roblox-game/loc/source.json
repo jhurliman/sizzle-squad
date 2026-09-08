@@ -2183,6 +2183,51 @@
         "de": "frei · tippen zum Spielen",
         "id": "kosong · ketuk untuk main"
       }
+    },
+    {
+      "key": "ui.like_nudge",
+      "source": "👍 Enjoying the kitchen? A like helps more chefs find it",
+      "context": "Join card: asks the player to like the experience on its Roblox page",
+      "note": "'like' is the Roblox thumbs-up, not a feeling",
+      "tr": {
+        "fr": "👍 Tu aimes la cuisine ? Un like aide d'autres chefs à la trouver",
+        "de": "👍 Gefällt dir die Küche? Ein Like hilft anderen Köchen, sie zu finden",
+        "id": "👍 Suka dapurnya? Satu like membantu chef lain menemukannya",
+        "ja": "👍 このキッチンが気に入った？いいねで他のシェフにも見つけてもらおう",
+        "ko": "👍 주방이 마음에 드나요? 좋아요는 다른 셰프들이 찾는 데 도움이 돼요",
+        "pt": "👍 Curtiu a cozinha? Um like ajuda mais chefs a encontrá-la",
+        "es": "👍 ¿Te gusta la cocina? Un like ayuda a que más chefs la encuentren"
+      }
+    },
+    {
+      "key": "fmt.streak_tomorrow",
+      "source": "🔥 Day {1} streak · play tomorrow for +{2}% bonus coins",
+      "context": "Join card: {1} = current streak in days, {2} = the daily-bonus percentage tomorrow will pay",
+      "note": "",
+      "tr": {
+        "fr": "🔥 Série de {1} jour(s) · reviens demain pour +{2}% de pièces bonus",
+        "de": "🔥 {1} Tage in Folge · morgen spielen für +{2}% Bonusmünzen",
+        "id": "🔥 Streak {1} hari · main besok untuk +{2}% koin bonus",
+        "ja": "🔥 {1}日連続 · 明日プレイでボーナスコイン+{2}%",
+        "ko": "🔥 {1}일 연속 · 내일 플레이하면 보너스 코인 +{2}%",
+        "pt": "🔥 Sequência de {1} dia(s) · jogue amanhã por +{2}% de moedas bônus",
+        "es": "🔥 Racha de {1} día(s) · juega mañana por +{2}% de monedas extra"
+      }
+    },
+    {
+      "key": "fmt.first_shift_done",
+      "source": "Nice first shift, {1}!",
+      "context": "Join card title for a player who has just completed the tutorial; {1} = display name",
+      "note": "",
+      "tr": {
+        "fr": "Belle première journée, {1} !",
+        "de": "Starke erste Schicht, {1}!",
+        "id": "Shift pertama yang hebat, {1}!",
+        "ja": "初めてのシフト、お見事 {1}！",
+        "ko": "첫 근무 멋졌어요, {1}!",
+        "pt": "Primeiro turno mandou bem, {1}!",
+        "es": "¡Buen primer turno, {1}!"
+      }
     }
   ],
   "note": "Bare language codes, not region locales. The experience registers its languages as languageCodeType=Language (en, fr, de, id, ja, ko, pt, es) and the dashboard importer rejects de-de/id-id/ja-jp/ko-kr against that. Bare codes are also the better runtime choice: Roblox falls back from a player's region locale (ja-jp) to the base language (ja), so one column covers every region of that language."
