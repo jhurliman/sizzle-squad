@@ -548,6 +548,26 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 		-- curve until the NEXT round's loop happened to consume it, so the
 		-- level-up arrived a round late and unexplained), and analytics logged
 		-- an income source it could not see.
+		-- THE STREAK MOVES BEFORE THE DAILIES SETTLE. settleDailies pays the
+		-- streak multiplier off streak.count, and this block used to run after
+		-- it -- so the first round of a new day was paid on YESTERDAY's count:
+		-- a day-2 player got 1.0x, day 3 got 1.1x, and the join card's "play
+		-- tomorrow for +10%" was a promise the server broke on the very round
+		-- it was made about. The day you come back is the day that pays.
+		-- (Grace token: one missed day per week forgiven.)
+		local streak = profile.streak
+		if streak.lastDay ~= today then
+			local yesterday = os.date("!%Y-%m-%d", os.time() - 86400) :: string
+			if streak.lastDay == yesterday then
+				streak.count += 1
+			elseif streak.lastDay ~= "" and streak.graceUsedWeek ~= weekKey() then
+				streak.graceUsedWeek = weekKey()
+				streak.count += 1
+			else
+				streak.count = 1
+			end
+			streak.lastDay = today
+		end
 		local dailyCoins, dailyXp = self:settleDailies(profile, results, stats, today)
 		xp += dailyXp
 
@@ -596,21 +616,6 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 			stars = results.stars,
 			served = serves,
 		}
-
-		-- streak (grace token: one missed day per week forgiven)
-		local streak = profile.streak
-		if streak.lastDay ~= today then
-			local yesterday = os.date("!%Y-%m-%d", os.time() - 86400) :: string
-			if streak.lastDay == yesterday then
-				streak.count += 1
-			elseif streak.lastDay ~= "" and streak.graceUsedWeek ~= weekKey() then
-				streak.graceUsedWeek = weekKey()
-				streak.count += 1
-			else
-				streak.count = 1
-			end
-			streak.lastDay = today
-		end
 
 		-- The funnel's last stage, noted HERE with the round it belongs to,
 		-- not by the caller afterwards: the two used to be separated by a

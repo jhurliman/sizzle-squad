@@ -215,6 +215,25 @@ do
 	fp:awardRound(crew, results, true)
 	check(math.abs((wp.firstShiftSeconds or -1) - 72) < 0.01, `firstShiftSeconds is the tutorial round's own duration, not cumulative play (got {wp.firstShiftSeconds})`)
 	check(wp.tutorialDone == true, "alongside tutorialDone")
+	-- THE DAY YOU COME BACK IS THE DAY THAT PAYS. settleDailies reads the
+	-- streak multiplier off streak.count, and the streak used to move AFTER
+	-- it: a day-2 player's first round paid on yesterday's count, so the join
+	-- card's "play tomorrow for +10%" was broken on the round it was about.
+	-- Observe the count settleDailies sees on the first round of a new day.
+	do
+		local yesterday = os.date("!%Y-%m-%d", os.time() - 86400)
+		wp.streak = { lastDay = yesterday, count = 1, graceUsedWeek = "" }
+		local seen = nil
+		local real = fp.settleDailies
+		fp.settleDailies = function(self2, profile, ...)
+			seen = profile.streak.count
+			return real(self2, profile, ...)
+		end
+		fp:awardRound(crew, results, false)
+		fp.settleDailies = nil
+		check(wp.streak.count == 2, `a round on the next day extends the streak to 2 ({wp.streak.count})`)
+		check(seen == 2, `and the dailies settle on the NEW count, so day 2 pays day 2's bonus (settled on {tostring(seen)})`)
+	end
 	CLOCK.t = 5400
 	results.time = 300
 	fp:awardRound(crew, results, true)
