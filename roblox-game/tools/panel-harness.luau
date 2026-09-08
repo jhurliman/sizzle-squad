@@ -773,21 +773,56 @@ do
 	local need = math.floor(utf8.len(longest) * 16 * 0.55)
 	local have = 420 + done.title.Size.X.Offset
 	check(need <= have, `the German greeting with a cut max-length name fits at 16px ({need} <= {have})`)
-	-- On a 568x320 phone relayout scales the whole card to ~0.735, which
-	-- scales the text with it. The floors must hold on SCREEN: min size x
-	-- card scale >= 12 for both scaled labels, and the German greeting must
-	-- still fit at the raised floor.
-	done:relayout(nil, Vector2.new(568, 320))
-	local scale = done.cardScale.Scale
-	local streakCst = done.streakLine:FindFirstChildWhichIsA("UITextSizeConstraint")
-	check(scale < 0.8, `a 568x320 phone scales the card down ({string.format("%.3f", scale)})`)
-	check(streakCst.MinTextSize * scale >= 12, `the streak line still renders at >= 12px there ({streakCst.MinTextSize} x {string.format("%.3f", scale)} = {string.format("%.1f", streakCst.MinTextSize * scale)})`)
-	check(streakCst.MaxTextSize >= streakCst.MinTextSize, `and its constraint stays ordered ({streakCst.MinTextSize}..{streakCst.MaxTextSize})`)
-	check(cst.MinTextSize * scale >= 12, `the title renders at >= 12px there ({cst.MinTextSize} x {string.format("%.3f", scale)} = {string.format("%.1f", cst.MinTextSize * scale)})`)
-	local needRaised = math.floor(utf8.len(longest) * cst.MinTextSize * 0.55)
-	check(needRaised <= have, `and the German greeting fits at the raised floor ({needRaised} <= {have})`)
+	-- relayout scales the whole card on a short screen, and the text with
+	-- it. The 12px floor must hold on SCREEN for EVERY text element -- the
+	-- goal rows, the buttons' constraints, the two new labels -- and every
+	-- one must come back to its designed size when the card grows again.
+	local function textOn(inst: any, out: { any })
+		for _, c in inst:GetChildren() do
+			if c.ClassName == "UITextSizeConstraint" then
+				table.insert(out, { inst = c, kind = "min", size = c.MinTextSize, max = c.MaxTextSize })
+			elseif (c.ClassName == "TextLabel" or c.ClassName == "TextButton") and c.TextScaled ~= true then
+				table.insert(out, { inst = c, kind = "size", size = c.TextSize })
+			end
+			textOn(c, out)
+		end
+	end
+	local designed = {}
 	done:relayout(nil, Vector2.new(1024, 768))
-	check(done.cardScale.Scale == 1 and streakCst.MinTextSize == 12 and cst.MinTextSize == 16, "a big screen gets the floors back to 12 / 16")
+	textOn(done.card, designed)
+	check(#designed >= 12, `the card has text to govern ({#designed} elements)`)
+	for _, vp in { { 667, 375 }, { 568, 320 } } do
+		done:relayout(nil, Vector2.new(vp[1], vp[2]))
+		local scale = done.cardScale.Scale
+		local under, unordered, smallest = 0, 0, 1000
+		local now = {}
+		textOn(done.card, now)
+		for _, t in now do
+			local rendered = t.size * scale
+			smallest = math.min(smallest, rendered)
+			if rendered < 12 then
+				under += 1
+			end
+			if t.kind == "min" and t.max < t.size then
+				unordered += 1
+			end
+		end
+		check(scale < 1, `{vp[1]}x{vp[2]} scales the card to {string.format("%.3f", scale)}`)
+		check(under == 0, `and every text element renders at >= 12px there (smallest {string.format("%.1f", smallest)}px, {under} under)`)
+		check(unordered == 0, `and every constraint stays ordered ({unordered} inverted)`)
+	end
+	local streakCst = done.streakLine:FindFirstChildWhichIsA("UITextSizeConstraint")
+	local needRaised = math.floor(utf8.len(longest) * cst.MinTextSize * 0.55)
+	check(needRaised <= have, `and the German greeting fits at the 320-tall floor of {cst.MinTextSize}px ({needRaised} <= {have})`)
+	done:relayout(nil, Vector2.new(1024, 768))
+	local drift = 0
+	for _, t in designed do
+		local v = if t.kind == "min" then t.inst.MinTextSize else t.inst.TextSize
+		if v ~= t.size then
+			drift += 1
+		end
+	end
+	check(done.cardScale.Scale == 1 and drift == 0 and streakCst.MinTextSize == 12 and cst.MinTextSize == 16, `a big screen hands every element its designed size back ({drift} drifted)`)
 	-- Players is captured at module load, so a long-named player needs the
 	-- module loaded against an environment that says so.
 	local wideEnv = table.clone(cardEnv)

@@ -91,7 +91,7 @@ function KitchenCard.new(gui: Instance, deps: any)
 		ZIndex = 8,
 		Text = "Welcome back, chef",
 	}, self.card)
-	self.titleFit = mk("UITextSizeConstraint", { MinTextSize = 16, MaxTextSize = 24 }, self.title)
+	mk("UITextSizeConstraint", { MinTextSize = 16, MaxTextSize = 24 }, self.title)
 
 	self.subtitle = Theme.label({
 		Size = UDim2.new(1, -24, 0, 22),
@@ -164,7 +164,7 @@ function KitchenCard.new(gui: Instance, deps: any)
 		ZIndex = 8,
 		Text = "",
 	}, self.card)
-	self.streakFit = mk("UITextSizeConstraint", { MinTextSize = 12, MaxTextSize = 15 }, self.streakLine)
+	mk("UITextSizeConstraint", { MinTextSize = 12, MaxTextSize = 15 }, self.streakLine)
 
 	local row = mk("Frame", {
 		Size = UDim2.new(1, -32, 0, Theme.MIN_TAP),
@@ -409,6 +409,20 @@ end
 -- most likely to be someone's first session.
 local CARD_W, CARD_H = 420, 392
 
+-- Every text element on the card with the size it was designed at: plain
+-- labels by TextSize, scaled labels and buttons by their constraint. Walked
+-- once, so relayout can raise a floor and hand it back without drift.
+local function collectText(inst: any, out: { any })
+	for _, c in inst:GetChildren() do
+		if c:IsA("UITextSizeConstraint") then
+			table.insert(out, { inst = c, min = c.MinTextSize, max = c.MaxTextSize })
+		elseif c:IsA("TextLabel") or c:IsA("TextButton") then
+			table.insert(out, { inst = c, size = c.TextSize })
+		end
+		collectText(c, out)
+	end
+end
+
 function KitchenCard:relayout(_L: any, viewport: Vector2)
 	self.card.Size = UDim2.fromOffset(CARD_W, CARD_H)
 	if self.cardScale == nil then
@@ -417,14 +431,26 @@ function KitchenCard:relayout(_L: any, viewport: Vector2)
 	local fit = math.min(1, (viewport.X - 32) / CARD_W, (viewport.Y - 32) / CARD_H)
 	local scale = math.clamp(fit, 0.62, 1)
 	self.cardScale.Scale = scale
-	-- UIScale multiplies rendered text too: a 12px floor on the label is
-	-- 8.8px on a 320-tall phone (scale 0.735). The scaled labels' floors are
-	-- raised by the inverse, so the size that reaches the screen is never
-	-- under 12px; the ceiling follows so the pair stays ordered.
+	-- UIScale multiplies rendered text too: a 14px goal row is 12.25px on
+	-- a 375-tall phone (scale 0.875) and 10px on a 320-tall one. Every text
+	-- element's floor is raised by the inverse of the scale, so the size
+	-- that reaches the screen is never under 12px, and lowered back to its
+	-- designed size when the card grows again. Scaled text (the title, the
+	-- streak line, every button) is governed by its constraint, so that is
+	-- what moves for it; its ceiling follows so the pair stays ordered.
+	if self.textFit == nil then
+		self.textFit = {}
+		collectText(self.card, self.textFit)
+	end
 	local floor = math.ceil(12 / scale)
-	self.streakFit.MinTextSize = floor
-	self.streakFit.MaxTextSize = math.max(15, floor)
-	self.titleFit.MinTextSize = math.max(16, floor)
+	for _, t in self.textFit do
+		if t.min ~= nil then
+			t.inst.MinTextSize = math.max(t.min, floor)
+			t.inst.MaxTextSize = math.max(t.max, t.inst.MinTextSize)
+		elseif t.inst.TextScaled ~= true then
+			t.inst.TextSize = math.max(t.size, floor)
+		end
+	end
 end
 
 return KitchenCard
