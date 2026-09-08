@@ -2185,33 +2185,18 @@
       }
     },
     {
-      "key": "ui.like_nudge",
-      "source": "👍 Enjoying the kitchen? A like helps more chefs find it",
-      "context": "Join card: asks the player to like the experience on its Roblox page",
-      "note": "'like' is the Roblox thumbs-up, not a feeling",
-      "tr": {
-        "fr": "👍 Tu aimes la cuisine ? Un like aide d'autres chefs à la trouver",
-        "de": "👍 Gefällt dir die Küche? Ein Like hilft anderen Köchen, sie zu finden",
-        "id": "👍 Suka dapurnya? Satu like membantu chef lain menemukannya",
-        "ja": "👍 このキッチンが気に入った？いいねで他のシェフにも見つけてもらおう",
-        "ko": "👍 주방이 마음에 드나요? 좋아요는 다른 셰프들이 찾는 데 도움이 돼요",
-        "pt": "👍 Curtiu a cozinha? Um like ajuda mais chefs a encontrá-la",
-        "es": "👍 ¿Te gusta la cocina? Un like ayuda a que más chefs la encuentren"
-      }
-    },
-    {
       "key": "fmt.streak_tomorrow",
-      "source": "🔥 Day {1} streak · play tomorrow for +{2}% bonus coins",
-      "context": "Join card: {1} = current streak in days, {2} = the daily-bonus percentage tomorrow will pay",
+      "source": "🔥 Day {1} streak · tomorrow's daily goals pay +{2}%",
+      "context": "Join card: {1} = streak in days after today's shift, {2} = the bonus tomorrow's daily-goal coins pay",
       "note": "",
       "tr": {
-        "fr": "🔥 Série de {1} jour(s) · reviens demain pour +{2}% de pièces bonus",
-        "de": "🔥 {1} Tage in Folge · morgen spielen für +{2}% Bonusmünzen",
-        "id": "🔥 Streak {1} hari · main besok untuk +{2}% koin bonus",
-        "ja": "🔥 {1}日連続 · 明日プレイでボーナスコイン+{2}%",
-        "ko": "🔥 {1}일 연속 · 내일 플레이하면 보너스 코인 +{2}%",
-        "pt": "🔥 Sequência de {1} dia(s) · jogue amanhã por +{2}% de moedas bônus",
-        "es": "🔥 Racha de {1} día(s) · juega mañana por +{2}% de monedas extra"
+        "fr": "🔥 Série de {1} jour(s) · demain, les objectifs du jour rapportent +{2}%",
+        "de": "🔥 {1} Tage in Folge · morgen zahlen die Tagesziele +{2}%",
+        "id": "🔥 Streak {1} hari · besok target harian membayar +{2}%",
+        "ja": "🔥 {1}日連続 · 明日のデイリー目標は+{2}%",
+        "ko": "🔥 {1}일 연속 · 내일의 일일 목표는 +{2}%",
+        "pt": "🔥 Sequência de {1} dia(s) · amanhã as metas diárias pagam +{2}%",
+        "es": "🔥 Racha de {1} día(s) · mañana las metas diarias pagan +{2}%"
       }
     },
     {

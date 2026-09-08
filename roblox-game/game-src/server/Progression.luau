@@ -163,6 +163,31 @@ local function weekKey(): string
 	return os.date("!%Y-W%W") :: string
 end
 
+--- WHAT THE STREAK WILL BE after today's shift, and what tomorrow's daily
+--- goals will pay because of it. Pure, so the join card's promise can be
+--- pinned to the same arithmetic awardRound and settleDailies use.
+---
+--- The card can open BEFORE today's shift (a returning player, new day) or
+--- after it (a First Shift completer, or a second round today). In the first
+--- case today's play still has to move the streak, so "tomorrow" is two
+--- increments away; in the second it is one. A lapsed streak (lastDay older
+--- than yesterday, no grace) restarts at 1 today. The multiplier is
+--- 1 + 0.1 x (days - 1), capped at 1.5, applied to daily-goal coins only.
+function Progression.streakOutlook(streak: any, today: string, yesterday: string, week: string): (number, number)
+	local count = (streak and streak.count) or 0
+	local lastDay = (streak and streak.lastDay) or ""
+	local daysAfterToday
+	if lastDay == today then
+		daysAfterToday = math.max(1, count)
+	elseif lastDay == yesterday or (lastDay ~= "" and (streak.graceUsedWeek or "") ~= week) then
+		daysAfterToday = count + 1
+	else
+		daysAfterToday = 1
+	end
+	local tomorrowPct = math.min(50, 10 * daysAfterToday)
+	return daysAfterToday, tomorrowPct
+end
+
 function Progression.new(config: any, remotes: { [string]: any }, catalog: any, dataStores: any?)
 	local self = setmetatable({}, Progression)
 	self.config = config
@@ -402,6 +427,12 @@ function Progression:push(player: any)
 			xp = d.xp,
 		})
 	end
+	local streakDays, streakTomorrowPct = Progression.streakOutlook(
+		profile.streak,
+		dayKey(),
+		os.date("!%Y-%m-%d", os.time() - 86400) :: string,
+		weekKey()
+	)
 	self.remotes.Progress:FireClient(player, {
 		xp = profile.xp,
 		level = profile.level,
@@ -414,6 +445,11 @@ function Progression:push(player: any)
 		equipped = profile.equipped,
 		dailies = dailies,
 		streak = profile.streak.count,
+		-- The streak as it stands after today's shift, and what tomorrow's
+		-- daily goals pay for it -- the join card's promise, computed here
+		-- because only the server knows lastDay (see streakOutlook).
+		streakDays = streakDays,
+		streakTomorrowPct = streakTomorrowPct,
 		-- Only present on the push that follows a round award.
 		award = self.lastAward[player],
 		sessions = profile.sessions or 1,

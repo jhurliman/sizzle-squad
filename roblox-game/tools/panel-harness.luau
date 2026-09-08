@@ -712,13 +712,13 @@ check(
 	`and once pledged it counts the crew ({panel.startButton.Text})`
 )
 
--- ------------------------------------------ E. the join card asks for tomorrow, and a like
+-- ------------------------------------------ E. the join card asks for tomorrow
 --
--- The two things that grow the game are said on the one screen every First
--- Shift completer and every returning player sees. The promise on the streak
--- line is sized off Progression:settleDailies (10% per day, capped at +50%), so
--- these pin the arithmetic to the server's, not to a hope.
-print("E. the join card says what tomorrow pays, and asks for the like")
+-- The reason to come back is said on the one screen every First Shift
+-- completer and every returning player sees. The promise is the server's
+-- projection (Progression.streakOutlook, pinned in first-session-harness);
+-- these pin that the card shows what it was sent, and who sees it.
+print("E. the join card says what tomorrow pays")
 local Loc2 = {
 	f = function(key: string, ...)
 		local a = { ... }
@@ -752,23 +752,24 @@ end
 -- A player straight out of First Shift: one round, first session, tutorial done.
 local done = card()
 done:setPhase({ phase = "intermission" })
-done:setProgress({ level = 2, coins = 160, rounds = 1, sessions = 1, tutorialDone = true, streak = 1, xp = 20, xpToNext = 150, dailies = {} })
+done:setProgress({ level = 2, coins = 160, rounds = 1, sessions = 1, tutorialDone = true, streak = 1, streakDays = 1, streakTomorrowPct = 10, xp = 20, xpToNext = 150, dailies = {} })
 check(done.card.Visible == true, "a First Shift completer arriving in a real kitchen gets the card")
 check(done.title.Text == "fmt.first_shift_done:Me", `and it congratulates the first shift, not \"welcome back\" ({done.title.Text})`)
 check(done.streakLine.Text == "fmt.streak_tomorrow:1,10", `day 1: tomorrow pays +10% ({done.streakLine.Text})`)
-check(string.find(done.likeLine.Text, "like", 1, true) ~= nil, `and it asks for the like ({done.likeLine.Text})`)
 
 -- A returning player on a 3-day streak.
 local back = card()
 back:setPhase({ phase = "intermission" })
-back:setProgress({ level = 6, coins = 2978, rounds = 12, sessions = 5, tutorialDone = true, streak = 3, xp = 20, xpToNext = 300, dailies = {} })
+-- Opened on a new day BEFORE today's shift: the server projects today's
+-- play into the streak (3 -> 4) and tomorrow's bonus off that.
+back:setProgress({ level = 6, coins = 2978, rounds = 12, sessions = 5, tutorialDone = true, streak = 3, streakDays = 4, streakTomorrowPct = 40, xp = 20, xpToNext = 300, dailies = {} })
 check(back.title.Text == "fmt.welcome_named:Me", `a returning player is welcomed back ({back.title.Text})`)
-check(back.streakLine.Text == "fmt.streak_tomorrow:3,30", `day 3: tomorrow pays +30% ({back.streakLine.Text})`)
+check(back.streakLine.Text == "fmt.streak_tomorrow:4,40", `the card shows the server's projection, not the stale count ({back.streakLine.Text})`)
 
 -- The bonus caps at +50% (settleDailies caps the multiplier at 1.5).
 local capped = card()
 capped:setPhase({ phase = "intermission" })
-capped:setProgress({ level = 9, coins = 100, rounds = 40, sessions = 20, tutorialDone = true, streak = 9, xp = 0, xpToNext = 300, dailies = {} })
+capped:setProgress({ level = 9, coins = 100, rounds = 40, sessions = 20, tutorialDone = true, streak = 9, streakDays = 9, streakTomorrowPct = 50, xp = 0, xpToNext = 300, dailies = {} })
 check(capped.streakLine.Text == "fmt.streak_tomorrow:9,50", `day 9: the promise caps at +50%, like the payout ({capped.streakLine.Text})`)
 
 -- A brand-new player never sees it (FirstShift owns that moment).
