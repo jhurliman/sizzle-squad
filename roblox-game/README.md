@@ -101,7 +101,7 @@ client-side (walk/hop/squash/stun/carry). See `../docs/art/chefs-preview.png`.
 
 | Command | What it proves |
 |---|---|
-| `npm run parity` | TS and Luau builds tick-identical (3 seeds × 10,800 ticks: discrete state exact, floats ≤ 8e-11) |
+| `npm run parity` | TS and Luau builds tick-identical (3 seeds × 10,800 ticks: discrete state exact at zero tolerance; positional floats gated at 5e-9, typically ~1e-10) |
 | `lune run tools/server-harness.luau` | Full server stack end-to-end: round loop, drop-in/AFK, pacing, progression, shop, replication (22 checks) |
 | `lune run tools/client-harness.luau` | Mirror movement + working-freeze, interpolation, verb prompt, delta mirroring |
 | `lune run tools/smoothing-harness.luau` | Remote chefs render at true speed under jitter, loss, network and client stalls, a 500 ms outage, an out-of-order packet, a 1.5 s stall, a chef that resumes elsewhere, a bump, a 1 s server hitch, a straggler landing in the drawn segment, and the real send cadence |
