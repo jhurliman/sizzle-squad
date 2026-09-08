@@ -26,4 +26,6 @@ return {
 	["fmt.ticket_complete"] = "{1} is complete — pick up the plate and serve it.",
 	["fmt.ticket_not_needed"] = "The ticket doesn't need {1} — put it back in the crate.",
 	["fmt.ready_collect"] = "That {1} is ready — pick it up and add it to your plate.",
+	["fmt.streak_tomorrow"] = "🔥 Day {1} streak · tomorrow's daily goals pay +{2}%",
+	["fmt.first_shift_done"] = "Nice first shift, {1}!",
 }

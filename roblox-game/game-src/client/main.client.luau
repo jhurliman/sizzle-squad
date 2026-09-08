@@ -797,8 +797,17 @@ RunService.RenderStepped:Connect(function(dt)
 	if coachModel ~= nil and coachId ~= focusId then
 		coachGlow.Adornee = coachModel
 		coachGlow.Enabled = true
-		-- A slow pulse reads as "go here" where a steady glow reads as scenery.
-		coachGlow.FillTransparency = 0.52 + math.sin(state.clock * 4) * 0.16
+		-- A PULSE, NOT A GLOW. A steady highlight reads as scenery, and the old
+		-- ±0.16 breath on the fill alone was close enough to steady that the
+		-- campaign-003 funnel still had 294 players standing with an ingredient
+		-- in hand for half a minute, never taking it to the board the coach
+		-- was pointing at. Fill and outline now swell together, deep enough
+		-- to change the object's colour at the peak, at about one beat a
+		-- second -- a rhythm that says "here, now" without strobing. Only ever
+		-- in First Shift: the coach is the only thing that sets a target.
+		local beat = 0.5 + 0.5 * math.sin(state.clock * 5.5)
+		coachGlow.FillTransparency = 0.74 - 0.44 * beat
+		coachGlow.OutlineTransparency = 0.65 - 0.65 * beat
 	else
 		coachGlow.Enabled = false
 	end

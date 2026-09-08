@@ -712,6 +712,151 @@ check(
 	`and once pledged it counts the crew ({panel.startButton.Text})`
 )
 
+-- ------------------------------------------ E. the join card asks for tomorrow
+--
+-- The reason to come back is said on the one screen every First Shift
+-- completer and every returning player sees. The promise is the server's
+-- projection (Progression.streakOutlook, pinned in first-session-harness);
+-- these pin that the card shows what it was sent, and who sees it.
+print("E. the join card says what tomorrow pays")
+local Loc2 = {
+	f = function(key: string, ...)
+		local a = { ... }
+		local parts = {}
+		for i = 1, select("#", ...) do
+			table.insert(parts, tostring(a[i]))
+		end
+		return `{key}:{table.concat(parts, ",")}`
+	end,
+}
+local cardEnv = table.clone(env)
+cardEnv.script = { Parent = { Theme = "THEME", Parent = { Loc = "LOC" } } }
+cardEnv.require = function(what)
+	if what == "THEME" then
+		return Theme
+	elseif what == "LOC" then
+		return Loc2
+	end
+	error(`unexpected require from KitchenCard: {tostring(what)}`)
+end
+local KitchenCard =
+	luau.load(luau.compile(fs.readFile("game-src/client/Menu/KitchenCard.luau")), { environment = cardEnv })()
+local function card()
+	return KitchenCard.new(newInstance("ScreenGui"), {
+		onReady = function() end,
+		onOpenTab = function() end,
+		onJoinFriend = function() end,
+	})
+end
+
+-- A player straight out of First Shift: one round, first session, tutorial done.
+local done = card()
+done:setPhase({ phase = "intermission" })
+done:setProgress({ level = 2, coins = 160, rounds = 1, sessions = 1, tutorialDone = true, streak = 1, streakDays = 1, streakTomorrowPct = 10, xp = 20, xpToNext = 150, dailies = {} })
+check(done.card.Visible == true, "a First Shift completer arriving in a real kitchen gets the card")
+check(done.title.Text == "fmt.first_shift_done:Me", `and it congratulates the first shift, not \"welcome back\" ({done.title.Text})`)
+check(done.streakLine.Text == "fmt.streak_tomorrow:1,10", `day 1: tomorrow pays +10% ({done.streakLine.Text})`)
+-- The title holds a 20-character name in the longest locale without running
+-- under the close button: it stops 50px short of the right edge, scales down
+-- to 16px, and never wraps into the subtitle.
+do
+	local cst = done.title:FindFirstChildWhichIsA("UITextSizeConstraint")
+	check(done.title.TextScaled == true and cst ~= nil and cst.MinTextSize >= 16, "the title scales, but never below 16px")
+	check(done.title.TextWrapped == false, "and stays one line")
+	check(done.title.Size.X.Offset <= -(16 + 34 + 8), `and stops short of the close button (right inset {-done.title.Size.X.Offset}px)`)
+	-- Width the longest shipping string needs at the floor size, ~0.55em per
+	-- Latin character in the title face: it must fit the label's width on
+	-- the 420px card.
+	-- A max-length name is cut to 14 characters first (compactName), so the
+	-- longest string the title can hold is the German greeting plus that.
+	local longest = "Starke erste Schicht, Xx_SuperDuper…!"
+	local need = math.floor(utf8.len(longest) * 16 * 0.55)
+	local have = 420 + done.title.Size.X.Offset
+	check(need <= have, `the German greeting with a cut max-length name fits at 16px ({need} <= {have})`)
+	-- relayout scales the whole card on a short screen, and the text with
+	-- it. The 12px floor must hold on SCREEN for EVERY text element -- the
+	-- goal rows, the buttons' constraints, the two new labels -- and every
+	-- one must come back to its designed size when the card grows again.
+	local function textOn(inst: any, out: { any })
+		for _, c in inst:GetChildren() do
+			if c.ClassName == "UITextSizeConstraint" then
+				table.insert(out, { inst = c, kind = "min", size = c.MinTextSize, max = c.MaxTextSize })
+			elseif (c.ClassName == "TextLabel" or c.ClassName == "TextButton") and c.TextScaled ~= true then
+				table.insert(out, { inst = c, kind = "size", size = c.TextSize })
+			end
+			textOn(c, out)
+		end
+	end
+	local designed = {}
+	done:relayout(nil, Vector2.new(1024, 768))
+	textOn(done.card, designed)
+	check(#designed >= 12, `the card has text to govern ({#designed} elements)`)
+	for _, vp in { { 667, 375 }, { 568, 320 } } do
+		done:relayout(nil, Vector2.new(vp[1], vp[2]))
+		local scale = done.cardScale.Scale
+		local under, unordered, smallest = 0, 0, 1000
+		local now = {}
+		textOn(done.card, now)
+		for _, t in now do
+			local rendered = t.size * scale
+			smallest = math.min(smallest, rendered)
+			if rendered < 12 then
+				under += 1
+			end
+			if t.kind == "min" and t.max < t.size then
+				unordered += 1
+			end
+		end
+		check(scale < 1, `{vp[1]}x{vp[2]} scales the card to {string.format("%.3f", scale)}`)
+		check(under == 0, `and every text element renders at >= 12px there (smallest {string.format("%.1f", smallest)}px, {under} under)`)
+		check(unordered == 0, `and every constraint stays ordered ({unordered} inverted)`)
+	end
+	local streakCst = done.streakLine:FindFirstChildWhichIsA("UITextSizeConstraint")
+	local needRaised = math.floor(utf8.len(longest) * cst.MinTextSize * 0.55)
+	check(needRaised <= have, `and the German greeting fits at the 320-tall floor of {cst.MinTextSize}px ({needRaised} <= {have})`)
+	done:relayout(nil, Vector2.new(1024, 768))
+	local drift = 0
+	for _, t in designed do
+		local v = if t.kind == "min" then t.inst.MinTextSize else t.inst.TextSize
+		if v ~= t.size then
+			drift += 1
+		end
+	end
+	check(done.cardScale.Scale == 1 and drift == 0 and streakCst.MinTextSize == 12 and cst.MinTextSize == 16, `a big screen hands every element its designed size back ({drift} drifted)`)
+	-- Players is captured at module load, so a long-named player needs the
+	-- module loaded against an environment that says so.
+	local wideEnv = table.clone(cardEnv)
+	wideEnv.game = { GetService = function(_, n)
+		return { LocalPlayer = { UserId = 7, DisplayName = "Xx_SuperDuperChef_xX", Name = "x" } }
+	end }
+	local WideCard = luau.load(luau.compile(fs.readFile("game-src/client/Menu/KitchenCard.luau")), { environment = wideEnv })()
+	local wide = WideCard.new(newInstance("ScreenGui"), { onReady = function() end, onOpenTab = function() end, onJoinFriend = function() end })
+	wide:setPhase({ phase = "intermission" })
+	wide:setProgress({ level = 2, coins = 0, rounds = 1, sessions = 1, tutorialDone = true, streak = 1, streakDays = 1, streakTomorrowPct = 10, xp = 0, xpToNext = 150, dailies = {} })
+	check(wide.title.Text == "fmt.first_shift_done:Xx_SuperDuper…", `a 20-character name is cut to 14 with an ellipsis ({wide.title.Text})`)
+end
+
+-- A returning player on a 3-day streak.
+local back = card()
+back:setPhase({ phase = "intermission" })
+-- Opened on a new day BEFORE today's shift: the server projects today's
+-- play into the streak (3 -> 4) and tomorrow's bonus off that.
+back:setProgress({ level = 6, coins = 2978, rounds = 12, sessions = 5, tutorialDone = true, streak = 3, streakDays = 4, streakTomorrowPct = 40, xp = 20, xpToNext = 300, dailies = {} })
+check(back.title.Text == "fmt.welcome_named:Me", `a returning player is welcomed back ({back.title.Text})`)
+check(back.streakLine.Text == "fmt.streak_tomorrow:4,40", `the card shows the server's projection, not the stale count ({back.streakLine.Text})`)
+
+-- The bonus caps at +50% (settleDailies caps the multiplier at 1.5).
+local capped = card()
+capped:setPhase({ phase = "intermission" })
+capped:setProgress({ level = 9, coins = 100, rounds = 40, sessions = 20, tutorialDone = true, streak = 9, streakDays = 9, streakTomorrowPct = 50, xp = 0, xpToNext = 300, dailies = {} })
+check(capped.streakLine.Text == "fmt.streak_tomorrow:9,50", `day 9: the promise caps at +50%, like the payout ({capped.streakLine.Text})`)
+
+-- A brand-new player never sees it (FirstShift owns that moment).
+local fresh = card()
+fresh:setPhase({ phase = "intermission" })
+fresh:setProgress({ level = 1, coins = 0, rounds = 0, sessions = 1, tutorialDone = false, streak = 0, xp = 0, xpToNext = 100, dailies = {} })
+check(fresh.card.Visible == false, "and a brand-new player still does not get the card")
+
 print(if failures > 0 then `{failures} FAILURES` else "PASS: panel")
 if failures > 0 then
 	error(`{failures} checks failed`)

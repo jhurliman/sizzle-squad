@@ -24,6 +24,21 @@ local mk = Theme.mk
 
 local AUTO_DISMISS = 12
 
+-- A NAME IN A TITLE IS SHOWN, NOT SPELLED. Twenty characters is a legal
+-- display name, and "Starke erste Schicht, Xx_SuperDuperChef_xX!" does not
+-- fit a 354px title at the 16px floor. Past this many characters the name is
+-- cut with an ellipsis, by codepoint so a kanji counts as one.
+local NAME_MAX = 14
+
+local function compactName(name: string): string
+	local ok, n = pcall(utf8.len, name)
+	if not ok or n == nil or n <= NAME_MAX then
+		return name
+	end
+	local cut = utf8.offset(name, NAME_MAX)
+	return string.sub(name, 1, cut - 1) .. "…"
+end
+
 function KitchenCard.new(gui: Instance, deps: any)
 	local self = setmetatable({}, KitchenCard)
 	self.deps = deps
@@ -60,15 +75,23 @@ function KitchenCard.new(gui: Instance, deps: any)
 	}, gui)
 	Theme.stroke(self.card, Theme.GOLD, 2)
 
+	-- The title carries a display name -- up to twenty characters, in the
+	-- longest of seven languages -- so it stops short of the close button
+	-- and scales down (never below 16px) rather than running under it or
+	-- off a phone's edge. relayout scales the whole card, which does not
+	-- change how much text fits inside it.
 	self.title = Theme.label({
-		Size = UDim2.new(1, -24, 0, 34),
+		Size = UDim2.new(1, -16 - 50, 0, 34),
 		Position = UDim2.fromOffset(16, 14),
 		TextSize = 24,
 		Font = Theme.TITLE_FONT,
 		TextColor3 = Theme.GOLD,
+		TextScaled = true,
+		TextWrapped = false,
 		ZIndex = 8,
 		Text = "Welcome back, chef",
 	}, self.card)
+	mk("UITextSizeConstraint", { MinTextSize = 16, MaxTextSize = 24 }, self.title)
 
 	self.subtitle = Theme.label({
 		Size = UDim2.new(1, -24, 0, 22),
@@ -115,6 +138,33 @@ function KitchenCard.new(gui: Instance, deps: any)
 			Text = "",
 		}, self.card)
 	end
+
+	-- A REASON TO COME BACK TOMORROW, SAID WHERE 45% OF NEW PLAYERS LOOK.
+	--
+	-- This card is the first thing a First Shift completer sees in a real
+	-- kitchen, and the first thing every returning player sees each session
+	-- -- the one screen with both the people worth keeping and the moment they
+	-- are pleased with themselves. The line makes tomorrow concrete: not "keep
+	-- your streak" but the number it pays, projected by the server
+	-- (Progression.streakOutlook) off the same arithmetic settleDailies pays.
+	--
+	-- No "please like the game" line. There is no in-experience like API, so
+	-- that would be a nag pointing at a menu the player has to leave to find;
+	-- a game earns likes by being worth one.
+	-- Two lines of room and scaled text: the French and Portuguese sentences
+	-- run ~1.4x the English, and a fixed 22px line clipped them.
+	self.streakLine = Theme.label({
+		Size = UDim2.new(1, -32, 0, 44),
+		Position = UDim2.fromOffset(16, 204),
+		TextSize = 15,
+		TextColor3 = Theme.GOLD,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextWrapped = true,
+		TextScaled = true,
+		ZIndex = 8,
+		Text = "",
+	}, self.card)
+	mk("UITextSizeConstraint", { MinTextSize = 12, MaxTextSize = 15 }, self.streakLine)
 
 	local row = mk("Frame", {
 		Size = UDim2.new(1, -32, 0, Theme.MIN_TAP),
@@ -254,7 +304,18 @@ end
 function KitchenCard:setProgress(progress: any)
 	self.progress = progress
 	local player = Players.LocalPlayer
-	self.title.Text = Loc.f("fmt.welcome_named", player.DisplayName)
+	-- A player straight out of First Shift has never been here before, so
+	-- "welcome back" is a lie the first time. One round, one session, and
+	-- the tutorial done is exactly that player.
+	local fresh = (progress.rounds or 0) == 1 and (progress.sessions or 1) <= 1 and progress.tutorialDone == true
+	local name = compactName(player.DisplayName)
+	self.title.Text = if fresh then Loc.f("fmt.first_shift_done", name) else Loc.f("fmt.welcome_named", name)
+	-- Tomorrow's bonus comes projected from the server (Progression
+	-- .streakOutlook): only it knows whether today's shift has moved the
+	-- streak yet, and the multiplier is its arithmetic, not ours.
+	local days = progress.streakDays or math.max(1, progress.streak or 1)
+	local tomorrowPct = progress.streakTomorrowPct or math.min(50, 10 * days)
+	self.streakLine.Text = Loc.f("fmt.streak_tomorrow", days, tomorrowPct)
 	local xp, toNext = progress.xp or 0, progress.xpToNext
 	self.subtitle.Text = Loc.f("fmt.level_coins", progress.level or 1, progress.coins or 0, progress.rounds or 0)
 	if toNext ~= nil and toNext > 0 then
@@ -348,13 +409,48 @@ end
 -- most likely to be someone's first session.
 local CARD_W, CARD_H = 420, 392
 
+-- Every text element on the card with the size it was designed at: plain
+-- labels by TextSize, scaled labels and buttons by their constraint. Walked
+-- once, so relayout can raise a floor and hand it back without drift.
+local function collectText(inst: any, out: { any })
+	for _, c in inst:GetChildren() do
+		if c:IsA("UITextSizeConstraint") then
+			table.insert(out, { inst = c, min = c.MinTextSize, max = c.MaxTextSize })
+		elseif c:IsA("TextLabel") or c:IsA("TextButton") then
+			table.insert(out, { inst = c, size = c.TextSize })
+		end
+		collectText(c, out)
+	end
+end
+
 function KitchenCard:relayout(_L: any, viewport: Vector2)
 	self.card.Size = UDim2.fromOffset(CARD_W, CARD_H)
 	if self.cardScale == nil then
 		self.cardScale = Theme.mk("UIScale", { Scale = 1 }, self.card)
 	end
 	local fit = math.min(1, (viewport.X - 32) / CARD_W, (viewport.Y - 32) / CARD_H)
-	self.cardScale.Scale = math.clamp(fit, 0.62, 1)
+	local scale = math.clamp(fit, 0.62, 1)
+	self.cardScale.Scale = scale
+	-- UIScale multiplies rendered text too: a 14px goal row is 12.25px on
+	-- a 375-tall phone (scale 0.875) and 10px on a 320-tall one. Every text
+	-- element's floor is raised by the inverse of the scale, so the size
+	-- that reaches the screen is never under 12px, and lowered back to its
+	-- designed size when the card grows again. Scaled text (the title, the
+	-- streak line, every button) is governed by its constraint, so that is
+	-- what moves for it; its ceiling follows so the pair stays ordered.
+	if self.textFit == nil then
+		self.textFit = {}
+		collectText(self.card, self.textFit)
+	end
+	local floor = math.ceil(12 / scale)
+	for _, t in self.textFit do
+		if t.min ~= nil then
+			t.inst.MinTextSize = math.max(t.min, floor)
+			t.inst.MaxTextSize = math.max(t.max, t.inst.MinTextSize)
+		elseif t.inst.TextScaled ~= true then
+			t.inst.TextSize = math.max(t.size, floor)
+		end
+	end
 end
 
 return KitchenCard
