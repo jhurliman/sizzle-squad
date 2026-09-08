@@ -221,7 +221,10 @@ do
 	-- card's "play tomorrow for +10%" was broken on the round it was about.
 	-- Observe the count settleDailies sees on the first round of a new day.
 	do
-		local yesterday = os.date("!%Y-%m-%d", os.time() - 86400)
+		-- "Yesterday" on the module's clock (penv fakes os.time off CLOCK.t),
+		-- not the harness's real one: the rule is now an exact day, not "any
+		-- day but today".
+		local yesterday = os.date("!%Y-%m-%d", 1788000000 + math.floor(CLOCK.t) - 86400)
 		wp.streak = { lastDay = yesterday, count = 1, graceUsedWeek = "" }
 		local seen = nil
 		local real = fp.settleDailies
@@ -233,24 +236,31 @@ do
 		fp.settleDailies = nil
 		check(wp.streak.count == 2, `a round on the next day extends the streak to 2 ({wp.streak.count})`)
 		check(seen == 2, `and the dailies settle on the NEW count, so day 2 pays day 2's bonus (settled on {tostring(seen)})`)
+		-- A month away is not a missed day. Grace used to forgive ANY lapse
+		-- once a week, so this player kept a 6-day streak and its 1.5x.
+		wp.streak = { lastDay = "2026-08-01", count = 6, graceUsedWeek = "" }
+		fp:awardRound(crew, results, false)
+		check(wp.streak.count == 1, `a streak abandoned for weeks restarts at 1, not 7 ({wp.streak.count})`)
 	end
 	-- THE JOIN CARD'S PROMISE IS THE SERVER'S ARITHMETIC. streakOutlook says
 	-- what the streak will be after today's shift and what tomorrow's daily
 	-- goals pay for it, whether the card opens before or after today's play.
 	do
 		local outlook = Progression.streakOutlook
-		local T, Y, W = "2026-09-08", "2026-09-07", "2026-W36"
-		local days, pct = outlook({ lastDay = T, count = 1, graceUsedWeek = "" }, T, Y, W)
+		local T, Y, B, W = "2026-09-08", "2026-09-07", "2026-09-06", "2026-W36"
+		local days, pct = outlook({ lastDay = T, count = 1, graceUsedWeek = "" }, T, Y, B, W)
 		check(days == 1 and pct == 10, `First Shift just done today: day 1, tomorrow +10% ({days}, {pct})`)
-		days, pct = outlook({ lastDay = Y, count = 3, graceUsedWeek = "" }, T, Y, W)
+		days, pct = outlook({ lastDay = Y, count = 3, graceUsedWeek = "" }, T, Y, B, W)
 		check(days == 4 and pct == 40, `back on a new day with 3: today makes 4, tomorrow +40% ({days}, {pct})`)
-		days, pct = outlook({ lastDay = T, count = 4, graceUsedWeek = "" }, T, Y, W)
+		days, pct = outlook({ lastDay = T, count = 4, graceUsedWeek = "" }, T, Y, B, W)
 		check(days == 4 and pct == 40, `and after today's shift the same player still reads 4 / +40% ({days}, {pct})`)
-		days, pct = outlook({ lastDay = "2026-09-01", count = 6, graceUsedWeek = W }, T, Y, W)
-		check(days == 1 and pct == 10, `a lapsed streak with no grace restarts at 1 ({days}, {pct})`)
-		days, pct = outlook({ lastDay = "2026-09-06", count = 6, graceUsedWeek = "" }, T, Y, W)
+		days, pct = outlook({ lastDay = B, count = 6, graceUsedWeek = W }, T, Y, B, W)
+		check(days == 1 and pct == 10, `one missed day with grace already spent this week restarts at 1 ({days}, {pct})`)
+		days, pct = outlook({ lastDay = B, count = 6, graceUsedWeek = "" }, T, Y, B, W)
 		check(days == 7 and pct == 50, `one missed day is forgiven and the promise caps at +50% ({days}, {pct})`)
-		days, pct = outlook({ lastDay = "", count = 0, graceUsedWeek = "" }, T, Y, W)
+		days, pct = outlook({ lastDay = "2026-09-01", count = 6, graceUsedWeek = "" }, T, Y, B, W)
+		check(days == 1 and pct == 10, `a week away is NOT forgiven, grace or no grace: restarts at 1 ({days}, {pct})`)
+		days, pct = outlook({ lastDay = "", count = 0, graceUsedWeek = "" }, T, Y, B, W)
 		check(days == 1 and pct == 10, `no streak yet: today is day 1 ({days}, {pct})`)
 	end
 	CLOCK.t = 5400

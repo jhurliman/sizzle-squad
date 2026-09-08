@@ -170,16 +170,17 @@ end
 --- The card can open BEFORE today's shift (a returning player, new day) or
 --- after it (a First Shift completer, or a second round today). In the first
 --- case today's play still has to move the streak, so "tomorrow" is two
---- increments away; in the second it is one. A lapsed streak (lastDay older
---- than yesterday, no grace) restarts at 1 today. The multiplier is
---- 1 + 0.1 x (days - 1), capped at 1.5, applied to daily-goal coins only.
-function Progression.streakOutlook(streak: any, today: string, yesterday: string, week: string): (number, number)
+--- increments away; in the second it is one. Grace forgives exactly ONE
+--- missed day (lastDay is the day before yesterday), once a week; any longer
+--- lapse restarts at 1 today. The multiplier is 1 + 0.1 x (days - 1), capped
+--- at 1.5, applied to daily-goal coins only.
+function Progression.streakOutlook(streak: any, today: string, yesterday: string, dayBefore: string, week: string): (number, number)
 	local count = (streak and streak.count) or 0
 	local lastDay = (streak and streak.lastDay) or ""
 	local daysAfterToday
 	if lastDay == today then
 		daysAfterToday = math.max(1, count)
-	elseif lastDay == yesterday or (lastDay ~= "" and (streak.graceUsedWeek or "") ~= week) then
+	elseif lastDay == yesterday or (lastDay == dayBefore and (streak.graceUsedWeek or "") ~= week) then
 		daysAfterToday = count + 1
 	else
 		daysAfterToday = 1
@@ -431,6 +432,7 @@ function Progression:push(player: any)
 		profile.streak,
 		dayKey(),
 		os.date("!%Y-%m-%d", os.time() - 86400) :: string,
+		os.date("!%Y-%m-%d", os.time() - 2 * 86400) :: string,
 		weekKey()
 	)
 	self.remotes.Progress:FireClient(player, {
@@ -590,13 +592,17 @@ function Progression:awardRound(crew: any, results: any, tutorial: boolean?)
 		-- a day-2 player got 1.0x, day 3 got 1.1x, and the join card's "play
 		-- tomorrow for +10%" was a promise the server broke on the very round
 		-- it was made about. The day you come back is the day that pays.
-		-- (Grace token: one missed day per week forgiven.)
+		-- Grace forgives exactly ONE missed day, once a week. It used to
+		-- forgive any lapse -- a player back after a month kept a stale
+		-- 6-day streak and its multiplier -- because the test was only "has a
+		-- lastDay and has not used grace this week".
 		local streak = profile.streak
 		if streak.lastDay ~= today then
 			local yesterday = os.date("!%Y-%m-%d", os.time() - 86400) :: string
+			local dayBefore = os.date("!%Y-%m-%d", os.time() - 2 * 86400) :: string
 			if streak.lastDay == yesterday then
 				streak.count += 1
-			elseif streak.lastDay ~= "" and streak.graceUsedWeek ~= weekKey() then
+			elseif streak.lastDay == dayBefore and streak.graceUsedWeek ~= weekKey() then
 				streak.graceUsedWeek = weekKey()
 				streak.count += 1
 			else

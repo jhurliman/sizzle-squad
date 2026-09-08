@@ -128,15 +128,20 @@ function KitchenCard.new(gui: Instance, deps: any)
 	-- No "please like the game" line. There is no in-experience like API, so
 	-- that would be a nag pointing at a menu the player has to leave to find;
 	-- a game earns likes by being worth one.
+	-- Two lines of room and scaled text: the French and Portuguese sentences
+	-- run ~1.4x the English, and a fixed 22px line clipped them.
 	self.streakLine = Theme.label({
-		Size = UDim2.new(1, -32, 0, 22),
-		Position = UDim2.fromOffset(16, 216),
+		Size = UDim2.new(1, -32, 0, 44),
+		Position = UDim2.fromOffset(16, 204),
 		TextSize = 15,
 		TextColor3 = Theme.GOLD,
 		TextXAlignment = Enum.TextXAlignment.Center,
+		TextWrapped = true,
+		TextScaled = true,
 		ZIndex = 8,
 		Text = "",
 	}, self.card)
+	mk("UITextSizeConstraint", { MinTextSize = 12, MaxTextSize = 15 }, self.streakLine)
 
 	local row = mk("Frame", {
 		Size = UDim2.new(1, -32, 0, Theme.MIN_TAP),
