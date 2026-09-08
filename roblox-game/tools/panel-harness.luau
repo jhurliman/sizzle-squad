@@ -773,6 +773,21 @@ do
 	local need = math.floor(utf8.len(longest) * 16 * 0.55)
 	local have = 420 + done.title.Size.X.Offset
 	check(need <= have, `the German greeting with a cut max-length name fits at 16px ({need} <= {have})`)
+	-- On a 568x320 phone relayout scales the whole card to ~0.735, which
+	-- scales the text with it. The floors must hold on SCREEN: min size x
+	-- card scale >= 12 for both scaled labels, and the German greeting must
+	-- still fit at the raised floor.
+	done:relayout(nil, Vector2.new(568, 320))
+	local scale = done.cardScale.Scale
+	local streakCst = done.streakLine:FindFirstChildWhichIsA("UITextSizeConstraint")
+	check(scale < 0.8, `a 568x320 phone scales the card down ({string.format("%.3f", scale)})`)
+	check(streakCst.MinTextSize * scale >= 12, `the streak line still renders at >= 12px there ({streakCst.MinTextSize} x {string.format("%.3f", scale)} = {string.format("%.1f", streakCst.MinTextSize * scale)})`)
+	check(streakCst.MaxTextSize >= streakCst.MinTextSize, `and its constraint stays ordered ({streakCst.MinTextSize}..{streakCst.MaxTextSize})`)
+	check(cst.MinTextSize * scale >= 12, `the title renders at >= 12px there ({cst.MinTextSize} x {string.format("%.3f", scale)} = {string.format("%.1f", cst.MinTextSize * scale)})`)
+	local needRaised = math.floor(utf8.len(longest) * cst.MinTextSize * 0.55)
+	check(needRaised <= have, `and the German greeting fits at the raised floor ({needRaised} <= {have})`)
+	done:relayout(nil, Vector2.new(1024, 768))
+	check(done.cardScale.Scale == 1 and streakCst.MinTextSize == 12 and cst.MinTextSize == 16, "a big screen gets the floors back to 12 / 16")
 	-- Players is captured at module load, so a long-named player needs the
 	-- module loaded against an environment that says so.
 	local wideEnv = table.clone(cardEnv)

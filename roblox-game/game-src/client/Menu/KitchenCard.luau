@@ -91,7 +91,7 @@ function KitchenCard.new(gui: Instance, deps: any)
 		ZIndex = 8,
 		Text = "Welcome back, chef",
 	}, self.card)
-	mk("UITextSizeConstraint", { MinTextSize = 16, MaxTextSize = 24 }, self.title)
+	self.titleFit = mk("UITextSizeConstraint", { MinTextSize = 16, MaxTextSize = 24 }, self.title)
 
 	self.subtitle = Theme.label({
 		Size = UDim2.new(1, -24, 0, 22),
@@ -164,7 +164,7 @@ function KitchenCard.new(gui: Instance, deps: any)
 		ZIndex = 8,
 		Text = "",
 	}, self.card)
-	mk("UITextSizeConstraint", { MinTextSize = 12, MaxTextSize = 15 }, self.streakLine)
+	self.streakFit = mk("UITextSizeConstraint", { MinTextSize = 12, MaxTextSize = 15 }, self.streakLine)
 
 	local row = mk("Frame", {
 		Size = UDim2.new(1, -32, 0, Theme.MIN_TAP),
@@ -415,7 +415,16 @@ function KitchenCard:relayout(_L: any, viewport: Vector2)
 		self.cardScale = Theme.mk("UIScale", { Scale = 1 }, self.card)
 	end
 	local fit = math.min(1, (viewport.X - 32) / CARD_W, (viewport.Y - 32) / CARD_H)
-	self.cardScale.Scale = math.clamp(fit, 0.62, 1)
+	local scale = math.clamp(fit, 0.62, 1)
+	self.cardScale.Scale = scale
+	-- UIScale multiplies rendered text too: a 12px floor on the label is
+	-- 8.8px on a 320-tall phone (scale 0.735). The scaled labels' floors are
+	-- raised by the inverse, so the size that reaches the screen is never
+	-- under 12px; the ceiling follows so the pair stays ordered.
+	local floor = math.ceil(12 / scale)
+	self.streakFit.MinTextSize = floor
+	self.streakFit.MaxTextSize = math.max(15, floor)
+	self.titleFit.MinTextSize = math.max(16, floor)
 end
 
 return KitchenCard
