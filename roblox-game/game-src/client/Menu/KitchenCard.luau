@@ -24,6 +24,21 @@ local mk = Theme.mk
 
 local AUTO_DISMISS = 12
 
+-- A NAME IN A TITLE IS SHOWN, NOT SPELLED. Twenty characters is a legal
+-- display name, and "Starke erste Schicht, Xx_SuperDuperChef_xX!" does not
+-- fit a 354px title at the 16px floor. Past this many characters the name is
+-- cut with an ellipsis, by codepoint so a kanji counts as one.
+local NAME_MAX = 14
+
+local function compactName(name: string): string
+	local ok, n = pcall(utf8.len, name)
+	if not ok or n == nil or n <= NAME_MAX then
+		return name
+	end
+	local cut = utf8.offset(name, NAME_MAX)
+	return string.sub(name, 1, cut - 1) .. "…"
+end
+
 function KitchenCard.new(gui: Instance, deps: any)
 	local self = setmetatable({}, KitchenCard)
 	self.deps = deps
@@ -60,15 +75,23 @@ function KitchenCard.new(gui: Instance, deps: any)
 	}, gui)
 	Theme.stroke(self.card, Theme.GOLD, 2)
 
+	-- The title carries a display name -- up to twenty characters, in the
+	-- longest of seven languages -- so it stops short of the close button
+	-- and scales down (never below 16px) rather than running under it or
+	-- off a phone's edge. relayout scales the whole card, which does not
+	-- change how much text fits inside it.
 	self.title = Theme.label({
-		Size = UDim2.new(1, -24, 0, 34),
+		Size = UDim2.new(1, -16 - 50, 0, 34),
 		Position = UDim2.fromOffset(16, 14),
 		TextSize = 24,
 		Font = Theme.TITLE_FONT,
 		TextColor3 = Theme.GOLD,
+		TextScaled = true,
+		TextWrapped = false,
 		ZIndex = 8,
 		Text = "Welcome back, chef",
 	}, self.card)
+	mk("UITextSizeConstraint", { MinTextSize = 16, MaxTextSize = 24 }, self.title)
 
 	self.subtitle = Theme.label({
 		Size = UDim2.new(1, -24, 0, 22),
@@ -285,9 +308,8 @@ function KitchenCard:setProgress(progress: any)
 	-- "welcome back" is a lie the first time. One round, one session, and
 	-- the tutorial done is exactly that player.
 	local fresh = (progress.rounds or 0) == 1 and (progress.sessions or 1) <= 1 and progress.tutorialDone == true
-	self.title.Text = if fresh
-		then Loc.f("fmt.first_shift_done", player.DisplayName)
-		else Loc.f("fmt.welcome_named", player.DisplayName)
+	local name = compactName(player.DisplayName)
+	self.title.Text = if fresh then Loc.f("fmt.first_shift_done", name) else Loc.f("fmt.welcome_named", name)
 	-- Tomorrow's bonus comes projected from the server (Progression
 	-- .streakOutlook): only it knows whether today's shift has moved the
 	-- streak yet, and the multiplier is its arithmetic, not ours.

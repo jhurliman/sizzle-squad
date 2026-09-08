@@ -756,6 +756,35 @@ done:setProgress({ level = 2, coins = 160, rounds = 1, sessions = 1, tutorialDon
 check(done.card.Visible == true, "a First Shift completer arriving in a real kitchen gets the card")
 check(done.title.Text == "fmt.first_shift_done:Me", `and it congratulates the first shift, not \"welcome back\" ({done.title.Text})`)
 check(done.streakLine.Text == "fmt.streak_tomorrow:1,10", `day 1: tomorrow pays +10% ({done.streakLine.Text})`)
+-- The title holds a 20-character name in the longest locale without running
+-- under the close button: it stops 50px short of the right edge, scales down
+-- to 16px, and never wraps into the subtitle.
+do
+	local cst = done.title:FindFirstChildWhichIsA("UITextSizeConstraint")
+	check(done.title.TextScaled == true and cst ~= nil and cst.MinTextSize >= 16, "the title scales, but never below 16px")
+	check(done.title.TextWrapped == false, "and stays one line")
+	check(done.title.Size.X.Offset <= -(16 + 34 + 8), `and stops short of the close button (right inset {-done.title.Size.X.Offset}px)`)
+	-- Width the longest shipping string needs at the floor size, ~0.55em per
+	-- Latin character in the title face: it must fit the label's width on
+	-- the 420px card.
+	-- A max-length name is cut to 14 characters first (compactName), so the
+	-- longest string the title can hold is the German greeting plus that.
+	local longest = "Starke erste Schicht, Xx_SuperDuper…!"
+	local need = math.floor(utf8.len(longest) * 16 * 0.55)
+	local have = 420 + done.title.Size.X.Offset
+	check(need <= have, `the German greeting with a cut max-length name fits at 16px ({need} <= {have})`)
+	-- Players is captured at module load, so a long-named player needs the
+	-- module loaded against an environment that says so.
+	local wideEnv = table.clone(cardEnv)
+	wideEnv.game = { GetService = function(_, n)
+		return { LocalPlayer = { UserId = 7, DisplayName = "Xx_SuperDuperChef_xX", Name = "x" } }
+	end }
+	local WideCard = luau.load(luau.compile(fs.readFile("game-src/client/Menu/KitchenCard.luau")), { environment = wideEnv })()
+	local wide = WideCard.new(newInstance("ScreenGui"), { onReady = function() end, onOpenTab = function() end, onJoinFriend = function() end })
+	wide:setPhase({ phase = "intermission" })
+	wide:setProgress({ level = 2, coins = 0, rounds = 1, sessions = 1, tutorialDone = true, streak = 1, streakDays = 1, streakTomorrowPct = 10, xp = 0, xpToNext = 150, dailies = {} })
+	check(wide.title.Text == "fmt.first_shift_done:Xx_SuperDuper…", `a 20-character name is cut to 14 with an ellipsis ({wide.title.Text})`)
+end
 
 -- A returning player on a 3-day streak.
 local back = card()
